@@ -1,0 +1,34 @@
+/* Searchbar.css */
+
+.searchbar-form {
+    width: 100%;
+    margin: 0;
+  }
+  
+  .searchbar-form .input-group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  
+  .searchbar-form .dropdown-toggle,
+  .searchbar-form .btn {
+    min-width: 120px;
+  }
+  
+  .searchbar-form .form-control {
+    min-width: 200px;
+  }
+  
+  @media (max-width: 768px) {
+    .searchbar-form .input-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  
+    .searchbar-form .input-group > * {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+  }
+  
