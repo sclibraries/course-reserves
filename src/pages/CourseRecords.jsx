@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import useRecordStore from "../store/recordStore";
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -18,11 +17,18 @@ import {
   AccordionHeader,
   AccordionItem,
 } from 'reactstrap';
-import '../CourseRecords.css';
+import useRecordStore from '../store/recordStore';
+import useCustomizationStore from '../store/customizationStore';
+import { useCurrentCollege } from '../hooks/useCustomization';
 
 function CourseRecords() {
   const location = useLocation();
   const navigate = useNavigate();
+  const currentCollege = useCurrentCollege(); // Set the active college
+
+  const searchParams = new URLSearchParams(location.search);
+  const collegeParam = searchParams.get('college');
+
   const { record, setRecord } = useRecordStore();
   const [records, setRecords] = useState([]);
   const [course, setCourse] = useState([]);
@@ -31,19 +37,21 @@ function CourseRecords() {
   const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState({});
   const [openAccordions, setOpenAccordions] = useState({});
+  const [customization, setCustomization] = useState(
+    useCustomizationStore.getState().getCustomization()
+  );
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    if (searchParams.get('courseListingId')) {
-      setRecord(searchParams.get('courseListingId'));
+    const param = searchParams.get('courseListingId');
+    if (param && param !== record) {
+      setRecord(param);
     }
-  }, [location.search, setRecord]);
+  }, [location.search, record, setRecord, searchParams]);
 
   useEffect(() => {
     if (record) {
       fetchAllData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record]);
 
   useEffect(() => {
@@ -103,7 +111,9 @@ function CourseRecords() {
 
   const fetchItemAvailability = async (instanceId) => {
     try {
-      const response = await fetch(`https://libtools2.smith.edu/folio/web/search/search-rtac?id=${instanceId}`);
+      const response = await fetch(
+        `https://libtools2.smith.edu/folio/web/search/search-rtac?id=${instanceId}`
+      );
       const results = await response.json();
       let { holding } = results.data;
 
@@ -126,7 +136,6 @@ function CourseRecords() {
     records.forEach((item) => fetchItemAvailability(item.copiedItem.instanceId));
   }, [records]);
 
-  // Initialize open accordions with Reserves open for each item
   useEffect(() => {
     const initialOpenAccordions = {};
     records.forEach((recordItem) => {
@@ -141,7 +150,9 @@ function CourseRecords() {
       const isOpen = prevState[instanceId]?.includes(accordionId);
       let newOpenAccordions;
       if (isOpen) {
-        newOpenAccordions = prevState[instanceId].filter((id) => id !== accordionId);
+        newOpenAccordions = prevState[instanceId].filter(
+          (id) => id !== accordionId
+        );
       } else {
         newOpenAccordions = [...(prevState[instanceId] || []), accordionId];
       }
@@ -152,31 +163,81 @@ function CourseRecords() {
     });
   };
 
-  let iframeSrc = null;
-  if (springShare && springShare.length > 0) {
-    const springshareCourseId = springShare[0].course_identifier;
-    iframeSrc = `https://lgapi-us.libapps.com/widget_er.php?site_id=356&widget_type=10&output_format=2&widget_title=&widget_embed_type=1&course_id=${springshareCourseId}&enable_navigation=1&config_id=1732569319927`;
-  }
-
   const courseInfo = course && course.length > 0 ? course[0] : null;
-  const courseUrl = springShare && springShare.length > 0 ? springShare[0].course_url : null;
+  const courseUrl = springShare && springShare.length > 0
+    ? springShare[0].course_url
+    : null;
+
+    useEffect(() => {
+      if (availability && Object.keys(availability).length > 0 && !collegeParam) {
+        // Iterate through availability data to find the first reserve location
+        let reserveLocation = null;
+        for (const instanceId in availability) {
+          const holdings = availability[instanceId]?.holdings || [];
+          const firstReserveHolding = holdings.find((holding) =>
+            holding.location && holding.location.includes('Reserve')
+          );
+          if (firstReserveHolding) {
+            reserveLocation = firstReserveHolding.location;
+            break; // Stop searching after finding the first reserve location
+          }
+        }
+    
+        // Get customization based on reserve location or default
+        const newCustomization = useCustomizationStore.getState().getCustomizationByReserve(reserveLocation);
+        setCustomization(newCustomization);
+      } else if (collegeParam) {
+        // If college param is present, use it for customization
+        const newCustomization = useCustomizationStore.getState().getCustomization();
+        setCustomization(newCustomization);
+      }
+    }, [availability, collegeParam]);
+
+  // Pull the new custom fields from the store
+  const {
+    recordsCardTitleTextColor = customization.cardTextColor,
+    recordsCardTextColor = customization.cardTextColor,
+    recordsDiscoverLinkText = 'View in Discover Advanced',
+    recordsDiscoverLinkBgColor = customization.buttonSecondaryColor,
+    recordsDiscoverLinkBaseUrl = customization.discoverLinkBaseUrl,
+    accordionHeaderBgColor = customization.buttonPrimaryColor,
+    accordionHeaderTextColor = customization.cardTextColor,
+    moodleLink = customization.moodleLink,
+  } = customization;
 
   return (
     <div className="container mt-4">
-      {/* Back icon and heading */}
       {courseInfo && (
-      <div className="mb-3 d-flex align-items-center">
-        <Button color="link" className="p-0 me-2" onClick={() => navigate(-1)}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-arrow-left-circle" viewBox="0 0 16 16">
-            <path fillRule="evenodd" d="M8 15A7 7 0 1 1 8 .999a7 7 0 0 1 0 14.002ZM8 1.999A6 6 0 1 0 8 13.999a6 6 0 0 0 0-11.998Zm.146 3.646a.5.5 0 0 1 .708.708L6.707 7.5H12.5a.5.5 0 1 1 0 1H6.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3Z"/>
-          </svg>
-        </Button>
-        <h1 className="h4 mb-0">Back to results</h1>
-      </div>
-    )}
+        <div className="mb-3 d-flex align-items-center">
+          <Button
+            color="link"
+            className="p-0 me-2"
+            onClick={() => navigate(-1)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              fill="currentColor"
+              className="bi bi-arrow-left-circle"
+              viewBox="0 0 16 16"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8 15A7 7 0 1 1 8 .999a7 7 0 0 1 0 14.002ZM8 1.999A6 6 0 1 0 8 13.999a6 6 0 0 0 0-11.998Zm.146 3.646a.5.5 0 0 1 .708.708L6.707 
+                  7.5H12.5a.5.5 0 1 1 0 
+                  1H6.707l2.147 2.146a.5.5 0 0 
+                  1-.708.708l-3-3a.5.5 0 0 
+                  1 0-.708l3-3Z"
+              />
+            </svg>
+          </Button>
+          <h1 className="h4 mb-0">Back to results</h1>
+        </div>
+      )}
 
       {courseInfo && (
-        <div className="course-info mb-4 container-fluid py-5">
+        <div className="course-info mb-4 container-fluid py-2">
           <h2 className="display-5 fw-bold">
             {courseInfo.courseNumber}: {courseInfo.name}
           </h2>
@@ -192,15 +253,43 @@ function CourseRecords() {
         </div>
       )}
 
-      {/* Navigation buttons for mobile */}
-      <div className="mb-3 d-md-none">
-        <Button color="primary" href="#print-resources" className="me-2">
-          Go to Print Resources
-        </Button>
-        <Button color="primary" href="#electronic-resources">
-          Go to Electronic Resources
-        </Button>
-      </div>
+      {courseUrl && (
+        <Alert color="info">
+          <h4>Electronic Reserves</h4>
+          <p>
+            PDFs of articles, E-Books, and other course readings are available
+            through the
+            <a href={courseUrl} target="_blank" rel="noopener noreferrer">
+              {' '}
+              {courseInfo.courseNumber}: {courseInfo.name}{' '}
+            </a>
+            course page or directly in your{' '}
+            <a href={moodleLink} target="_blank" rel="noopener noreferrer">
+              Moodle
+            </a>
+            course.
+          </p>
+          <p>
+            To comply with copyright law, materials are only accessible to
+            enrolled students for the duration of the course. Please log in with
+            your institutional credentials if prompted.
+          </p>
+          <p>
+            The U.S. Copyright Act (Title 17, U.S. Code) governs photocopying
+            and other reproductions of copyrighted materials. “Fair use”
+            generally limits use of these materials to private study,
+            scholarship, or research.{' '}
+            <a
+              href="https://www.copyright.gov/fair-use/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Learn more about copyright and fair use
+            </a>
+            .
+          </p>
+        </Alert>
+      )}
 
       {isLoading ? (
         <div className="text-center">
@@ -209,225 +298,203 @@ function CourseRecords() {
         </div>
       ) : error ? (
         <Alert color="danger">{error}</Alert>
-      ) : (records && records.length > 0) || iframeSrc ? (
+      ) : records && records.length > 0 ? (
         <Row className="g-4" style={{ alignItems: 'stretch' }}>
-          {/* Left column: Print resources */}
-          <Col
-            xs="12"
-            md="6"
-            className="d-flex flex-column"
-            style={{
-              maxHeight: '80vh',
-            }}
-          >
-            <h2 id="print-resources">Print Resources</h2>
-            <div
-              style={
-                iframeSrc
-                  ? { flex: 1, overflowY: 'auto' }
-                  : { flex: 1 }
-              }
-            >
-              {records && records.length > 0 ? (
-                records.map((recordItem) => {
-                  const { id, copiedItem } = recordItem;
-                  const {
-                    instanceId,
-                    title,
-                    contributors,
-                    publication,
-                    callNumber,
-                  } = copiedItem;
+          <Col xs="12">
+            <h2 id="print-resources">Print Reserves</h2>
+            {records.map((recordItem) => {
+              const { id, copiedItem } = recordItem;
+              const {
+                instanceId,
+                title,
+                contributors,
+                publication,
+                callNumber,
+              } = copiedItem;
 
-                  // Get availability data for this item
-                  const edsLink = instanceId.replace(/-/g, '.');
-                  const availabilityData = availability[instanceId];
-                  const holdings =
-                    availabilityData && availabilityData.holdings
-                      ? availabilityData.holdings
-                      : [];
+              const edsLink = instanceId.replace(/-/g, '.');
+              const finalDiscoverUrl = `${recordsDiscoverLinkBaseUrl}${edsLink}`;
+              const availabilityData = availability[instanceId];
+              const holdings = availabilityData?.holdings || [];
 
-                  // Separate reserves and other holdings
-                  const reserves = holdings.filter((h) =>
-                    h.location.includes('Reserve')
-                  );
-                  const otherHoldings = holdings.filter(
-                    (h) => !h.location.includes('Reserve')
-                  );
+              const reserves = holdings.filter((h) =>
+                h.location.includes('Reserve')
+              );
+              const otherHoldings = holdings.filter(
+                (h) => !h.location.includes('Reserve')
+              );
 
-                  return (
-                    <Card
-                      key={id}
-                      className="mb-4 flex-grow-0 shadow-sm p-3 mb-5 bg-body-tertiary rounded"
+              return (
+                <Card
+                  key={id}
+                  className="mb-4 flex-grow-0 shadow-sm p-3 mb-5 bg-body-tertiary rounded"
+                >
+                  <CardBody>
+                    <CardTitle
+                      tag="h5"
+                      style={{ color: recordsCardTitleTextColor }}
                     >
-                      <CardBody>
-                        <CardTitle tag="h5">{title}</CardTitle>
-                        {/* Authors */}
-                        {contributors && contributors.length > 0 && (
-                          <CardText>
-                            <strong>Authors:</strong>{' '}
-                            {contributors.map((contributor) => contributor.name).join(', ')}
-                          </CardText>
+                      {title}
+                    </CardTitle>
+                    {contributors && contributors.length > 0 && (
+                      <CardText style={{ color: recordsCardTextColor }}>
+                        <strong>Authors:</strong>{' '}
+                        {contributors
+                          .map((contributor) => contributor.name)
+                          .join(', ')}
+                      </CardText>
+                    )}
+                    {callNumber && (
+                      <CardText style={{ color: recordsCardTextColor }}>
+                        <strong>Call Number:</strong> {callNumber}
+                      </CardText>
+                    )}
+                    {publication && publication.length > 0 && (
+                      <CardText style={{ color: recordsCardTextColor }}>
+                        <strong>Publication:</strong>{' '}
+                        {publication
+                          .map((pub) => {
+                            let parts = [];
+                            if (pub.publisher) parts.push(pub.publisher);
+                            if (pub.place) parts.push(pub.place);
+                            if (pub.dateOfPublication)
+                              parts.push(pub.dateOfPublication);
+                            return parts.join('; ');
+                          })
+                          .join(' / ')}
+                      </CardText>
+                    )}
+                    <div className="mb-3">
+                      <a
+                        className="btn justify-content-center"
+                        style={{
+                          backgroundColor: recordsDiscoverLinkBgColor,
+                          color: '#fff',
+                        }}
+                        href={finalDiscoverUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {recordsDiscoverLinkText}{' '}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          fill="currentColor"
+                          className="bi bi-box-arrow-up-right"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M8.636 3.5a.5.5 0 0 
+                              0-.5-.5H1.5A1.5 1.5 0 0 
+                              0 0 4.5v10A1.5 1.5 0 0 
+                              0 1.5 16h10a1.5 1.5 0 0 
+                              0 1.5-1.5V7.864a.5.5 0 0 
+                              0-1 0V14.5a.5.5 0 0 
+                              1-.5.5h-10a.5.5 0 0 
+                              1-.5-.5v-10a.5.5 0 0 
+                              1 .5-.5h6.636a.5.5 0 0 
+                              0 .5-.5ZM16 .5a.5.5 0 0 
+                              0-.5-.5h-5a.5.5 0 0 0 0 
+                              1h3.793L6.146 9.146a.5.5 0 1 0 
+                              .708.708L15 1.707V5.5a.5.5 0 0 
+                              0 1 0V.5Z"
+                          />
+                        </svg>
+                      </a>
+                    </div>
+                    {holdings.length > 0 ? (
+                      <Accordion
+                        flush
+                        open={openAccordions[instanceId]}
+                        toggle={(id) => toggleAccordion(instanceId, id)}
+                      >
+                        {reserves.length > 0 && (
+                          <AccordionItem>
+                            <AccordionHeader
+                              targetId={`reserves-${instanceId}`}
+                              style={{
+                                backgroundColor: accordionHeaderBgColor,
+                                color: accordionHeaderTextColor,
+                              }}
+                            >
+                              Reserves
+                            </AccordionHeader>
+                            <AccordionBody
+                              accordionId={`reserves-${instanceId}`}
+                            >
+                              <ListGroup className="mb-3">
+                                {reserves.map((holding) => (
+                                  <ListGroupItem key={holding.id}>
+                                    <p>
+                                      <strong>Location:</strong>{' '}
+                                      {holding.location}
+                                    </p>
+                                    <p>
+                                      <strong>Status:</strong> {holding.status}
+                                    </p>
+                                    <p>
+                                      <strong>Temporary Loan Type:</strong>{' '}
+                                      {holding.temporaryLoanType}
+                                    </p>
+                                    <p>
+                                      <strong>Library:</strong>{' '}
+                                      {holding.library.name}
+                                    </p>
+                                  </ListGroupItem>
+                                ))}
+                              </ListGroup>
+                            </AccordionBody>
+                          </AccordionItem>
                         )}
-                        {/* Call Number */}
-                        {callNumber && (
-                          <CardText>
-                            <strong>Call Number:</strong> {callNumber}
-                          </CardText>
+                        {otherHoldings.length > 0 && (
+                          <AccordionItem>
+                            <AccordionHeader
+                              targetId={`holdings-${instanceId}`}
+                              style={{
+                                backgroundColor: accordionHeaderBgColor,
+                                color: accordionHeaderTextColor,
+                              }}
+                            >
+                              Other Holdings
+                            </AccordionHeader>
+                            <AccordionBody
+                              accordionId={`holdings-${instanceId}`}
+                            >
+                              <ListGroup>
+                                {otherHoldings.map((holding) => (
+                                  <ListGroupItem key={holding.id}>
+                                    <p>
+                                      <strong>Location:</strong>{' '}
+                                      {holding.location}
+                                    </p>
+                                    <p>
+                                      <strong>Status:</strong> {holding.status}
+                                    </p>
+                                    <p>
+                                      <strong>Permanent Loan Type:</strong>{' '}
+                                      {holding.permanentLoanType}
+                                    </p>
+                                    <p>
+                                      <strong>Library:</strong>{' '}
+                                      {holding.library.name}
+                                    </p>
+                                  </ListGroupItem>
+                                ))}
+                              </ListGroup>
+                            </AccordionBody>
+                          </AccordionItem>
                         )}
-                        {/* Publication Info */}
-                        {publication && publication.length > 0 && (
-                          <CardText>
-                            <strong>Publication:</strong>{' '}
-                            {publication
-                              .map((pub) => {
-                                let parts = [];
-                                if (pub.publisher) parts.push(pub.publisher);
-                                if (pub.place) parts.push(pub.place);
-                                if (pub.dateOfPublication) parts.push(pub.dateOfPublication);
-                                return parts.join('; ');
-                              })
-                              .join(' / ')}
-                          </CardText>
-                        )}
-                          <div className="mb-3">
-                          <a className="btn btn-dark  justify-content-center" href={`https://openurl.ebsco.com/c/4e4lys/openurl?sid=ebsco:plink&id=ebsco:cat09206a:scf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.${edsLink}`} target="_blank" rel="noopener noreferrer">
-                            View in Discovery Advanced{' '} 
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" 
-                                className="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
-                                <path fillRule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 
-                                1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 
-                                0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 
-                                1-.5-.5v-10a.5.5 0 0 
-                                1 .5-.5h6.636a.5.5 0 0 
-                                0 .5-.5"/>
-                                <path fillRule="evenodd" d="M16 .5a.5.5 0 0 
-                                0-.5-.5h-5a.5.5 0 0 0 0 
-                                1h3.793L6.146 9.146a.5.5 0 1 0 
-                                .708.708L15 1.707V5.5a.5.5 0 0 
-                                0 1 0z"/>
-                            </svg>
-                          </a>
-                          </div>
-                        {/* Accordion for Availability Info */}
-                        {holdings && holdings.length > 0 ? (
-                          <Accordion
-                            flush
-                            open={openAccordions[instanceId]}
-                            toggle={(id) => toggleAccordion(instanceId, id)}
-                          >
-                            {reserves.length > 0 && (
-                              <AccordionItem>
-                                <AccordionHeader targetId={`reserves-${instanceId}`}>
-                                  Reserves
-                                </AccordionHeader>
-                                <AccordionBody accordionId={`reserves-${instanceId}`}>
-                                  <ListGroup className="mb-3">
-                                    {reserves.map((holding) => (
-                                      <ListGroupItem key={holding.id}>
-                                        <p>
-                                          <strong>Location:</strong> {holding.location}
-                                        </p>
-                                        <p>
-                                          <strong>Status:</strong> {holding.status}
-                                        </p>
-                                        <p>
-                                          <strong>Temporary Loan Type:</strong>{' '}
-                                          {holding.temporaryLoanType}
-                                        </p>
-                                        <p>
-                                          <strong>Library:</strong> {holding.library.name}
-                                        </p>
-                                      </ListGroupItem>
-                                    ))}
-                                  </ListGroup>
-                                </AccordionBody>
-                              </AccordionItem>
-                            )}
-                            {otherHoldings.length > 0 && (
-                              <AccordionItem>
-                                <AccordionHeader targetId={`holdings-${instanceId}`}>
-                                  Other Holdings
-                                </AccordionHeader>
-                                <AccordionBody accordionId={`holdings-${instanceId}`}>
-                                  <ListGroup>
-                                    {otherHoldings.map((holding) => (
-                                      <ListGroupItem key={holding.id}>
-                                        <p>
-                                          <strong>Location:</strong> {holding.location}
-                                        </p>
-                                        <p>
-                                          <strong>Status:</strong> {holding.status}
-                                        </p>
-                                        <p>
-                                          <strong>Permanent Loan Type:</strong>{' '}
-                                          {holding.permanentLoanType}
-                                        </p>
-                                        <p>
-                                          <strong>Library:</strong> {holding.library.name}
-                                        </p>
-                                      </ListGroupItem>
-                                    ))}
-                                  </ListGroup>
-                                </AccordionBody>
-                              </AccordionItem>
-                            )}
-                          </Accordion>
-                        ) : (
-                          <p>Loading availability...</p>
-                        )}
-                      </CardBody>
-                    </Card>
-                  );
-                })
-              ) : (
-                <p>No print resources found.</p>
-              )}
-            </div>
+                      </Accordion>
+                    ) : (
+                      <p>Loading availability...</p>
+                    )}
+                  </CardBody>
+                </Card>
+              );
+            })}
           </Col>
-          {/* Right column: Electronic resources */}
-          { iframeSrc && (
-            <Col
-              xs="12"
-              md="6"
-              className="d-flex flex-column"
-              style={{
-                maxHeight: '80vh',
-              }}
-            >
-              <h2 id="electronic-resources">Electronic Resources{'   '}
-                <a title="Open in new window" target="_blank" rel="noopener noreferrer" href={`${courseUrl}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" 
-                    className="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
-                    <path fillRule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 
-                      1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 
-                      0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 
-                      1-.5-.5v-10a.5.5 0 0 
-                      1 .5-.5h6.636a.5.5 0 0 
-                      0 .5-.5"/>
-                    <path fillRule="evenodd" d="M16 .5a.5.5 0 0 
-                      0-.5-.5h-5a.5.5 0 0 0 0 
-                      1h3.793L6.146 9.146a.5.5 0 1 0 
-                      .708.708L15 1.707V5.5a.5.5 0 0 
-                      0 1 0z"/>
-                  </svg>
-                </a>
-              </h2>
-              {iframeSrc ? (
-                <div className="iframe-responsive">
-                  <iframe
-                    title="Electronic Resources"
-                    src={iframeSrc}
-                    frameBorder="0"
-                    scrolling="yes"
-                    className="iframe"
-                  ></iframe>
-                </div>
-              ) : (
-                <p>No electronic resources found.</p>
-              )}
-            </Col>
-          )}
         </Row>
       ) : (
         <p>No records found.</p>

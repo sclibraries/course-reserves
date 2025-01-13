@@ -21,4 +21,9 @@ header .navbar {
       margin-top: 10px;
     }
   }
+
+  .college-logo {
+    height: 50px; 
+    width: auto;
+  }
   

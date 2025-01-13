@@ -45,4 +45,8 @@
   .course-info h2 {
     margin-bottom: 0.5rem;
   }
+
+  .accordion-button::after {
+    background-color: '#eeeeee';
+  }
   
