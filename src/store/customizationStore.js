@@ -3,6 +3,7 @@ import { create } from 'zustand';
 const useCustomizationStore = create((set, get) => ({
   customizations: {
     hampshire: {
+      campusLocation: "hampshire",
       logoUrl: 'https://www.hampshire.edu/themes/custom/hampshire/images/hampshire-logo.svg',
       altText: 'Hampshire College Logo',
       headerBgColor: '#47494C',
@@ -21,34 +22,35 @@ const useCustomizationStore = create((set, get) => ({
       accordionHeaderBgColor: '#f8f9fa',
       accordionHeaderTextColor: '#000000',
       recordsDiscoverLinkBaseUrl:
-        'https://openurl.ebsco.com/c/4e4lys/openurl?sid=ebsco:plink&id=ebsco:cat09206a:scf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
+        'https://search.ebscohost.com/login.aspx?direct=true&AuthType=ip,guest,sso&db=cat09204a&site=eds-live&scope=site&custid= s8515197&groupid=main&AN=hcfc.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.hampshire.edu',
     },
     mtholyoke: {
-      logoUrl:
-        'https://lits.mtholyoke.edu/themes/contrib/lits_theme/images/logos/MHC-wordmark-logo.png',
-      secondaryText: ' | LTS',
+      campusLocation: 'mtholyoke',
+      logoUrl:'https://www.mtholyoke.edu/themes/custom/holyoke/assets/img/MountHolyoke-logo.svg',
+      secondaryText: ' | LITS',
       altText: 'Mount Holyoke College Logo',
-      headerBgColor: '#154876',
-      searchButtonBgColor: '#2977CC',
-      resetButtonBgColor: '#6c757d',
+      headerBgColor: '#004876',
+      searchButtonBgColor: '#0077CC',
+      resetButtonBgColor: '#6e6259',
       cardBgColor: '#ffffff',
-      cardBorderColor: '#dee2e6',
+      cardBorderColor: '#004876',
       cardTitleTextColor: '#000000',
       cardTitleFontSize: '1.25rem',
-      cardTextColor: '#333333',
-      cardButtonBgColor: '#2977CC',
+      cardTextColor: '#000000',
+      cardButtonBgColor: '#0077CC',
       recordsCardTitleTextColor: '#000000',
-      recordsCardTextColor: '#333333',
-      recordsDiscoverLinkText: 'View in Discover Advanced',
-      recordsDiscoverLinkBgColor: '#2977CC',
-      accordionHeaderBgColor: '#154876',
-      accordionHeaderTextColor: '#000000',
+      recordsCardTextColor: '#000000',
+      recordsDiscoverLinkText: 'View in Discover',
+      recordsDiscoverLinkBgColor: '#004876',
+      accordionHeaderBgColor: '#0077CC',
+      accordionHeaderTextColor: '#ffffff',
       recordsDiscoverLinkBaseUrl:
         'https://search.ebscohost.com/login.aspx?direct=true&AuthType=ip,guest,sso&db=cat09205a&site=eds-live&scope=site&custid=s8884507&groupid=main&AN=mhf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.mtholyoke.edu',
     },
     umass: {
+      campusLocation: 'umass',
       logoUrl:
         'https://www.library.umass.edu/wp-content/uploads/2022/07/UMass_Libraries-256wide-1.png',
       altText: 'UMass Amherst Logo',
@@ -72,10 +74,11 @@ const useCustomizationStore = create((set, get) => ({
       moodleLink: 'https://moodle.umass.edu',
     },
     amherst: {
+      campusLocation: 'amherst',
       logoUrl:
-        'https://www.amherst.edu/system/files/styles/original/private/media/LibraryLogoPurpleNightMed.png',
+        'https://www.amherst.edu/system/files/2025-01/library_logo_white.png',
       altText: 'Amherst College Logo',
-      headerBgColor: '#33204D',
+      headerBgColor: '#311A4D',
       searchButtonBgColor: '#5D3C85',
       resetButtonBgColor: '#6c757d',
       cardBgColor: '#ffffff',
@@ -95,6 +98,7 @@ const useCustomizationStore = create((set, get) => ({
       moodleLink: 'https://moodle.amherst.edu',
     },
     smith: {
+      campusLocation: 'smith',
       logoUrl:
         'https://image-handler.ehost-live.eislz.com/42ece00a-7a45-4339-a39c-10d6e53bd230_1707148879.png',
       altText: 'Smith College Logo',
@@ -103,7 +107,7 @@ const useCustomizationStore = create((set, get) => ({
       resetButtonBgColor: '#6c757d',
       cardBgColor: '#ffffff',
       cardBorderColor: '#dee2e6',
-      cardTitleTextColor: '#388E77',
+      cardTitleTextColor: '#257D62',
       cardTitleFontSize: '1.25rem',
       cardTextColor: '#333333',
       cardButtonBgColor: '#287CB1',

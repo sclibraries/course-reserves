@@ -2,6 +2,7 @@
 .searchbar-container {
   padding: 1rem;
   border-bottom: 1px solid #ccc;
+  width: 100%;
 }
 
 /* Styles for the search toggle button */
@@ -45,5 +46,59 @@
   .searchbar-container .searchbar-expanded,
   .searchbar-container .searchbar-collapsed {
     display: flex; /* Use flexbox for horizontal layout */
+  }
+}
+
+.admin-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar-wrapper {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  width: 300px; /* Adjust width as needed */
+  transition: transform 0.3s ease;
+}
+
+.admin-main-content {
+  margin-left: 300px; /* Same as sidebar width */
+  height: 100vh;
+  overflow-y: auto;
+  transition: margin 0.3s ease;
+}
+
+.admin-sidebar {
+  height: 100%;
+  overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.mobile-toggle {
+  position: absolute;
+  right: -40px;
+  top: 10px;
+  z-index: 1001;
+}
+
+/* Responsive handling */
+@media (max-width: 992px) {
+  .sidebar-wrapper {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar-wrapper.open {
+    transform: translateX(0);
+  }
+
+  .admin-main-content {
+    margin-left: 0;
+  }
+  
+  .admin-sidebar {
+    width: 100vw;
   }
 }

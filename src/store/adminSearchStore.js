@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const useSearchStore = create(
+const useAdminSearchStore = create(
   persist(
     (set) => ({
       // Existing state
@@ -35,7 +35,7 @@ const useSearchStore = create(
           limit: '100',
           department: '',
           sortOption: '',
-          termId: null,
+          termId: '',
         }),
 
       // NEW: fetchTerms action
@@ -47,7 +47,7 @@ const useSearchStore = create(
             throw new Error(`Failed to fetch terms: ${res.statusText}`);
           }
           const json = await res.json();
-          const termItems = json?.response?.data?.terms?.item || [];
+          const termItems = json?.response?.data?.terms || [];
 
           // Optionally, choose a default term ID or leave it null
           // e.g. pick the one that is "active" by date or just the first in the list:
@@ -65,10 +65,10 @@ const useSearchStore = create(
       },
     }),
     {
-      name: 'search-storage', // Name of storage key
+      name: 'admin-search-storage', // Name of storage key
       getStorage: () => sessionStorage,
     }
   )
 );
 
-export default useSearchStore;
+export default useAdminSearchStore;

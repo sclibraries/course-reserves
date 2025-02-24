@@ -9,16 +9,21 @@ import {
   Button,
   Row,
   Col,
+  ButtonGroup,
 } from 'reactstrap';
 import useSearchStore from '../store/searchStore';
 import { useNavigate } from 'react-router-dom';
 import useCustomizationStore from '../store/customizationStore';
 import '../Searchbar.css';
 
+// IMPORTANT: Ensure Font Awesome is loaded in your project,
+// for example by including: import 'font-awesome/css/font-awesome.min.css';
+
 function Searchbar() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false); // State for collapse
 
+  // Destructure search store values and setter functions
   const {
     college,
     type,
@@ -30,21 +35,23 @@ function Searchbar() {
     setQuery,
     setDepartment,
     setSortOption,
+    termId,
+    setTermId,
+    terms,
   } = useSearchStore();
 
-  const {
-    searchButtonBgColor,
-    resetButtonBgColor,
-  } = useCustomizationStore((state) =>
-    state.getCustomizationForCollege(college)
+  // Get custom button colors from the customization store
+  const { searchButtonBgColor, resetButtonBgColor, location } = useCustomizationStore(
+    (state) => state.getCustomizationForCollege(college)
   );
 
-  // Local states for dropdowns
+  // Local states for dropdowns and input field
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
 
+  // Arrays for select options
   const searchAreas = [
     'All fields',
     'Course Name',
@@ -53,11 +60,11 @@ function Searchbar() {
     'Instructor',
   ];
   const colleges = [
-    'All Colleges',
-    'Smith',
-    'Hampshire',
-    'MtHolyoke',
-    'Amherst',
+    'All',
+    'Amherst College',
+    'Hampshire College',
+    'Mount Holyoke College',
+    'Smith College',
     'UMass',
   ];
   const sortingOptions = [
@@ -69,75 +76,84 @@ function Searchbar() {
     { label: 'Section Name (Desc)', value: 'sectionName.descending' },
   ];
 
+  // Sync local state with store whenever these values change
   useEffect(() => {
-    // Sync local state with store
     setSearchArea(keyToSearchArea(type));
     setSearchInput(query || '');
     setSelectedCollege(keyToCollegeName(college));
   }, [type, query, college, department, sortOption]);
 
-  // Fetch departments whenever the selected college changes
+  // Fetch departments when the selected college changes
   useEffect(() => {
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
-    let url =
-      'https://libtools2.smith.edu/folio/web/search/search-departments';
-
+    let url = 'https://libtools2.smith.edu/folio/web/search/search-departments';
     if (queryParam) {
       url += `?query=${encodeURIComponent(queryParam)}`;
     }
     fetch(url)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          // Check for network errors
+          throw new Error('Network response was not ok');
+        }
+        return res.json();
+      })
       .then((data) => {
-        // Adjust parsing based on your actual API response structure.
+        // Ensure the API response structure is as expected
         if (data && data.data && Array.isArray(data.data.departments)) {
           setDepartments(data.data.departments);
         } else {
           setDepartments([]);
         }
       })
-      .catch(() => setDepartments([]));
+      .catch((error) => {
+        console.error('Error fetching departments:', error);
+        setDepartments([]);
+      });
   }, [college]);
 
+  // Handle search button click or "Enter" key press
   const handleSearch = () => {
     const areaKey = searchAreaToKey(searchArea);
     const collegeKey = collegeNameToKey(selectedCollege);
     const sanitizedInput = searchInput.trim();
 
+    // Update the store
     setType(areaKey);
     setCollege(collegeKey);
     setQuery(sanitizedInput);
 
-    // Build URL params
+    // Build URL parameters
     const queryParams = new URLSearchParams();
-    if (collegeKey && collegeKey !== 'all')
-      queryParams.set('college', collegeKey);
+    if (collegeKey && collegeKey !== 'all') queryParams.set('college', collegeKey);
     if (areaKey && areaKey !== 'all') queryParams.set('type', areaKey);
     if (sanitizedInput) queryParams.set('query', sanitizedInput);
-    if (department && department.trim() !== '')
-      queryParams.set('department', department);
-    if (sortOption && sortOption.trim() !== '')
-      queryParams.set('sort', sortOption);
+    if (department && department.trim() !== '') queryParams.set('department', department);
+    if (sortOption && sortOption.trim() !== '') queryParams.set('sort', sortOption);
 
     navigate(`/search?${queryParams.toString()}`);
   };
 
+  // Reset the search inputs and store values
   const handleReset = () => {
-    // Reset the store
+    // Reset store values
     setType('all');
     setQuery('');
     setDepartment('');
     setSortOption('');
 
-    // Reset local states
+    // Reset local state values
     setSearchArea('All fields');
     setSearchInput('');
-    setDepartments([]);
-
-    // Navigate back to the base search page
-    navigate('/search');
+    if (college) {
+      navigate('/search?college=' + college);
+    } else {
+      navigate('/search');
+    }
   };
 
+  // Map display search area to key used in store and URL params
   const searchAreaToKey = (area) => {
     switch (area) {
       case 'All fields':
@@ -155,6 +171,7 @@ function Searchbar() {
     }
   };
 
+  // Map key to display value for search area
   const keyToSearchArea = (key) => {
     switch (key) {
       case 'all':
@@ -172,44 +189,46 @@ function Searchbar() {
     }
   };
 
+  // Convert college name from dropdown to key used in store and API calls
   const collegeNameToKey = (col) => {
     switch (col) {
-      case 'Smith':
+      case 'Smith College':
         return 'smith';
-      case 'Hampshire':
+      case 'Hampshire College':
         return 'hampshire';
-      case 'MtHolyoke':
+      case 'Mount Holyoke College':
         return 'mtholyoke';
-      case 'Amherst':
+      case 'Amherst College':
         return 'amherst';
       case 'UMass':
         return 'umass';
-      case 'All Colleges':
+      case 'All':
       default:
         return 'all';
     }
   };
 
+  // Map key to college display name
   const keyToCollegeName = (key) => {
     switch (key) {
       case 'smith':
-        return 'Smith';
+        return 'Smith College';
       case 'hampshire':
-        return 'Hampshire';
+        return 'Hampshire College';
       case 'mtholyoke':
-        return 'MtHolyoke';
+        return 'Mount Holyoke';
       case 'amherst':
-        return 'Amherst';
+        return 'Amherst College';
       case 'umass':
         return 'UMass';
       case 'all':
       default:
-        return 'All Colleges';
+        return 'All';
     }
   };
 
+  // Get query string prefix for department fetch based on college key
   const getCollegeQuery = (collegeKey) => {
-    // Returns the department query prefix based on selected college
     switch (collegeKey) {
       case 'smith':
         return 'name==sc*';
@@ -222,59 +241,112 @@ function Searchbar() {
       case 'umass':
         return 'name==um*';
       default:
-        return ''; // no query for all colleges (fetch all)
+        return ''; // No query for all colleges (fetch all)
     }
   };
 
+  // Handle term change
+  const handleTermChange = (e) => {
+    if (e.target.value !== termId) {
+      setTermId(e.target.value);
+    }
+  };
+
+  // Toggle the navbar collapse state
   const toggle = () => setIsOpen(!isOpen);
 
   return (
-    <div className="searchbar-container">
+    <div className="searchbar-container" role="search">
       {/* NavbarToggler for the hamburger icon */}
       <NavbarToggler
         onClick={toggle}
         className="searchbar-toggle"
+        aria-label="Toggle search options"
+        aria-expanded={isOpen}
+        aria-controls="search-collapse"
       />
 
       {/* Collapsible content */}
-      <Collapse isOpen={isOpen} className={isOpen ? 'searchbar-expanded' : 'searchbar-collapsed'}>
+      <Collapse 
+          id="search-collapse"
+          isOpen={isOpen} 
+          className={isOpen ? 'searchbar-expanded' : 'searchbar-collapsed'}
+        >
+
         <Form>
           <Row>
-            <Col md={2} className="mb-2">
-              <FormGroup>
-                <Label for="collegeSelect" className="mr-2">
-                  College
-                </Label>
-                <Input
-                  type="select"
-                  name="college"
-                  id="collegeSelect"
-                  value={selectedCollege}
-                  onChange={(e) => {
-                    setSelectedCollege(e.target.value);
-                    setCollege(collegeNameToKey(e.target.value));
-                  }}
-                >
-                  {colleges.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
-                    </option>
-                  ))}
-                </Input>
-              </FormGroup>
+            {/* College Select */}
+            <Col className="mb-2">
+            <FormGroup>
+              <Label for="collegeSelect" className="mr-2" style={{ color: '#212529' }}>
+                College
+              </Label>
+              <Input
+                type="select"
+                name="college"
+                id="collegeSelect"
+                role="combobox"
+                value={selectedCollege}
+                aria-expanded="false"
+                aria-controls="college-options"
+                onChange={(e) => {
+                  const newCollege = e.target.value;
+                  const newCollegeKey = collegeNameToKey(newCollege);
+
+                  // Reset all search parameters when college changes
+                  setSelectedCollege(newCollege);
+                  setCollege(newCollegeKey);
+                  setDepartment('');
+                  setSearchInput('');
+                  setSearchArea('All fields');
+                  setType('all');
+                  setSortOption('');
+
+                  navigate('/search?college=' + newCollegeKey);
+                }}
+                aria-live="polite"
+                aria-describedby="college-reset-warning"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.target.blur(); 
+                  }
+                }}
+              >
+                {colleges.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+              </Input>
+              <small id="college-reset-warning" className="visually-hidden">
+                Changing the college resets all search filters.
+              </small>
+            </FormGroup>
+
             </Col>
-            <Col md={2} className="mb-2">
+
+            {/* Department Select */}
+            <Col className="mb-1">
               <FormGroup>
-                <Label for="departmentSelect" className="mr-2">
+                <Label for="departmentSelect" className="mr-2" style={{ color: '#212529' }}>
                   Department
                 </Label>
                 <Input
                   type="select"
                   name="department"
                   id="departmentSelect"
+                  aria-live="polite"
+                  aria-expanded="false"
+                  aria-controls="department-options"
+                  aria-activedescendant={department ? `dept-${department}` : undefined}
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   disabled={departments.length === 0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.target.blur(); 
+                    }
+                  }}
                 >
                   <option value="">All Departments</option>
                   {departments.map((dept) => (
@@ -285,15 +357,24 @@ function Searchbar() {
                 </Input>
               </FormGroup>
             </Col>
-            <Col md={2} className="mb-2">
+
+            {/* Search Area Select */}
+            <Col className="mb-2">
               <FormGroup>
-                <Label for="searchAreaSelect" className="mr-2">
+                <Label for="searchAreaSelect" className="mr-2" style={{ color: '#212529' }}>
                   Search Area
                 </Label>
                 <Input
                   type="select"
                   name="searchArea"
                   id="searchAreaSelect"
+                  aria-expanded="false"
+                  aria-controls="searchArea-options"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.target.blur(); 
+                    }
+                  }}
                   value={searchArea}
                   onChange={(e) => {
                     setSearchArea(e.target.value);
@@ -308,16 +389,57 @@ function Searchbar() {
                 </Input>
               </FormGroup>
             </Col>
-            <Col md={2} className="mb-2">
+
+            {/* Term Select */}
+            <Col className="mb-2">
               <FormGroup>
-                <Label for="sortSelect" className="mr-2">
+                <Label for="termSelect" className="mr-2" style={{ color: '#212529' }}>
+                  Term
+                </Label>
+                <Input
+                  type="select"
+                  name="term"
+                  id="termSelect"
+                  aria-expanded="false"
+                  aria-controls="term-options"
+                  value={termId || ''}
+                  onChange={handleTermChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.target.blur(); 
+                    }
+                  }}
+                >
+                  <option value="" disabled>
+                    Select a term
+                  </option>
+                  {terms.map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {term.name}
+                    </option>
+                  ))}
+                </Input>
+              </FormGroup>
+            </Col>
+
+            {/* Sort By Select */}
+            <Col className="mb-2">
+              <FormGroup>
+                <Label for="sortSelect" className="mr-2" style={{ color: '#212529' }}>
                   Sort By
                 </Label>
                 <Input
                   type="select"
                   name="sortOption"
                   id="sortSelect"
+                  aria-expanded="false"
+                  aria-controls="sort-options"
                   value={sortOption}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.target.blur(); 
+                    }
+                  }}
                   onChange={(e) => {
                     setSortOption(e.target.value);
                     handleSearch();
@@ -332,9 +454,11 @@ function Searchbar() {
                 </Input>
               </FormGroup>
             </Col>
-            <Col md={2} className="mb-2">
+
+            {/* Search Input */}
+            <Col className="mb-2">
               <FormGroup>
-                <Label for="searchInput" className="mr-2">
+              <Label for="searchInput" id="searchInput-label" className="mr-2">
                   Search
                 </Label>
                 <Input
@@ -342,33 +466,62 @@ function Searchbar() {
                   name="query"
                   id="searchInput"
                   placeholder="Enter keyword"
+                  aria-labelledby="searchInput-label"
+                  aria-placeholder='Enter keyword'
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => { 
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      e.preventDefault(); 
+                      e.preventDefault();
                       handleSearch();
                     }
                   }}
+                  style={{
+                    color: '#000',
+                    backgroundColor: '#ffffff',
+                    borderColor: '#6c757d', 
+                  }}
                 />
+
               </FormGroup>
             </Col>
-            <Col md={2} className="align-items-end">
-              <Button
-                color="primary"
-                onClick={handleSearch}
-                style={{ backgroundColor: searchButtonBgColor }}
-                className="mr-2"
-              >
-                Search
-              </Button>{' '}
-              <Button
-                color="secondary"
-                onClick={handleReset}
-                style={{ backgroundColor: resetButtonBgColor }}
-              >
-                Reset
-              </Button>
+
+            {/* Button Group for Search and Reset */}
+            <Col className="mb-2">
+              {/* Flex container with no wrap to keep buttons in one line */}
+              <div className="d-flex justify-content-end flex-nowrap">
+                <ButtonGroup>
+                <Button
+                  color="primary"
+                  onClick={handleSearch}
+                  style={{
+                    backgroundColor: searchButtonBgColor || '#007bff', 
+                    color: location === 'hampshire' ? 'black' : 'white',
+                  }}
+                  aria-label="Search"
+                  tabIndex="0"
+                >
+                  <i className="fas fa-search" role="button"></i>
+                  <span className="d-none d-sm-inline ml-1">Search</span>
+                </Button>
+
+                <Button
+                  color="secondary"
+                  onClick={handleReset}
+                  style={{
+                    backgroundColor: resetButtonBgColor || '#6c757d', // Ensure contrast
+                    color: '#ffffff',
+                  }}
+                  aria-label="Reset search filters"
+                  tabIndex="0"
+                >
+                  <i className="fas fa-undo" role='button'></i>
+                  <span className="d-none d-sm-inline ml-1">Reset</span>
+                </Button>
+
+
+                </ButtonGroup>
+              </div>
             </Col>
           </Row>
         </Form>

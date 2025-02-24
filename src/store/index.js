@@ -10,7 +10,8 @@ const initialState = {
   filters: [],
   limit: 100,
   baseUrl: 'https://libtools2.smith.edu/folio/web/search/search-courses',
-  lastFetchedQuery: null, // Add this to track the last fetched query
+  lastFetchedQuery: null, 
+  currentSemester: null
 };
 
 const fetchResults = async (query) => {
@@ -32,26 +33,26 @@ const fetchResults = async (query) => {
     const results = await response.json();
     const data = results.data;
     // Client-side filtering to include only active courses
-    const currentDate = new Date();
-    const activeCourses = data.courses.filter((course) => {
-      const courseListing = course.courseListingObject;
-      const term = courseListing?.termObject;
-      const location = courseListing?.locationObject;
+    // const currentDate = new Date();
+    // const activeCourses = data.courses.filter((course) => {
+    //   const courseListing = course.courseListingObject;
+    //   const term = courseListing?.termObject;
+    //   const location = courseListing?.locationObject;
 
-      if (!term || !location || !location.campusId) {
-        return false;
-      }
+    //   if (!term || !location || !location.campusId) {
+    //     return false;
+    //   }
 
-      const startDate = new Date(term.startDate);
-      const endDate = new Date(term.endDate);
-      endDate.setDate(endDate.getDate() + 1);
+    //   const startDate = new Date(term.startDate);
+    //   const endDate = new Date(term.endDate);
+    //   endDate.setDate(endDate.getDate() + 1);
 
-      const isActiveTerm = currentDate >= startDate && currentDate < endDate;
-      return isActiveTerm;
-    });
+    //   const isActiveTerm = currentDate >= startDate && currentDate < endDate;
+    //   return isActiveTerm;
+    // });
 
     useCourseStore.setState({
-      results: activeCourses,
+      results: data.courses,
       loading: false,
       lastFetchedQuery: query, // Update the lastFetchedQuery after successful fetch
     });

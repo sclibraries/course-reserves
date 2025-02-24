@@ -31,7 +31,7 @@
 
 .searchbar-container {
   position: fixed;
-  top: 56px; /* Adjust this value based on the header's height */
+  top: 56px; 
   left: 0;
   right: 0;
   background-color: #fff;
@@ -52,8 +52,6 @@
     margin-top: 0px;
   }
 }
-
-/* CourseRecords.css */
 
 .course-records-container {
   display: flex;
@@ -79,16 +77,60 @@
 }
 
 .main-content {
-  padding-top: 10em; /* Adjust based on the height of your navbar */
+  padding-top: 10em; 
 }
 
 @media (max-width: 576px) {
   .main-content {
-    padding-top: 100px; /* Adjust if navbar height changes on mobile */
+    padding-top: 100px;
   }
 }
 
 .logo__img {
   width: 150px;
   height: auto;
+}
+
+.icon-button {
+  padding: 0.25rem;          /* Padding around the icon */
+  border-radius: 4px;       /* Slightly rounded corners */
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; /* Smooth transitions */
+  background-color: transparent;  /* No default background */
+  border: 1px solid transparent; /* Initially transparent border */
+}
+
+.icon-button:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* Light gray background on hover */
+  border-color: #007bff;            /* Bootstrap primary color border on hover */
+  /* OR, for a more subtle border: */
+  /* border-color: #6c757d; */       /* Gray border */
+}
+
+.icon-button svg {
+  transition: transform 0.2s ease-in-out, color 0.2s ease-in-out;
+  color: #6c757d;
+}
+
+.icon-button:hover svg {
+  transform: scale(1.15);  /* Slightly smaller scale on hover */
+  color: #007bff;
+}
+
+.admin-resource-table .resource-row.is-dragging {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.admin-resource-table .resource-link {
+  word-break: break-all;
+  color: #0066cc;
+}
+
+.admin-resource-table .resource-link:hover {
+  text-decoration: underline;
+}
+
+button:focus, a:focus {
+  outline: 2px solid #0056b3;
+  outline-offset: 2px;
 }
