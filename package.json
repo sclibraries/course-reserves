@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@awesome.me/kit-48b7df1f35": "^1.0.4",
+    "@fortawesome/fontawesome-pro": "^6.7.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "axios": "^1.7.7",
@@ -22,6 +25,7 @@
     "react-loading-skeleton": "^3.5.0",
     "react-router-dom": "^7.0.1",
     "react-table": "^7.8.0",
+    "react-toastify": "^11.0.5",
     "reactstrap": "^9.2.3",
     "zustand": "^5.0.1"
   },
@@ -34,6 +38,7 @@
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
+    "eslint-plugin-unused-imports": "^4.1.4",
     "globals": "^15.11.0",
     "vite": "^5.4.10"
   }

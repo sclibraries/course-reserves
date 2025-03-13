@@ -40,6 +40,25 @@ export async function fetchElectronicReserves(courseListingId) {
     throw err;
   }
 }
+
+/**
+ * Fetch cross linked courses for a given courseListingId.
+ */
+export async function fetchCrossLinkedCourses(courseListingId) {
+  try {
+    const response = await fetch(
+      `https://libtools2.smith.edu/course-reserves/backend/web/offering-link/get-linked-resources?courseListingId=${courseListingId}`
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const results = await response.json();
+    return results.resources || [];
+  } catch (err) {
+    console.error("Error fetching cross linked courses:", err);
+    throw err;
+  }
+}
   
   /**
    * Fetch Springshare data for a given course number.

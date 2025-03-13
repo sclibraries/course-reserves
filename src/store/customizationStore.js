@@ -182,6 +182,11 @@ const useCustomizationStore = create((set, get) => ({
 
     return customizations[college] || customizations.default;
   },
+  setCurrentCollege: (college) => 
+    console.log('Setting current college to:', college) ||
+    set((state) => ({
+      currentCollege: college
+    })),
 }));
 
 export default useCustomizationStore;

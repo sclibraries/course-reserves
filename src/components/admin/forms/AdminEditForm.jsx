@@ -179,6 +179,7 @@ export const AdminEditForm = ({
                         <AdditionalCommonFields 
                             handleFieldChange={handleFieldChange}
                             formData={formData}
+                            setFormData={setFormData}
                         />
             </div>
           </Col>

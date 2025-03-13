@@ -1,20 +1,44 @@
-import { Navbar, NavbarBrand } from 'reactstrap';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navbar, NavbarBrand, Button } from 'reactstrap';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useCustomizationStore from '../store/customizationStore';
+import useSearchStore from '../store/searchStore';
 import '../Header.css';
 import LoginButton from './StaffLogin';
+
 
 function Header() {
   // Grab the current college from URL query parameters
   const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const college = queryParams.get('college');
+  const navigate = useNavigate();
+  // const queryParams = new URLSearchParams(location.search);
+  // const college = queryParams.get('college');
+  const currentCollege = useCustomizationStore((state) => state.currentCollege);
+  const setCollege = useSearchStore((state) => state.setCollege);
+  const college = currentCollege;
+  setCollege(college);
+
   const isAdminPath = location.pathname.startsWith('/admin');
 
   // Pull the relevant customization info from Zustand store
   const { logoUrl, secondaryText, altText, headerBgColor, campusLocation} = useCustomizationStore(
     (state) => state.getCustomizationForCollege(college)
   );
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    setIsLoggedIn(!!token);
+  }, []);
+
+    // Logout handler: remove tokens, update state, and redirect the user
+    const handleLogout = () => {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('refreshToken');
+      setIsLoggedIn(false);
+      navigate('/');
+    };
 
   return (
       <header role="banner" tabIndex="0">
@@ -59,9 +83,14 @@ function Header() {
         )}
       </NavbarBrand>
 
-        {(college === 'smith' || isAdminPath) && (
+      {(college === 'smith' || isAdminPath) &&
+        (isLoggedIn ? (
+          <Button color="secondary" onClick={handleLogout} aria-label="Log out">
+            Logout
+          </Button>
+        ) : (
           <LoginButton aria-label="Login to staff account" />
-        )}
+        ))}
 
       </Navbar>
     </header>

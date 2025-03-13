@@ -10,11 +10,14 @@
  * @returns {Object} The transformed data.
  */
 export const transformFolioCourseToLocal = (folioCourse) => {
+  const termStart = folioCourse?.courseListingObject?.termObject?.startDate;
+  const termEnd = folioCourse?.courseListingObject?.termObject?.endDate;
+  const now = new Date();
+  const isActive = now >= new Date(termStart) && now <= new Date(termEnd);
   return {
     // Static course information (Courses table)
     course: {
       // Use the courseListingId as the unique identifier from FOLIO.
-      folio_course_id: folioCourse.courseListingId,
       course_name: folioCourse.name,
       course_number: folioCourse.courseNumber,
       department_id: folioCourse.departmentId,
@@ -27,13 +30,15 @@ export const transformFolioCourseToLocal = (folioCourse) => {
     // Term-specific offering information (course_offerings table)
     offering: {
       // Map the term-related data from the courseListingObject.
+      folio_course_id: folioCourse.courseListingId,
+
       term_id: folioCourse.courseListingObject?.termId || '',
       term_name: folioCourse.courseListingObject?.termObject?.name || '',
       // Use the provided ISO date strings directly or perform any additional formatting if needed.
       start_date: folioCourse.courseListingObject?.termObject?.startDate || null,
       end_date: folioCourse.courseListingObject?.termObject?.endDate || null,
-      // Set the default status for a new offering. You can modify this as needed.
-      status: 'active',
+      
+      status: isActive ? 'active' : 'inactive',
     }
-  };
+  };  
 };

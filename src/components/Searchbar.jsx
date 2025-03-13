@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Collapse,
   NavbarToggler,
-  Form,
   FormGroup,
   Label,
   Input,
@@ -11,19 +10,17 @@ import {
   Col,
   ButtonGroup,
 } from 'reactstrap';
-import useSearchStore from '../store/searchStore';
 import { useNavigate } from 'react-router-dom';
+import useSearchStore from '../store/searchStore';
 import useCustomizationStore from '../store/customizationStore';
+import { trackingService } from '../services/trackingService';
+import { getTermName } from '../util/termHelpers';
 import '../Searchbar.css';
-
-// IMPORTANT: Ensure Font Awesome is loaded in your project,
-// for example by including: import 'font-awesome/css/font-awesome.min.css';
 
 function Searchbar() {
   const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(false); // State for collapse
+  const [isOpen, setIsOpen] = useState(false);
 
-  // Destructure search store values and setter functions
   const {
     college,
     type,
@@ -40,18 +37,14 @@ function Searchbar() {
     terms,
   } = useSearchStore();
 
-  // Get custom button colors from the customization store
-  const { searchButtonBgColor, resetButtonBgColor, location } = useCustomizationStore(
-    (state) => state.getCustomizationForCollege(college)
-  );
+  const { searchButtonBgColor, resetButtonBgColor, campusLocation } =
+    useCustomizationStore((state) => state.getCustomizationForCollege(college));
 
-  // Local states for dropdowns and input field
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
 
-  // Arrays for select options
   const searchAreas = [
     'All fields',
     'Course Name',
@@ -76,14 +69,12 @@ function Searchbar() {
     { label: 'Section Name (Desc)', value: 'sectionName.descending' },
   ];
 
-  // Sync local state with store whenever these values change
   useEffect(() => {
     setSearchArea(keyToSearchArea(type));
     setSearchInput(query || '');
     setSelectedCollege(keyToCollegeName(college));
   }, [type, query, college, department, sortOption]);
 
-  // Fetch departments when the selected college changes
   useEffect(() => {
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
@@ -94,13 +85,11 @@ function Searchbar() {
     fetch(url)
       .then((res) => {
         if (!res.ok) {
-          // Check for network errors
           throw new Error('Network response was not ok');
         }
         return res.json();
       })
       .then((data) => {
-        // Ensure the API response structure is as expected
         if (data && data.data && Array.isArray(data.data.departments)) {
           setDepartments(data.data.departments);
         } else {
@@ -113,18 +102,33 @@ function Searchbar() {
       });
   }, [college]);
 
-  // Handle search button click or "Enter" key press
   const handleSearch = () => {
     const areaKey = searchAreaToKey(searchArea);
     const collegeKey = collegeNameToKey(selectedCollege);
     const sanitizedInput = searchInput.trim();
+    const currentTermName = getTermName(terms, termId);
 
-    // Update the store
+    // Track the search
+    trackingService.trackEvent({
+      event_type: "search",
+      college: collegeKey,
+      course_id: "N/A",
+      term: currentTermName || "N/A",
+      course_name: "",
+      course_code: "",
+      instructor: null,
+      metadata: {
+        searchArea,
+        query: sanitizedInput,
+        department,
+        sortOption,
+      }
+    }).catch(err => console.error("Error tracking search event:", err));
+
     setType(areaKey);
     setCollege(collegeKey);
     setQuery(sanitizedInput);
 
-    // Build URL parameters
     const queryParams = new URLSearchParams();
     if (collegeKey && collegeKey !== 'all') queryParams.set('college', collegeKey);
     if (areaKey && areaKey !== 'all') queryParams.set('type', areaKey);
@@ -135,15 +139,30 @@ function Searchbar() {
     navigate(`/search?${queryParams.toString()}`);
   };
 
-  // Reset the search inputs and store values
   const handleReset = () => {
-    // Reset store values
+    // Track the reset
+    const currentTermName = getTermName(terms, termId);
+    trackingService.trackEvent({
+      event_type: "search_reset",
+      college,
+      course_id: "N/A",
+      term: currentTermName || "N/A",
+      course_name: "",
+      course_code: "",
+      instructor: null,
+      metadata: {
+        old_searchArea: searchArea,
+        old_query: searchInput,
+        old_department: department,
+        old_sortOption: sortOption,
+      }
+    }).catch(err => console.error("Error tracking reset event:", err));
+
     setType('all');
     setQuery('');
     setDepartment('');
     setSortOption('');
 
-    // Reset local state values
     setSearchArea('All fields');
     setSearchInput('');
     if (college) {
@@ -153,7 +172,34 @@ function Searchbar() {
     }
   };
 
-  // Map display search area to key used in store and URL params
+  const handleTermChange = (e) => {
+    const newTermId = e.target.value;
+    if (newTermId !== termId) {
+
+      const newTermName = getTermName(terms, newTermId);
+      const oldTermName = getTermName(terms, termId);
+      // Track the term change
+      trackingService.trackEvent({
+        event_type: "term_change",
+        college,
+        course_id: "N/A",
+        term: newTermName,
+        course_name: "",
+        course_code: "",
+        instructor: null,
+        metadata: {
+          old_term: oldTermName || "N/A",
+          new_term: newTermName || "N/A",
+        }
+      }).catch(err => console.error("Error tracking term change:", err));
+
+      setTermId(newTermId);
+    }
+  };
+
+  const toggle = () => setIsOpen(!isOpen);
+
+  // Utility function conversions...
   const searchAreaToKey = (area) => {
     switch (area) {
       case 'All fields':
@@ -171,7 +217,6 @@ function Searchbar() {
     }
   };
 
-  // Map key to display value for search area
   const keyToSearchArea = (key) => {
     switch (key) {
       case 'all':
@@ -189,7 +234,6 @@ function Searchbar() {
     }
   };
 
-  // Convert college name from dropdown to key used in store and API calls
   const collegeNameToKey = (col) => {
     switch (col) {
       case 'Smith College':
@@ -208,7 +252,6 @@ function Searchbar() {
     }
   };
 
-  // Map key to college display name
   const keyToCollegeName = (key) => {
     switch (key) {
       case 'smith':
@@ -227,7 +270,6 @@ function Searchbar() {
     }
   };
 
-  // Get query string prefix for department fetch based on college key
   const getCollegeQuery = (collegeKey) => {
     switch (collegeKey) {
       case 'smith':
@@ -241,23 +283,12 @@ function Searchbar() {
       case 'umass':
         return 'name==um*';
       default:
-        return ''; // No query for all colleges (fetch all)
+        return '';
     }
   };
-
-  // Handle term change
-  const handleTermChange = (e) => {
-    if (e.target.value !== termId) {
-      setTermId(e.target.value);
-    }
-  };
-
-  // Toggle the navbar collapse state
-  const toggle = () => setIsOpen(!isOpen);
 
   return (
     <div className="searchbar-container" role="search">
-      {/* NavbarToggler for the hamburger icon */}
       <NavbarToggler
         onClick={toggle}
         className="searchbar-toggle"
@@ -266,17 +297,14 @@ function Searchbar() {
         aria-controls="search-collapse"
       />
 
-      {/* Collapsible content */}
-      <Collapse 
-          id="search-collapse"
-          isOpen={isOpen} 
-          className={isOpen ? 'searchbar-expanded' : 'searchbar-collapsed'}
-        >
-
-        <Form>
-          <Row>
-            {/* College Select */}
-            <Col className="mb-2">
+      <Collapse
+        id="search-collapse"
+        isOpen={isOpen}
+        className={isOpen ? 'searchbar-expanded' : 'searchbar-collapsed'}
+      >
+        <Row>
+          {/* College Select */}
+          <Col xs="12" md className="mb-2">
             <FormGroup>
               <Label for="collegeSelect" className="mr-2" style={{ color: '#212529' }}>
                 College
@@ -292,6 +320,21 @@ function Searchbar() {
                 onChange={(e) => {
                   const newCollege = e.target.value;
                   const newCollegeKey = collegeNameToKey(newCollege);
+                  const currentTermName = getTermName(terms, termId);
+                  // If you want to track college changes:
+                  trackingService.trackEvent({
+                    event_type: "college_change",
+                    college: newCollegeKey,
+                    course_id: "N/A",
+                    term: currentTermName || "N/A",
+                    course_name: "",
+                    course_code: "",
+                    instructor: null,
+                    metadata: {
+                      old_college_key: college,
+                      new_college_key: newCollegeKey,
+                    }
+                  }).catch(err => console.error("Error tracking college change:", err));
 
                   // Reset all search parameters when college changes
                   setSelectedCollege(newCollege);
@@ -308,7 +351,7 @@ function Searchbar() {
                 aria-describedby="college-reset-warning"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
-                    e.target.blur(); 
+                    e.target.blur();
                   }
                 }}
               >
@@ -322,209 +365,237 @@ function Searchbar() {
                 Changing the college resets all search filters.
               </small>
             </FormGroup>
+          </Col>
 
-            </Col>
+          {/* Department Select */}
+          <Col xs="12" md className="mb-2">
+            <FormGroup>
+              <Label for="departmentSelect" className="mr-2" style={{ color: '#212529' }}>
+                Department
+              </Label>
+              <Input
+                type="select"
+                name="department"
+                id="departmentSelect"
+                aria-live="polite"
+                aria-expanded="false"
+                aria-controls="department-options"
+                aria-activedescendant={department ? `dept-${department}` : undefined}
+                value={department}
+                onChange={(e) => {
+                  const newDept = e.target.value;
+                  const currentTermName = getTermName(terms, termId);
+                  // Track the department change
+                  trackingService.trackEvent({
+                    event_type: "department_change",
+                    college,
+                    course_id: "N/A",
+                    term: currentTermName || "N/A",
+                    course_name: "",
+                    course_code: "",
+                    instructor: null,
+                    metadata: {
+                      old_department: department || "none",
+                      new_department: newDept,
+                    },
+                  }).catch(err => console.error("Error tracking department change:", err));
 
-            {/* Department Select */}
-            <Col className="mb-1">
-              <FormGroup>
-                <Label for="departmentSelect" className="mr-2" style={{ color: '#212529' }}>
-                  Department
-                </Label>
-                <Input
-                  type="select"
-                  name="department"
-                  id="departmentSelect"
-                  aria-live="polite"
-                  aria-expanded="false"
-                  aria-controls="department-options"
-                  aria-activedescendant={department ? `dept-${department}` : undefined}
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  disabled={departments.length === 0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.target.blur(); 
-                    }
-                  }}
-                >
-                  <option value="">All Departments</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.name}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </Input>
-              </FormGroup>
-            </Col>
-
-            {/* Search Area Select */}
-            <Col className="mb-2">
-              <FormGroup>
-                <Label for="searchAreaSelect" className="mr-2" style={{ color: '#212529' }}>
-                  Search Area
-                </Label>
-                <Input
-                  type="select"
-                  name="searchArea"
-                  id="searchAreaSelect"
-                  aria-expanded="false"
-                  aria-controls="searchArea-options"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.target.blur(); 
-                    }
-                  }}
-                  value={searchArea}
-                  onChange={(e) => {
-                    setSearchArea(e.target.value);
-                    setType(searchAreaToKey(e.target.value));
-                  }}
-                >
-                  {searchAreas.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </Input>
-              </FormGroup>
-            </Col>
-
-            {/* Term Select */}
-            <Col className="mb-2">
-              <FormGroup>
-                <Label for="termSelect" className="mr-2" style={{ color: '#212529' }}>
-                  Term
-                </Label>
-                <Input
-                  type="select"
-                  name="term"
-                  id="termSelect"
-                  aria-expanded="false"
-                  aria-controls="term-options"
-                  value={termId || ''}
-                  onChange={handleTermChange}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.target.blur(); 
-                    }
-                  }}
-                >
-                  <option value="" disabled>
-                    Select a term
+                  setDepartment(newDept);
+                }}
+                disabled={departments.length === 0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.target.blur();
+                  }
+                }}
+              >
+                <option value="">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.name}>
+                    {dept.name}
                   </option>
-                  {terms.map((term) => (
-                    <option key={term.id} value={term.id}>
-                      {term.name}
-                    </option>
-                  ))}
-                </Input>
-              </FormGroup>
-            </Col>
+                ))}
+              </Input>
+            </FormGroup>
+          </Col>
 
-            {/* Sort By Select */}
-            <Col className="mb-2">
-              <FormGroup>
-                <Label for="sortSelect" className="mr-2" style={{ color: '#212529' }}>
-                  Sort By
-                </Label>
-                <Input
-                  type="select"
-                  name="sortOption"
-                  id="sortSelect"
-                  aria-expanded="false"
-                  aria-controls="sort-options"
-                  value={sortOption}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.target.blur(); 
+
+          {/* Search Area Select */}
+          <Col xs="12" md className="mb-2">
+            <FormGroup>
+              <Label for="searchAreaSelect" className="mr-2" style={{ color: '#212529' }}>
+                Search Area
+              </Label>
+              <Input
+                type="select"
+                name="searchArea"
+                id="searchAreaSelect"
+                aria-expanded="false"
+                aria-controls="searchArea-options"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.target.blur();
+                  }
+                }}
+                value={searchArea}
+                onChange={(e) => {
+                  setSearchArea(e.target.value);
+                  setType(searchAreaToKey(e.target.value));
+                }}
+              >
+                {searchAreas.map((area) => (
+                  <option key={area} value={area}>
+                    {area}
+                  </option>
+                ))}
+              </Input>
+            </FormGroup>
+          </Col>
+
+          {/* Term Select */}
+          <Col xs="12" md className="mb-2">
+            <FormGroup>
+              <Label for="termSelect" className="mr-2" style={{ color: '#212529' }}>
+                Term
+              </Label>
+              <Input
+                type="select"
+                name="term"
+                id="termSelect"
+                aria-expanded="false"
+                aria-controls="term-options"
+                value={termId || ''}
+                onChange={handleTermChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.target.blur();
+                  }
+                }}
+              >
+                <option value="" disabled>
+                  Select a term
+                </option>
+                {terms.map((term) => (
+                  <option key={term.id} value={term.id}>
+                    {term.name}
+                  </option>
+                ))}
+              </Input>
+            </FormGroup>
+          </Col>
+
+          {/* Sort By Select */}
+          <Col xs="12" md className="mb-2">
+            <FormGroup>
+              <Label for="sortSelect" className="mr-2" style={{ color: '#212529' }}>
+                Sort By
+              </Label>
+              <Input
+                type="select"
+                name="sortOption"
+                id="sortSelect"
+                aria-expanded="false"
+                aria-controls="sort-options"
+                value={sortOption}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.target.blur();
+                  }
+                }}
+                onChange={(e) => {
+                  setSortOption(e.target.value);
+                  // Optionally track the sorting action
+                  trackingService.trackEvent({
+                    event_type: "sort_change",
+                    college: college,
+                    course_id: "N/A",
+                    term: termId || "N/A",
+                    course_name: "",
+                    course_code: "",
+                    instructor: null,
+                    metadata: {
+                      new_sort: e.target.value,
                     }
-                  }}
-                  onChange={(e) => {
-                    setSortOption(e.target.value);
-                    handleSearch();
-                  }}
-                >
-                  <option value="">Default</option>
-                  {sortingOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Input>
-              </FormGroup>
-            </Col>
+                  }).catch(err => console.error("Error tracking sort change:", err));
 
-            {/* Search Input */}
-            <Col className="mb-2">
-              <FormGroup>
+                  handleSearch();
+                }}
+              >
+                <option value="">Default</option>
+                {sortingOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Input>
+            </FormGroup>
+          </Col>
+
+          {/* Search Input */}
+          <Col className="mb-2">
+            <FormGroup>
               <Label for="searchInput" id="searchInput-label" className="mr-2">
-                  Search
-                </Label>
-                <Input
-                  type="text"
-                  name="query"
-                  id="searchInput"
-                  placeholder="Enter keyword"
-                  aria-labelledby="searchInput-label"
-                  aria-placeholder='Enter keyword'
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                  style={{
-                    color: '#000',
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6c757d', 
-                  }}
-                />
+                Search
+              </Label>
+              <Input
+                type="text"
+                name="query"
+                id="searchInput"
+                placeholder="Enter keyword"
+                aria-labelledby="searchInput-label"
+                aria-placeholder="Enter keyword"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                style={{
+                  color: '#000',
+                  backgroundColor: '#ffffff',
+                  borderColor: '#6c757d',
+                }}
+              />
+            </FormGroup>
+          </Col>
 
-              </FormGroup>
-            </Col>
-
-            {/* Button Group for Search and Reset */}
-            <Col className="mb-2">
-              {/* Flex container with no wrap to keep buttons in one line */}
-              <div className="d-flex justify-content-end flex-nowrap">
-                <ButtonGroup>
+          {/* Button Group for Search and Reset */}
+          <Col xs="12" md="auto" className="mb-2">
+            <div className="d-flex justify-content-end">
+              <ButtonGroup className="w-100 w-md-auto">
                 <Button
                   color="primary"
                   onClick={handleSearch}
                   style={{
-                    backgroundColor: searchButtonBgColor || '#007bff', 
-                    color: location === 'hampshire' ? 'black' : 'white',
+                    backgroundColor: searchButtonBgColor || '#007bff',
+                    color: campusLocation === 'hampshire' ? 'black' : 'white',
                   }}
                   aria-label="Search"
                   tabIndex="0"
                 >
                   <i className="fas fa-search" role="button"></i>
-                  <span className="d-none d-sm-inline ml-1">Search</span>
+                  <span className="d-inline ml-1">Search</span>
                 </Button>
 
                 <Button
                   color="secondary"
                   onClick={handleReset}
                   style={{
-                    backgroundColor: resetButtonBgColor || '#6c757d', // Ensure contrast
+                    backgroundColor: resetButtonBgColor || '#6c757d',
                     color: '#ffffff',
                   }}
                   aria-label="Reset search filters"
                   tabIndex="0"
                 >
-                  <i className="fas fa-undo" role='button'></i>
-                  <span className="d-none d-sm-inline ml-1">Reset</span>
+                  <i className="fas fa-undo" role="button"></i>
+                  <span className="d-inline ml-1">Reset</span>
                 </Button>
-
-
-                </ButtonGroup>
-              </div>
-            </Col>
-          </Row>
-        </Form>
+              </ButtonGroup>
+            </div>
+          </Col>
+        </Row>
       </Collapse>
     </div>
   );

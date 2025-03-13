@@ -1,16 +1,20 @@
 // src/pages/CourseRecords.jsx
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Row, Col, Button, Spinner, Alert, ButtonGroup } from 'reactstrap';
+import { Row, Col, Button, Spinner, Alert, ButtonGroup, Badge } from 'reactstrap';
 
 import useRecordStore from '../store/recordStore';
 import useCustomizationStore from '../store/customizationStore';
+import { trackingService } from '../services/trackingService';
+import { adminCourseService } from '../services/admin/adminCourseService';
+import {  useParams } from 'react-router-dom';
 
 import {
   fetchRecords,
   fetchCourseData,
   fetchElectronicReserves,
   fetchItemAvailabilityData,
+  fetchCrossLinkedCourses
 } from '../components/CourseRecords/api';
 
 import RecordCard from '../components/CourseRecords/RecordCard';
@@ -19,6 +23,7 @@ import RecordTable from '../components/CourseRecords/RecordTable';
 function CourseRecords() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { uuid } = useParams();
 
   const searchParams = new URLSearchParams(location.search);
   const collegeParam = searchParams.get('college');
@@ -40,6 +45,28 @@ function CourseRecords() {
   // Extract the first course from the course details array
   const courseInfo = useMemo(() => (course.length > 0 ? course[0] : null), [course]);
 
+  //check if this request is a uuid request
+  useEffect(() => {
+    if (uuid) {
+      const fetchFOLIOCourseListingId = async () => {
+        try {
+          const courseListingId = await adminCourseService.getFolioCourseId(uuid);
+          if(courseListingId) {
+            if(courseListingId?.exists == true){
+              setRecord(courseListingId?.folio_course_id);
+            }
+          }
+        } catch (e) {
+          console.info('No course found for this uuid' + e);
+        }
+      };
+      fetchFOLIOCourseListingId();
+    }
+  }, [uuid]);
+            
+      //We need to grab the courseListingId from the uuid
+
+
   // Update record from URL parameter (if it differs)
   useEffect(() => {
     if (courseListingIdParam && courseListingIdParam !== record) {
@@ -60,10 +87,11 @@ function CourseRecords() {
     setError(null);
     try {
       // Use Promise.allSettled to gracefully handle potential errors
-      const [printResult, courseResult, electronicResult] = await Promise.allSettled([
+      const [printResult, courseResult, electronicResult, crossLinkedResult] = await Promise.allSettled([
         fetchRecords(record),
         fetchCourseData(record),
         fetchElectronicReserves(record).catch(() => []),
+        fetchCrossLinkedCourses(record).catch(() => [])
       ]);
 
       if (printResult.status === 'rejected') {
@@ -80,7 +108,9 @@ function CourseRecords() {
       const electronicReserves = electronicResult.status === 'fulfilled'
         ? electronicResult.value
         : [];
+        
       setHasElectronicReserves(electronicReserves.length > 0);
+
       // Transform electronic reserves so they match the print reserves structure.
       const electronicReservesTransformed = electronicReserves.map(resource => ({
         id: resource.resource_id,
@@ -97,8 +127,30 @@ function CourseRecords() {
         resource,
       }));
 
+      //Check for cross linked courses
+      const crossLinkedCourses = crossLinkedResult.status === 'fulfilled'
+        ? crossLinkedResult.value
+        : [];
+
+      setHasElectronicReserves(crossLinkedCourses.length > 0);
+
+      const crossLinkedCoursesTransformed = crossLinkedCourses.map(resource => ({
+        id: resource.resource_id,
+        folder_id: resource.folder_id || null,
+        folder_name: resource.folder_name || 'Electronic Resources',
+        copiedItem: {
+          instanceId: resource.resource_id,
+          title: resource.name,
+          contributors: [],
+          publication: [],
+          callNumber: '',
+        },
+        isElectronic: true,
+        resource,
+      }));
+
       // Merge print and electronic reserves
-      const mergedReserves = [...printReserves, ...electronicReservesTransformed];
+      const mergedReserves = [...printReserves, ...electronicReservesTransformed, ...crossLinkedCoursesTransformed];
 
       if (mergedReserves.length === 0 && courseData.length === 0) {
         throw new Error('No course data found');
@@ -343,37 +395,74 @@ function CourseRecords() {
 
   // Toggle display mode between "card" and "table".
   const handleToggleDisplay = () => {
-    setDisplayMode(prev => (prev === 'card' ? 'table' : 'card'));
+    const oldMode = displayMode;
+    const newMode = oldMode === 'card' ? 'table' : 'card';
+  
+    // Fire tracking event
+    trackingService.trackEvent({
+      college: collegeParam || 'Unknown',
+      event_type: newMode === 'card' ? 'switched_to_card_view' : 'switched_to_table_view',
+      course_id: courseInfo?.courseListingId ?? 'N/A',
+      term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
+      course_name: courseInfo?.name ?? '',
+      course_code: courseInfo?.courseNumber ?? '',
+      instructor:
+        courseInfo?.courseListingObject?.instructorObjects?.map((instr) => ({
+          name: instr.name,
+        })) || [],
+      metadata: {
+        old_mode: oldMode,
+        new_mode: newMode,
+      },
+    }).catch((err) => console.error('Error tracking view toggle:', err));
+  
+    setDisplayMode(newMode);
   };
+
+  const handleFilterChange = (newFilter) => {
+    // Track the filter change
+    trackingService.trackEvent({
+      college: collegeParam || 'Unknown',
+      event_type: 'filter_change',
+      course_id: courseInfo?.courseListingId ?? 'N/A',
+      term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
+      course_name: courseInfo?.name ?? '',
+      course_code: courseInfo?.courseNumber ?? '',
+      instructor:
+        courseInfo?.courseListingObject?.instructorObjects?.map((instr) => ({
+          name: instr.name,
+        })) || [],
+      metadata: {
+        old_filter: filter,
+        new_filter: newFilter,
+      },
+    }).catch((err) => console.error('Error tracking filter change:', err));
+  
+    // Update the filter state
+    setFilter(newFilter);
+  };
+  
 
   const renderFilterButtons = () => (
     <ButtonGroup className="mb-3">
       <Button
         style={{backgroundColor: recordsDiscoverLinkBgColor}}
         active={filter === 'all'}
-        onClick={() => setFilter('all')}
+        onClick={() => handleFilterChange('all')}
       >
         All
       </Button>
       <Button
         style={{backgroundColor: recordsDiscoverLinkBgColor}}
         active={filter === 'print'}
-        onClick={() => setFilter('print')}
-        disabled={
-          !Object.values(grouped).flat().some(item => !item.isElectronic) &&
-          !ungrouped.some(item => !item.isElectronic)
-        }
+        onClick={() => handleFilterChange('print')}
       >
         Print
       </Button>
       <Button
         style={{backgroundColor: recordsDiscoverLinkBgColor}}
         active={filter === 'electronic'}
-        onClick={() => setFilter('electronic')}
-        disabled={
-          !Object.values(grouped).flat().some(item => item.isElectronic) &&
-          !ungrouped.some(item => item.isElectronic)
-        }
+        onClick={() => handleFilterChange('electronic')}
       >
         Electronic
       </Button>
@@ -421,6 +510,7 @@ function CourseRecords() {
                 .join(', ')}
             </h3>
           )}
+          <Badge color="primary">{courseInfo?.courseListingObject?.termObject?.name}</Badge>
         </div>
       )}
 
@@ -512,6 +602,8 @@ function CourseRecords() {
                               openAccordions={openAccordions}
                               toggleAccordion={toggleAccordion}
                               customization={customizationProps}
+                              courseInfo={courseInfo}
+                              collegeParam={collegeParam}
                               isGrouped
                             />
                           </Col>
@@ -531,6 +623,8 @@ function CourseRecords() {
                         openAccordions={openAccordions}
                         toggleAccordion={toggleAccordion}
                         customization={customizationProps}
+                        courseInfo={courseInfo}
+                        collegeParam={collegeParam}
                       />
                     </Col>
                   </Row>
@@ -541,12 +635,14 @@ function CourseRecords() {
         ) : (
           // Compact table view using the RecordTable component.
           <RecordTable
-            groupedRecords={grouped}
-            ungroupedRecords={ungrouped}
+            combinedResults={combinedResults}
             availability={availability}
             customization={customizationProps}
             hasElectronicReserves={hasElectronicReserves}
+            courseInfo={courseInfo}
+            collegeParam={collegeParam}
           />
+
         )
       ) : (
         <p>No records found.</p>

@@ -5,6 +5,9 @@ import useSearchStore from '../store/searchStore';
 import CourseList from '../components/CourseList';
 import { useBuildQuery } from '../hooks/useBuildQuery';
 import { Container, Spinner, Alert } from 'reactstrap';
+import { trackingService } from '../services/trackingService';
+import useCustomizationStore from '../store/customizationStore';
+
 
 function Search() {
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ function Search() {
   const results = useCourseStore((state) => state.results);
   const error = useCourseStore((state) => state.error);
   const loading = useCourseStore((state) => state.loading);
+  const currentCollege = useCustomizationStore((state) => state.currentCollege);
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -34,7 +38,7 @@ function Search() {
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
 
-    const collegeParam = queryParams.get('college') || 'all';
+    const collegeParam = queryParams.get('college') || currentCollege ||  'all';
     const typeParam = queryParams.get('type') || 'all';
     const queryParam = queryParams.get('query') || '';
     const departmentParam = queryParams.get('department') || '';
@@ -90,10 +94,33 @@ function Search() {
   const cqlQuery = useBuildQuery(college, type, query, department, sortOption);
 
   useEffect(() => {
-    if (!isInitialized) return; // Prevent fetching before initialization
+    if (!isInitialized) return;
     
     fetchResults(cqlQuery);
-  }, [cqlQuery, fetchResults, isInitialized]);
+
+    // Track the search event.
+    // Since this is a search, we send placeholder values for course-specific fields.
+    const trackingData = {
+      college: college,
+      event_type: "search",
+      course_id: "N/A",
+      term: "N/A",
+      course_name: "",
+      course_code: "",
+      instructor: null,
+      metadata: {
+        query: query,
+        type: type,
+        department: department,
+        sortOption: sortOption,
+        cqlQuery: cqlQuery,
+      },
+    };
+
+    trackingService.trackEvent(trackingData)
+      .then(() => console.log("Search event tracked."))
+      .catch((error) => console.error("Error tracking search event:", error));
+  }, [cqlQuery, fetchResults, isInitialized, college, type, query, department, sortOption]);  
 
   if (!isInitialized) {
     return null;

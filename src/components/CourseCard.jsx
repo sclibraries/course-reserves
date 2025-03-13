@@ -1,6 +1,9 @@
 // CourseCard.jsx
 import PropTypes from 'prop-types';
 import { Card, CardBody, CardTitle, CardText, Button } from 'reactstrap';
+import { trackingService } from '../services/trackingService';
+import useSearchStore from '../store/searchStore';
+
 
 function CourseCard({ course, customization, onRecordsClick }) {
   const {
@@ -22,12 +25,36 @@ function CourseCard({ course, customization, onRecordsClick }) {
     sectionName
   } = course;
 
+  const college = useSearchStore((state) => state.college);
+
   const departmentName = departmentObject?.name || 'Unknown Department';
   const instructors =
     courseListingObject?.instructorObjects?.map((i) => i.name) || [];
   const termName = courseListingObject?.termObject?.name || 'Unknown Term';
   const locationName =
     courseListingObject?.locationObject?.name || 'Unknown Location';
+
+
+    const handleRecordsClick = () => {
+      // Tracking event before navigating
+      trackingService.trackEvent({
+        college: college,
+        event_type: "course_access",
+        course_id: courseListingId,
+        term: termName,
+        course_name: name,
+        course_code: courseNumber,
+        instructor: instructors.map(i => ({ name: i })),
+        metadata: {
+          department: departmentName,
+          location: locationName,
+          action: "viewed course records"
+        },
+      }).catch((error) => console.error("Error tracking course access:", error));
+  
+      // Proceed with navigation
+      onRecordsClick(courseListingId);
+    };
 
   return (
     <Card
@@ -45,10 +72,11 @@ function CourseCard({ course, customization, onRecordsClick }) {
             color: cardTitleTextColor,
             fontSize: cardTitleFontSize,
             textAlign: 'left', // Ensure alignment
+            wordBreak: 'break-word', // Ensure long course names wrap
           }}
         >
           <button
-            onClick={() => onRecordsClick(courseListingId)}
+            onClick={handleRecordsClick}
             style={{
               background: 'none',
               border: 'none',
@@ -100,7 +128,7 @@ function CourseCard({ course, customization, onRecordsClick }) {
             backgroundColor: cardButtonBgColor || '#007bff', 
             color: campusLocation == "hampshire" ? 'black' : 'white',
           }}
-          onClick={() => onRecordsClick(courseListingId)}
+          onClick={handleRecordsClick}
         >
           See Reserves
         </Button>

@@ -1,13 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Col, FormGroup, Label, Input, Button } from 'reactstrap';
 import { useFolderManagement } from '../../../hooks/useFolderManagement';
+import { useAdminCourseStore } from '../../../store/adminCourseStore';
 import PropTypes from 'prop-types';
 
-export const AdditionalCommonFields = ({handleFieldChange, formData}) => {
-
+export const AdditionalCommonFields = ({ handleFieldChange, formData, setFormData }) => {
   const { folders, loading, error, createFolder } = useFolderManagement();
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const { folioCourseData } = useAdminCourseStore();
+
+  useEffect(() => {
+    if (folioCourseData) {
+      setFormData((prev) => ({
+        ...prev,
+        start_visibility: prev.start_visibility || new Date(folioCourseData.courseListingObject.termObject.startDate)
+          .toISOString().split('T')[0],
+        end_visibility: prev.end_visibility || new Date(folioCourseData.courseListingObject.termObject.endDate)
+          .toISOString().split('T')[0],
+      }));
+    }
+  }, [folioCourseData]);
+  
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -16,8 +30,8 @@ export const AdditionalCommonFields = ({handleFieldChange, formData}) => {
       const newFolder = await createFolder({ name: newFolderName });
       const value = {
         name: 'folder',
-        value: newFolder.folder_id
-      }
+        value: newFolder.folder_id,
+      };
       // Set the folder field in the form data to the newly created folder's id.
       handleFieldChange(value);
       setNewFolderName('');
@@ -28,36 +42,47 @@ export const AdditionalCommonFields = ({handleFieldChange, formData}) => {
     }
   };
 
-  console.log(formData)
-
   return (
     <>
       <Col>
         <FormGroup>
-          <Label>Use Proxy?</Label><br />
+          <Label>Use Proxy?</Label>
+          <br />
           <div>
             <Input
               type="radio"
               name="use_proxy"
               value="1"
-              checked={formData.use_proxy === true || formData.use_proxy === '1' || formData.use_proxy === 1}
+              checked={
+                formData.use_proxy === true ||
+                formData.use_proxy === '1' ||
+                formData.use_proxy === 1
+              }
               onChange={handleFieldChange}
             />
-            <Label check className="ml-1 mr-3">Yes</Label>
+            <Label check className="ml-1 mr-3">
+              Yes
+            </Label>
             <Input
               type="radio"
               name="use_proxy"
               value="0"
-              checked={formData.use_proxy === false || formData.use_proxy === '0' || formData.use_proxy === 0}
+              checked={
+                formData.use_proxy === false ||
+                formData.use_proxy === '0' ||
+                formData.use_proxy === 0
+              }
               onChange={handleFieldChange}
             />
-            <Label check className="ml-1">No</Label>
+            <Label check className="ml-1">
+              No
+            </Label>
           </div>
         </FormGroup>
       </Col>
       <Col>
         <FormGroup>
-          <Label for="folder">Folder</Label>
+          <Label htmlFor="folder">Folder</Label>
           <Input
             type="select"
             id="folder"
@@ -94,24 +119,38 @@ export const AdditionalCommonFields = ({handleFieldChange, formData}) => {
       </Col>
       <Col>
         <FormGroup>
-          <Label for="start_visibility">Start Visibility</Label>
+          <Label htmlFor="start_visibility">Start Visibility</Label>
           <Input
             type="date"
             id="start_visibility"
             name="start_visibility"
-            value={formData.start_visibility || ''}
+            value={
+              formData.start_visibility ||
+              (folioCourseData
+                ? new Date(folioCourseData?.courseListingObject?.termObject?.startDate)
+                    .toISOString()
+                    .split('T')[0]
+                : '')
+            }
             onChange={handleFieldChange}
           />
         </FormGroup>
       </Col>
       <Col>
         <FormGroup>
-          <Label for="end_visibility">End Visibility</Label>
+          <Label htmlFor="end_visibility">End Visibility</Label>
           <Input
             type="date"
             id="end_visibility"
             name="end_visibility"
-            value={formData.end_visibility || ''}
+            value={
+              formData.end_visibility ||
+              (folioCourseData
+                ? new Date(folioCourseData?.courseListingObject?.termObject?.endDate)
+                    .toISOString()
+                    .split('T')[0]
+                : '')
+            }
             onChange={handleFieldChange}
           />
         </FormGroup>
@@ -120,7 +159,16 @@ export const AdditionalCommonFields = ({handleFieldChange, formData}) => {
   );
 };
 
-PropTypes.AdditionalCommonFields = {
+AdditionalCommonFields.propTypes = {
   handleFieldChange: PropTypes.func.isRequired,
-  formData: PropTypes.object
+  formData: PropTypes.shape({
+    use_proxy: PropTypes.oneOfType([
+      PropTypes.bool,
+      PropTypes.string,
+      PropTypes.number,
+    ]),
+    folder: PropTypes.string,
+    start_visibility: PropTypes.string,
+    end_visibility: PropTypes.string,
+  }).isRequired,
 };

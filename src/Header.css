@@ -26,4 +26,11 @@ header .navbar {
     height: 50px; 
     width: auto;
   }
+
+  @media (max-width: 768px) {
+    .college-logo {
+      height: 20px;
+      width: 100%;
+    }
+  }
   

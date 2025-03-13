@@ -22,6 +22,9 @@ import { AdditionalCommonFields } from './AdditionalCommonFields';
 import { TypeSpecificFields } from './TypeSpecificFields';
 import { adminMaterialTypeService } from '../../../services/admin/adminMaterialTypeService';
 import { adminCourseService } from '../../../services/admin/adminCourseService';
+import { useAdminCourseStore } from '../../../store/adminCourseStore';
+import { adjustProxy } from '../../../util/proxyUtil';
+import { toast } from 'react-toastify';
 /**
  * AdminHitchcockForm
  *
@@ -31,7 +34,11 @@ import { adminCourseService } from '../../../services/admin/adminCourseService';
  * - Displays the results in a table.
  * - When a result is selected, a modal opens so you can add additional details.
  */
-export const AdminHitchcockForm = ({ course, onSubmit }) => {
+export const AdminHitchcockForm = ({ onSubmit }) => {
+
+  //store values
+  const { course, folioCourseData } = useAdminCourseStore();
+
   // State for the search input and results
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -169,24 +176,18 @@ export const AdminHitchcockForm = ({ course, onSubmit }) => {
    * Submits the resource. Replace the example submission with your actual service call.
    */
   const handleSubmitResource = async () => {
+    const data = course
     try {
       setLoading(true);
-      // If proxy is enabled, adjust the link accordingly.
-      let finalLink = formData.link || '';
-      if (formData.use_proxy) {
-        const proxyPrefix = "https://libproxy.smith.edu/login?url=";
-        if (!finalLink.startsWith(proxyPrefix)) {
-          finalLink = proxyPrefix + finalLink;
-        }
-      }
-      const submissionData = { ...formData, link: finalLink };
-      await adminCourseService.createResource(course.course_id, submissionData);
-      alert('Resource added successfully!');
+      const submissionData = { ...formData };
+      adjustProxy(submissionData);
+      await adminCourseService.createResource(data.offering_id, data.course_id, submissionData, folioCourseData);
+      toast.success('Resource added successfully');
       setEditModalOpen(false);
       onSubmit();
     } catch (err) {
       console.error('Error submitting resource:', err);
-      setError(err.message);
+      toast.error('Failed to add resource');
     } finally {
       setLoading(false);
     }
@@ -203,7 +204,7 @@ export const AdminHitchcockForm = ({ course, onSubmit }) => {
       setTimeout(() => setCopiedField(null), 2000);
     } catch (err) {
       console.error('Failed to copy text:', err);
-      setError('Failed to copy text to clipboard.');
+      toast.error('Failed to copy text');
     }
   };
 
@@ -330,6 +331,7 @@ export const AdminHitchcockForm = ({ course, onSubmit }) => {
                         <AdditionalCommonFields 
                           handleFieldChange={handleFieldChange}
                           formData={formData}
+                          setFormData={setFormData}
                         />
                       </div>
                     </Col>
@@ -380,7 +382,7 @@ export const AdminHitchcockForm = ({ course, onSubmit }) => {
               {/* Right Column: Display raw API data from the selected record */}
               <Col md={4}>
                 <h5>Available API Data</h5>
-                <p>Click "Copy" to copy its value:</p>
+                <p>Click Copy to copy its value:</p>
                 {selectedRecord && (
                   <ListGroup>
                     {Object.entries(selectedRecord).map(([key, value], index) => (

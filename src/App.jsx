@@ -13,9 +13,16 @@ import ProtectedRoutePage from './components/ProtectedRoutePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Admin from './pages/Admin';
 import { useLocation } from 'react-router-dom';
-import AdminElectronicResources from './components/AdminElectronicResources';
+import AdminElectronicResources from './pages/AdminElectronicResources';
 import useRefreshToken from './hooks/useRefreshToken';
 import { useNavigate } from 'react-router-dom';
+import { ToastContainer  } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { all } from '@awesome.me/kit-48b7df1f35/icons'
+import CampusDetection from './components/CampusDetection';
+
+library.add(...all)
 
 function App() {
   const navigate = useNavigate();
@@ -32,18 +39,16 @@ function App() {
     localStorage.removeItem('refreshToken');
     setToken(null);
     setIsAuthorized(false);
-    navigate('/login'); // Redirect to your login page or another appropriate route
+    navigate('/'); // Redirect to your login page or another appropriate route
     alert('Your session has expired. Please log in again.');
   };
 
   useEffect(() => {
-    console.log("App useEffect: terms changed", terms);
     if (!loading && terms?.length > 0) {
       setTerms(terms);
   
       // Only set auto-detected term if selectedTermId is null (i.e. not set by the user)
       if (selectedTermId === null) {
-        console.log("App useEffect: setting termId to", autoDetectedTermId);
         setTermId(autoDetectedTermId);
       }
     }
@@ -52,13 +57,18 @@ function App() {
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tokenFromUrl = queryParams.get('token');
+    const refreshTokenFromUrl = queryParams.get('refreshToken'); 
     const storedToken = tokenFromUrl || localStorage.getItem('authToken');
+
   
     if (storedToken) {
-      console.log('Token found:', storedToken);
       setToken(storedToken);
       setIsAuthorized(true);
       localStorage.setItem('authToken', storedToken);
+
+      if (refreshTokenFromUrl) {
+        localStorage.setItem('refreshToken', refreshTokenFromUrl);
+      }
   
       // Clean the URL if the token was in the query string
       if (tokenFromUrl) {
@@ -85,6 +95,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
           <Route path="/records" element={<CourseRecords />} />
+          <Route path="/records/:uuid" element={<CourseRecords />} />
           <Route path="/protected-route" element = {<ProtectedRoutePage />} />
           <Route path="/admin"
             element={
@@ -115,7 +126,6 @@ function Layout() {
   return (
     <>
     <Header />
-
     {/* Only render the search bar if not on admin routes */}
     {!isAdminPath && <Searchbar />}
     {!isAdminPath && <div className="main-content"> <App /> </div>}
@@ -127,7 +137,9 @@ function Layout() {
 function RootApp() {
   return(
     <Router basename="course-reserves">
-        <Layout />
+         <CampusDetection />
+         <ToastContainer />
+          <Layout />
     </Router>
   )
 }

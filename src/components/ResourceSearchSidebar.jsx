@@ -6,15 +6,15 @@ import {
   Input,
   Button,
   Collapse,
-  Alert
+  Spinner
 } from 'reactstrap';
+import { toast } from 'react-toastify';
 import useResourceSearchStore from '../store/resourceSearchStore';
 import { adminMaterialTypeService } from '../services/admin/adminMaterialTypeService';
-import { adminResourceService } from '../services/admin/adminResourceService'
+import { adminResourceService } from '../services/admin/adminResourceService';
 
 function ResourceSearchSidebar() {
   const [isOpen, setIsOpen] = useState(true);
-  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [materialTypes, setMaterialTypes] = useState([]);
   
@@ -28,32 +28,35 @@ function ResourceSearchSidebar() {
   
   const [activeTypeFields, setActiveTypeFields] = useState([]);
 
+  // Fetch material types on mount.
+  useEffect(() => {
+    const fetchMaterialTypes = async () => {
+      try {
+        const { data } = await adminMaterialTypeService.getMaterialTypes();
+        setMaterialTypes(data);
+      } catch (err) {
+        console.error('Error fetching material types:', err);
+        toast.error('Error fetching material types.');
+      }
+    };
+    fetchMaterialTypes();
+  }, []);
 
-    useEffect(() => {
-      const fetchMaterialTypes = async () => {
-        try {
-          const { data } = await adminMaterialTypeService.getMaterialTypes();
-          setMaterialTypes(data);
-        } catch (err) {
-          console.error('Error fetching material types:', err);
-        }
-      };
-      fetchMaterialTypes();
-    }, []);
-
+  // Update dynamic metadata fields when the material type filter changes.
   useEffect(() => {
     if (filters.materialTypeId) {
-      const selectedType = materialTypes.find(t => 
-        t.material_type_id === filters.materialTypeId
+      const selectedType = materialTypes.find(
+        t => t.material_type_id === filters.materialTypeId
       );
       setActiveTypeFields(selectedType?.fields || []);
+    } else {
+      setActiveTypeFields([]);
     }
   }, [filters.materialTypeId, materialTypes]);
 
+  // Execute resource search.
   const handleSearch = async () => {
-    setError(null);
     setLoading(true);
-    
     try {
       const { data, pagination } = await adminResourceService.searchResources({
         name: filters.name,
@@ -64,16 +67,18 @@ function ResourceSearchSidebar() {
         page: filters.page,
         perPage: filters.perPage
       });
-
       setSearchResults(data);
       setPagination(pagination);
+      toast.success('Search completed successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to search resources');
+      console.error('Failed to search resources:', err);
+      toast.error(err.message || 'Failed to search resources.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Update metadata filter value.
   const handleMetadataChange = (fieldName, value) => {
     setFilters({
       ...filters,
@@ -84,13 +89,20 @@ function ResourceSearchSidebar() {
     });
   };
 
+  // Reset filters and re-run the search.
+  const handleReset = async () => {
+    setLoading(true);
+    resetFilters();
+    setActiveTypeFields([]);
+    setSearchResults([]); // Clear current results for immediate feedback.
+    await handleSearch();
+  };
+
   return (
     <div className="resource-sidebar bg-light p-3 h-100">
       <Collapse isOpen={isOpen}>
         <div className="sidebar-inner p-3">
           <h5 className="mb-3">Resource Search</h5>
-          {error && <Alert color="danger" className="mb-3">{error}</Alert>}
-          
           <Form onSubmit={async (e) => {
             e.preventDefault();
             await handleSearch();
@@ -100,7 +112,7 @@ function ResourceSearchSidebar() {
               <Label>Resource Name</Label>
               <Input
                 type="text"
-                value={filters.name}
+                value={filters.name || ''}
                 onChange={e => setFilters({ ...filters, name: e.target.value })}
               />
             </FormGroup>
@@ -109,7 +121,7 @@ function ResourceSearchSidebar() {
               <Label>Material Type</Label>
               <Input
                 type="select"
-                value={filters.materialTypeId}
+                value={filters.materialTypeId || ''}
                 onChange={e => setFilters({ ...filters, materialTypeId: e.target.value })}
               >
                 <option value="">All Types</option>
@@ -128,18 +140,20 @@ function ResourceSearchSidebar() {
                 {field.field_type === 'select' ? (
                   <Input
                     type="select"
-                    value={filters.metadata[field.field_name] || ''}
+                    value={(filters.metadata && filters.metadata[field.field_name]) || ''}
                     onChange={e => handleMetadataChange(field.field_name, e.target.value)}
                   >
                     <option value="">All</option>
                     {JSON.parse(field.options_json).map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
                     ))}
                   </Input>
                 ) : (
                   <Input
                     type="text"
-                    value={filters.metadata[field.field_name] || ''}
+                    value={(filters.metadata && filters.metadata[field.field_name]) || ''}
                     onChange={e => handleMetadataChange(field.field_name, e.target.value)}
                   />
                 )}
@@ -152,17 +166,17 @@ function ResourceSearchSidebar() {
               <div className="d-flex gap-2">
                 <Input
                   type="date"
-                  value={filters.startDate}
+                  value={filters.startDate || ''}
                   onChange={e => setFilters({ ...filters, startDate: e.target.value })}
                 />
-                </div>
-                </FormGroup>
-                <FormGroup>
-                <Label>End Date</Label>
-                <div className="d-flex gap-2">
+              </div>
+            </FormGroup>
+            <FormGroup>
+              <Label>End Date</Label>
+              <div className="d-flex gap-2">
                 <Input
                   type="date"
-                  value={filters.endDate}
+                  value={filters.endDate || ''}
                   onChange={e => setFilters({ ...filters, endDate: e.target.value })}
                 />
               </div>
@@ -170,14 +184,20 @@ function ResourceSearchSidebar() {
 
             {/* Action Buttons */}
             <div className="d-flex gap-2 mt-4">
-              <Button color="primary" type="submit">
-                Search
+              <Button color="primary" type="submit" disabled={loading}>
+                {loading ? <Spinner size="sm" /> : 'Search'}
               </Button>
-              <Button color="secondary" onClick={resetFilters}>
+              <Button color="secondary" type="button" onClick={handleReset} disabled={loading}>
                 Reset
               </Button>
             </div>
           </Form>
+
+          {loading && (
+            <div className="mt-3 text-center">
+              <Spinner color="primary" />
+            </div>
+          )}
         </div>
       </Collapse>
     </div>

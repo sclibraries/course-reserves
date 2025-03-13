@@ -1,18 +1,10 @@
 // src/components/AdminCourseCard.jsx
-import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardTitle, CardText, Button, Spinner } from 'reactstrap';
+import { Card, CardBody, CardTitle, CardText, Button} from 'reactstrap';
 import useCourseManagementStore from '../store/courseManagementStore';
-import { fetchRecords } from './CourseRecords/api';
-import { adminCourseService } from '../services/admin/adminCourseService';
 
 function AdminCourseCard({ course, onDetailsClick }) {
-  const [printCount, setPrintCount] = useState(0);
-  const [electronicCount, setElectronicCount] = useState(0);
-  const [loadingPrintCount, setLoadingPrintCount] = useState(false);
-  const [loadingElectronicCount, setLoadingElectronicCount] = useState(false);
-  const [ setError] = useState(null);
   const { setCourse } = useCourseManagementStore();
   const navigate = useNavigate();
 
@@ -25,46 +17,6 @@ function AdminCourseCard({ course, onDetailsClick }) {
   } = course;
 
   const courseListingId = courseListingObject?.id;
-
-  // Fetch the number of print items.
-  const fetchPrintItems = useCallback(async () => {
-    if (!courseListingId) return;
-    setLoadingPrintCount(true);
-    setError(null);
-
-    try {
-      const reserves = await fetchRecords(courseListingId);
-      setPrintCount(reserves.length);
-    } catch (err) {
-      setError(`Failed to fetch print count: ${err.message || err}`);
-      setPrintCount(0);
-    } finally {
-      setLoadingPrintCount(false);
-    }
-  }, [courseListingId]);
-
-  // Fetch the number of electronic items.
-  const fetchElectronicItems = useCallback(async () => {
-    if (!courseListingId) return;
-    setLoadingElectronicCount(true);
-    setError(null);
-
-    try {
-      const reserves = await adminCourseService.getResourcesByCourse(courseListingId);
-      setElectronicCount(reserves.count || 0);
-    } catch (err) {
-      setError(`Failed to fetch electronic count: ${err.message || err}`);
-      setElectronicCount(0);
-    } finally {
-      setLoadingElectronicCount(false);
-    }
-  }, [courseListingId]);
-
-  // Load both counts when the component mounts or when courseListingId changes.
-  useEffect(() => {
-    // fetchPrintItems();
-    // fetchElectronicItems();
-  }, [fetchPrintItems, fetchElectronicItems]);
 
   // Derive display strings.
   const departmentName = departmentObject?.name || 'Unknown Department';
@@ -125,14 +77,6 @@ function AdminCourseCard({ course, onDetailsClick }) {
         </CardText>
         <CardText>
           <strong>Status:</strong> {isActive ? 'Active' : 'Inactive'}
-        </CardText>
-        <CardText>
-          <strong>Print Items:</strong>{' '}
-          {loadingPrintCount ? <Spinner size="sm" color="primary" /> : printCount}
-        </CardText>
-        <CardText>
-          <strong>Electronic Items:</strong>{' '}
-          {loadingElectronicCount ? <Spinner size="sm" color="primary" /> : electronicCount}
         </CardText>
 
         {/* Button for managing course details */}

@@ -23,8 +23,10 @@ import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
 import { EDS_TO_DB_FIELD_MAPPING } from '../../../constants/edsFieldMapping';
 import { AdditionalCommonFields } from './AdditionalCommonFields';
 import { TypeSpecificFields } from './TypeSpecificFields';
+import { useAdminCourseStore } from '../../../store/adminCourseStore';
+import { toast } from 'react-toastify';
 
-export const AdminEDSForm = ({ course, onSubmit }) => {
+export const AdminEDSForm = ({ onSubmit }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -35,6 +37,8 @@ export const AdminEDSForm = ({ course, onSubmit }) => {
   const [error, setError] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
+  const { course, folioCourseData } = useAdminCourseStore();
+  const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
 
   // Main form data for the resource.
   const [formData, setFormData] = useState({
@@ -166,19 +170,34 @@ export const AdminEDSForm = ({ course, onSubmit }) => {
     }
   };
 
+  function adjustProxy(data) {
+    // Basic error checking
+    if (!data || typeof data.link !== "string") {
+      throw new Error("Invalid data or missing link property");
+    }
+    
+    // Check explicitly against the numbers 1 or 0.
+    if (data.use_proxy == 1) {
+      // Add the proxy prefix if it's not already present.
+      if (!data.link.startsWith(PROXY_PREFIX)) {
+        data.link = PROXY_PREFIX + data.link;
+      }
+    } else if (data.use_proxy == 0) {
+      // Remove the proxy prefix if it's present.
+      if (data.link.startsWith(PROXY_PREFIX)) {
+        data.link = data.link.replace(PROXY_PREFIX, "");
+      }
+    }
+  }
+
   const handleSubmitResource = async () => {
+    const data = course
     try {
       setLoading(true);
-      let finalLink = formData.link || '';
-      if (formData.use_proxy) {
-        const proxyPrefix = "https://libproxy.smith.edu/login?url=";
-        if (!finalLink.startsWith(proxyPrefix)) {
-          finalLink = proxyPrefix + finalLink;
-        }
-      }
-      const submissionData = { ...formData, link: finalLink };
-      await adminCourseService.createResource(course.course_id, submissionData);
-      alert('Resource added successfully!');
+      const submissionData = { ...formData };
+      adjustProxy(submissionData);
+      await adminCourseService.createResource(data.offering_id, data.course_id, submissionData, folioCourseData);
+      toast.success('Resource added successfully');
       setEditModalOpen(false);
       onSubmit();
     } catch (err) {
@@ -196,7 +215,6 @@ export const AdminEDSForm = ({ course, onSubmit }) => {
     return `https://openurl.ebsco.com/c/4e4lys/openurl?sid=ebsco:plink&id=ebsco:${encodeURIComponent(dbId)}:${encodeURIComponent(accession)}`;
   };
 
-  console.log(selectedRecord)
 
   return (
     <div>
@@ -329,6 +347,7 @@ export const AdminEDSForm = ({ course, onSubmit }) => {
                         <AdditionalCommonFields 
                            handleFieldChange={handleFieldChange}
                            formData={formData}
+                           setFormData={setFormData}
                         />
                       </div>
                     </Col>

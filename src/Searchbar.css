@@ -1,6 +1,9 @@
 /* Searchbar.css */
 .searchbar-container {
-  padding: 1rem;
+  padding-top: 1em;
+  padding-left: 2.5em;
+  padding-right: 2.5em;
+  padding-bottom: .5em;
   border-bottom: 1px solid #ccc;
   width: 100%;
 }
