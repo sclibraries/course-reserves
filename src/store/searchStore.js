@@ -1,9 +1,7 @@
 // store/searchStore.js
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 const useSearchStore = create(
-  persist(
     (set) => ({
       // Existing state
       college: 'all',
@@ -14,7 +12,6 @@ const useSearchStore = create(
       sortOption: '',
       termId: null,
       terms: [],
-
       setTermId: (termId) => set({ termId }),
       setTerms: (terms) => set({ terms }),
       termsLoading: false,
@@ -68,7 +65,6 @@ const useSearchStore = create(
       name: 'search-storage', // Name of storage key
       getStorage: () => sessionStorage,
     }
-  )
 );
 
 export default useSearchStore;

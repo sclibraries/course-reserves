@@ -126,6 +126,7 @@ function Searchbar() {
     }).catch(err => console.error("Error tracking search event:", err));
 
     setType(areaKey);
+    console.log(collegeKey)
     setCollege(collegeKey);
     setQuery(sanitizedInput);
 
@@ -138,6 +139,7 @@ function Searchbar() {
 
     navigate(`/search?${queryParams.toString()}`);
   };
+
 
   const handleReset = () => {
     // Track the reset
@@ -287,6 +289,7 @@ function Searchbar() {
     }
   };
 
+
   return (
     <div className="searchbar-container" role="search">
       <NavbarToggler
@@ -339,13 +342,17 @@ function Searchbar() {
                   // Reset all search parameters when college changes
                   setSelectedCollege(newCollege);
                   setCollege(newCollegeKey);
+                  useCustomizationStore.getState().setCurrentCollege(newCollegeKey);
                   setDepartment('');
                   setSearchInput('');
                   setSearchArea('All fields');
                   setType('all');
                   setSortOption('');
 
-                  navigate('/search?college=' + newCollegeKey);
+                  const queryParams = new URLSearchParams(location.search);
+                  queryParams.set('college', newCollegeKey);
+
+                  navigate(`/search?${queryParams.toString()}`);
                 }}
                 aria-live="polite"
                 aria-describedby="college-reset-warning"

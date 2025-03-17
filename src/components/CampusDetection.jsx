@@ -62,7 +62,6 @@ const computedIPRanges = ipCampusMappings.map(mapping => {
   return { ...mapping, start, end };
 });
 
-console.log('Computed IP ranges:', computedIPRanges);
 
 /**
  * Determines the college code based on a provided IP address.
@@ -78,7 +77,6 @@ const getCollegeFromIP = (ip) => {
       return mapping.college;
     }
   }
-  console.log("ip", ip)
   return 'default';
 };
 
@@ -95,16 +93,23 @@ const CampusDetection = () => {
   const setCurrentCollege = useCustomizationStore(state => state.setCurrentCollege);
 
   useEffect(() => {
-    // If a college is specified in the URL, that overrides IP-based detection.
     if (urlCollege) {
       setCurrentCollege(urlCollege);
     } else {
+      // Check if there's already a college set in Zustand store
+      const currentStoredCollege = useCustomizationStore.getState().currentCollege;
+  
+      if (currentStoredCollege && currentStoredCollege !== 'default') {
+        // Do nothing because college is already explicitly set by the user
+        return;
+      }
+  
+      // Perform IP detection if no stored college
       const fetchIP = async () => {
         try {
           const response = await fetch('https://api.ipify.org?format=json');
           const data = await response.json();
           const determinedCollege = getCollegeFromIP(data.ip);
-          console.log('Detected college:', determinedCollege);
           setCurrentCollege(determinedCollege);
         } catch (error) {
           console.error("Error fetching IP:", error);
@@ -113,7 +118,6 @@ const CampusDetection = () => {
       fetchIP();
     }
   }, [urlCollege, setCurrentCollege, location.search]);
-
   return null; // This component does not render any UI.
 };
 

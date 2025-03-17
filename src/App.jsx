@@ -126,6 +126,8 @@ function Layout() {
   return (
     <>
     <Header />
+    <CampusDetection />
+
     {/* Only render the search bar if not on admin routes */}
     {!isAdminPath && <Searchbar />}
     {!isAdminPath && <div className="main-content"> <App /> </div>}
@@ -137,7 +139,6 @@ function Layout() {
 function RootApp() {
   return(
     <Router basename="course-reserves">
-         <CampusDetection />
          <ToastContainer />
           <Layout />
     </Router>
