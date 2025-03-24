@@ -24,6 +24,7 @@ const useCustomizationStore = create((set, get) => ({
       recordsDiscoverLinkBaseUrl:
         'https://search.ebscohost.com/login.aspx?direct=true&AuthType=ip,guest,sso&db=cat09204a&site=eds-live&scope=site&custid= s8515197&groupid=main&AN=hcfc.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.hampshire.edu',
+      additionalHeaderText: ''
     },
     mtholyoke: {
       campusLocation: 'mtholyoke',
@@ -48,6 +49,7 @@ const useCustomizationStore = create((set, get) => ({
       recordsDiscoverLinkBaseUrl:
         'https://search.ebscohost.com/login.aspx?direct=true&AuthType=ip,guest,sso&db=cat09205a&site=eds-live&scope=site&custid=s8884507&groupid=main&AN=mhf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.mtholyoke.edu',
+      additionalHeaderText: ''
     },
     umass: {
       campusLocation: 'umass',
@@ -72,6 +74,7 @@ const useCustomizationStore = create((set, get) => ({
       recordsDiscoverLinkBaseUrl:
         'https://search.ebscohost.com/login.aspx?direct=true&site=eds-live&scope=site&custid=umaah&groupid=main&AuthType=ip,guest,sso&db=cat09207a&AN=umf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.umass.edu',
+      additionalHeaderText: 'If your course is not listed here, try searching for textbooks, streaming video, and other resources in the UMass Libraries <a target="_blank" href="https://nam10.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.library.umass.edu%2F&data=05%7C02%7Cmargaret.youngberg%40umass.edu%7C533428f7ee064c82d3e008dd5fe8e93e%7C7bd08b0b33954dc194bbd0b2e56a497f%7C0%7C0%7C638772176129627665%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=NX0gE0mrdXtJ8tZa%2Bb7Mkhf%2BinOOKEcHMqnFhIq%2FyaU%3D&reserved=0"> Discovery Search</a>.'
     },
     amherst: {
       campusLocation: 'amherst',
@@ -96,6 +99,7 @@ const useCustomizationStore = create((set, get) => ({
       recordsDiscoverLinkBaseUrl:
         'https://search.ebscohost.com/login.aspx?direct=true&AuthType=ip,guest,sso&groupid=main&site=eds-live&scope=site&custid=s8897430&db=cat09203a&AN=acf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.amherst.edu',
+      additionalHeaderText: ''
     },
     smith: {
       campusLocation: 'smith',
@@ -120,6 +124,7 @@ const useCustomizationStore = create((set, get) => ({
       recordsDiscoverLinkBaseUrl:
         'https://openurl.ebsco.com/c/4e4lys/openurl?sid=ebsco:plink&id=ebsco:cat09206a:scf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.',
       moodleLink: 'https://moodle.smith.edu',
+      additionalHeaderText: ''
     },
     default: {
       logoUrl: '',
@@ -140,7 +145,8 @@ const useCustomizationStore = create((set, get) => ({
       accordionHeaderBgColor: '#f8f9fa',
       accordionHeaderTextColor: '#000000',
       recordsDiscoverLinkBaseUrl: '',
-      moodleLink: '', // Or a generic Moodle URL if applicable
+      moodleLink: '',
+      additionalHeaderText: ''
     },
   },
   currentCollege: 'default',

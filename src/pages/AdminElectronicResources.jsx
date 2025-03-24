@@ -24,12 +24,12 @@ import {
   CardBody
 } from 'reactstrap';
 import classnames from 'classnames';
-import { fetchCourseData, fetchRecords } from '../components/CourseRecords/api';
+import { fetchCourseData, fetchRecords } from '../components/page-sections/course-record/api';
 import { adminCourseService } from '../services/admin/adminCourseService';
 import { useAdminModal } from '../hooks/admin/useAdminModal';
 import { useAdminResourceStore } from '../store/adminResourceStore';
 import { transformFolioCourseToLocal } from '../util/adminTransformers';
-import { AdminResourceTable } from '../components/admin/AdminResourceTable';
+import { AdminResourceTable } from '../components/page-sections/admin/AdminResourceTable';
 import { AdminNewResourceModal } from '../components/admin/modals/AdminNewResourceModal';
 import { AdminReuseResourceModal } from '../components/admin/modals/AdminReuseResourceModal';
 import { ADMIN_ERROR_MESSAGES } from '../constants/admin';

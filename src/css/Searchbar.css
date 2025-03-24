@@ -1,0 +1,130 @@
+/* Searchbar.css */
+.searchbar-container {
+  position: fixed;
+  top: 75px; 
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  z-index: 1030;
+  padding-top: 1em;
+  padding-left: 2.5em;
+  padding-right: 2.5em;
+  padding-bottom: .1em;
+  border-bottom: 1px solid #ccc;
+  width: 100%;
+}
+
+.searchbar-container form {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.searchbar-container button {
+  margin-top: 33px;
+}
+
+@media (max-width: 576px) {
+  .searchbar-container button {
+    margin-top: 0px;
+  }
+}
+
+.searchbar-toggle {
+  border: none; 
+  background: none; 
+  padding: 0; 
+  cursor: pointer;
+}
+
+.searchbar-toggle .navbar-toggler-icon {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cpath stroke='rgba(0, 0, 0, 0.5)' stroke-linecap='round' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100%;
+}
+
+.searchbar-expanded {
+  display: block;
+  width: 100%;
+}
+
+.searchbar-collapsed {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .searchbar-toggle {
+    display: none; /* Hide toggle button on larger screens */
+  }
+
+  .searchbar-container .searchbar-expanded,
+  .searchbar-container .searchbar-collapsed {
+    display: flex;
+  }
+}
+
+.admin-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar-wrapper {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  width: 300px; /* Adjust width as needed */
+  transition: transform 0.3s ease;
+}
+
+.admin-main-content {
+  margin-left: 300px; /* Same as sidebar width */
+  height: 100vh;
+  overflow-y: auto;
+  transition: margin 0.3s ease;
+}
+
+.admin-sidebar {
+  height: 100%;
+  margin-top: 75px;
+  overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.resource-sidebar {
+  height: 100%;
+  margin-top: 75px;
+  overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.mobile-toggle {
+  position: absolute;
+  right: -40px;
+  top: 10px;
+  z-index: 1001;
+}
+
+/* Responsive handling */
+@media (max-width: 992px) {
+  .sidebar-wrapper {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar-wrapper.open {
+    transform: translateX(0);
+  }
+
+  .admin-main-content {
+    margin-left: 0;
+  }
+  
+  .admin-sidebar {
+    width: 100vw;
+  }
+}

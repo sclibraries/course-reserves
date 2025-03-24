@@ -15,6 +15,6 @@ AdminEditResourceModal.propTypes = {
     isOpen: PropTypes.bool.isRequired,
     toggle: PropTypes.func.isRequired,
     onSubmit: PropTypes.func.isRequired,
-    course: PropTypes.object.isRequired
+    resource: PropTypes.object.isRequired
     };
 export default AdminEditResourceModal;

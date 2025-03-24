@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { config } from '../config';
+
+const FOLIO_SEARCH_URL = `${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}`;
 
 const initialState = {
   count: 0,
@@ -9,7 +12,7 @@ const initialState = {
   sort: 'name',
   filters: [],
   limit: 100,
-  baseUrl: 'https://libtools2.smith.edu/folio/web/search/search-courses',
+  baseUrl: FOLIO_SEARCH_URL,
   lastFetchedQuery: null, 
   currentSemester: null
 };

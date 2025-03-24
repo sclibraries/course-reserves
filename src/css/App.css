@@ -1,0 +1,123 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;          
+  background-color: #fff; 
+}
+
+#root {
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 100vh;      
+  background-color: #fff; 
+  box-sizing: border-box; 
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+
+.course-records-container {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.column {
+  flex: 1 1 50%;
+  box-sizing: border-box;
+}
+
+.left-column {
+  padding-right: 10px;
+}
+
+.right-column {
+  padding-left: 10px;
+}
+
+.resource-item {
+  margin-bottom: 15px;
+}
+
+.main-content {
+  padding-top: 12em; 
+}
+
+@media (max-width: 576px) {
+  .main-content {
+    padding-top: 12em;
+  }
+}
+
+.logo__img {
+  width: 150px;
+  height: auto;
+}
+
+.icon-button {
+  padding: 0.25rem;          /* Padding around the icon */
+  border-radius: 4px;       /* Slightly rounded corners */
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; /* Smooth transitions */
+  background-color: transparent;  /* No default background */
+  border: 1px solid transparent; /* Initially transparent border */
+}
+
+.icon-button:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* Light gray background on hover */
+  border-color: #007bff;            /* Bootstrap primary color border on hover */
+  /* OR, for a more subtle border: */
+  /* border-color: #6c757d; */       /* Gray border */
+}
+
+.icon-button svg {
+  transition: transform 0.2s ease-in-out, color 0.2s ease-in-out;
+  color: #6c757d;
+}
+
+.icon-button:hover svg {
+  transform: scale(1.15);  /* Slightly smaller scale on hover */
+  color: #007bff;
+}
+
+.admin-resource-table .resource-row.is-dragging {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.admin-resource-table .resource-link {
+  word-break: break-all;
+  color: #0066cc;
+}
+
+.admin-resource-table .resource-link:hover {
+  text-decoration: underline;
+}
+
+button:focus, a:focus {
+  outline: 2px solid #0056b3;
+  outline-offset: 2px;
+}

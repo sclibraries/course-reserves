@@ -1,6 +1,6 @@
 // Home.jsx
 import { Container, Row, Col } from 'reactstrap';
-import '../Home.css';
+import '../css/Home.css';
 
 function Home() {
   return (

@@ -1,10 +1,9 @@
 // src/hooks/useFolderManagement.js
 import { useState, useEffect } from 'react';
+import { config } from '../config';
 
-const API_BASE = 'https://libtools2.smith.edu/course-reserves/backend/web';
-
-// Helper to get the auth token
-const getAuthToken = () => localStorage.getItem('authToken') || '';
+const API_BASE = config.api.urls.courseReserves;
+const getAuthToken = config.api.getAuthToken;
 
 export const useFolderManagement = () => {
   const [folders, setFolders] = useState([]);
@@ -16,10 +15,11 @@ export const useFolderManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/folder`, {
+      const FOLDER_ENDPOINT = `${API_BASE}${config.api.endpoints.folder.base}`;
+      const response = await fetch(FOLDER_ENDPOINT, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
+          'Authorization': `${getAuthToken()}`,
         },
       });
       if (!response.ok) {

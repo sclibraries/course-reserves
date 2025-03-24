@@ -1,6 +1,7 @@
 // src/hooks/useRefreshToken.js
 import { useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { config } from '../config';
 
 /**
  * Custom hook to automatically refresh the access token.
@@ -49,9 +50,9 @@ const useRefreshToken = (token, setToken, logout) => {
         if (!storedRefreshToken) {
           throw new Error('No refresh token available');
         }
-
+        const REFRESH_TOKEN_URL = `${config.api.urls.courseReserves}${config.api.endpoints.auth.refreshToken}`;
         // Call the backend refresh endpoint
-        const response = await fetch('https://libtools2.smith.edu/course-reserves/backend/admin/refresh-token', {
+        const response = await fetch(REFRESH_TOKEN_URL, {
           method: 'POST',
           credentials: 'include', // if your backend uses cookies
           headers: {

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Row, Col, Button, Spinner, Alert, ButtonGroup, Badge } from 'reactstrap';
-
+import { config } from '../config';
 import useRecordStore from '../store/recordStore';
 import useCustomizationStore from '../store/customizationStore';
 import { trackingService } from '../services/trackingService';
@@ -15,15 +15,15 @@ import {
   fetchElectronicReserves,
   fetchItemAvailabilityData,
   fetchCrossLinkedCourses
-} from '../components/CourseRecords/api';
+} from '../components/page-sections/course-record/api';
 
-import RecordCard from '../components/CourseRecords/RecordCard';
-import RecordTable from '../components/CourseRecords/RecordTable';
+import RecordCard from '../components/page-sections/course-record/RecordCard';
+import RecordTable from '../components/page-sections/course-record/RecordTable';
 
 function CourseRecords() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { uuid } = useParams();
+  const { uuid, courseCode } = useParams();
 
   const searchParams = new URLSearchParams(location.search);
   const collegeParam = searchParams.get('college');
@@ -63,6 +63,40 @@ function CourseRecords() {
       fetchFOLIOCourseListingId();
     }
   }, [uuid]);
+
+  useEffect(() => {
+    if (!courseCode) return;
+  
+    const fetchFOLIOCourseListingId = async () => {
+      try {
+        const response = await fetch(`${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}?query=(courseNumber=="${courseCode}")`);
+        if (!response.ok) {
+          throw new Error(`Network response was not ok: ${response.status}`);
+        }
+  
+        const result = await response.json();
+  
+        if (result?.data?.courses?.length > 0) {
+          // Sort courses by startDate descending to find the most recent
+          const currentCourse = result.data.courses
+            .sort((a, b) => new Date(b.courseListingObject.termObject.startDate) - new Date(a.courseListingObject.termObject.startDate))[0];
+  
+          if (currentCourse?.courseListingId) {
+            setRecord(currentCourse.courseListingId);
+          } else {
+            console.info('Course listing ID not found for the current course.');
+          }
+        } else {
+          console.info('No courses found matching the course code provided.');
+        }
+      } catch (e) {
+        console.error(`Failed to fetch course data: ${e.message}`);
+      }
+    };
+  
+    fetchFOLIOCourseListingId();
+  
+  }, [courseCode, config.api.urls.folio]);
             
       //We need to grab the courseListingId from the uuid
 
@@ -216,58 +250,58 @@ function CourseRecords() {
   }, []);
 
   // Compute grouped and ungrouped items (for table view; unchanged)
-  const { grouped, ungrouped } = useMemo(() => {
-    const grouped = {};
-    const ungrouped = [];
-    records.forEach(item => {
-      if (item.folder_id) {
-        const groupName = item.folder_name;
-        if (!grouped[groupName]) {
-          grouped[groupName] = [];
-        }
-        grouped[groupName].push(item);
-      } else {
-        ungrouped.push(item);
-      }
-    });
+  // const { grouped, ungrouped } = useMemo(() => {
+  //   const grouped = {};
+  //   const ungrouped = [];
+  //   records.forEach(item => {
+  //     if (item.folder_id) {
+  //       const groupName = item.folder_name;
+  //       if (!grouped[groupName]) {
+  //         grouped[groupName] = [];
+  //       }
+  //       grouped[groupName].push(item);
+  //     } else {
+  //       ungrouped.push(item);
+  //     }
+  //   });
 
-    let filteredGrouped = {};
-    let filteredUngrouped = [];
+  //   let filteredGrouped = {};
+  //   let filteredUngrouped = [];
 
-    if (filter !== 'all') {
-      const filterFunc = filter === 'print'
-        ? item => !item.isElectronic
-        : item => item.isElectronic;
+  //   if (filter !== 'all') {
+  //     const filterFunc = filter === 'print'
+  //       ? item => !item.isElectronic
+  //       : item => item.isElectronic;
 
-      for (const groupName in grouped) {
-        const filteredItems = grouped[groupName].filter(filterFunc);
-        if (filteredItems.length > 0) {
-          filteredGrouped[groupName] = filteredItems;
-        }
-      }
-      filteredUngrouped = ungrouped.filter(filterFunc);
-    } else {
-      filteredGrouped = grouped;
-      filteredUngrouped = ungrouped;
-    }
+  //     for (const groupName in grouped) {
+  //       const filteredItems = grouped[groupName].filter(filterFunc);
+  //       if (filteredItems.length > 0) {
+  //         filteredGrouped[groupName] = filteredItems;
+  //       }
+  //     }
+  //     filteredUngrouped = ungrouped.filter(filterFunc);
+  //   } else {
+  //     filteredGrouped = grouped;
+  //     filteredUngrouped = ungrouped;
+  //   }
 
-    // Sort items within each group by title
-    Object.keys(filteredGrouped).forEach(key => {
-      filteredGrouped[key].sort((a, b) => {
-        const titleA = a.copiedItem.title.toLowerCase();
-        const titleB = b.copiedItem.title.toLowerCase();
-        return titleA.localeCompare(titleB);
-      });
-    });
-    // Sort ungrouped items by title
-    filteredUngrouped.sort((a, b) => {
-      const titleA = a.copiedItem.title.toLowerCase();
-      const titleB = b.copiedItem.title.toLowerCase();
-      return titleA.localeCompare(titleB);
-    });
+  //   // Sort items within each group by title
+  //   Object.keys(filteredGrouped).forEach(key => {
+  //     filteredGrouped[key].sort((a, b) => {
+  //       const titleA = a.copiedItem.title.toLowerCase();
+  //       const titleB = b.copiedItem.title.toLowerCase();
+  //       return titleA.localeCompare(titleB);
+  //     });
+  //   });
+  //   // Sort ungrouped items by title
+  //   filteredUngrouped.sort((a, b) => {
+  //     const titleA = a.copiedItem.title.toLowerCase();
+  //     const titleB = b.copiedItem.title.toLowerCase();
+  //     return titleA.localeCompare(titleB);
+  //   });
 
-    return { grouped: filteredGrouped, ungrouped: filteredUngrouped };
-  }, [records, filter]);
+  //   return { grouped: filteredGrouped, ungrouped: filteredUngrouped };
+  // }, [records, filter]);
 
   // NEW: Combine grouped and ungrouped items into a single alphabetically sorted list
   // so that folder groups (using the folder name as the sort key) are interleaved

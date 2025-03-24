@@ -1,0 +1,35 @@
+/* Header.css */
+  header .navbar {
+    padding: 0.1rem 1rem;
+  }
+  
+  header .navbar-brand img {
+    height: 40px;
+  }
+  
+  header .navbar-text {
+    width: 100%;
+  }
+  
+  header .navbar-collapse {
+    flex-grow: 1;
+  }
+  
+  @media (max-width: 768px) {
+    header .navbar-text {
+      margin-top: 10px;
+    }
+  }
+
+  .college-logo {
+    height: 50px; 
+    width: auto;
+  }
+
+  @media (max-width: 768px) {
+    .college-logo {
+      height: 20px;
+      width: 100%;
+    }
+  }
+  

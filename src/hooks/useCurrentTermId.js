@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-
+import { config } from '../config'
 /**
  * Custom hook to fetch all terms from the backend and
  * auto-detect the current term ID by picking the one with
@@ -20,7 +20,7 @@ export function useCurrentTermId(termsApiUrl) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const DEFAULT_URL = 'https://libtools2.smith.edu/folio/web/search/search-terms';
+  const TERMS_API_URL = `${config.api.urls.folio}/search/search-terms`;
 
   useEffect(() => {
     async function fetchTerms() {
@@ -28,17 +28,19 @@ export function useCurrentTermId(termsApiUrl) {
       setError(null);
 
       try {
-        const response = await fetch(termsApiUrl || DEFAULT_URL);
+        const response = await fetch(termsApiUrl || TERMS_API_URL);
         if (!response.ok) {
           throw new Error(`Failed to fetch terms: ${response.status}`);
         }
         const data = await response.json();
-        const allTerms = data?.data?.terms || [];
+        const allTerms = (data?.data?.terms || []).slice().sort((a, b) => 
+          b.name.localeCompare(a.name)
+        );
+        console.log("useCurrentTermId: allTerms", allTerms);
         setTerms(allTerms);
-
-        // Auto-detect current term
+        
         const currentDate = new Date();
-        const sorted = allTerms.sort(
+        const sorted = allTerms.slice().sort(
           (a, b) => new Date(a.startDate) - new Date(b.startDate)
         );
         const activeTerms = sorted.filter((term) => {
@@ -51,13 +53,11 @@ export function useCurrentTermId(termsApiUrl) {
         if (activeTerms.length === 1) {
           chosenTerm = activeTerms[0];
         } else if (activeTerms.length > 1) {
-          // Pick the term with the latest startDate
           chosenTerm = activeTerms.reduce((latest, term) =>
             new Date(term.startDate) > new Date(latest.startDate) ? term : latest
           );
         }
 
-        console.log("useCurrentTermId: auto-detected termId (chosenTerm?.id)", chosenTerm?.id);
         setTermId(chosenTerm?.id || null);
       } catch (err) {
         setError(err.message);

@@ -1,5 +1,6 @@
 // store/searchStore.js
 import { create } from 'zustand';
+import { config } from '../config';
 
 const useSearchStore = create(
     (set) => ({
@@ -10,6 +11,7 @@ const useSearchStore = create(
       limit: '100',
       department: '',
       sortOption: '',
+      displayMode: 'card',
       termId: null,
       terms: [],
       setTermId: (termId) => set({ termId }),
@@ -23,6 +25,7 @@ const useSearchStore = create(
       setLimit: (limit) => set({ limit }),
       setDepartment: (department) => set({ department }),
       setSortOption: (sortOption) => set({ sortOption }),
+      setDisplayMode: (displayMode) => set({ displayMode }),
 
       resetSearchParams: () =>
         set({
@@ -32,29 +35,44 @@ const useSearchStore = create(
           limit: '100',
           department: '',
           sortOption: '',
+          displayMode: 'card',
           termId: null,
         }),
 
-      // NEW: fetchTerms action
-      fetchTerms: async () => {
+      // Modified to use config and not automatically set termId
+      fetchTerms: async (setDefaultTerm = false) => {
         try {
           set({ termsLoading: true });
-          const res = await fetch('https://libtools2.smith.edu/folio/web/search/search-terms');
+          // Use config for URL
+          const url = `${config.api.urls.folio}/search/search-terms`;
+          console.log("Fetching terms from:", url);
+          
+          const res = await fetch(url);
           if (!res.ok) {
-            throw new Error(`Failed to fetch terms: ${res.statusText}`);
+            throw new Error(`Failed to fetch terms: ${res.status}`);
           }
+          
           const json = await res.json();
-          const termItems = json?.response?.data?.terms?.item || [];
-
-          // Optionally, choose a default term ID or leave it null
-          // e.g. pick the one that is "active" by date or just the first in the list:
-          const defaultTermId = termItems[0]?.id ?? null;
-
-          set({
-            terms: termItems,
-            termId: defaultTermId,  // Set the default
-            termsLoading: false,
-          });
+          console.log("Terms response:", json);
+          
+          // Get terms from the response (adjust path if needed)
+          const termItems = json?.data?.terms || []; 
+          
+          // Only set termId if explicitly requested AND no termId is currently set
+          const currentState = useSearchStore.getState();
+          const stateUpdate = { 
+            terms: termItems, 
+            termsLoading: false 
+          };
+          
+          // Only set termId if explicitly requested and none is already set
+          if (setDefaultTerm && currentState.termId === null) {
+            const defaultTermId = termItems[0]?.id ?? null;
+            stateUpdate.termId = defaultTermId;
+            console.log("Setting default term:", defaultTermId);
+          }
+          
+          set(stateUpdate);
         } catch (error) {
           console.error('Error fetching terms:', error);
           set({ termsLoading: false });

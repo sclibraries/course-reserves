@@ -1,20 +1,22 @@
 // src/pages/Admin.jsx
 import { useState, useEffect } from 'react';
 import { Container, Row, Col, Spinner, Alert, Nav, NavItem, NavLink } from 'reactstrap';
-import AdminSidebar from '../components/AdminSidebar';
-import ResourceSearchSidebar from '../components/ResourceSearchSidebar';
-import AdminCourseList from '../components/AdminCourseList';
-import ResourceListTable from '../components/ResourceListTable';
+import AdminSidebar from '../components/layout/AdminSidebar';
+import ResourceSearchSidebar from '../components/layout/ResourceSearchSidebar';
+import AdminCourseList from '../components/page-sections/admin/AdminCourseList';
+import ResourceListTable from '../components/page-sections/admin/ResourceListTable';
 import useAdminSearchStore from '../store/adminSearchStore';
 import useCourseStore from '../store';
 import useResourceSearchStore from '../store/resourceSearchStore';
 import { useBuildQuery } from '../hooks/useBuildQuery';
 import { adminResourceService } from '../services/admin/adminResourceService';
 import { useSearchParams } from 'react-router-dom';
+import useSearchStore from '../store/searchStore';
 
 function Admin() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { college, type, query, department } = useAdminSearchStore();
+  const { termId } = useSearchStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'courses';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -22,13 +24,11 @@ function Admin() {
 
 
   const { 
-    filters: resourceFilters,
     results: resources,
     pagination: resourcePagination,
     error: resourceError,
     loading: resourceLoading,
     setSearchResults,
-    setPagination
   } = useResourceSearchStore();
 
 
@@ -38,10 +38,10 @@ function Admin() {
 
   // Fetch course results whenever the query changes.
   useEffect(() => {
-    if (cqlQuery) {
+    if (termId && cqlQuery) {
       fetchResults(cqlQuery);
     }
-  }, [cqlQuery, fetchResults]);
+  }, [cqlQuery, fetchResults, termId]);
 
   useEffect(() => {
     if(activeTab === 'resources') {

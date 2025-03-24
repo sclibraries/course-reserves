@@ -1,5 +1,9 @@
-const API_BASE = 'https://libtools2.smith.edu/course-reserves/backend/web';
-import { ADMIN_API_ENDPOINTS, ADMIN_ERROR_MESSAGES } from '../../constants/admin';
+import { ADMIN_ERROR_MESSAGES } from '../../constants/admin';
+import { config } from '../../config';
+
+const COURSE_API = config.api.urls.courseReserves;
+const FOLIO_API = config.api.urls.folio;
+const getAuthToken = config.api.getAuthToken;
 
 export const adminCourseService = {
   getAuthToken: () => `${localStorage.getItem('authToken')}`,
@@ -7,10 +11,10 @@ export const adminCourseService = {
 // adminCourseService.js
 
 async  checkPermanentCourseExists(courseData) {
-  const response = await fetch(`${API_BASE}/course/check-course-exists`, {
+  const response = await fetch(`${COURSE_API}${config.api.endpoints.course.exists}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+      'Authorization': `${getAuthToken()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(courseData),
@@ -24,10 +28,10 @@ async  checkPermanentCourseExists(courseData) {
 },
 
 async reactivateCourse(params) {
-  const response = await fetch(`${API_BASE}/course/reactivate-course`, {
+  const response = await fetch(`${COURSE_API}${config.api.endpoints.course.reactivate}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+      'Authorization': `${getAuthToken()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -43,9 +47,9 @@ params
 
   async searchResources(searchTerm) {
     const response = await fetch(
-      `${API_BASE}/course/search-resources?search=${encodeURIComponent(searchTerm)}`,
+      `${COURSE_API}${config.api.endpoints.course.searchResources}?search=${encodeURIComponent(searchTerm)}`,
       {
-        headers: { 'Authorization': this.getAuthToken() }
+        headers: { 'Authorization': getAuthToken() }
       }
     );
     if (!response.ok) throw new Error('Failed to search resources');
@@ -55,11 +59,11 @@ params
 
   async checkCourseExists(folioCourseId) {
     const response = await fetch(
-      `${API_BASE}${ADMIN_API_ENDPOINTS.COURSE_EXISTS}?folioCourseId=${folioCourseId}`,
+      `${COURSE_API}${config.api.endpoints.admin.courseExists}?folioCourseId=${folioCourseId}`,
       {
         headers: {
           'Content-Type': 'application/json', 
-          'Authorization': this.getAuthToken()
+          'Authorization': getAuthToken()
         }
       }
     );
@@ -70,11 +74,11 @@ params
   },
 
   async createLocalCourse(data) {
-    const response = await fetch(`${API_BASE}${ADMIN_API_ENDPOINTS.CREATE_COURSE}`, {
+    const response = await fetch(`${COURSE_API}${config.api.endpoints.admin.createCourse}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Authorization': `${getAuthToken()}`,
       },
       body: JSON.stringify(data)
     });
@@ -85,8 +89,8 @@ params
   },
 
   async fetchCourseResources(courseId) {
-    const url = ADMIN_API_ENDPOINTS.COURSE_RESOURCES.replace(':id', courseId);
-    const response = await fetch(`${API_BASE}${url}`, {
+    const url = config.api.endpoints.admin.courseResources.replace(':id', courseId);
+    const response = await fetch(`${COURSE_API}${url}`, {
       method: 'GET',
     });
     if (!response.ok) {
@@ -95,20 +99,20 @@ params
     return response.json();
   },
   async searchEDS(searchTerm) {
-    const response = await fetch(`${API_BASE}/ebsco-search/search?query=${encodeURIComponent(searchTerm)}`, {
-      headers: { 'Authorization': this.getAuthToken() }
+    const response = await fetch(`${COURSE_API}${config.api.endpoints.ebsco.search}?query=${encodeURIComponent(searchTerm)}`, {
+      headers: { 'Authorization': getAuthToken() }
     });
     if (!response.ok) throw new Error('EDS search failed.');
     return response.json();
   },
   async createResource(offering_id, courseId, formData, folioData) {
     const response = await fetch(
-        `https://libtools2.smith.edu/course-reserves/backend/web/course/create-resource`,
+        `${COURSE_API}${config.api.endpoints.course.createResource}`,
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                'Authorization': `${getAuthToken()}`,
             },
             body: JSON.stringify({ ...formData, courseId: courseId, offering_id: offering_id, folioData: folioData }), // Include courseId in the body
         }
@@ -120,11 +124,11 @@ params
   },
 
   async linkCourses(sourceId, targetId) {
-    const response = await fetch(`${API_BASE}/offering-link`, {
+    const response = await fetch(`${COURSE_API}${config.api.endpoints.offeringLink.create}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        'Authorization': `${getAuthToken()}`,
       },
       body: JSON.stringify({
         offering_id: sourceId,
@@ -135,20 +139,24 @@ params
     return response.json();
   },
   async linkExistingResources(offeringId, resourceId){
-    const response = await fetch(`${API_BASE}/offering-link/link-existing-resources?offering_id=${offeringId}&resource_id=${resourceId}`);
+    const response = await fetch(
+      `${COURSE_API}${config.api.endpoints.offeringLink.linkExisting}?offering_id=${offeringId}&resource_id=${resourceId}`
+    );
     if (!response.ok) throw new Error('Failed to link resources');
     return response.json();
   },
   async getLinkedCourses(courseId) {
-    const response = await fetch(`${API_BASE}/offering-link/find-linked-offerings?offering_id=${courseId}`);
+    const response = await fetch(
+      `${COURSE_API}${config.api.endpoints.offeringLink.findLinked}?offering_id=${courseId}`
+    );
     if (!response.ok) throw new Error('Failed to find linked courses');
     return response.json();
   },
 
     async getResourcesByCourse(courseId) {
         const response = await fetch(
-            `${API_BASE}${ADMIN_API_ENDPOINTS.GET_RESOURCES_BY_COURSE}?courseListingId=${courseId}`,
-            {
+          `${COURSE_API}${config.api.endpoints.admin.getResourcesByCourse}?courseListingId=${courseId}`,
+          {
                 headers: {
                     'Content-Type': 'application/json',
                 }
@@ -161,12 +169,12 @@ params
     },
     async deleteResourceLink(courseResourceId) {
         const response = await fetch(
-            `${API_BASE}${ADMIN_API_ENDPOINTS.DELETE_RESOURCE_LINK}`,
-            {
+          `${COURSE_API}${config.api.endpoints.admin.deleteResourceLink}`,
+          {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Authorization': `${getAuthToken()}`,
                 },
                 body: JSON.stringify({ courseResourceId })
             }
@@ -185,11 +193,11 @@ params
         })),
       };
   
-      const response = await fetch(`${API_BASE}${ADMIN_API_ENDPOINTS.UPDATE_RESOURCE_ORDER}`, {
+      const response = await fetch(`${COURSE_API}${config.api.endpoints.admin.updateResourceOrder}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Authorization': `${getAuthToken()}`,
         },
         body: JSON.stringify(payload),
       });
@@ -202,10 +210,10 @@ params
     async searchFolioCourses(searchTerm) {
       // This might call the same endpoint your front-end uses for searching in FOLIO
       const response = await fetch(
-        `https://libtools2.smith.edu/folio/web/search/search-courses?query=${encodeURIComponent(searchTerm)}`,
+        `${FOLIO_API}${config.api.endpoints.folioSearch.courses}?query=${encodeURIComponent(searchTerm)}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
+            'Authorization': getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -218,8 +226,8 @@ params
       const result = await response.json();
       return result.data || [];
     },
-    async getFolioCourseId($uuid){
-      const response = await fetch(`${API_BASE}/course/check-unique-id?uuid=${$uuid}`);
+    async getFolioCourseId(uuid){
+      const response = await fetch(`${COURSE_API}${config.api.endpoints.course.checkUniqueId}?uuid=${uuid}`);
       if (!response.ok) {
         throw new Error('Error checking course existence.');
       }

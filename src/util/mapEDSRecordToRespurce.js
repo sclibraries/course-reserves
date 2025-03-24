@@ -1,7 +1,6 @@
 import { EDS_TO_DB_FIELD_MAPPING } from "../constants/edsFieldMapping";
 import { adminMaterialTypeService } from "../services/admin/adminMaterialTypeService";
 
-// Optionally, you could cache material types outside of this function if needed.
 let cachedMaterialTypes = null;
 
 /**

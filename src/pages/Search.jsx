@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useCourseStore from '../store';
 import useSearchStore from '../store/searchStore';
-import CourseList from '../components/CourseList';
+import CourseList from '../components/page-sections/search/CourseList';
 import { useBuildQuery } from '../hooks/useBuildQuery';
 import { Container, Spinner, Alert } from 'reactstrap';
 import { trackingService } from '../services/trackingService';
@@ -24,6 +24,8 @@ function Search() {
     setQuery,
     setDepartment,
     setSortOption,
+    displayMode,
+    setDisplayMode
   } = useSearchStore();
 
   const fetchResults = useCourseStore((state) => state.fetchResults);
@@ -43,6 +45,7 @@ function Search() {
     const queryParam = queryParams.get('query') || '';
     const departmentParam = queryParams.get('department') || '';
     const sortParam = queryParams.get('sort') || '';
+    const displayModeParam = queryParams.get('displayMode') || 'card';
 
     // Update store if parameters have changed
     if (collegeParam !== college) setCollege(collegeParam);
@@ -50,6 +53,8 @@ function Search() {
     if (queryParam !== query) setQuery(queryParam);
     if (departmentParam !== department) setDepartment(departmentParam);
     if (sortParam !== sortOption) setSortOption(sortParam);
+    if (displayModeParam !== displayMode) setDisplayMode(displayModeParam); // Update store
+
 
     setIsInitialized(true);
 
@@ -78,6 +83,10 @@ function Search() {
       queryParams.set('sort', sortOption.trim());
     }
 
+    if(displayMode && displayMode.trim() !== '') {
+      queryParams.set('displayMode', displayMode.trim());
+    }
+
     const newSearch = queryParams.toString();
     const currentSearch = location.search.startsWith('?') ? location.search.substring(1) : location.search;
 
@@ -88,7 +97,7 @@ function Search() {
       }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [college, type, query, department, sortOption]);
+  }, [college, type, query, department, sortOption, displayMode]);
 
   // Build the query using the updated buildQuery function that can handle department and sort
   const cqlQuery = useBuildQuery(college, type, query, department, sortOption);
