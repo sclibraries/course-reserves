@@ -1,9 +1,73 @@
-// src/components/AdminCourseCard.jsx
+/**
+ * @file AdminCourseCard component
+ * @module AdminCourseCard
+ * @description Displays a single course card within the admin interface. Shows course details,
+ * instructor info, term info, and provides buttons for managing details and e-resources.
+ *
+ * @requires prop-types
+ * @requires react-router-dom
+ * @requires reactstrap
+ * @requires ../../../store/courseManagementStore
+ */
+
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardTitle, CardText, Button} from 'reactstrap';
-import useCourseManagementStore from '../store/courseManagementStore';
+import { Card, CardBody, CardTitle, CardText, Button } from 'reactstrap';
+import useCourseManagementStore from '../../../store/courseManagementStore';
 
+/**
+ * Admin course card component
+ *
+ * Displays course metadata, term information, location, and offers navigation
+ * for managing additional details or electronic resources.
+ * 
+ * Features:
+ * - Shows department, instructors, and term info.
+ * - Checks if course term is active based on the current date.
+ * - Provides button to view/edit course details.
+ * - Provides button to manage electronic resources (if set).
+ *
+ * @component
+ * @example
+ * const onDetailsClick = (courseListingId) => {
+ *   // navigate to course details
+ * };
+ *
+ * return (
+ *   <AdminCourseCard
+ *     course={someCourseObject}
+ *     onDetailsClick={onDetailsClick}
+ *   />
+ * );
+ *
+ * @param {Object} props - Component properties
+ * @param {Object} props.course - Course data object
+ * @param {string} [props.course.id] - Primary course ID
+ * @param {string} [props.course.courseListingId] - Course listing ID
+ * @param {string} [props.course.name] - Display name of the course
+ * @param {string} [props.course.courseNumber] - Course number (e.g. ENG-101)
+ * @param {Object} [props.course.departmentObject] - Department info
+ * @param {string} [props.course.departmentObject.name] - Department name
+ * @param {Object} [props.course.courseListingObject] - Detailed listing object
+ * @param {string} [props.course.courseListingObject.id] - ListingId used for sub-routes
+ * @param {Object[]} [props.course.courseListingObject.instructorObjects] - Instructors list
+ * @param {string} props.course.courseListingObject.instructorObjects[].id - Instructor ID
+ * @param {string} props.course.courseListingObject.instructorObjects[].name - Instructor name
+ * @param {string} props.course.courseListingObject.instructorObjects[].userId - Auth user ID
+ * @param {Object} [props.course.courseListingObject.courseTypeObject] - Course type metadata
+ * @param {string} [props.course.courseListingObject.courseTypeObject.name] - Type name
+ * @param {string} [props.course.courseListingObject.courseTypeObject.description] - Type description
+ * @param {Object} [props.course.courseListingObject.termObject] - Term info
+ * @param {string} [props.course.courseListingObject.termObject.name] - Term name
+ * @param {string} [props.course.courseListingObject.termObject.startDate] - Term start date
+ * @param {string} [props.course.courseListingObject.termObject.endDate] - Term end date
+ * @param {Object} [props.course.courseListingObject.locationObject] - Location info
+ * @param {string} [props.course.courseListingObject.locationObject.name] - Location name
+ * @param {string} [props.course.courseListingObject.locationObject.code] - Location code
+ * @param {Function} props.onDetailsClick - Handler for "Manage Details" button click
+ *
+ * @return {JSX.Element} A card displaying course information with action buttons.
+ */
 function AdminCourseCard({ course, onDetailsClick }) {
   const { setCourse } = useCourseManagementStore();
   const navigate = useNavigate();
@@ -18,7 +82,7 @@ function AdminCourseCard({ course, onDetailsClick }) {
 
   const courseListingId = courseListingObject?.id;
 
-  // Derive display strings.
+  // Derive display strings
   const departmentName = departmentObject?.name || 'Unknown Department';
   const courseTypeName =
     courseListingObject?.courseTypeObject?.name ||
@@ -34,14 +98,24 @@ function AdminCourseCard({ course, onDetailsClick }) {
     courseListingObject?.locationObject?.code ||
     'Unknown Location';
 
-  // Simple "active" check based on term start and end dates.
+  /**
+   * Determine if the course term is currently active based on start/end dates
+   * @private
+   * @function
+   * @returns {boolean} True if current date is within the term's range
+   */
   const isActive = (() => {
     if (!termStart || !termEnd) return false;
     const now = new Date();
     return now >= new Date(termStart) && now <= new Date(termEnd);
   })();
 
-  // Handlers for navigation.
+  /**
+   * Navigate to manage electronic resources for this course
+   * @private
+   * @function
+   * @returns {void}
+   */
   const handleManageElectronic = () => {
     setCourse(course);
     navigate(`/admin/electronic/${courseListingId}`);
@@ -79,7 +153,7 @@ function AdminCourseCard({ course, onDetailsClick }) {
           <strong>Status:</strong> {isActive ? 'Active' : 'Inactive'}
         </CardText>
 
-        {/* Button for managing course details */}
+        {/* Button to manage course details */}
         <Button
           color="primary"
           className="mt-auto"
@@ -88,7 +162,7 @@ function AdminCourseCard({ course, onDetailsClick }) {
           Manage Details
         </Button>
 
-        {/* Button for managing electronic resources */}
+        {/* Button to manage electronic resources */}
         <Button
           color="warning"
           className="mt-2"

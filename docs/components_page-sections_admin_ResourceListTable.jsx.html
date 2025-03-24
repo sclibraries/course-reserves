@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/page-sections/admin/ResourceListTable.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/page-sections/admin/ResourceListTable.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file ResourceListTable component
+ * @module ResourceListTable
+ * @description Displays a table of electronic resources with editing and deletion capabilities.
+ * Supports pagination, sorting, and filtering of resources.
+ * @requires react
+ * @requires prop-types
+ * @requires reactstrap
+ * @requires react-toastify
+ * @requires ../../../hooks/admin/useAdminModal
+ * @requires ../../admin/modals/AdminEditResourceModel
+ * @requires ../../../services/admin/adminResourceService
+ */
+
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import {
+  Table,
+  Badge,
+  Button,
+  Container,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Spinner
+} from 'reactstrap';
+import { AdminEditResourceModal } from '../../admin/modals/AdminEditResourceModel';
+import { useAdminModal } from '../../../hooks/admin/useAdminModal';
+import { adminResourceService } from '../../../services/admin/adminResourceService';
+import { toast } from 'react-toastify';
+
+/**
+ * Smith College proxy URL prefix
+ * @constant {string}
+ */
+const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
+
+/**
+ * Resource shape definition for PropTypes
+ * @constant {Object}
+ */
+const resourceShape = PropTypes.shape({
+  resource_id: PropTypes.string.isRequired,
+  name: PropTypes.string,
+  item_url: PropTypes.string,
+  description: PropTypes.string,
+  material_type_name: PropTypes.string,
+  material_type_id: PropTypes.string,
+  created_at: PropTypes.string,
+  course_count: PropTypes.number,
+});
+
+/**
+ * Pagination shape definition for PropTypes
+ * @constant {Object}
+ */
+const paginationShape = PropTypes.shape({
+  currentPage: PropTypes.number,
+  totalPages: PropTypes.number,
+  totalItems: PropTypes.number,
+  perPage: PropTypes.number,
+});
+
+/**
+ * Adjusts the proxy settings in a resource URL
+ * 
+ * @function
+ * @param {Object} data - Resource data
+ * @param {string} data.link - The URL to adjust
+ * @param {number} data.use_proxy - Whether to use proxy (1) or not (0)
+ * @returns {void}
+ * @throws {Error} If data or link property is invalid
+ */
+function adjustProxy(data) {
+  // Basic error checking
+  if (!data || typeof data.link !== "string") {
+    throw new Error("Invalid data or missing link property");
+  }
+  
+  // Check explicitly against the numbers 1 or 0.
+  if (data.use_proxy == 1) {
+    // Add the proxy prefix if it's not already present.
+    if (!data.link.startsWith(PROXY_PREFIX)) {
+      data.link = PROXY_PREFIX + data.link;
+    }
+  } else if (data.use_proxy == 0) {
+    // Remove the proxy prefix if it's present.
+    if (data.link.startsWith(PROXY_PREFIX)) {
+      data.link = data.link.replace(PROXY_PREFIX, "");
+    }
+  }
+}
+
+/**
+ * Delete confirmation modal component
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {boolean} props.isOpen - Whether the modal is open
+ * @param {Function} props.toggle - Function to toggle modal visibility
+ * @param {Object} props.resource - Resource to be deleted
+ * @param {boolean} props.loading - Loading state
+ * @param {Function} props.onConfirm - Function to call when deletion is confirmed
+ * @returns {JSX.Element} Modal component
+ */
+const DeleteConfirmationModal = ({ isOpen, toggle, resource, loading, onConfirm }) => (
+  &lt;Modal isOpen={isOpen} toggle={toggle}>
+    &lt;ModalHeader toggle={toggle}>Confirm Deletion&lt;/ModalHeader>
+    &lt;ModalBody>
+      {resource &amp;&amp; (
+        &lt;>
+          &lt;p>Are you sure you want to delete this resource? This action cannot be undone.&lt;/p>
+          &lt;p>&lt;strong>Resource:&lt;/strong> {resource.name}&lt;/p>
+          {resource.course_count > 0 &amp;&amp; (
+            &lt;p className="text-danger">
+              Warning: This resource is linked to {resource.course_count} {resource.course_count === 1 ? 'course' : 'courses'}.
+            &lt;/p>
+          )}
+        &lt;/>
+      )}
+    &lt;/ModalBody>
+    &lt;ModalFooter>
+      &lt;Button color="secondary" onClick={toggle} disabled={loading}>
+        Cancel
+      &lt;/Button>
+      &lt;Button color="danger" onClick={onConfirm} disabled={loading}>
+        {loading ? &lt;Spinner size="sm" /> : 'Delete'}
+      &lt;/Button>
+    &lt;/ModalFooter>
+  &lt;/Modal>
+);
+
+DeleteConfirmationModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  toggle: PropTypes.func.isRequired,
+  resource: PropTypes.object,
+  loading: PropTypes.bool.isRequired,
+  onConfirm: PropTypes.func.isRequired
+};
+
+/**
+ * Resource list table component
+ * 
+ * Displays a sortable, filterable table of electronic resources with
+ * options for editing and deletion.
+ * 
+ * @component
+ * @example
+ * const resources = [
+ *   {
+ *     resource_id: '123',
+ *     name: 'Introduction to React',
+ *     item_url: 'https://example.com/resource',
+ *     material_type_name: 'E-Book',
+ *     created_at: '2023-04-15T12:00:00Z',
+ *     course_count: 2
+ *   }
+ * ];
+ * 
+ * return (
+ *   &lt;ResourceListTable 
+ *     resources={resources} 
+ *     refreshResources={() => fetchResources()}
+ *   />
+ * );
+ * 
+ * @param {Object} props - Component props
+ * @param {Array&lt;Object>} props.resources - List of resources to display
+ * @param {Object} [props.pagination] - Pagination information
+ * @param {Function} props.refreshResources - Function to refresh resources after updates
+ * @returns {JSX.Element} Resource table with modals
+ */
+const ResourceListTable = ({ resources, refreshResources }) => {
+  /**
+   * Edit resource modal state
+   * @type {[boolean, Function]}
+   */
+  const [editResourceModalOpen, toggleEditResourceModal] = useAdminModal();
+  
+  /**
+   * Selected resource for editing
+   * @type {[Object|null, Function]}
+   */
+  const [selectedResource, setSelectedResource] = useState(null);
+  
+  /**
+   * Delete confirmation modal state
+   * @type {[boolean, Function]}
+   */
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  
+  /**
+   * Resource selected for deletion
+   * @type {[Object|null, Function]}
+   */
+  const [resourceToDelete, setResourceToDelete] = useState(null);
+  
+  /**
+   * Loading state for async operations
+   * @type {[boolean, Function]}
+   */
+  const [loading, setLoading] = useState(false);
+
+  /**
+   * Toggle delete confirmation modal
+   * @function
+   * @returns {void}
+   */
+  const toggleDeleteModal = () => setDeleteModalOpen(!deleteModalOpen);
+
+  /**
+   * Handle resource editing
+   * 
+   * Updates the resource via API and refreshes the resource list
+   * 
+   * @async
+   * @function
+   * @param {Object} formData - Form data from the edit modal
+   * @param {string} formData.resource_id - ID of the resource to update
+   * @returns {Promise&lt;void>}
+   */
+  const handleEdit = async (formData) => {
+    const { resource_id, ...data } = formData;
+    
+    try {
+      adjustProxy(data);
+      const update = await adminResourceService.updateResource(resource_id, data);
+      
+      if (update) {
+        toggleEditResourceModal();
+        toast.success('Resource updated successfully');
+        refreshResources();
+      } else {
+        toast.error('Resource update failed');
+      }
+    } catch (error) {
+      console.error('Resource Update Failed:', error);
+      toast.error(`Resource update failed: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  /**
+   * Trigger delete confirmation modal
+   * 
+   * @function
+   * @param {string} id - Resource ID to delete
+   * @returns {void}
+   */
+  const handleDelete = (id) => {
+    const resource = resources.find(r => r.resource_id === id);
+    setResourceToDelete(resource);
+    toggleDeleteModal();
+  };
+
+  /**
+   * Confirm resource deletion
+   * 
+   * Deletes the resource via API and refreshes the list
+   * 
+   * @async
+   * @function
+   * @returns {Promise&lt;void>}
+   */
+  const confirmDelete = async () => {
+    if (!resourceToDelete) return;
+    
+    try {
+      setLoading(true);
+      await adminResourceService.deleteResource(resourceToDelete.resource_id);
+      toast.success('Resource deleted successfully');
+      refreshResources();
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error(`Failed to delete resource: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+      toggleDeleteModal();
+      setResourceToDelete(null);
+    }
+  };
+
+  /**
+   * Open the edit modal for a selected resource
+   * 
+   * @function
+   * @param {Object} resource - The resource to edit
+   * @returns {void}
+   */
+  const handleSelectedResource = (resource) => {
+    setSelectedResource(resource);
+    toggleEditResourceModal();
+  };
+
+  // Show message when no resources available
+  if (!resources || resources.length === 0) {
+    return (
+      &lt;Container className="my-4 text-center">
+        &lt;p>No resources found. Add some resources to get started.&lt;/p>
+      &lt;/Container>
+    );
+  }
+
+  return (
+    &lt;Container className="my-4">
+      &lt;Table hover responsive striped>
+        &lt;thead>
+          &lt;tr>
+            &lt;th>Resource ID&lt;/th>  
+            &lt;th>Name&lt;/th>
+            &lt;th>URL&lt;/th>
+            &lt;th>Material Type&lt;/th>
+            &lt;th>Created At&lt;/th>
+            &lt;th>Course Count&lt;/th>
+            &lt;th>Actions&lt;/th>
+          &lt;/tr>
+        &lt;/thead>
+        &lt;tbody>
+          {resources.map(resource => (
+            &lt;tr key={resource.resource_id}>
+              &lt;td>{resource.resource_id}&lt;/td>
+              &lt;td style={{ wordBreak: 'break-word' }}>{resource.name}&lt;/td>
+              &lt;td style={{ wordBreak: 'break-word' }}>
+                {resource.item_url ? (
+                  &lt;a 
+                    href={resource.item_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${resource.name} link`}
+                  >
+                    {resource.item_url}
+                  &lt;/a>
+                ) : (
+                  &lt;span className="text-muted">—&lt;/span>
+                )}
+              &lt;/td>
+              &lt;td>
+                &lt;Badge color="info">{resource.material_type_name || '—'}&lt;/Badge>
+              &lt;/td>
+              &lt;td>
+                {resource.created_at 
+                  ? new Date(resource.created_at).toLocaleDateString() 
+                  : '—'
+                }
+              &lt;/td>
+              &lt;td>{resource.course_count || 0}&lt;/td>
+              &lt;td>
+                &lt;div className="d-flex gap-2">
+                  &lt;Button 
+                    color="primary" 
+                    size="sm"
+                    onClick={() => handleSelectedResource(resource)}
+                    aria-label={`Edit ${resource.name}`}
+                  >
+                    Edit
+                  &lt;/Button>
+                  &lt;Button 
+                    color="danger" 
+                    size="sm" 
+                    onClick={() => handleDelete(resource.resource_id)}
+                    disabled={loading}
+                    aria-label={`Delete ${resource.name}`}
+                  >
+                    Delete
+                  &lt;/Button>
+                &lt;/div>
+              &lt;/td>
+            &lt;/tr>
+          ))}
+        &lt;/tbody>
+      &lt;/Table>
+
+      {/* Edit Resource Modal */}
+      &lt;AdminEditResourceModal
+        isOpen={editResourceModalOpen}
+        toggle={toggleEditResourceModal}
+        onSubmit={handleEdit}
+        resource={selectedResource}
+      />
+
+      {/* Delete Confirmation Modal */}
+      &lt;DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        toggle={toggleDeleteModal}
+        resource={resourceToDelete}
+        loading={loading}
+        onConfirm={confirmDelete}
+      />
+    &lt;/Container>
+  );
+};
+
+ResourceListTable.propTypes = {
+  resources: PropTypes.arrayOf(resourceShape).isRequired,
+  pagination: paginationShape,
+  refreshResources: PropTypes.func.isRequired
+};
+
+export default ResourceListTable;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

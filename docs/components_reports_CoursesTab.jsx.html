@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/reports/CoursesTab.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/reports/CoursesTab.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { useState, useMemo } from 'react';
+import PropTypes from 'prop-types';
+import { Alert, Spinner } from 'reactstrap';
+
+// Import utility functions and components
+import { 
+  filterValidTerms, 
+  sortTerms,
+  normalizeCourseData,
+  getCoursesByTerm,
+  getCoursesByCampus
+} from './utils/courseDataUtils';
+import CoursesByTermChart from './charts/CoursesByTermChart';
+import CoursesByCampusChart from './charts/CoursesByCampusChart';
+import CollegeAccessChart from './charts/CollegeAccessChart';
+import CoursesTable from './tables/CoursesTable';
+
+/**
+ * CoursesTab component displaying course access analytics
+ */
+const CoursesTab = ({ analyticsData, loading, error }) => {
+  // State management
+  const [courseSearchTerm, setCourseSearchTerm] = useState('');
+  const [courseSortConfig, setCourseSortConfig] = useState({ key: 'count', direction: 'desc' });
+  const [coursesPagination, setCoursesPagination] = useState({ page: 1, pageSize: 25 });
+  const [campusFilter, setCampusFilter] = useState('');
+  const [activeCampusTab, setActiveCampusTab] = useState('all');
+  const [termFilter, setTermFilter] = useState('');
+  const [activeTermTab, setActiveTermTab] = useState('all');
+
+  // Reset pagination when filters change
+  const resetPagination = () => setCoursesPagination(prev => ({...prev, page: 1}));
+
+  // Processed data - move complex data processing to useMemo hooks
+  const processedCourses = useMemo(() => 
+    normalizeCourseData(analyticsData.allCourses), 
+    [analyticsData.allCourses]
+  );
+
+  const availableTerms = useMemo(() => {
+    // First try to use terms from analytics data
+    if (analyticsData.terms &amp;&amp; Array.isArray(analyticsData.terms) &amp;&amp; analyticsData.terms.length) {
+      return sortTerms(filterValidTerms(analyticsData.terms));
+    }
+    
+    // Otherwise extract from courses data
+    const termsFromCourses = [...new Set(
+      processedCourses
+        .filter(course => course.term)
+        .map(course => course.term)
+    )];
+    
+    return sortTerms(filterValidTerms(termsFromCourses));
+  }, [analyticsData.terms, processedCourses]);
+
+  // Courses by term and campus
+  const coursesByTerm = useMemo(() => 
+    getCoursesByTerm(processedCourses, availableTerms), 
+    [processedCourses, availableTerms]
+  );
+  
+  const coursesByCampus = useMemo(() => 
+    getCoursesByCampus(processedCourses), 
+    [processedCourses]
+  );
+  
+  // Campus list for tabs and filters
+  const campuses = useMemo(() => 
+    ['all', ...Object.keys(coursesByCampus).filter(c => c !== 'all')], 
+    [coursesByCampus]
+  );
+
+  // Error handling
+  if (error) {
+    return (
+      &lt;Alert color="danger">
+        &lt;h4 className="alert-heading">Error Loading Course Data&lt;/h4>
+        &lt;p>{error}&lt;/p>
+      &lt;/Alert>
+    );
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      &lt;div className="text-center my-5">
+        &lt;Spinner color="primary" />
+        &lt;p className="mt-2">Loading course analytics...&lt;/p>
+      &lt;/div>
+    );
+  }
+
+  return (
+    &lt;div>
+      {processedCourses.length === 0 ? (
+        &lt;Alert color="info">
+          No course data available. Please adjust your filters or try again later.
+        &lt;/Alert>
+      ) : (
+        &lt;>
+          {/* Top Courses By Term Chart */}
+          &lt;CoursesByTermChart 
+            coursesByTerm={coursesByTerm}
+            availableTerms={availableTerms}
+            activeTermTab={activeTermTab}
+            setActiveTermTab={setActiveTermTab}
+          />
+
+          {/* Top Courses by Campus Chart */}
+          &lt;CoursesByCampusChart
+            coursesByCampus={coursesByCampus}
+            campuses={campuses}
+            activeCampusTab={activeCampusTab}
+            setActiveCampusTab={setActiveCampusTab}
+          />
+          
+          {/* College Access Chart */}
+          &lt;CollegeAccessChart collegeData={analyticsData.collegeData} />
+          
+          {/* Courses Table */}
+          &lt;CoursesTable 
+            processedCourses={processedCourses}
+            courseSearchTerm={courseSearchTerm}
+            campusFilter={campusFilter}
+            termFilter={termFilter}
+            availableTerms={availableTerms}
+            campuses={campuses}
+            courseSortConfig={courseSortConfig} 
+            setCourseSortConfig={setCourseSortConfig}
+            coursesPagination={coursesPagination}
+            setCoursesPagination={setCoursesPagination}
+            setCampusFilter={setCampusFilter}
+            setTermFilter={setTermFilter}
+            setCourseSearchTerm={setCourseSearchTerm}
+          />
+        &lt;/>
+      )}
+    &lt;/div>
+  );
+};
+
+CoursesTab.propTypes = {
+  analyticsData: PropTypes.shape({
+    collegeData: PropTypes.arrayOf(PropTypes.shape({
+      college: PropTypes.string,
+      value: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    })),
+    topCourses: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string,
+      count: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+      college: PropTypes.string,
+      term: PropTypes.string
+    })),
+    allCourses: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string,
+      count: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+      college: PropTypes.string,
+      term: PropTypes.string
+    })),
+    terms: PropTypes.arrayOf(PropTypes.string),
+    totalCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+  }),
+  loading: PropTypes.bool,
+  error: PropTypes.string
+};
+
+export default CoursesTab;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

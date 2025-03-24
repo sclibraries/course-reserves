@@ -1,8 +1,29 @@
-# React + Vite
+<h1 align="center">Welcome to course-reserves 👋</h1>
+<p>
+  <img alt="Version" src="https://img.shields.io/badge/version-1.1.0-blue.svg?cacheSeconds=2592000" />
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Course reserves management for the Five Colleges. Connects FOLIO APIs to frontend VITE.JS application to search and view course reserves. Contains optional backend system for linking electronic reserves to physical reserves.
 
-Currently, two official plugins are available:
+### 🏠 [Homepage](https://libtools2.smith.edu/course-reserves)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### ✨ [Demo](https://libtools2.smith.edu/course-reserves)
+
+## Install
+
+```sh
+npm install
+```
+
+## Author
+
+👤 **Rob O'Connell**
+
+* Github: [@sclibraries](https://github.com/sclibraries)
+
+## Show your support
+
+Give a ⭐️ if this project helped you!
+
+***
+_This README was generated with ❤️ by [readme-md-generator](https://github.com/kefranabg/readme-md-generator)_

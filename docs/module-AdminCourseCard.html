@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: AdminCourseCard</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: AdminCourseCard</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description">Displays a single course card within the admin interface. Shows course details,
+instructor info, term info, and provides buttons for managing details and e-resources.</div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="components_page-sections_admin_AdminCourseCard.jsx.html">components/page-sections/admin/AdminCourseCard.jsx</a>, <a href="components_page-sections_admin_AdminCourseCard.jsx.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+        <h3 class="subsection-title">Requires</h3>
+
+        <ul>
+            <li>module:prop-types</li>
+        
+            <li>module:react-router-dom</li>
+        
+            <li>module:reactstrap</li>
+        
+            <li>module:../../../store/courseManagementStore</li>
+        </ul>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~AdminCourseCard"><span class="type-signature">(inner) </span>AdminCourseCard<span class="signature">(props)</span><span class="type-signature"> &rarr; {JSX.Element}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Admin course card component
+
+Displays course metadata, term information, location, and offers navigation
+for managing additional details or electronic resources.
+
+Features:
+- Shows department, instructors, and term info.
+- Checks if course term is active based on the current date.
+- Provides button to view/edit course details.
+- Provides button to manage electronic resources (if set).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>props</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Component properties
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>course</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Course data object
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Primary course ID</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>courseListingId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Course listing ID</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Display name of the course</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>courseNumber</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Course number (e.g. ENG-101)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>departmentObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Department info
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Department name</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>courseListingObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Detailed listing object
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">ListingId used for sub-routes</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>instructorObjects</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;Object></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Instructors list
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Instructor ID</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Instructor name</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Auth user ID</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>courseTypeObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Course type metadata
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Type name</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>description</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Type description</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>termObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Term info
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Term name</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>startDate</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Term start date</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>endDate</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Term end date</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>locationObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Location info
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Location name</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>code</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Location code</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>onDetailsClick</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Handler for "Manage Details" button click</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="components_page-sections_admin_AdminCourseCard.jsx.html">components/page-sections/admin/AdminCourseCard.jsx</a>, <a href="components_page-sections_admin_AdminCourseCard.jsx.html#line71">line 71</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A card displaying course information with action buttons.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">JSX.Element</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const onDetailsClick = (courseListingId) => {
+  // navigate to course details
+};
+
+return (
+  &lt;AdminCourseCard
+    course={someCourseObject}
+    onDetailsClick={onDetailsClick}
+  />
+);</code></pre>
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

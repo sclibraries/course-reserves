@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/admin/forms/CrosslinkForm.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/admin/forms/CrosslinkForm.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// src/components/admin/forms/CrossLinkForm.jsx
+import React, { useState } from 'react';
+import PropTypes from 'prop-types';
+import {
+  FormGroup,
+  Label,
+  Input,
+  Button,
+  Spinner,
+  Row,
+  Col,
+  Table,
+  ButtonGroup,
+  Badge
+} from 'reactstrap';
+import { useBuildQuery } from '../../../hooks/useBuildQuery';
+import { adminCourseService } from '../../../services/admin/adminCourseService';
+import { transformFolioCourseToLocal } from '../../../util/adminTransformers';
+import useCourseStore from '../../../store';
+import { toast } from 'react-toastify';
+import { useAdminCourseStore } from '../../../store/adminCourseStore';
+
+/**
+ * CrossLinkForm Component
+ * --------------------------
+ * Provides an interface for admins to search for a FOLIO course and link it to a local resource.
+ * This version leverages courseStore's search state and fetchResults function so that it stays
+ * consistent with the sidebar search functionality.
+ */
+export function CrossLinkForm({ resourceId, onSuccess, onClose, courseInfo }) {
+  // Local states for search parameters
+  const [college, setCollege] = useState('all');
+  const [searchArea, setSearchArea] = useState('all'); // corresponds to 'type' in your courseStore
+  const [query, setQuery] = useState('');
+  const [department, setDepartment] = useState('');
+  const [sortOption, setSortOption] = useState('');
+
+  const { course, folioCourseData } = useAdminCourseStore();
+
+  // Retrieve search functions and state from courseStore
+  const fetchResults = useCourseStore((state) => state.fetchResults);
+  const results = useCourseStore((state) => state.results);
+  const error = useCourseStore((state) => state.error);
+  const loading = useCourseStore((state) => state.loading);
+
+  // Build the CQL query using the current search parameters
+  const cqlQuery = useBuildQuery(college, searchArea, query, department, sortOption);
+
+  /**
+   * handleSearch
+   * -------------
+   * Validates the input and then triggers the search by calling fetchResults
+   * from the courseStore with the built CQL query.
+   */
+  const handleSearch = async () => {
+    if (!query.trim()) {
+      toast.error('Please enter a search term.');
+      return;
+    }
+    try {
+      await fetchResults(cqlQuery);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      toast.error('Error fetching courses. Please try again.');
+    }
+  };
+
+  /**
+   * handleLinkCourse
+   * -----------------
+   * Checks whether the selected FOLIO course exists in the local DB.
+   * If not, creates a new local course entry and then links it to the given resource.
+   */
+  const handleLinkCourse = async (folioCourse) => {
+    const data = course
+    try {
+      // Check if the local record exists using the FOLIO course listing ID
+      const folioCourseId = folioCourse.courseListingId;
+      const { exists, course: existingCourse, offerings } =
+        await adminCourseService.checkCourseExists(folioCourseId);
+
+      let localCourse = existingCourse;
+      if (!exists) {
+        // Transform FOLIO course data into the local data structure
+        const uploadData = transformFolioCourseToLocal(folioCourse);
+        // Create a local course record
+        localCourse = await adminCourseService.createLocalCourse(uploadData);
+        if (offerings) {
+          localCourse.offerings = offerings;
+        }
+      }
+
+      // Link the local course to the resource using provided IDs
+      await adminCourseService.linkCourses(data.offering_id, localCourse.offering.offering_id);
+
+      toast.success('Course linked successfully.');
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error('Error linking FOLIO course:', err);
+      toast.error('Error linking course. Please try again.');
+    }
+  };
+
+  /**
+   * handleReset
+   * ------------
+   * Resets the search filters and clears the search results in the courseStore.
+   */
+  const handleReset = () => {
+    setCollege('all');
+    setSearchArea('all');
+    setQuery('');
+    setDepartment('');
+    setSortOption('');
+    useCourseStore.setState({ results: [] });
+  };
+
+  return (
+    &lt;div>
+      &lt;Row>
+        &lt;Col md={3}>
+          &lt;FormGroup>
+            &lt;Label htmlFor="collegeSelect">College&lt;/Label>
+            &lt;Input
+              id="collegeSelect"
+              type="select"
+              value={college}
+              onChange={(e) => setCollege(e.target.value)}
+            >
+              &lt;option value="all">All&lt;/option>
+              &lt;option value="smith">Smith&lt;/option>
+              &lt;option value="hampshire">Hampshire&lt;/option>
+              &lt;option value="mtholyoke">Mount Holyoke&lt;/option>
+              &lt;option value="amherst">Amherst&lt;/option>
+              &lt;option value="umass">UMass&lt;/option>
+            &lt;/Input>
+          &lt;/FormGroup>
+        &lt;/Col>
+        &lt;Col md={3}>
+          &lt;FormGroup>
+            &lt;Label htmlFor="searchAreaSelect">Search Area&lt;/Label>
+            &lt;Input
+              id="searchAreaSelect"
+              type="select"
+              value={searchArea}
+              onChange={(e) => setSearchArea(e.target.value)}
+            >
+              &lt;option value="all">All fields&lt;/option>
+              &lt;option value="name">Course Name&lt;/option>
+              &lt;option value="code">Course Code&lt;/option>
+              &lt;option value="section">Section&lt;/option>
+              &lt;option value="instructor">Instructor&lt;/option>
+            &lt;/Input>
+          &lt;/FormGroup>
+        &lt;/Col>
+        &lt;Col md={3}>
+          &lt;FormGroup>
+            &lt;Label htmlFor="queryInput">Search Term&lt;/Label>
+            &lt;Input
+              id="queryInput"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Enter search term"
+            />
+          &lt;/FormGroup>
+        &lt;/Col>
+      &lt;/Row>
+
+      &lt;Row>
+        &lt;Col md={9} className="d-flex align-items-end">
+          &lt;ButtonGroup className="w-100 w-md-auto">
+            &lt;Button color="primary" onClick={handleSearch} disabled={loading}>
+              {loading ? &lt;Spinner size="sm" /> : 'Search'}
+            &lt;/Button>
+            &lt;Button
+              color="secondary"
+              onClick={handleReset}
+              aria-label="Reset search filters"
+            >
+              &lt;i className="fas fa-undo" role="button">&lt;/i>
+              &lt;span className="d-inline ml-1">Reset&lt;/span>
+            &lt;/Button>
+          &lt;/ButtonGroup>
+        &lt;/Col>
+      &lt;/Row>
+
+      &lt;hr />
+      &lt;h5>Search Results&lt;/h5>
+      {loading &amp;&amp; &lt;p>Searching...&lt;/p>}
+      {!loading &amp;&amp; results.length === 0 &amp;&amp; &lt;p>No courses found.&lt;/p>}
+      {error &amp;&amp; &lt;p className="text-danger">Error: {error.message}&lt;/p>}
+      &lt;Table responsive striped>
+        &lt;thead>
+          &lt;tr>
+            &lt;th scope="col">Course Number&lt;/th>
+            &lt;th scope="col">Course Name&lt;/th>
+            &lt;th scope="col">Section&lt;/th>
+            &lt;th scope="col">Instructor&lt;/th>
+            &lt;th scope="col">Term&lt;/th>
+            &lt;th scope="col">Location&lt;/th>
+            &lt;th scope="col">Department&lt;/th>
+            &lt;th scope="col">Actions&lt;/th>
+          &lt;/tr>
+        &lt;/thead>
+        &lt;tbody>
+          {results.map((course) => {
+            // Extract instructor names if available
+            const instructors = course?.courseListingObject?.instructorObjects
+              ? course.courseListingObject.instructorObjects.map((i) => i.name)
+              : [];
+            return (
+              &lt;tr key={course.id || course.folioCourseId}>
+                &lt;td>{course.courseNumber}&lt;/td>
+                &lt;td>{course.name}&lt;/td>
+                &lt;td>{course.sectionName}&lt;/td>
+                &lt;td>{instructors.join(', ')}&lt;/td>
+                &lt;td>{course?.courseListingObject?.termObject?.name}&lt;/td>
+                &lt;td>{course?.courseListingObject?.locationObject?.name}&lt;/td>
+                &lt;td>{course?.departmentObject?.name}&lt;/td>
+                &lt;td>
+                  {courseInfo &amp;&amp; courseInfo.course_number === course.courseNumber ? (
+                    &lt;Badge color="danger" pill>
+                      Selected Course
+                    &lt;/Badge>
+                  ) : (
+                    &lt;Button
+                      color="success"
+                      size="sm"
+                      disabled={loading}
+                      onClick={() => handleLinkCourse(course)}
+                    >
+                      Link
+                    &lt;/Button>
+                  )}
+                &lt;/td>
+              &lt;/tr>
+            );
+          })}
+        &lt;/tbody>
+      &lt;/Table>
+    &lt;/div>
+  );
+}
+
+CrossLinkForm.propTypes = {
+  resourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  onSuccess: PropTypes.func, // Callback to refresh parent component on success
+  courseInfo: PropTypes.object, // Pre-selected course data (if any)
+  onClose: PropTypes.func,   // Optional callback to close the modal
+};
+
+export default CrossLinkForm;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 export const defaults = {
     api: {
+      folioBaseApplication: 'https://fivecolleges.folio.ebsco.com',
       baseUrl: 'https://libtools2.smith.edu',
       endpoints: {
         courseReserves: '/course-reserves/backend/web',

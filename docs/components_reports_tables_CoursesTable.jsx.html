@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/reports/tables/CoursesTable.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/reports/tables/CoursesTable.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { useMemo } from 'react';
+import PropTypes from 'prop-types';
+import { Card, CardHeader, CardBody, Table, Badge, Button, Input } from 'reactstrap';
+import { CAMPUS_COLORS, COLORS } from '../constants';
+
+/**
+ * Table component for displaying all courses with sorting and pagination
+ */
+const CoursesTable = ({
+  processedCourses,
+  courseSearchTerm,
+  campusFilter,
+  termFilter,
+  courseSortConfig,
+  setCourseSortConfig,
+  coursesPagination,
+  setCoursesPagination,
+  setCampusFilter,
+  setTermFilter,
+  setCourseSearchTerm
+}) => {
+  // Filter and sort courses
+  const filteredAndSortedCourses = useMemo(() => {
+    try {
+      // First filter courses based on search term, campus, and term
+      const filtered = processedCourses.filter(course => {
+        const matchesSearch = !courseSearchTerm || 
+          (course.name &amp;&amp; course.name.toLowerCase().includes(courseSearchTerm.toLowerCase()));
+        const matchesCampus = !campusFilter || course.college === campusFilter;
+        const matchesTerm = !termFilter || course.term === termFilter;
+        
+        return matchesSearch &amp;&amp; matchesCampus &amp;&amp; matchesTerm;
+      });
+      
+      // Then sort the filtered courses
+      return [...filtered].sort((a, b) => {
+        // Handle string fields (name, college, term)
+        if (['name', 'college', 'term'].includes(courseSortConfig.key)) {
+          const valueA = (a[courseSortConfig.key] || '').toLowerCase();
+          const valueB = (b[courseSortConfig.key] || '').toLowerCase();
+          
+          if (valueA &lt; valueB) {
+            return courseSortConfig.direction === 'asc' ? -1 : 1;
+          }
+          if (valueA > valueB) {
+            return courseSortConfig.direction === 'asc' ? 1 : -1;
+          }
+          return 0;
+        }
+        
+        // Handle numeric field (count)
+        const countA = Number(a.count) || 0;
+        const countB = Number(b.count) || 0;
+        
+        return courseSortConfig.direction === 'asc' 
+          ? countA - countB 
+          : countB - countA;
+      });
+    } catch (err) {
+      console.error('Error filtering/sorting courses:', err);
+      return [];
+    }
+  }, [processedCourses, courseSearchTerm, campusFilter, termFilter, courseSortConfig]);
+
+  // Calculate total count for percentage calculations
+  const totalCount = useMemo(() => {
+    return processedCourses.reduce((sum, course) => sum + (Number(course.count) || 0), 0);
+  }, [processedCourses]);
+
+  // Pagination logic
+  const paginatedCourses = useMemo(() => {
+    const startIndex = (coursesPagination.page - 1) * coursesPagination.pageSize;
+    const endIndex = startIndex + coursesPagination.pageSize;
+    
+    return filteredAndSortedCourses.slice(startIndex, endIndex);
+  }, [filteredAndSortedCourses, coursesPagination.page, coursesPagination.pageSize]);
+
+  // Handle column sorting
+  const handleSortRequest = (key) => {
+    let direction = 'asc';
+    if (courseSortConfig.key === key &amp;&amp; courseSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setCourseSortConfig({ key, direction });
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    setCoursesPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  // Handle rows per page change
+  const handleRowsPerPageChange = (e) => {
+    setCoursesPagination({
+      page: 1, // Reset to first page when changing page size
+      pageSize: Number(e.target.value)
+    });
+  };
+
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredAndSortedCourses.length / coursesPagination.pageSize);
+
+  // If no matching courses, show message
+  if (filteredAndSortedCourses.length === 0) {
+    return (
+      &lt;Card className="shadow-sm mt-4">
+        &lt;CardHeader className="bg-light">
+          &lt;h5 className="mb-0">All Courses Access Report&lt;/h5>
+        &lt;/CardHeader>
+        &lt;CardBody className="text-center p-5">
+          &lt;p>No courses match your current filter criteria.&lt;/p>
+          &lt;Button color="primary" onClick={() => {
+            setCampusFilter('');
+            setTermFilter('');
+            setCourseSearchTerm('');
+          }}>
+            Clear Filters
+          &lt;/Button>
+        &lt;/CardBody>
+      &lt;/Card>
+    );
+  }
+
+  return (
+    &lt;Card className="shadow-sm mt-4">
+      &lt;CardHeader className="bg-light d-flex justify-content-between align-items-center">
+        &lt;h5 className="mb-0">All Courses Access Report&lt;/h5>
+        &lt;div className="text-muted small">
+          Showing {filteredAndSortedCourses.length} course{filteredAndSortedCourses.length !== 1 ? 's' : ''}
+        &lt;/div>
+      &lt;/CardHeader>
+      &lt;CardBody>
+        &lt;div className="table-responsive">
+          &lt;Table striped hover bordered>
+            &lt;thead>
+              &lt;tr>
+                &lt;th 
+                  onClick={() => handleSortRequest('name')} 
+                  style={{ cursor: 'pointer' }}
+                  className="position-relative"
+                >
+                  Course Name 
+                  {courseSortConfig.key === 'name' &amp;&amp; (
+                    &lt;span className="ms-1">
+                      {courseSortConfig.direction === 'asc' ? '↑' : '↓'}
+                    &lt;/span>
+                  )}
+                &lt;/th>
+                &lt;th 
+                  onClick={() => handleSortRequest('college')} 
+                  style={{ cursor: 'pointer', width: '120px' }}
+                >
+                  Campus 
+                  {courseSortConfig.key === 'college' &amp;&amp; (
+                    &lt;span className="ms-1">
+                      {courseSortConfig.direction === 'asc' ? '↑' : '↓'}
+                    &lt;/span>
+                  )}
+                &lt;/th>
+                &lt;th 
+                  onClick={() => handleSortRequest('term')} 
+                  style={{ cursor: 'pointer', width: '140px' }}
+                >
+                  Term 
+                  {courseSortConfig.key === 'term' &amp;&amp; (
+                    &lt;span className="ms-1">
+                      {courseSortConfig.direction === 'asc' ? '↑' : '↓'}
+                    &lt;/span>
+                  )}
+                &lt;/th>
+                &lt;th 
+                  onClick={() => handleSortRequest('count')} 
+                  style={{ cursor: 'pointer', width: '120px', textAlign: 'center' }}
+                >
+                  Access Count 
+                  {courseSortConfig.key === 'count' &amp;&amp; (
+                    &lt;span className="ms-1">
+                      {courseSortConfig.direction === 'asc' ? '↑' : '↓'}
+                    &lt;/span>
+                  )}
+                &lt;/th>
+                &lt;th style={{ width: '120px' }}>Percentage&lt;/th>
+              &lt;/tr>
+            &lt;/thead>
+            &lt;tbody>
+              {paginatedCourses.map((course, index) => {
+                // Calculate percentage of total access
+                const percentage = totalCount > 0
+                  ? ((Number(course.count) || 0) / totalCount * 100).toFixed(1)
+                  : '0.0';
+                  
+                return (
+                  &lt;tr key={`course-${course.college}-${course.name}-${index}`}>
+                    &lt;td className="text-wrap">{course.name || 'Unknown Course'}&lt;/td>
+                    &lt;td>
+                      {course.college ? (
+                        &lt;Badge 
+                          color="primary" 
+                          style={{ 
+                            backgroundColor: CAMPUS_COLORS[course.college] || '#666'
+                          }}
+                        >
+                          {course.college}
+                        &lt;/Badge>
+                      ) : 'Unknown'}
+                    &lt;/td>
+                    &lt;td>{course.term || 'N/A'}&lt;/td>
+                    &lt;td className="text-center">{course.count}&lt;/td>
+                    &lt;td>
+                      &lt;div className="d-flex align-items-center">
+                        &lt;div className="me-2">{percentage}%&lt;/div>
+                        &lt;div className="progress" style={{width: '60px', height: '8px'}}>
+                          &lt;div 
+                            className="progress-bar" 
+                            role="progressbar" 
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: course.college ? 
+                                CAMPUS_COLORS[course.college] : COLORS[index % COLORS.length]
+                            }} 
+                            aria-valuenow={percentage} 
+                            aria-valuemin="0" 
+                            aria-valuemax="100"
+                          >&lt;/div>
+                        &lt;/div>
+                      &lt;/div>
+                    &lt;/td>
+                  &lt;/tr>
+                );
+              })}
+            &lt;/tbody>
+          &lt;/Table>
+        &lt;/div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 &amp;&amp; (
+          &lt;div className="d-flex justify-content-between align-items-center mt-3">
+            &lt;div>
+              Showing {((coursesPagination.page - 1) * coursesPagination.pageSize) + 1}-
+              {Math.min(coursesPagination.page * coursesPagination.pageSize, filteredAndSortedCourses.length)} of {filteredAndSortedCourses.length} courses
+            &lt;/div>
+            &lt;div className="d-flex align-items-center">
+              &lt;span className="me-2">Rows per page:&lt;/span>
+              &lt;Input
+                type="select"
+                bsSize="sm"
+                value={coursesPagination.pageSize}
+                onChange={handleRowsPerPageChange}
+                style={{width: '70px'}}
+              >
+                &lt;option value="10">10&lt;/option>
+                &lt;option value="25">25&lt;/option>
+                &lt;option value="50">50&lt;/option>
+                &lt;option value="100">100&lt;/option>
+              &lt;/Input>
+              
+              &lt;Button 
+                color="primary" 
+                size="sm" 
+                onClick={() => handlePageChange(coursesPagination.page - 1)}
+                disabled={coursesPagination.page === 1}
+                className="ms-2"
+              >
+                Previous
+              &lt;/Button>
+              
+              {/* Page number indicator */}
+              &lt;span className="mx-2">
+                Page {coursesPagination.page} of {totalPages}
+              &lt;/span>
+              
+              &lt;Button
+                color="primary"
+                size="sm"
+                onClick={() => handlePageChange(coursesPagination.page + 1)}
+                disabled={coursesPagination.page >= totalPages}
+              >
+                Next
+              &lt;/Button>
+            &lt;/div>
+          &lt;/div>
+        )}
+      &lt;/CardBody>
+    &lt;/Card>
+  );
+};
+
+CoursesTable.propTypes = {
+  processedCourses: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      count: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+      college: PropTypes.string,
+      term: PropTypes.string
+    })
+  ).isRequired,
+  courseSearchTerm: PropTypes.string,
+  campusFilter: PropTypes.string,
+  termFilter: PropTypes.string,
+  availableTerms: PropTypes.arrayOf(PropTypes.string).isRequired,
+  campuses: PropTypes.arrayOf(PropTypes.string).isRequired,
+  courseSortConfig: PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    direction: PropTypes.oneOf(['asc', 'desc']).isRequired
+  }).isRequired,
+  setCourseSortConfig: PropTypes.func.isRequired,
+  coursesPagination: PropTypes.shape({
+    page: PropTypes.number.isRequired,
+    pageSize: PropTypes.number.isRequired
+  }).isRequired,
+  setCoursesPagination: PropTypes.func.isRequired,
+  setCampusFilter: PropTypes.func.isRequired,
+  setTermFilter: PropTypes.func.isRequired,
+  setCourseSearchTerm: PropTypes.func.isRequired
+};
+
+CoursesTable.defaultProps = {
+  courseSearchTerm: '',
+  campusFilter: '',
+  termFilter: ''
+};
+
+export default CoursesTable;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

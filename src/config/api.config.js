@@ -5,13 +5,15 @@ const BASE_API_URL = import.meta.env.VITE_BASE_API_URL || defaults.api.baseUrl;
 const COURSE_RESERVES_PATH = import.meta.env.VITE_COURSE_RESERVES_PATH || defaults.api.endpoints.courseReserves;
 const FOLIO_PATH = import.meta.env.VITE_FOLIO_PATH || defaults.api.endpoints.folio;
 const AUTH_PATH = import.meta.env.VITE_AUTH_PATH || defaults.api.endpoints.auth;
+const FOLIO_BASE_URL = import.meta.env.VITE_FOLIO_BASE_URL || defaults.api.folioBaseApplication;
 
 export const apiConfig = {
   baseUrl: BASE_API_URL,
+  folioBaseUrl: FOLIO_BASE_URL,
   urls: {
     courseReserves: `${BASE_API_URL}${COURSE_RESERVES_PATH}`,
     folio: `${BASE_API_URL}${FOLIO_PATH}`,
-    auth: `${BASE_API_URL}${AUTH_PATH}`,
+    auth: `${BASE_API_URL}${AUTH_PATH}`
   },
   endpoints: {
     auth: {
@@ -19,6 +21,9 @@ export const apiConfig = {
         login: '/admin/login',
         developmentLogin: '/authorize-dev.php',
         productionLogin: '/authorize.php',
+    },
+    folioApplicationEndpoints: {
+        courses: '/cr/courses/',
     },
     admin: {
         courseExists: '/course/exists',
@@ -31,7 +36,7 @@ export const apiConfig = {
         deleteResourceLink: '/course/unlink-resource', 
         updateResourceOrder: '/course/update-resource-order',
         reports: "/tracking"
-      },    
+    },    
     course: {
       exists: '/course/check-course-exists',
       reactivate: '/course/reactivate-course',

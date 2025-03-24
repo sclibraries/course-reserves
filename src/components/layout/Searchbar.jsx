@@ -1,3 +1,19 @@
+
+/**
+ * @file Advanced search interface component
+ * @module Searchbar
+ * @description Provides a comprehensive search interface for course reserves with filters,
+ * sorting, and tracking capabilities. Allows filtering by institution, department, search area, 
+ * and term, with configurable appearance based on campus settings.
+ * @requires react
+ * @requires reactstrap
+ * @requires react-router-dom
+ * @requires ../../store/searchStore
+ * @requires ../../store/customizationStore
+ * @requires ../../services/trackingService
+ * @requires ../../util/termHelpers
+ * @requires ../../config
+ */
 import { useState, useEffect } from 'react';
 import {
   Collapse,
@@ -18,9 +34,47 @@ import { getTermName } from '../../util/termHelpers';
 import { config } from '../../config'
 import '../../css/Searchbar.css';
 
+/**
+ * Search interface component for course reserves
+ * 
+ * Provides an expandable interface for searching and filtering course reserves with:
+ * - Institution selection
+ * - Department filtering
+ * - Search area specification (All fields, Course Name, Course Code, etc.)
+ * - Term selection
+ * - Sort options
+ * - Keyword search
+ * 
+ * Features:
+ * - Responsive design with collapse/expand functionality
+ * - Campus-specific styling
+ * - Integration with tracking service
+ * - URL-based state management
+ * - Accessibility support
+ * 
+ * @component
+ * @example
+ * return (
+ *   <Layout>
+ *     <Searchbar />
+ *     <SearchResults />
+ *   </Layout>
+ * )
+ */
+
 function Searchbar() {
   const navigate = useNavigate();
+
+    /**
+   * Collapse/expand state for responsive design
+   * @type {boolean}
+   */
   const [isOpen, setIsOpen] = useState(false);
+
+    /**
+   * Search state and actions from global store
+   * @type {Object}
+   */
 
   const {
     college,
@@ -38,12 +92,32 @@ function Searchbar() {
     terms,
   } = useSearchStore();
 
+   /**
+   * Campus-specific customization settings
+   * @type {Object}
+   */
   const { searchButtonBgColor, resetButtonBgColor, campusLocation, additionalHeaderText } =
     useCustomizationStore((state) => state.getCustomizationForCollege(college));
 
+  /**
+   * Current search area selection
+   * @type {string}
+   */
   const [searchArea, setSearchArea] = useState('All fields');
+    /**
+   * Current search input value
+   * @type {string}
+   */
   const [searchInput, setSearchInput] = useState('');
+    /**
+   * Selected college display name
+   * @type {string}
+   */
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
+    /**
+   * Available departments for the current college
+   * @type {Array<Object>}
+   */
   const [departments, setDepartments] = useState([]);
 
   const searchAreas = [
@@ -70,11 +144,18 @@ function Searchbar() {
     { label: 'Section Name (Desc)', value: 'sectionName.descending' },
   ];
 
+    /**
+   * Synchronize component state with search store
+   */
   useEffect(() => {
     setSearchArea(keyToSearchArea(type));
     setSearchInput(query || '');
     setSelectedCollege(keyToCollegeName(college));
   }, [type, query, college, department, sortOption]);
+
+    /**
+   * Fetch departments when college changes
+   */
 
   useEffect(() => {
     setDepartments([]);
@@ -114,6 +195,11 @@ function Searchbar() {
       });
   }, [college]);
 
+    /**
+   * Execute search with current filters
+   * @function
+   * @returns {void}
+   */
   const handleSearch = () => {
     const areaKey = searchAreaToKey(searchArea);
     const collegeKey = collegeNameToKey(selectedCollege);
@@ -151,7 +237,11 @@ function Searchbar() {
     navigate(`/search?${queryParams.toString()}`);
   };
 
-
+  /**
+   * Reset all search filters
+   * @function
+   * @returns {void}
+   */
   const handleReset = () => {
     // Track the reset
     const currentTermName = getTermName(terms, termId);
@@ -185,6 +275,12 @@ function Searchbar() {
     }
   };
 
+    /**
+   * Handle term selection change
+   * @function
+   * @param {Event} e - Change event from select input
+   * @returns {void}
+   */
   const handleTermChange = (e) => {
     const newTermId = e.target.value;
     if (newTermId !== termId) {
@@ -210,9 +306,19 @@ function Searchbar() {
     }
   };
 
+    /**
+   * Toggle searchbar expanded/collapsed state
+   * @function
+   * @returns {void}
+   */
   const toggle = () => setIsOpen(!isOpen);
 
-  // Utility function conversions...
+    /**
+   * Convert search area display name to internal key
+   * @function
+   * @param {string} area - Display name of search area
+   * @returns {string} Internal key value
+   */
   const searchAreaToKey = (area) => {
     switch (area) {
       case 'All fields':
@@ -230,6 +336,12 @@ function Searchbar() {
     }
   };
 
+    /**
+   * Convert internal key to search area display name
+   * @function
+   * @param {string} key - Internal key for search area
+   * @returns {string} Display name
+   */
   const keyToSearchArea = (key) => {
     switch (key) {
       case 'all':
@@ -247,6 +359,12 @@ function Searchbar() {
     }
   };
 
+    /**
+   * Convert college display name to internal key
+   * @function
+   * @param {string} col - Display name of college
+   * @returns {string} Internal key value
+   */
   const collegeNameToKey = (col) => {
     switch (col) {
       case 'Smith College':
@@ -265,6 +383,12 @@ function Searchbar() {
     }
   };
 
+    /**
+   * Convert internal key to college display name
+   * @function
+   * @param {string} key - Internal key for college
+   * @returns {string} Display name
+   */
   const keyToCollegeName = (key) => {
     switch (key) {
       case 'smith':
@@ -282,6 +406,13 @@ function Searchbar() {
         return 'All';
     }
   };
+
+    /**
+   * Get FOLIO API query parameter for college
+   * @function
+   * @param {string} collegeKey - Internal key for college
+   * @returns {string} FOLIO API query string
+   */
 
   const getCollegeQuery = (collegeKey) => {
     switch (collegeKey) {

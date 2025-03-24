@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/reports/ActionsTab.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/reports/ActionsTab.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { useMemo } from 'react';
+import PropTypes from 'prop-types';
+import { Card, CardHeader, CardBody, Table, Alert } from 'reactstrap';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts';
+
+// Color palette for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+
+/**
+ * Actions Tab component displaying analytics related to user actions
+ */
+const ActionsTab = ({ analyticsData, loading, error }) => {
+  // Validate and prepare top actions data
+  const validTopActions = useMemo(() => {
+    if (!analyticsData.topActions || !Array.isArray(analyticsData.topActions)) {
+      return [];
+    }
+    return analyticsData.topActions.map(action => ({
+      action: action.action || 'Unknown Action',
+      count: Number(action.count) || 0
+    }));
+  }, [analyticsData.topActions]);
+
+  // Validate and prepare event type data
+  const validEventTypes = useMemo(() => {
+    if (!analyticsData.eventTypeData || !Array.isArray(analyticsData.eventTypeData)) {
+      return [];
+    }
+    return analyticsData.eventTypeData.map(type => ({
+      name: type.name || 'Unknown Type',
+      value: Number(type.value) || 0
+    }));
+  }, [analyticsData.eventTypeData]);
+
+  // Calculate total count safely
+  const totalCount = useMemo(() => {
+    return Number(analyticsData.totalCount) || 
+      validEventTypes.reduce((sum, type) => sum + type.value, 0);
+  }, [analyticsData.totalCount, validEventTypes]);
+
+  // Check if we have valid data to display
+  const hasTopActionsData = validTopActions.length > 0;
+  const hasEventTypeData = validEventTypes.length > 0;
+
+  // If there's an error, display it
+  if (error) {
+    return (
+      &lt;Alert color="danger">
+        &lt;h4 className="alert-heading">Error Loading Actions Data&lt;/h4>
+        &lt;p>{error}&lt;/p>
+      &lt;/Alert>
+    );
+  }
+
+  return (
+    &lt;div>
+      &lt;Card className="mb-4 shadow-sm">
+        &lt;CardHeader className="bg-light">
+          &lt;h5 className="mb-0">Top User Actions&lt;/h5>
+        &lt;/CardHeader>
+        &lt;CardBody>
+          {loading ? (
+            &lt;div className="text-center p-4">
+              &lt;div className="spinner-border text-primary" role="status">
+                &lt;span className="visually-hidden">Loading...&lt;/span>
+              &lt;/div>
+              &lt;p className="mt-2">Loading action data...&lt;/p>
+            &lt;/div>
+          ) : !hasTopActionsData ? (
+            &lt;div className="text-center p-4">
+              &lt;p>No action data available.&lt;/p>
+            &lt;/div>
+          ) : (
+            &lt;ResponsiveContainer width="100%" height={400}>
+              &lt;BarChart 
+                data={validTopActions}
+                layout="vertical"
+                margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+              >
+                &lt;CartesianGrid strokeDasharray="3 3" />
+                &lt;XAxis type="number" />
+                &lt;YAxis 
+                  type="category" 
+                  dataKey="action" 
+                  width={120}
+                  tick={{ fontSize: 12 }}
+                />
+                &lt;Tooltip formatter={(value) => [`${value} events`, 'Count']} />
+                &lt;Bar dataKey="count" fill="#82ca9d" name="Event Count">
+                  {validTopActions.map((entry, index) => (
+                    &lt;Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                &lt;/Bar>
+              &lt;/BarChart>
+            &lt;/ResponsiveContainer>
+          )}
+        &lt;/CardBody>
+      &lt;/Card>
+      
+      &lt;Card className="shadow-sm">
+        &lt;CardHeader className="bg-light">
+          &lt;h5 className="mb-0">Event Types Breakdown&lt;/h5>
+        &lt;/CardHeader>
+        &lt;CardBody>
+          {loading ? (
+            &lt;div className="text-center p-4">
+              &lt;div className="spinner-border text-primary" role="status">
+                &lt;span className="visually-hidden">Loading...&lt;/span>
+              &lt;/div>
+              &lt;p className="mt-2">Loading event type data...&lt;/p>
+            &lt;/div>
+          ) : !hasEventTypeData ? (
+            &lt;div className="text-center p-4">
+              &lt;p>No event type data available.&lt;/p>
+            &lt;/div>
+          ) : (
+            &lt;Table hover responsive>
+              &lt;thead>
+                &lt;tr>
+                  &lt;th>Event Type&lt;/th>
+                  &lt;th>Count&lt;/th>
+                  &lt;th>Percentage&lt;/th>
+                &lt;/tr>
+              &lt;/thead>
+              &lt;tbody>
+                {validEventTypes.map((type, index) => {
+                  // Safe percentage calculation
+                  const percentage = totalCount > 0 
+                    ? (Number(type.value) / totalCount * 100).toFixed(1) 
+                    : '0.0';
+                    
+                  return (
+                    &lt;tr key={type.name || index}>
+                      &lt;td>{type.name}&lt;/td>
+                      &lt;td>{type.value}&lt;/td>
+                      &lt;td>
+                        &lt;div className="d-flex align-items-center">
+                          &lt;div className="me-2">{percentage}%&lt;/div>
+                          &lt;div className="progress" style={{width: '100px', height: '10px'}}>
+                            &lt;div 
+                              className="progress-bar" 
+                              role="progressbar" 
+                              style={{
+                                width: `${percentage}%`,
+                                backgroundColor: COLORS[index % COLORS.length]
+                              }} 
+                              aria-valuenow={percentage} 
+                              aria-valuemin="0" 
+                              aria-valuemax="100"
+                            >&lt;/div>
+                          &lt;/div>
+                        &lt;/div>
+                      &lt;/td>
+                    &lt;/tr>
+                  );
+                })}
+              &lt;/tbody>
+            &lt;/Table>
+          )}
+        &lt;/CardBody>
+      &lt;/Card>
+    &lt;/div>
+  );
+};
+
+// Improved PropTypes with more specific validation
+ActionsTab.propTypes = {
+  analyticsData: PropTypes.shape({
+    topActions: PropTypes.arrayOf(PropTypes.shape({
+      action: PropTypes.string,
+      count: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    })),
+    eventTypeData: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string,
+      value: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    })),
+    totalCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+  }),
+  loading: PropTypes.bool,
+  error: PropTypes.string
+};
+
+ActionsTab.defaultProps = {
+  analyticsData: {
+    topActions: [],
+    eventTypeData: [],
+    totalCount: 0
+  },
+  loading: false,
+  error: null
+};
+
+export default ActionsTab;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

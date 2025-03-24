@@ -1,38 +1,200 @@
+/**
+ * @file Search form component
+ * @module SearchForm
+ * @description Reusable form component for searching course reserves with configurable filters and appearance
+ * @requires prop-types
+ * @requires reactstrap
+ * @requires ../../hooks/useDepartments
+ * @requires ../../util/searchUtils
+ */
+
 import PropTypes from 'prop-types';
 import { Form, FormGroup, Label, Input, Button, Alert } from 'reactstrap';
 import { useDepartments } from '../../hooks/useDepartments';
 import { collegeNameToKey } from '../../util/searchUtils';
 
+/**
+ * Course reserves search form component
+ * 
+ * A flexible, configurable search form that allows filtering by:
+ * - College/institution
+ * - Department
+ * - Search area (All fields, Course Name, etc.)
+ * - Term (optional)
+ * - Keyword search
+ * 
+ * The component handles form submission, reset functionality, and dynamic department loading
+ * based on selected college.
+ * 
+ * @component
+ * @example
+ * const [selectedCollege, setSelectedCollege] = useState('All Colleges');
+ * const [searchArea, setSearchArea] = useState('All fields');
+ * const [searchInput, setSearchInput] = useState('');
+ * const [department, setDepartment] = useState('');
+ * 
+ * return (
+ *   <SearchForm
+ *     selectedCollege={selectedCollege}
+ *     setSelectedCollege={setSelectedCollege}
+ *     searchArea={searchArea}
+ *     setSearchArea={setSearchArea}
+ *     searchInput={searchInput}
+ *     setSearchInput={setSearchInput}
+ *     department={department}
+ *     setDepartment={setDepartment}
+ *     onSubmit={handleSearch}
+ *     onReset={handleReset}
+ *   />
+ * );
+ */
 const SearchForm = ({
   // Required props
+  /**
+   * Currently selected college
+   * @type {string}
+   */
   selectedCollege,
+  
+  /**
+   * Function to update the selected college
+   * @type {function}
+   * @param {string} college - The new college value
+   */
   setSelectedCollege,
+  
+  /**
+   * Current search area selection (All fields, Course Name, etc.)
+   * @type {string}
+   */
   searchArea,
+  
+  /**
+   * Function to update the search area
+   * @type {function}
+   * @param {string} area - The new search area value
+   */
   setSearchArea, 
+  
+  /**
+   * Current search input value/query
+   * @type {string}
+   */
   searchInput,
+  
+  /**
+   * Function to update the search input
+   * @type {function}
+   * @param {string} input - The new search input value
+   */
   setSearchInput,
+  
+  /**
+   * Currently selected department
+   * @type {string}
+   */
   department,
+  
+  /**
+   * Function to update the selected department
+   * @type {function}
+   * @param {string} dept - The new department value
+   */
   setDepartment,
   
   // Optional props with defaults
+  /**
+   * Available academic terms for filtering
+   * @type {Array<{id: string, name: string}>}
+   * @default []
+   */
   terms = [],
+  
+  /**
+   * Currently selected term ID
+   * @type {string|null}
+   * @default null
+   */
   termId = null,
+  
+  /**
+   * Handler function for term selection changes
+   * @type {function|null}
+   * @param {Event} e - Change event from term select input
+   * @default null
+   */
   handleTermChange = null,
+  
+  /**
+   * Whether to show term selection field
+   * @type {boolean}
+   * @default false
+   */
   showTerms = false,
+  
+  /**
+   * Form submission handler
+   * @type {function}
+   * @default () => {}
+   */
   onSubmit = () => {},
+  
+  /**
+   * Form reset handler
+   * @type {function}
+   * @default () => {}
+   */
   onReset = () => {},
+  
+  /**
+   * Background color for the search button
+   * @type {string}
+   * @default "#007bff"
+   */
   searchButtonBgColor = "#007bff",
+  
+  /**
+   * Background color for the reset button
+   * @type {string}
+   * @default "#6c757d"
+   */
   resetButtonBgColor = "#6c757d",
+  
+  /**
+   * List of available colleges to select from
+   * @type {Array<string>}
+   * @default ['All Colleges', 'Smith', 'Hampshire', 'MtHolyoke', 'Amherst', 'UMass']
+   */
   colleges = [
     'All Colleges', 'Smith', 'Hampshire', 'MtHolyoke', 'Amherst', 'UMass'
   ],
+  
+  /**
+   * List of available search areas to select from
+   * @type {Array<string>}
+   * @default ['All fields', 'Course Name', 'Course Code', 'Section', 'Instructor']
+   */
   searchAreas = [
     'All fields', 'Course Name', 'Course Code', 'Section', 'Instructor'
   ],
 }) => {
-  // Use our custom hook
+  /**
+   * Custom hook that fetches departments based on selected college
+   * @type {Object}
+   * @property {Array} departments - List of departments for the selected college
+   * @property {boolean} loading - Whether departments are currently being fetched
+   * @property {string|null} error - Error message if department fetching failed
+   */
   const { departments, loading, error } = useDepartments(collegeNameToKey(selectedCollege));
 
+  /**
+   * Handle form submission
+   * Prevents default form behavior and calls the onSubmit handler
+   * 
+   * @function
+   * @param {Event} e - Form submit event
+   * @returns {void}
+   */
   const handleSubmit = (e) => {
     e.preventDefault();
     if (typeof onSubmit === 'function') {
@@ -40,6 +202,14 @@ const SearchForm = ({
     }
   };
 
+  /**
+   * Handle form reset
+   * Prevents default form behavior and calls the onReset handler
+   * 
+   * @function
+   * @param {Event} e - Form reset event
+   * @returns {void}
+   */
   const handleReset = (e) => {
     e.preventDefault();
     if (typeof onReset === 'function') {

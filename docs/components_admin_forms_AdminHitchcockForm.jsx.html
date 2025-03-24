@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/admin/forms/AdminHitchcockForm.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/admin/forms/AdminHitchcockForm.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// AdminHitchcockForm.jsx
+import { useState, useEffect } from 'react';
+import {
+  Form,
+  FormGroup,
+  Label,
+  Input,
+  Button,
+  Table,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ListGroup,
+  ListGroupItem,
+  Container,
+  Row,
+  Col
+} from 'reactstrap';
+import PropTypes from 'prop-types';
+import { AdditionalCommonFields } from './AdditionalCommonFields';
+import { TypeSpecificFields } from './TypeSpecificFields';
+import { adminMaterialTypeService } from '../../../services/admin/adminMaterialTypeService';
+import { adminCourseService } from '../../../services/admin/adminCourseService';
+import { useAdminCourseStore } from '../../../store/adminCourseStore';
+import { adjustProxy } from '../../../util/proxyUtil';
+import { toast } from 'react-toastify';
+/**
+ * AdminHitchcockForm
+ *
+ * - Provides a simple search input.
+ * - Performs a search via the Yii2 endpoint `/hitchcock/search-resources?title=[searchTerm]`
+ *   which handles Hitchcock authentication server-side.
+ * - Displays the results in a table.
+ * - When a result is selected, a modal opens so you can add additional details.
+ */
+export const AdminHitchcockForm = ({ onSubmit }) => {
+
+  //store values
+  const { course, folioCourseData } = useAdminCourseStore();
+
+  // State for the search input and results
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [materialTypeFields, setMaterialTypeFields] = useState([]);
+  const [materialTypes, setMaterialTypes] = useState([]);
+
+  // State for loading and error handling
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // State for modal visibility
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Form data state for additional details on the resource
+  const [formData, setFormData] = useState({
+    title: '',
+    link: '',
+    notes: '',
+    material_type: '',
+    metadata: {},
+    use_proxy: false,
+    start_visibility: '',
+    end_visibility: '',
+    internal_note: '',
+    external_note: '',
+    folder: ''
+  });
+
+    // Fetch material types on mount.
+    useEffect(() => {
+      const fetchMaterialTypes = async () => {
+        try {
+          const { data } = await adminMaterialTypeService.getMaterialTypes();
+          setMaterialTypes(data);
+        } catch (err) {
+          console.error('Error fetching material types:', err);
+        }
+      };
+      fetchMaterialTypes();
+    }, []);
+
+  // State to handle copy-to-clipboard feedback for API data
+  const [copiedField, setCopiedField] = useState(null);
+
+    const fetchMaterialTypeFields = async (materialTypeId) => {
+      if (!materialTypeId) return;
+      try {
+        const { data } = await adminMaterialTypeService.getMaterialTypeFields(materialTypeId);
+        setMaterialTypeFields(data);
+      } catch (err) {
+        console.error('Error fetching material type fields:', err);
+        setError('Failed to load material type fields');
+      }
+    };
+
+  /**
+   * handleSearch
+   * On form submission, calls the Yii2 endpoint to perform a Hitchcock search.
+   */
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) return;
+    setError(null);
+    setLoading(true);
+    try {
+      // Build the search URL using the search term (encoded)
+      // Adjust the URL if you need to prepend a backend base URL
+      const searchUrl = `https://libtools2.smith.edu/course-reserves/backend/web/hitchcock/search-resources?title=${encodeURIComponent(searchTerm)}`;
+
+      // Perform the search. The backend handles Hitchcock authentication.
+      const response = await fetch(searchUrl, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Search failed with status ${response.status}`);
+      }
+      const results = await response.json();
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Error during search:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * handleSelectRecord
+   * Maps the selected Hitchcock record to our formData and opens the edit modal.
+   */
+  const handleSelectRecord = (record) => {
+    setSelectedRecord(record);
+    setFormData({
+      title: record.title || '',
+      link: record.link || '',
+      notes: record.notes || '',
+      material_type: '', // Let the user choose material type if necessary
+      metadata: {},
+      use_proxy: false,
+      start_visibility: '',
+      end_visibility: '',
+      internal_note: '',
+      external_note: '',
+      folder: ''
+    });
+    setEditModalOpen(true);
+  };
+
+  /**
+   * handleFieldChange
+   * Updates formData when input values change.
+   */
+  const handleFieldChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    if (type === 'checkbox') {
+      setFormData(prev => ({ ...prev, [name]: checked }));
+    } else {
+      if (name in formData) {
+        setFormData(prev => ({ ...prev, [name]: value }));
+      } else {
+        // For fields inside metadata
+        setFormData(prev => ({
+          ...prev,
+          metadata: { ...prev.metadata, [name]: value }
+        }));
+      }
+    }
+  };
+
+  /**
+   * handleSubmitResource
+   * Submits the resource. Replace the example submission with your actual service call.
+   */
+  const handleSubmitResource = async () => {
+    const data = course
+    try {
+      setLoading(true);
+      const submissionData = { ...formData };
+      adjustProxy(submissionData);
+      await adminCourseService.createResource(data.offering_id, data.course_id, submissionData, folioCourseData);
+      toast.success('Resource added successfully');
+      setEditModalOpen(false);
+      onSubmit();
+    } catch (err) {
+      console.error('Error submitting resource:', err);
+      toast.error('Failed to add resource');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * handleInsertField
+   * Copies a field’s value to clipboard and shows feedback.
+   */
+  const handleInsertField = async (value, fieldName) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+      toast.error('Failed to copy text');
+    }
+  };
+
+  return (
+    &lt;div>
+      &lt;h4>Hitchcock Search&lt;/h4>
+      &lt;Form inline onSubmit={handleSearch} className="mb-3">
+        &lt;FormGroup className="mr-2">
+          &lt;Label for="hitchcockQuery" className="mr-2">Search Query&lt;/Label>
+          &lt;Input
+            id="hitchcockQuery"
+            name="hitchcockQuery"
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Enter title to search..."
+            className="mr-2"
+          />
+        &lt;/FormGroup>
+        &lt;Button color="primary" type="submit" disabled={loading}>
+          {loading ? 'Searching...' : 'Search'}
+        &lt;/Button>
+      &lt;/Form>
+
+      {error &amp;&amp; &lt;div className="text-danger mb-3">Error: {error}&lt;/div>}
+
+      {searchResults.length > 0 &amp;&amp; (
+        &lt;div className="response-table mb-4">
+          &lt;Table bordered hover size="lg">
+            &lt;thead>
+              &lt;tr>
+                &lt;th>ID&lt;/th>
+                &lt;th>Title&lt;/th>
+                &lt;th>Form&lt;/th>
+                &lt;th>Description&lt;/th>
+                &lt;th>Notes&lt;/th>
+                &lt;th>Action&lt;/th>
+              &lt;/tr>
+            &lt;/thead>
+            &lt;tbody>
+              {searchResults.map(record => (
+                &lt;tr key={record.id}>
+                  &lt;td style={{ wordBreak: 'break-all' }}>{record.id}&lt;/td>
+                  &lt;td>{record.title}&lt;/td>
+                  &lt;td>{record.form}&lt;/td>
+                  &lt;td>{record.description || '-'}&lt;/td>
+                  &lt;td>{record.notes || '-'}&lt;/td>
+                  &lt;td>
+                    &lt;Button color="primary" onClick={() => handleSelectRecord(record)}>
+                      Edit &amp;amp; Add
+                    &lt;/Button>
+                  &lt;/td>
+                &lt;/tr>
+              ))}
+            &lt;/tbody>
+          &lt;/Table>
+        &lt;/div>
+      )}
+
+      {/* Modal for editing and adding additional details */}
+      &lt;Modal size="xl" isOpen={editModalOpen} toggle={() => setEditModalOpen(!editModalOpen)}>
+        &lt;ModalHeader toggle={() => setEditModalOpen(!editModalOpen)}>
+          Edit Resource Details
+        &lt;/ModalHeader>
+        &lt;ModalBody>
+          &lt;Container fluid>
+            &lt;Row>
+              {/* Left Column: Basic Details and Common Fields */}
+              &lt;Col md={8}>
+                &lt;Container fluid>
+                  &lt;Row>
+                    &lt;Col md={6}>
+                      &lt;div className="border-bottom pb-3 mb-3">
+                        &lt;h5>Basic Details&lt;/h5>
+                        &lt;FormGroup>
+                          &lt;Label for="title">Title&lt;/Label>
+                          &lt;Input
+                            id="title"
+                            name="title"
+                            value={formData.title || ''}
+                            onChange={handleFieldChange}
+                            required
+                          />
+                        &lt;/FormGroup>
+                        &lt;FormGroup>
+                          &lt;Label for="link">Link (URL)&lt;/Label>
+                          &lt;Input
+                            id="link"
+                            name="link"
+                            value={formData.link || ''}
+                            onChange={handleFieldChange}
+                          />
+                        &lt;/FormGroup>
+                        &lt;FormGroup>
+                          &lt;Label for="notes">Description / Notes&lt;/Label>
+                          &lt;Input
+                            id="notes"
+                            type="textarea"
+                            name="notes"
+                            value={formData.notes || ''}
+                            onChange={handleFieldChange}
+                          />
+                        &lt;/FormGroup>
+                        &lt;FormGroup>
+                          &lt;Label for="internal_note">Internal Note (Staff Only)&lt;/Label>
+                          &lt;Input
+                            id="internal_note"
+                            name="internal_note"
+                            type="textarea"
+                            value={formData.internal_note || ''}
+                            onChange={handleFieldChange}
+                          />
+                        &lt;/FormGroup>
+                        &lt;FormGroup>
+                          &lt;Label for="external_note">External Note (Visible to User)&lt;/Label>
+                          &lt;Input
+                            id="external_note"
+                            name="external_note"
+                            type="textarea"
+                            value={formData.external_note || ''}
+                            onChange={handleFieldChange}
+                          />
+                        &lt;/FormGroup>
+                        &lt;AdditionalCommonFields 
+                          handleFieldChange={handleFieldChange}
+                          formData={formData}
+                          setFormData={setFormData}
+                        />
+                      &lt;/div>
+                    &lt;/Col>
+                    &lt;Col md={6}>
+                      &lt;div className="border-bottom pb-3 mb-3">
+                        &lt;h5>Material Type&lt;/h5>
+                        &lt;FormGroup>
+                          &lt;Label for="material_type">Type&lt;/Label>
+                          &lt;Input
+                            type="select"
+                            name="material_type"
+                            value={formData.material_type || ''}
+                            onChange={(e) => {
+                                handleFieldChange(e)
+                                setFormData(prev => ({ ...prev, metadata: {} }))
+                                fetchMaterialTypeFields(e.target.value)
+                            }}
+                          >
+                            &lt;option value="">-- Select Material Type --&lt;/option>
+                            {materialTypes.map((mt) => (
+                              &lt;option key={mt.material_type_id} value={mt.material_type_id}>
+                                {mt.name}
+                              &lt;/option>
+                            ))}
+                          &lt;/Input>
+                        &lt;/FormGroup>
+                      &lt;/div>
+                      &lt;div>
+                        &lt;h5>Type-Specific Details&lt;/h5>
+                        &lt;TypeSpecificFields
+                          formData={formData}
+                          metadata={formData.metadata}
+                          handleFieldChange={handleFieldChange}
+                          materialTypeFields={materialTypeFields}
+                        />
+                      &lt;/div>                    
+                    &lt;/Col>
+                  &lt;/Row>
+                  &lt;Row>
+                    &lt;Col className="text-right mt-3">
+                      &lt;Button color="primary" onClick={handleSubmitResource} disabled={loading}>
+                        Save &amp;amp; Add
+                      &lt;/Button>
+                    &lt;/Col>
+                  &lt;/Row>
+                &lt;/Container>
+              &lt;/Col>
+              {/* Right Column: Display raw API data from the selected record */}
+              &lt;Col md={4}>
+                &lt;h5>Available API Data&lt;/h5>
+                &lt;p>Click Copy to copy its value:&lt;/p>
+                {selectedRecord &amp;&amp; (
+                  &lt;ListGroup>
+                    {Object.entries(selectedRecord).map(([key, value], index) => (
+                      &lt;ListGroupItem key={index} className="d-flex justify-content-between align-items-center">
+                        &lt;div>
+                          &lt;strong>{key}:&lt;/strong>{' '}
+                          &lt;span style={{ wordBreak: 'break-all' }}>
+                            {typeof value === 'object' ? JSON.stringify(value) : value}
+                          &lt;/span>
+                        &lt;/div>
+                        &lt;span
+                          className="badge text-bg-primary rounded-pill"
+                          onClick={() =>
+                            handleInsertField(
+                              typeof value === 'object' ? JSON.stringify(value) : value,
+                              key
+                            )
+                          }
+                        >
+                          {copiedField === key ? "✓ Copied" : "Copy"}
+                        &lt;/span>
+                      &lt;/ListGroupItem>
+                    ))}
+                  &lt;/ListGroup>
+                )}
+              &lt;/Col>
+            &lt;/Row>
+          &lt;/Container>
+        &lt;/ModalBody>
+        &lt;ModalFooter>
+          &lt;Button color="secondary" onClick={() => setEditModalOpen(false)}>
+            Cancel
+          &lt;/Button>
+        &lt;/ModalFooter>
+      &lt;/Modal>
+    &lt;/div>
+  );
+};
+
+AdminHitchcockForm.propTypes = {
+  course: PropTypes.object.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+};
+
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

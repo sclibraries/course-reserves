@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/page-sections/admin/AdminCourseCard.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/page-sections/admin/AdminCourseCard.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file AdminCourseCard component
+ * @module AdminCourseCard
+ * @description Displays a single course card within the admin interface. Shows course details,
+ * instructor info, term info, and provides buttons for managing details and e-resources.
+ *
+ * @requires prop-types
+ * @requires react-router-dom
+ * @requires reactstrap
+ * @requires ../../../store/courseManagementStore
+ */
+
+import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardBody, CardTitle, CardText, Button } from 'reactstrap';
+import useCourseManagementStore from '../../../store/courseManagementStore';
+
+/**
+ * Admin course card component
+ *
+ * Displays course metadata, term information, location, and offers navigation
+ * for managing additional details or electronic resources.
+ * 
+ * Features:
+ * - Shows department, instructors, and term info.
+ * - Checks if course term is active based on the current date.
+ * - Provides button to view/edit course details.
+ * - Provides button to manage electronic resources (if set).
+ *
+ * @component
+ * @example
+ * const onDetailsClick = (courseListingId) => {
+ *   // navigate to course details
+ * };
+ *
+ * return (
+ *   &lt;AdminCourseCard
+ *     course={someCourseObject}
+ *     onDetailsClick={onDetailsClick}
+ *   />
+ * );
+ *
+ * @param {Object} props - Component properties
+ * @param {Object} props.course - Course data object
+ * @param {string} [props.course.id] - Primary course ID
+ * @param {string} [props.course.courseListingId] - Course listing ID
+ * @param {string} [props.course.name] - Display name of the course
+ * @param {string} [props.course.courseNumber] - Course number (e.g. ENG-101)
+ * @param {Object} [props.course.departmentObject] - Department info
+ * @param {string} [props.course.departmentObject.name] - Department name
+ * @param {Object} [props.course.courseListingObject] - Detailed listing object
+ * @param {string} [props.course.courseListingObject.id] - ListingId used for sub-routes
+ * @param {Object[]} [props.course.courseListingObject.instructorObjects] - Instructors list
+ * @param {string} props.course.courseListingObject.instructorObjects[].id - Instructor ID
+ * @param {string} props.course.courseListingObject.instructorObjects[].name - Instructor name
+ * @param {string} props.course.courseListingObject.instructorObjects[].userId - Auth user ID
+ * @param {Object} [props.course.courseListingObject.courseTypeObject] - Course type metadata
+ * @param {string} [props.course.courseListingObject.courseTypeObject.name] - Type name
+ * @param {string} [props.course.courseListingObject.courseTypeObject.description] - Type description
+ * @param {Object} [props.course.courseListingObject.termObject] - Term info
+ * @param {string} [props.course.courseListingObject.termObject.name] - Term name
+ * @param {string} [props.course.courseListingObject.termObject.startDate] - Term start date
+ * @param {string} [props.course.courseListingObject.termObject.endDate] - Term end date
+ * @param {Object} [props.course.courseListingObject.locationObject] - Location info
+ * @param {string} [props.course.courseListingObject.locationObject.name] - Location name
+ * @param {string} [props.course.courseListingObject.locationObject.code] - Location code
+ * @param {Function} props.onDetailsClick - Handler for "Manage Details" button click
+ *
+ * @return {JSX.Element} A card displaying course information with action buttons.
+ */
+function AdminCourseCard({ course, onDetailsClick }) {
+  const { setCourse } = useCourseManagementStore();
+  const navigate = useNavigate();
+
+  const {
+    name: courseName = 'No Title',
+    courseNumber = 'Unknown Course #',
+    departmentObject,
+    courseListingObject,
+    id: courseId,
+  } = course;
+
+  const courseListingId = courseListingObject?.id;
+
+  // Derive display strings
+  const departmentName = departmentObject?.name || 'Unknown Department';
+  const courseTypeName =
+    courseListingObject?.courseTypeObject?.name ||
+    courseListingObject?.courseTypeObject?.description ||
+    'Unknown Type';
+  const instructors = courseListingObject?.instructorObjects || [];
+  const instructorNames = instructors.map((i) => i.name).join(', ') || 'N/A';
+  const termName = courseListingObject?.termObject?.name || 'Unknown Term';
+  const termStart = courseListingObject?.termObject?.startDate;
+  const termEnd = courseListingObject?.termObject?.endDate;
+  const locationName =
+    courseListingObject?.locationObject?.name ||
+    courseListingObject?.locationObject?.code ||
+    'Unknown Location';
+
+  /**
+   * Determine if the course term is currently active based on start/end dates
+   * @private
+   * @function
+   * @returns {boolean} True if current date is within the term's range
+   */
+  const isActive = (() => {
+    if (!termStart || !termEnd) return false;
+    const now = new Date();
+    return now >= new Date(termStart) &amp;&amp; now &lt;= new Date(termEnd);
+  })();
+
+  /**
+   * Navigate to manage electronic resources for this course
+   * @private
+   * @function
+   * @returns {void}
+   */
+  const handleManageElectronic = () => {
+    setCourse(course);
+    navigate(`/admin/electronic/${courseListingId}`);
+  };
+
+  return (
+    &lt;Card className="h-100 shadow-sm p-3 mb-4 bg-body-tertiary rounded">
+      &lt;CardBody className="d-flex flex-column">
+        &lt;CardTitle tag="h5">{courseName}&lt;/CardTitle>
+        &lt;CardText>
+          &lt;strong>Course Number:&lt;/strong> {courseNumber}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Department:&lt;/strong> {departmentName}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Course Type:&lt;/strong> {courseTypeName}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Instructor(s):&lt;/strong> {instructorNames}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Term:&lt;/strong> {termName}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Term Start:&lt;/strong> {termStart ? termStart.substring(0, 10) : 'N/A'}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Term End:&lt;/strong> {termEnd ? termEnd.substring(0, 10) : 'N/A'}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Location:&lt;/strong> {locationName}
+        &lt;/CardText>
+        &lt;CardText>
+          &lt;strong>Status:&lt;/strong> {isActive ? 'Active' : 'Inactive'}
+        &lt;/CardText>
+
+        {/* Button to manage course details */}
+        &lt;Button
+          color="primary"
+          className="mt-auto"
+          onClick={() => onDetailsClick(courseListingId || courseId)}
+        >
+          Manage Details
+        &lt;/Button>
+
+        {/* Button to manage electronic resources */}
+        &lt;Button
+          color="warning"
+          className="mt-2"
+          onClick={handleManageElectronic}
+          disabled={!courseListingId}
+        >
+          Manage E-Resources
+        &lt;/Button>
+      &lt;/CardBody>
+    &lt;/Card>
+  );
+}
+
+AdminCourseCard.propTypes = {
+  course: PropTypes.shape({
+    id: PropTypes.string,
+    courseListingId: PropTypes.string,
+    name: PropTypes.string,
+    courseNumber: PropTypes.string,
+    departmentObject: PropTypes.shape({
+      name: PropTypes.string,
+    }),
+    courseListingObject: PropTypes.shape({
+      id: PropTypes.string,
+      instructorObjects: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.string,
+          name: PropTypes.string,
+          userId: PropTypes.string,
+        })
+      ),
+      courseTypeObject: PropTypes.shape({
+        name: PropTypes.string,
+        description: PropTypes.string,
+      }),
+      termObject: PropTypes.shape({
+        name: PropTypes.string,
+        startDate: PropTypes.string,
+        endDate: PropTypes.string,
+      }),
+      locationObject: PropTypes.shape({
+        name: PropTypes.string,
+        code: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
+  onDetailsClick: PropTypes.func.isRequired,
+};
+
+export default AdminCourseCard;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-AdminCourseCard.html">AdminCourseCard</a></li><li><a href="module-AdminCourseList.html">AdminCourseList</a></li><li><a href="module-AdminCourseTable.html">AdminCourseTable</a></li><li><a href="module-AdminResourceTable.html">AdminResourceTable</a></li><li><a href="module-App.html">App</a></li><li><a href="module-AppRoutes.html">AppRoutes</a></li><li><a href="module-CampusDetection.html">CampusDetection</a></li><li><a href="module-Header.html">Header</a></li><li><a href="module-Layout.html">Layout</a></li><li><a href="module-ResourceListTable.html">ResourceListTable</a></li><li><a href="module-ResourceSearchSidebar.html">ResourceSearchSidebar</a></li><li><a href="module-SearchForm.html">SearchForm</a></li><li><a href="module-Searchbar.html">Searchbar</a></li><li><a href="module-courseTypes.html">courseTypes</a></li><li><a href="module-main.html">main</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ActionsTab">ActionsTab</a></li><li><a href="global.html#AdminCrossLinkFolioCourseModal">AdminCrossLinkFolioCourseModal</a></li><li><a href="global.html#AdminHitchcockForm">AdminHitchcockForm</a></li><li><a href="global.html#AdminPrintResourceTable">AdminPrintResourceTable</a></li><li><a href="global.html#AdminResourceForm">AdminResourceForm</a></li><li><a href="global.html#Button">Button</a></li><li><a href="global.html#CollegeAccessChart">CollegeAccessChart</a></li><li><a href="global.html#CollegeBadge">CollegeBadge</a></li><li><a href="global.html#CollegeFilter">CollegeFilter</a></li><li><a href="global.html#CollegePieChart">CollegePieChart</a></li><li><a href="global.html#CoursesByCampusChart">CoursesByCampusChart</a></li><li><a href="global.html#CoursesTab">CoursesTab</a></li><li><a href="global.html#CoursesTable">CoursesTable</a></li><li><a href="global.html#CrossLinkForm">CrossLinkForm</a></li><li><a href="global.html#CustomChartTick">CustomChartTick</a></li><li><a href="global.html#CustomTooltip">CustomTooltip</a></li><li><a href="global.html#EventTypeBadge">EventTypeBadge</a></li><li><a href="global.html#EventTypeFilter">EventTypeFilter</a></li><li><a href="global.html#EventTypesPieChart">EventTypesPieChart</a></li><li><a href="global.html#EventsTable">EventsTable</a></li><li><a href="global.html#EventsTimeSeriesChart">EventsTimeSeriesChart</a></li><li><a href="global.html#FilterPanel">FilterPanel</a></li><li><a href="global.html#InstructorsPanel">InstructorsPanel</a></li><li><a href="global.html#MetadataDisplay">MetadataDisplay</a></li><li><a href="global.html#OverviewTab">OverviewTab</a></li><li><a href="global.html#PaginationControls">PaginationControls</a></li><li><a href="global.html#RawDataTab">RawDataTab</a></li><li><a href="global.html#SearchFilter">SearchFilter</a></li><li><a href="global.html#StateDisplay">StateDisplay</a></li><li><a href="global.html#TermFilter">TermFilter</a></li><li><a href="global.html#TrackingReport">TrackingReport</a></li><li><a href="global.html#WithFallbackToDefault">WithFallbackToDefault</a></li><li><a href="global.html#WithIPDetection">WithIPDetection</a></li><li><a href="global.html#WithQueryParameter">WithQueryParameter</a></li><li><a href="global.html#adjustProxy">adjustProxy</a></li><li><a href="global.html#buildFilterParams">buildFilterParams</a></li><li><a href="global.html#calculateInstructorCount">calculateInstructorCount</a></li><li><a href="global.html#extractColleges">extractColleges</a></li><li><a href="global.html#extractValue">extractValue</a></li><li><a href="global.html#fetchCourseData">fetchCourseData</a></li><li><a href="global.html#fetchCrossLinkedCourses">fetchCrossLinkedCourses</a></li><li><a href="global.html#fetchElectronicReserves">fetchElectronicReserves</a></li><li><a href="global.html#fetchItemAvailabilityData">fetchItemAvailabilityData</a></li><li><a href="global.html#fetchRecords">fetchRecords</a></li><li><a href="global.html#fetchSpringShareData">fetchSpringShareData</a></li><li><a href="global.html#filterValidColleges">filterValidColleges</a></li><li><a href="global.html#filterValidTerms">filterValidTerms</a></li><li><a href="global.html#formatDate">formatDate</a></li><li><a href="global.html#formatDateForApi">formatDateForApi</a></li><li><a href="global.html#formatEventType">formatEventType</a></li><li><a href="global.html#formatEventTypeData">formatEventTypeData</a></li><li><a href="global.html#formatEventTypeName">formatEventTypeName</a></li><li><a href="global.html#formatMetadataByEventType">formatMetadataByEventType</a></li><li><a href="global.html#formatTimeSeriesData">formatTimeSeriesData</a></li><li><a href="global.html#getCoursesByCampus">getCoursesByCampus</a></li><li><a href="global.html#getCoursesByTerm">getCoursesByTerm</a></li><li><a href="global.html#getEventBadgeColor">getEventBadgeColor</a></li><li><a href="global.html#getRelativeTime">getRelativeTime</a></li><li><a href="global.html#mapEdsRecordToResource">mapEdsRecordToResource</a></li><li><a href="global.html#normalizeCourseData">normalizeCourseData</a></li><li><a href="global.html#safeParseJSON">safeParseJSON</a></li><li><a href="global.html#sortTerms">sortTerms</a></li><li><a href="global.html#transformFolioCourseToLocal">transformFolioCourseToLocal</a></li><li><a href="global.html#useAdminCourseStore">useAdminCourseStore</a></li><li><a href="global.html#useAdminSearch">useAdminSearch</a></li><li><a href="global.html#useCurrentTermId">useCurrentTermId</a></li><li><a href="global.html#useRefreshToken">useRefreshToken</a></li><li><a href="global.html#useTokenExpiration">useTokenExpiration</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Mar 24 2025 15:14:45 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,3 +1,16 @@
+/**
+ * @file Resource search sidebar component
+ * @module ResourceSearchSidebar
+ * @description Advanced search and filtering sidebar for administrative resource management.
+ * Provides dynamic filters based on material types with customizable metadata fields.
+ * @requires react
+ * @requires reactstrap
+ * @requires react-toastify
+ * @requires ../../store/resourceSearchStore
+ * @requires ../../services/admin/adminMaterialTypeService
+ * @requires ../../services/admin/adminResourceService
+ */
+
 import { useState, useEffect } from 'react';
 import {
   Form,
@@ -14,11 +27,53 @@ import { adminMaterialTypeService } from '../../services/admin/adminMaterialType
 import { adminResourceService } from '../../services/admin/adminResourceService';
 import '../../css/Searchbar.css';
 
+/**
+ * Resource search sidebar component
+ * 
+ * Provides a comprehensive interface for searching and filtering resources with:
+ * - Basic text search by resource name
+ * - Material type filtering with dynamic metadata fields
+ * - Date range filtering
+ * - Collapsible interface for space efficiency
+ * 
+ * Features:
+ * - Dynamic metadata fields based on selected material type
+ * - Immediate search results with loading indicator
+ * - Reset functionality to clear all filters
+ * - Error handling with toast notifications
+ * 
+ * @component
+ * @example
+ * return (
+ *   <div className="resource-management">
+ *     <ResourceSearchSidebar />
+ *     <ResourceList />
+ *   </div>
+ * )
+ */
 function ResourceSearchSidebar() {
+  /**
+   * Sidebar expanded/collapsed state
+   * @type {boolean}
+   */
   const [isOpen, setIsOpen] = useState(true);
+  
+  /**
+   * Loading state for search operations
+   * @type {boolean}
+   */
   const [loading, setLoading] = useState(false);
+  
+  /**
+   * Available material types for filtering
+   * @type {Array<Object>}
+   */
   const [materialTypes, setMaterialTypes] = useState([]);
   
+  /**
+   * Resource search state and actions from store
+   * @type {Object}
+   */
   const { 
     filters, 
     setFilters, 
@@ -27,9 +82,22 @@ function ResourceSearchSidebar() {
     setPagination 
   } = useResourceSearchStore();
   
+  /**
+   * Active metadata fields for the selected material type
+   * @type {Array<Object>}
+   */
   const [activeTypeFields, setActiveTypeFields] = useState([]);
 
-  // Fetch material types on mount.
+  /**
+   * Toggle sidebar expanded/collapsed state
+   * @function
+   * @returns {void}
+   */
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
+  /**
+   * Fetch material types on component mount
+   */
   useEffect(() => {
     const fetchMaterialTypes = async () => {
       try {
@@ -43,7 +111,9 @@ function ResourceSearchSidebar() {
     fetchMaterialTypes();
   }, []);
 
-  // Update dynamic metadata fields when the material type filter changes.
+  /**
+   * Update dynamic metadata fields when material type filter changes
+   */
   useEffect(() => {
     if (filters.materialTypeId) {
       const selectedType = materialTypes.find(
@@ -55,7 +125,12 @@ function ResourceSearchSidebar() {
     }
   }, [filters.materialTypeId, materialTypes]);
 
-  // Execute resource search.
+  /**
+   * Execute resource search with current filters
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleSearch = async () => {
     setLoading(true);
     try {
@@ -79,7 +154,13 @@ function ResourceSearchSidebar() {
     }
   };
 
-  // Update metadata filter value.
+  /**
+   * Update metadata filter value for a specific field
+   * @function
+   * @param {string} fieldName - The name of the metadata field
+   * @param {string} value - The new filter value
+   * @returns {void}
+   */
   const handleMetadataChange = (fieldName, value) => {
     setFilters({
       ...filters,
@@ -90,7 +171,12 @@ function ResourceSearchSidebar() {
     });
   };
 
-  // Reset filters and re-run the search.
+  /**
+   * Reset filters and re-run the search
+   * @async
+   * @function
+   * @returns {Promise<void>}
+   */
   const handleReset = async () => {
     setLoading(true);
     resetFilters();
@@ -101,6 +187,11 @@ function ResourceSearchSidebar() {
 
   return (
     <div className="resource-sidebar bg-light p-3 h-100">
+      {/* Add toggle button if needed */}
+      <Button className="d-md-none mb-2" color="light" onClick={toggleSidebar}>
+        {isOpen ? 'Hide Filters' : 'Show Filters'}
+      </Button>
+      
       <Collapse isOpen={isOpen}>
         <div className="sidebar-inner p-3">
           <h5 className="mb-3">Resource Search</h5>
