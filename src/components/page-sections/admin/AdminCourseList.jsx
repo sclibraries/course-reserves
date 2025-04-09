@@ -1,25 +1,31 @@
 /**
  * @file AdminCourseList component
  * @module AdminCourseList
- * @description Renders a list of administrative courses in a table with an optional "scroll to top" button.
- * Attaches a scroll listener to display the button when needed.
+ * @description Renders a list of administrative courses with configurable view options
+ * (table or card) and improved UI/UX elements including scroll-to-top button.
  *
  * @requires react
  * @requires prop-types
  * @requires reactstrap
+ * @requires react-icons/fa
  * @requires ./AdminCourseTable
+ * @requires ./AdminCourseCard
+ * @requires ../../../css/AdminComponents.css
  */
 
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Button } from 'reactstrap';
+import { Button, ButtonGroup } from 'reactstrap';
+import { FaTable, FaTh, FaArrowUp, FaSearch } from 'react-icons/fa';
 import AdminCourseTable from './AdminCourseTable';
+import AdminCourseCard from './AdminCourseCard';
+import '../../../css/AdminComponents.css';
 
 /**
  * Admin course list component
  *
- * Displays a table of administrative courses and shows a "scroll to top" button
- * when the user scrolls beyond a certain threshold.
+ * Displays administrative courses in either table or card view with
+ * enhanced user experience features like view toggle and scroll-to-top.
  *
  * @component
  * @example
@@ -35,8 +41,9 @@ import AdminCourseTable from './AdminCourseTable';
  * @param {Function} [props.onCourseDetails] - Optional callback for course details
  * @returns {JSX.Element} The rendered course list.
  */
-function AdminCourseList({ courses }) {
+function AdminCourseList({ courses, onCourseDetails }) {
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
 
   // Listen for window scroll events to toggle the "scroll to top" button
   useEffect(() => {
@@ -56,26 +63,72 @@ function AdminCourseList({ courses }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /**
+   * Handle details click for a specific course
+   * @function handleDetailsClick
+   * @param {string} courseId - ID of the course to show details for
+   * @returns {void}
+   */
+  const handleDetailsClick = (courseId) => {
+    if (onCourseDetails) {
+      onCourseDetails(courseId);
+    }
+  };
+
   if (!courses || courses.length === 0) {
-    return <p>No admin courses found.</p>;
+    return (
+      <div className="empty-state fade-in">
+        <div className="empty-state-icon">
+          <FaSearch />
+        </div>
+        <h3>No courses found</h3>
+        <p className="text-muted">Try adjusting your search criteria or filters.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="mt-4">
-      <AdminCourseTable courses={courses} />
+    <div className="admin-course-list mt-4 fade-in">
+      <div className="view-toggle-container mb-3">
+        <ButtonGroup>
+          <Button
+            className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+            onClick={() => setViewMode('table')}
+            aria-label="Table view"
+          >
+            <FaTable /> Table View
+          </Button>
+          <Button
+            className={`view-toggle-btn ${viewMode === 'card' ? 'active' : ''}`}
+            onClick={() => setViewMode('card')}
+            aria-label="Card view"
+          >
+            <FaTh /> Card View
+          </Button>
+        </ButtonGroup>
+      </div>
+
+      {viewMode === 'table' ? (
+        <AdminCourseTable courses={courses} onCourseDetails={handleDetailsClick} />
+      ) : (
+        <div className="course-cards-container">
+          {courses.map(course => (
+            <AdminCourseCard
+              key={course.id}
+              course={course}
+              onDetailsClick={handleDetailsClick}
+            />
+          ))}
+        </div>
+      )}
 
       {showScrollTop && (
         <Button
-          color="secondary"
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            zIndex: '1000',
-          }}
+          className="scroll-top-btn"
           onClick={scrollToTop}
+          aria-label="Scroll to top"
         >
-          ↑ Top
+          <FaArrowUp />
         </Button>
       )}
     </div>

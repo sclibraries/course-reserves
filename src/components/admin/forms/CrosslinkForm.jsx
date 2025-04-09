@@ -1,5 +1,5 @@
 // src/components/admin/forms/CrossLinkForm.jsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   FormGroup,
@@ -27,7 +27,7 @@ import { useAdminCourseStore } from '../../../store/adminCourseStore';
  * This version leverages courseStore's search state and fetchResults function so that it stays
  * consistent with the sidebar search functionality.
  */
-export function CrossLinkForm({ resourceId, onSuccess, onClose, courseInfo }) {
+export function CrossLinkForm({  onSuccess, courseInfo }) {
   // Local states for search parameters
   const [college, setCollege] = useState('all');
   const [searchArea, setSearchArea] = useState('all'); // corresponds to 'type' in your courseStore
@@ -35,7 +35,7 @@ export function CrossLinkForm({ resourceId, onSuccess, onClose, courseInfo }) {
   const [department, setDepartment] = useState('');
   const [sortOption, setSortOption] = useState('');
 
-  const { course, folioCourseData } = useAdminCourseStore();
+  const { course} = useAdminCourseStore();
 
   // Retrieve search functions and state from courseStore
   const fetchResults = useCourseStore((state) => state.fetchResults);
@@ -76,10 +76,11 @@ export function CrossLinkForm({ resourceId, onSuccess, onClose, courseInfo }) {
     try {
       // Check if the local record exists using the FOLIO course listing ID
       const folioCourseId = folioCourse.courseListingId;
-      const { exists, course: existingCourse, offerings } =
-        await adminCourseService.checkCourseExists(folioCourseId);
-
+      const { exists, course: existingCourse, offerings } = await adminCourseService.checkCourseExists(folioCourseId);
       let localCourse = existingCourse;
+      if(offerings){
+        localCourse.offerings = offerings;
+      }
       if (!exists) {
         // Transform FOLIO course data into the local data structure
         const uploadData = transformFolioCourseToLocal(folioCourse);
@@ -91,7 +92,11 @@ export function CrossLinkForm({ resourceId, onSuccess, onClose, courseInfo }) {
       }
 
       // Link the local course to the resource using provided IDs
-      await adminCourseService.linkCourses(data.offering_id, localCourse.offering.offering_id);
+      if(data.offerings && data.offerings.length > 0 && localCourse && localCourse.offerings && localCourse.offerings.length > 0){
+        await adminCourseService.linkCourses(data.offering_id, localCourse.offerings[0].offering_id);
+      } else {
+        toast.error('Error linking course. Either a course or offering is missing.');
+      }
 
       toast.success('Course linked successfully.');
       if (onSuccess) {

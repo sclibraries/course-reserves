@@ -1,0 +1,82 @@
+/* 
+ * Global CSS Variables for Course Reserves Application
+ * This file centralizes theme colors and styling variables
+ */
+
+:root {
+  /* Base colors */
+  --primary-color: #4f46e5;
+  --primary-hover: #4338ca;
+  --secondary-color: #6c757d;
+  --secondary-hover: #5a6268;
+  --success-color: #10b981;
+  --info-color: #0dcaf0;
+  --warning-color: #fbbf24;
+  --danger-color: #ef4444;
+  
+  /* Text colors */
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  
+  /* Background colors */
+  --bg-light: #f8fafb;
+  --bg-white: #ffffff;
+  --bg-gray-50: #f9fafb;
+  --bg-gray-100: #f3f4f6;
+  
+  /* Border colors */
+  --border-color: #e5e7eb;
+  --border-color-dark: #d1d5db;
+  
+  /* Effects */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.1);
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-round: 50rem;
+  
+  /* Transitions */
+  --transition-all: all 0.2s ease;
+  --transition-transform: transform 0.2s ease;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem; 
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  /* Font sizes */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+}
+
+/* College-specific themes can be added here or managed via JS */
+.smith-theme {
+  /* Smith College specific variables can be added here */
+}
+
+.amherst-theme {
+  /* Amherst College specific variables can be added here */
+}
+
+.mtholyoke-theme {
+  /* Mount Holyoke specific variables can be added here */
+}
+
+.hampshire-theme {
+  /* Hampshire College specific variables can be added here */
+}
+
+.umass-theme {
+  /* UMass specific variables can be added here */
+}

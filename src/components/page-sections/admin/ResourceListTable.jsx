@@ -3,13 +3,6 @@
  * @module ResourceListTable
  * @description Displays a table of electronic resources with editing and deletion capabilities.
  * Supports pagination, sorting, and filtering of resources.
- * @requires react
- * @requires prop-types
- * @requires reactstrap
- * @requires react-toastify
- * @requires ../../../hooks/admin/useAdminModal
- * @requires ../../admin/modals/AdminEditResourceModel
- * @requires ../../../services/admin/adminResourceService
  */
 
 import { useState } from 'react';
@@ -18,13 +11,13 @@ import {
   Table,
   Badge,
   Button,
-  Container,
   Modal,
   ModalHeader,
   ModalBody,
   ModalFooter,
   Spinner
 } from 'reactstrap';
+import { FaEdit, FaTrash, FaExternalLinkAlt, FaSort, FaSortUp, FaSortDown, FaSearch } from 'react-icons/fa';
 import { AdminEditResourceModal } from '../../admin/modals/AdminEditResourceModel';
 import { useAdminModal } from '../../../hooks/admin/useAdminModal';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
@@ -37,55 +30,20 @@ import { toast } from 'react-toastify';
 const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
 
 /**
- * Resource shape definition for PropTypes
- * @constant {Object}
- */
-const resourceShape = PropTypes.shape({
-  resource_id: PropTypes.string.isRequired,
-  name: PropTypes.string,
-  item_url: PropTypes.string,
-  description: PropTypes.string,
-  material_type_name: PropTypes.string,
-  material_type_id: PropTypes.string,
-  created_at: PropTypes.string,
-  course_count: PropTypes.number,
-});
-
-/**
- * Pagination shape definition for PropTypes
- * @constant {Object}
- */
-const paginationShape = PropTypes.shape({
-  currentPage: PropTypes.number,
-  totalPages: PropTypes.number,
-  totalItems: PropTypes.number,
-  perPage: PropTypes.number,
-});
-
-/**
  * Adjusts the proxy settings in a resource URL
- * 
  * @function
  * @param {Object} data - Resource data
- * @param {string} data.link - The URL to adjust
- * @param {number} data.use_proxy - Whether to use proxy (1) or not (0)
- * @returns {void}
- * @throws {Error} If data or link property is invalid
  */
 function adjustProxy(data) {
-  // Basic error checking
   if (!data || typeof data.link !== "string") {
     throw new Error("Invalid data or missing link property");
   }
   
-  // Check explicitly against the numbers 1 or 0.
   if (data.use_proxy == 1) {
-    // Add the proxy prefix if it's not already present.
     if (!data.link.startsWith(PROXY_PREFIX)) {
       data.link = PROXY_PREFIX + data.link;
     }
   } else if (data.use_proxy == 0) {
-    // Remove the proxy prefix if it's present.
     if (data.link.startsWith(PROXY_PREFIX)) {
       data.link = data.link.replace(PROXY_PREFIX, "");
     }
@@ -94,15 +52,7 @@ function adjustProxy(data) {
 
 /**
  * Delete confirmation modal component
- * 
  * @component
- * @param {Object} props - Component props
- * @param {boolean} props.isOpen - Whether the modal is open
- * @param {Function} props.toggle - Function to toggle modal visibility
- * @param {Object} props.resource - Resource to be deleted
- * @param {boolean} props.loading - Loading state
- * @param {Function} props.onConfirm - Function to call when deletion is confirmed
- * @returns {JSX.Element} Modal component
  */
 const DeleteConfirmationModal = ({ isOpen, toggle, resource, loading, onConfirm }) => (
   <Modal isOpen={isOpen} toggle={toggle}>
@@ -131,95 +81,34 @@ const DeleteConfirmationModal = ({ isOpen, toggle, resource, loading, onConfirm 
   </Modal>
 );
 
+// Add PropTypes for DeleteConfirmationModal
 DeleteConfirmationModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   toggle: PropTypes.func.isRequired,
-  resource: PropTypes.object,
+  resource: PropTypes.shape({
+    resource_id: PropTypes.string.isRequired,
+    name: PropTypes.string,
+    course_count: PropTypes.number
+  }),
   loading: PropTypes.bool.isRequired,
   onConfirm: PropTypes.func.isRequired
 };
 
 /**
  * Resource list table component
- * 
- * Displays a sortable, filterable table of electronic resources with
- * options for editing and deletion.
- * 
  * @component
- * @example
- * const resources = [
- *   {
- *     resource_id: '123',
- *     name: 'Introduction to React',
- *     item_url: 'https://example.com/resource',
- *     material_type_name: 'E-Book',
- *     created_at: '2023-04-15T12:00:00Z',
- *     course_count: 2
- *   }
- * ];
- * 
- * return (
- *   <ResourceListTable 
- *     resources={resources} 
- *     refreshResources={() => fetchResources()}
- *   />
- * );
- * 
- * @param {Object} props - Component props
- * @param {Array<Object>} props.resources - List of resources to display
- * @param {Object} [props.pagination] - Pagination information
- * @param {Function} props.refreshResources - Function to refresh resources after updates
- * @returns {JSX.Element} Resource table with modals
  */
 const ResourceListTable = ({ resources, refreshResources }) => {
-  /**
-   * Edit resource modal state
-   * @type {[boolean, Function]}
-   */
   const [editResourceModalOpen, toggleEditResourceModal] = useAdminModal();
-  
-  /**
-   * Selected resource for editing
-   * @type {[Object|null, Function]}
-   */
   const [selectedResource, setSelectedResource] = useState(null);
-  
-  /**
-   * Delete confirmation modal state
-   * @type {[boolean, Function]}
-   */
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  
-  /**
-   * Resource selected for deletion
-   * @type {[Object|null, Function]}
-   */
   const [resourceToDelete, setResourceToDelete] = useState(null);
-  
-  /**
-   * Loading state for async operations
-   * @type {[boolean, Function]}
-   */
   const [loading, setLoading] = useState(false);
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
-  /**
-   * Toggle delete confirmation modal
-   * @function
-   * @returns {void}
-   */
   const toggleDeleteModal = () => setDeleteModalOpen(!deleteModalOpen);
 
-  /**
-   * Handle resource editing
-   * 
-   * Updates the resource via API and refreshes the resource list
-   * 
-   * @async
-   * @function
-   * @param {Object} formData - Form data from the edit modal
-   * @param {string} formData.resource_id - ID of the resource to update
-   * @returns {Promise<void>}
-   */
   const handleEdit = async (formData) => {
     const { resource_id, ...data } = formData;
     
@@ -240,28 +129,12 @@ const ResourceListTable = ({ resources, refreshResources }) => {
     }
   };
 
-  /**
-   * Trigger delete confirmation modal
-   * 
-   * @function
-   * @param {string} id - Resource ID to delete
-   * @returns {void}
-   */
   const handleDelete = (id) => {
     const resource = resources.find(r => r.resource_id === id);
     setResourceToDelete(resource);
     toggleDeleteModal();
   };
 
-  /**
-   * Confirm resource deletion
-   * 
-   * Deletes the resource via API and refreshes the list
-   * 
-   * @async
-   * @function
-   * @returns {Promise<void>}
-   */
   const confirmDelete = async () => {
     if (!resourceToDelete) return;
     
@@ -280,62 +153,117 @@ const ResourceListTable = ({ resources, refreshResources }) => {
     }
   };
 
-  /**
-   * Open the edit modal for a selected resource
-   * 
-   * @function
-   * @param {Object} resource - The resource to edit
-   * @returns {void}
-   */
   const handleSelectedResource = (resource) => {
     setSelectedResource(resource);
     toggleEditResourceModal();
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSortIcon = (field) => {
+    if (sortField !== field) return <FaSort size={12} className="ms-1 text-muted" />;
+    return sortDirection === 'asc' 
+      ? <FaSortUp size={12} className="ms-1 text-primary" /> 
+      : <FaSortDown size={12} className="ms-1 text-primary" />;
+  };
+
+  const getSortedResources = () => {
+    return [...resources].sort((a, b) => {
+      let aValue = a[sortField] || '';
+      let bValue = b[sortField] || '';
+
+      if (sortDirection === 'asc') {
+        return String(aValue).localeCompare(String(bValue));
+      } else {
+        return String(bValue).localeCompare(String(aValue));
+      }
+    });
+  };
+
   // Show message when no resources available
   if (!resources || resources.length === 0) {
     return (
-      <Container className="my-4 text-center">
-        <p>No resources found. Add some resources to get started.</p>
-      </Container>
+      <div className="empty-state fade-in">
+        <div className="empty-state-icon">
+          <FaSearch />
+        </div>
+        <h3>No resources found</h3>
+        <p className="text-muted">Try adjusting your search criteria or add some resources to get started.</p>
+      </div>
     );
   }
 
+  const sortedResources = getSortedResources();
+
   return (
-    <Container className="my-4">
-      <Table hover responsive striped>
+    <div className="admin-table-container">
+      <Table hover responsive className="custom-table">
         <thead>
           <tr>
-            <th>Resource ID</th>  
-            <th>Name</th>
-            <th>URL</th>
-            <th>Material Type</th>
-            <th>Created At</th>
-            <th>Course Count</th>
+            <th onClick={() => handleSort('resource_id')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                Resource ID {renderSortIcon('resource_id')}
+              </span>
+            </th>
+            <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                Name {renderSortIcon('name')}
+              </span>
+            </th>  
+            <th onClick={() => handleSort('item_url')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                URL {renderSortIcon('item_url')}
+              </span>
+            </th>
+            <th onClick={() => handleSort('material_type_name')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                Material Type {renderSortIcon('material_type_name')}
+              </span>
+            </th>
+            <th onClick={() => handleSort('created_at')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                Created At {renderSortIcon('created_at')}
+              </span>
+            </th>
+            <th onClick={() => handleSort('course_count')} style={{ cursor: 'pointer' }}>
+              <span className="d-inline-flex align-items-center">
+                Course Count {renderSortIcon('course_count')}
+              </span>
+            </th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {resources.map(resource => (
+          {sortedResources.map(resource => (
             <tr key={resource.resource_id}>
               <td>{resource.resource_id}</td>
-              <td style={{ wordBreak: 'break-word' }}>{resource.name}</td>
-              <td style={{ wordBreak: 'break-word' }}>
+              <td className="fw-medium">{resource.name || 'Untitled Resource'}</td>
+              <td>
                 {resource.item_url ? (
                   <a 
                     href={resource.item_url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="d-flex align-items-center text-primary"
                     aria-label={`Open ${resource.name} link`}
                   >
-                    {resource.item_url}
+                    View <FaExternalLinkAlt className="ms-1" size={12} />
                   </a>
                 ) : (
                   <span className="text-muted">—</span>
                 )}
               </td>
               <td>
-                <Badge color="info">{resource.material_type_name || '—'}</Badge>
+                <Badge color="info" pill className="px-3 py-1">
+                  {resource.material_type_name || 'Unknown'}
+                </Badge>
               </td>
               <td>
                 {resource.created_at 
@@ -343,25 +271,39 @@ const ResourceListTable = ({ resources, refreshResources }) => {
                   : '—'
                 }
               </td>
-              <td>{resource.course_count || 0}</td>
+              <td>
+                {resource.course_count > 0 ? (
+                  <Badge color="success" pill className="px-3 py-1">
+                    {resource.course_count}
+                  </Badge>
+                ) : (
+                  <Badge color="secondary" pill className="px-3 py-1">
+                    0
+                  </Badge>
+                )}
+              </td>
               <td>
                 <div className="d-flex gap-2">
                   <Button 
                     color="primary" 
                     size="sm"
+                    outline
+                    className="d-flex align-items-center gap-1"
                     onClick={() => handleSelectedResource(resource)}
                     aria-label={`Edit ${resource.name}`}
                   >
-                    Edit
+                    <FaEdit size={14} /> Edit
                   </Button>
                   <Button 
                     color="danger" 
                     size="sm" 
+                    outline
+                    className="d-flex align-items-center gap-1"
                     onClick={() => handleDelete(resource.resource_id)}
                     disabled={loading}
                     aria-label={`Delete ${resource.name}`}
                   >
-                    Delete
+                    <FaTrash size={14} /> Delete
                   </Button>
                 </div>
               </td>
@@ -386,13 +328,23 @@ const ResourceListTable = ({ resources, refreshResources }) => {
         loading={loading}
         onConfirm={confirmDelete}
       />
-    </Container>
+    </div>
   );
 };
 
 ResourceListTable.propTypes = {
-  resources: PropTypes.arrayOf(resourceShape).isRequired,
-  pagination: paginationShape,
+  resources: PropTypes.arrayOf(
+    PropTypes.shape({
+      resource_id: PropTypes.string.isRequired,
+      name: PropTypes.string,
+      item_url: PropTypes.string,
+      link: PropTypes.string,  // Added missing property used in adjustProxy
+      use_proxy: PropTypes.number, // Added missing property used in adjustProxy
+      material_type_name: PropTypes.string,
+      created_at: PropTypes.string,
+      course_count: PropTypes.number,
+    })
+  ).isRequired,
   refreshResources: PropTypes.func.isRequired
 };
 

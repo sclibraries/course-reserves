@@ -232,6 +232,7 @@ params
         throw new Error('Error checking course existence.');
       }
       return response.json();
-    }
+    },
+    
   
 };

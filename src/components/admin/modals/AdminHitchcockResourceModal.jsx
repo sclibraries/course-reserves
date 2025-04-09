@@ -3,7 +3,7 @@ import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 import { AdminHitchcockForm } from '../forms/AdminHitchcockForm';
 
 export const AdminHitchCockResourceModal = ({ isOpen, toggle, onSubmit, course }) => (
-  <Modal size="xl" fullscreen="xl" isOpen={isOpen} toggle={toggle}>
+  <Modal fullscreen isOpen={isOpen} toggle={toggle}>
     <ModalHeader toggle={toggle}>Create New Resource from Hitchcock</ModalHeader>
     <ModalBody>
       <AdminHitchcockForm onSubmit={onSubmit} course={course} />

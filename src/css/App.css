@@ -35,9 +35,6 @@ html, body {
   }
 }
 
-.card {
-  padding: 2em;
-}
 
 
 .course-records-container {
@@ -63,13 +60,24 @@ html, body {
   margin-bottom: 15px;
 }
 
+
+/* Padding when searchbar is visible */
 .main-content {
-  padding-top: 12em; 
+  padding-top: 2em; 
+}
+
+/* Reduced padding when searchbar is hidden */
+.main-content-no-search {
+  padding-top: 5em;
 }
 
 @media (max-width: 576px) {
   .main-content {
     padding-top: 12em;
+  }
+  
+  .main-content-no-search {
+    padding-top: 5em;
   }
 }
 

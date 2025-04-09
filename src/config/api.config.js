@@ -61,6 +61,10 @@ export const apiConfig = {
       courses: '/search/search-courses',
       departments: '/search/search-departments',
     },
+    customizations: {
+      getCustomizations: '/college-customization',
+      updateCustomizations: '/college-customization',
+    }
   },
   environment: import.meta.env.MODE || 'development',
   getAuthUrl: function() {
@@ -70,5 +74,8 @@ export const apiConfig = {
     
     return `${this.urls.auth}${authEndpoint}`;
   },
-  getAuthToken: () => `Bearer ${localStorage.getItem('authToken')}`,
+  getAuthToken: function() {
+    const token = localStorage.getItem('authToken');
+    return token ? `Bearer ${token}` : '';
+  },
 };

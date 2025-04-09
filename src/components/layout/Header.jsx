@@ -9,9 +9,8 @@
  * @requires ../../store/customizationStore
  * @requires ../../store/searchStore
  */
-
 import { useEffect, useState } from 'react';
-import { Navbar, NavbarBrand, Button, Nav, NavItem, NavLink } from 'reactstrap';
+import { Navbar, NavbarBrand, Button} from 'reactstrap';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useCustomizationStore from '../../store/customizationStore'; 
 import useSearchStore from '../../store/searchStore';
@@ -20,46 +19,38 @@ import LoginButton from '../ui/LoginButton';
 
 /**
  * Application header component with dynamic branding and navigation.
- * Handles authentication state, navigation, and college-specific branding.
- * 
- * Features:
- * - Dynamic college branding (logo, colors, text)
- * - Authentication-based navigation display
- * - Role-based access to administrative features
- * - Responsive design for various screen sizes
- * 
- * @component
- * @example
- * return (
- *   <Router>
- *     <Header />
- *     <MainContent />
- *   </Router>
- * )
  */
 function Header() {
-  // Grab the current college from URL query parameters
-  const location = useLocation();
   const navigate = useNavigate();
-  const currentCollege = useCustomizationStore((state) => state.currentCollege);
-  const setCollege = useSearchStore((state) => state.setCollege);
-  const college = currentCollege;
-  setCollege(college);
-
-  /**
-   * Path detection for active link styling
-   * @constant {boolean} isAdminPath - Whether current path is an admin path
-   * @constant {boolean} isReportsPath - Whether current path is a reports path
-   * @constant {boolean} isCourseManagementPath - Whether current path is a course management path
-   */
-  const isAdminPath = location.pathname.startsWith('/admin');
-  const isReportsPath = location.pathname.startsWith('/admin/reports');
-  const isCourseManagementPath = location.pathname.startsWith('/course-reserves/admin');
+  const location = useLocation();
   
-  // Pull the relevant customization info from Zustand store
-  const { logoUrl, secondaryText, altText, headerBgColor, campusLocation} = useCustomizationStore(
-    (state) => state.getCustomizationForCollege(college)
-  );
+  // Add path checks for conditional rendering
+  const isAdminPath = location.pathname.startsWith('/admin');
+    (location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/reports'));
+  
+  const currentCollege = useCustomizationStore((state) => state.currentCollege);
+  const setSearchStoreCollege = useSearchStore((state) => state.setCollege);
+  
+  // Get college from URL or default
+  const college = new URLSearchParams(location.search).get('college') || currentCollege || 'default';
+
+  // Set college in search store once Header component mounts or college changes
+  useEffect(() => {
+    setSearchStoreCollege(college);
+  }, [college, setSearchStoreCollege]);
+
+  // Grab customization from store with error handling
+  const customization = useCustomizationStore((state) => {
+    return state.getCustomizationForCollege(college) || {};
+  });
+  
+  const {
+    logoUrl = '',
+    secondaryText = 'Course Reserves',
+    altText = 'Library Course Reserves',
+    headerBgColor = '#ffffff',
+    campusLocation = 'default'
+  } = customization;
 
   /**
    * Authentication state
@@ -93,99 +84,72 @@ function Header() {
    */
   const textColor = campusLocation === "smith" ? "black" : "white";
 
+  // Add college-specific theme class to enable CSS variable theming
+  const collegeThemeClass = `${college}-theme`;
+
   return (
-    <header role="banner" tabIndex="0">
+    <header role="banner" tabIndex="0" className={collegeThemeClass}>
       <Navbar 
         light 
         expand="md" 
         fixed="top" 
-        className="shadow-sm py-3"
+        className="shadow-sm"
         style={{ 
           backgroundColor: headerBgColor,
           minHeight: '70px',
-          paddingTop: '0px',
-          paddingBottom: '5px'
         }}
       >
-        <NavbarBrand tag={Link} to={"/search?college=" + college}>
-          {logoUrl ? (
-            <>
-              <img
-                src={logoUrl}
-                className="college-logo"
-                alt=''
-                role="presentation"
-              />
-              <span 
-                className="visually-hidden"
-                style={{ color: textColor }}
-              >
-                {altText} Home
-              </span>
-              {secondaryText ? (
-                <span
-                  className="secondary-text"
+        <div className="container-fluid d-flex justify-content-between align-items-center">
+          <NavbarBrand tag={Link} to={"/search?college=" + college} className="d-flex align-items-center">
+            {logoUrl ? (
+              <>
+                <img
+                  src={logoUrl}
+                  className="college-logo"
+                  alt=''
+                  role="presentation"
+                />
+                <span 
+                  className="visually-hidden"
                   style={{ color: textColor }}
                 >
-                  {secondaryText}
+                  {altText} Home
                 </span>
-              ) : null}
-            </>
-          ) : (
-            altText
-          )}
-        </NavbarBrand>
-        
-        {/* Navigation and auth section */}
-        <div className="d-flex align-items-center">
-          {/* Show navigation links to logged in users */}
-          {isLoggedIn && (
-            <Nav navbar className="me-3">
-              {/* Reports link for all logged in users */}
-              <NavItem className={college === 'smith' ? 'me-3' : ''}>
-                <NavLink 
-                  tag={Link} 
-                  to="/admin/reports" 
-                  className={`fw-bold ${isReportsPath ? 'active' : ''}`}
-                  style={{ 
-                    color: textColor,
-                    textDecoration: isReportsPath ? 'underline' : 'none' 
-                  }}
-                  aria-label="View reports"
-                >
-                  Reports
-                </NavLink>
-              </NavItem>
-              
-              {/* Course Management link - only for Smith users */}
-              {college === 'smith' && (
-                <NavItem>
-                  <NavLink 
-                    tag={Link} 
-                    to="/admin" 
-                    className={`fw-bold ${isCourseManagementPath ? 'active' : ''}`}
-                    style={{ 
-                      color: textColor,
-                      textDecoration: isCourseManagementPath ? 'underline' : 'none' 
-                    }}
-                    aria-label="Manage courses"
+                {secondaryText ? (
+                  <span
+                    className="secondary-text"
+                    style={{ color: textColor }}
                   >
-                    Course Management
-                  </NavLink>
-                </NavItem>
-              )}
-            </Nav>
-          )}
-          
-          {/* Login/logout buttons */}
-          {(college === 'smith' || isAdminPath) &&
-            (isLoggedIn ? (
-              <Button color="secondary" onClick={handleLogout} aria-label="Log out">
-                Logout
-              </Button>
+                    {secondaryText}
+                  </span>
+                ) : null}
+              </>
             ) : (
-              <LoginButton aria-label="Login to staff account" />
-            ))}
+              altText
+            )}
+          </NavbarBrand>
+          
+          {/* Navigation and auth section */}
+          <div className="d-flex align-items-center">
+            
+            {/* Login/logout buttons */}
+            {(college === 'smith' || isAdminPath) &&
+              (isLoggedIn ? (
+                <Button 
+                  color="secondary" 
+                  onClick={handleLogout} 
+                  aria-label="Log out"
+                  className="custom-action-btn tertiary-action-btn"
+                >
+                  Logout
+                </Button>
+              ) : (
+                <LoginButton 
+                  aria-label="Login to staff account" 
+                  className="custom-action-btn primary-action-btn"
+                />
+              ))}
+          </div>
         </div>
       </Navbar>
     </header>

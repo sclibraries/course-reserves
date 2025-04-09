@@ -37,6 +37,8 @@ function CourseRecords() {
   const [availability, setAvailability] = useState({});
   const [openAccordions, setOpenAccordions] = useState({});
   const [hasElectronicReserves, setHasElectronicReserves] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
 
   // Display mode: "card" (detailed) vs. "table" (compact)
   const [displayMode, setDisplayMode] = useState('card');
@@ -114,6 +116,10 @@ function CourseRecords() {
       fetchAllData();
     }
   }, [record]);
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
 
   // Fetch all required data (print reserves, course data, electronic reserves)
   const fetchAllData = useCallback(async () => {
@@ -249,68 +255,26 @@ function CourseRecords() {
     });
   }, []);
 
-  // Compute grouped and ungrouped items (for table view; unchanged)
-  // const { grouped, ungrouped } = useMemo(() => {
-  //   const grouped = {};
-  //   const ungrouped = [];
-  //   records.forEach(item => {
-  //     if (item.folder_id) {
-  //       const groupName = item.folder_name;
-  //       if (!grouped[groupName]) {
-  //         grouped[groupName] = [];
-  //       }
-  //       grouped[groupName].push(item);
-  //     } else {
-  //       ungrouped.push(item);
-  //     }
-  //   });
-
-  //   let filteredGrouped = {};
-  //   let filteredUngrouped = [];
-
-  //   if (filter !== 'all') {
-  //     const filterFunc = filter === 'print'
-  //       ? item => !item.isElectronic
-  //       : item => item.isElectronic;
-
-  //     for (const groupName in grouped) {
-  //       const filteredItems = grouped[groupName].filter(filterFunc);
-  //       if (filteredItems.length > 0) {
-  //         filteredGrouped[groupName] = filteredItems;
-  //       }
-  //     }
-  //     filteredUngrouped = ungrouped.filter(filterFunc);
-  //   } else {
-  //     filteredGrouped = grouped;
-  //     filteredUngrouped = ungrouped;
-  //   }
-
-  //   // Sort items within each group by title
-  //   Object.keys(filteredGrouped).forEach(key => {
-  //     filteredGrouped[key].sort((a, b) => {
-  //       const titleA = a.copiedItem.title.toLowerCase();
-  //       const titleB = b.copiedItem.title.toLowerCase();
-  //       return titleA.localeCompare(titleB);
-  //     });
-  //   });
-  //   // Sort ungrouped items by title
-  //   filteredUngrouped.sort((a, b) => {
-  //     const titleA = a.copiedItem.title.toLowerCase();
-  //     const titleB = b.copiedItem.title.toLowerCase();
-  //     return titleA.localeCompare(titleB);
-  //   });
-
-  //   return { grouped: filteredGrouped, ungrouped: filteredUngrouped };
-  // }, [records, filter]);
 
   // NEW: Combine grouped and ungrouped items into a single alphabetically sorted list
   // so that folder groups (using the folder name as the sort key) are interleaved
   // with individual records.
   const combinedResults = useMemo(() => {
+
+    const filteredBySearch = searchQuery.trim() !== '' 
+    ? records.filter(item => 
+        item.copiedItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.copiedItem.contributors && 
+         item.copiedItem.contributors.some(c => 
+           c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())
+         ))
+      )
+    : records;
+
     // Separate records into groups and individual items.
     const groupedTemp = {};
     let ungroupedTemp = [];
-    records.forEach(item => {
+    filteredBySearch.forEach(item => {
       if (item.folder_id) {
         const groupName = item.folder_name;
         if (!groupedTemp[groupName]) {
@@ -321,6 +285,7 @@ function CourseRecords() {
         ungroupedTemp.push(item);
       }
     });
+
 
     // Apply filtering if needed.
     if (filter !== 'all') {
@@ -374,7 +339,7 @@ function CourseRecords() {
       j++;
     }
     return merged;
-  }, [records, filter]);
+  }, [records, filter, searchQuery]);
 
   // Get customization settings from the store.
   const [customization, setCustomization] = useState(
@@ -590,6 +555,43 @@ function CourseRecords() {
       </div>
 
       {hasElectronicReserves && renderFilterButtons()}
+
+      {/* Search Input */}
+      <div className="mb-3 search-container">
+        <div className="input-group">
+          <span className="input-group-text bg-white border-end-0">
+            <i className="fas fa-search text-muted"></i>
+          </span>
+          <input
+            type="text"
+            className="form-control border-start-0 ps-0"
+            placeholder="Search for titles or authors..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            aria-label="Search records"
+          />
+          {searchQuery && (
+            <button 
+              className="btn btn-outline-secondary border-start-0"
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          )}
+        </div>
+        {searchQuery && combinedResults.length > 0 && (
+          <div className="search-results-info text-muted small mt-1">
+            Found {combinedResults.length} matching {combinedResults.length === 1 ? 'record' : 'records'}
+          </div>
+        )}
+        {searchQuery && combinedResults.length === 0 && (
+          <div className="search-results-info text-muted small mt-1">
+            No records match your search
+          </div>
+        )}
+      </div>
 
       {/* Conditional Rendering: Loading / Error / Display */}
       {isLoading ? (

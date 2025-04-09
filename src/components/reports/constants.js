@@ -18,4 +18,5 @@ export const SEMESTER_ORDER = {
   'Winter': 1
 };
 
+// Default page sizes for tables
 export const DEFAULT_PAGE_SIZES = [10, 25, 50, 100];

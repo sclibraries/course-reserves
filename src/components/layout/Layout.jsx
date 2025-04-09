@@ -9,7 +9,6 @@
  * @requires ./Searchbar
  * @requires ./AppRoutes
  */
-
 import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Searchbar from './Searchbar';
@@ -20,20 +19,10 @@ import AppRoutes from './AppRoutes';
  * 
  * Provides the structural framework for the application with:
  * - Consistent header across all pages
- * - Search functionality on non-admin pages
- * - Different content layouts for admin vs public pages
- * 
- * The component detects the current route and adjusts the layout accordingly:
- * - Admin routes: Header + content with extra top margin (no search bar)
- * - Public routes: Header + search bar + main content area
+ * - Search functionality on non-admin pages (except course records)
+ * - Different content layouts based on page type
  * 
  * @component
- * @example
- * return (
- *   <Router>
- *     <Layout />
- *   </Router>
- * )
  */
 const Layout = () => {
   /**
@@ -47,27 +36,31 @@ const Layout = () => {
    * @type {boolean}
    */
   const isAdminPath = location.pathname.startsWith('/admin');
+  
+  /**
+   * Whether the current path is the course records page
+   * @type {boolean}
+   */
+  const isRecordsPage = location.pathname.startsWith('/records');
+
+  /**
+   * Determines if the search bar should be shown
+   * @type {boolean}
+   */
+  const showSearchbar = !isAdminPath && !isRecordsPage;
 
   return (
     <> 
       {/* Header is shown on all pages */}
       <Header />
       
-      {/* Search bar only shown on non-admin pages */}
-      {!isAdminPath && <Searchbar />}
+      {/* Search bar only shown on appropriate pages */}
+      {showSearchbar && <Searchbar />}
       
-      {/* Different container styling based on route type */}
-      {!isAdminPath && (
-        <div className="main-content">
-          <AppRoutes />
-        </div>
-      )}
-      
-      {isAdminPath && (
-        <div style={{marginTop: "4em"}}>
-          <AppRoutes />
-        </div>
-      )}
+      {/* Content with different styling based on whether searchbar is shown */}
+      <div className={showSearchbar ? "main-content" : "main-content-no-search"}>
+        <AppRoutes />
+      </div>
     </>
   );
 };

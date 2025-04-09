@@ -48,7 +48,7 @@ export const useFolderManagement = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
+          'Authorization': `${getAuthToken()}`,
         },
         body: JSON.stringify(folderData),
       });

@@ -1,130 +1,215 @@
-/* Searchbar.css */
-.searchbar-container {
-  position: fixed;
-  top: 75px; 
-  left: 0;
-  right: 0;
-  background-color: #fff;
-  z-index: 1030;
-  padding-top: 1em;
-  padding-left: 2.5em;
-  padding-right: 2.5em;
-  padding-bottom: .1em;
-  border-bottom: 1px solid #ccc;
-  width: 100%;
+/* Fixed horizontal searchbar styles */
+
+/* Main container - NOT fixed position */
+.search-panel-container {
+  position: relative; /* Change from fixed to relative */
+  background-color: #f8f9fa;
+  padding: 0.75rem 1.5rem;
+  z-index: 1010; /* Lower than header */
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  margin-top: 70px; /* Space for fixed header */
+  margin-bottom: 1rem;
 }
 
-.searchbar-container form {
-  max-width: 1200px;
+/* Search panel */
+.search-panel {
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
-.searchbar-container button {
-  margin-top: 33px;
+/* Filter controls layout - compact horizontal */
+.filter-controls-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* Filter items - smaller and more compact */
+.filter-item {
+  flex: 0.8;
+  min-width: 100px;
+  margin-bottom: 0;
+}
+
+/* Search field - positioned next to search button, more prominence */
+.search-field {
+  flex: 1.5;
+  min-width: 150px;
+}
+
+/* Filter item group - horizontal aligned pair */
+.filter-item-group {
+  display: flex;
+  gap: 8px;
+  flex: 1.5;
+}
+
+.filter-item-group .filter-item {
+  flex: 1;
+}
+
+/* Form element styling - more compact */
+.filter-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
+}
+
+.filter-select, .filter-input {
+  height: 36px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+.filter-select:focus, .filter-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
+}
+
+/* Button styling - compact */
+.filter-buttons {
+  display: flex;
+  min-width: auto;
+  margin-left: 4px;
+}
+
+.button-group {
+  display: flex;
+  gap: 6px;
+}
+
+.action-button {
+  height: 36px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.search-button {
+  background-color: #4f46e5;
+  width: auto;
+  min-width: 80px;
+}
+
+.reset-button {
+  width: 36px;
+  padding: 0;
+}
+
+.button-icon {
+  font-size: 12px;
+}
+
+/* Additional header text - smaller and more compact */
+.additional-header-text {
+  padding: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Content spacing to account for fixed searchbar */
+.content-container {
+  margin-top: 140px; /* Header height + searchbar height + some spacing */
+  padding-top: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .filter-controls-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .filter-item {
+    flex: 1 1 calc(20% - 8px);  /* 5 items per row minus gap */
+    min-width: calc(20% - 8px);
+  }
+  
+  .search-field {
+    flex: 2 0 calc(40% - 8px);  /* Search takes more space */
+    min-width: calc(40% - 8px);
+  }
+
+  .filter-buttons {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 992px) {
+  .filter-item, .filter-item-group, .search-field {
+    flex: 1 1 calc(33% - 6px);
+    min-width: calc(33% - 6px);
+  }
+}
+
+@media (max-width: 768px) {
+  .search-panel-container {
+    margin-top: 70px; /* Keep space for header */
+    padding: 0.5rem 1rem;
+  }
+  
+  .filter-item, .filter-item-group {
+    flex: 1 1 calc(50% - 6px);
+    min-width: calc(50% - 6px);
+  }
+  
+  .search-field {
+    flex: 1 1 calc(100% - 80px); /* Full width minus buttons */
+    order: -1; /* Move to top on mobile */
+  }
+  
+  .filter-buttons {
+    flex: 0 0 74px;
+    margin-left: 6px;
+    align-self: flex-end;
+  }
+  
+  .content-container {
+    margin-top: 1rem; /* Reset when searchbar is not fixed */
+  }
 }
 
 @media (max-width: 576px) {
-  .searchbar-container button {
-    margin-top: 0px;
-  }
-}
-
-.searchbar-toggle {
-  border: none; 
-  background: none; 
-  padding: 0; 
-  cursor: pointer;
-}
-
-.searchbar-toggle .navbar-toggler-icon {
-  display: inline-block;
-  width: 1.5em;
-  height: 1.5em;
-  vertical-align: middle;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cpath stroke='rgba(0, 0, 0, 0.5)' stroke-linecap='round' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100%;
-}
-
-.searchbar-expanded {
-  display: block;
-  width: 100%;
-}
-
-.searchbar-collapsed {
-  display: none;
-}
-
-@media (min-width: 769px) {
-  .searchbar-toggle {
-    display: none; /* Hide toggle button on larger screens */
-  }
-
-  .searchbar-container .searchbar-expanded,
-  .searchbar-container .searchbar-collapsed {
-    display: flex;
-  }
-}
-
-.admin-page {
-  height: 100vh;
-  overflow: hidden;
-}
-
-.sidebar-wrapper {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 1000;
-  width: 300px; /* Adjust width as needed */
-  transition: transform 0.3s ease;
-}
-
-.admin-main-content {
-  margin-left: 300px; /* Same as sidebar width */
-  height: 100vh;
-  overflow-y: auto;
-  transition: margin 0.3s ease;
-}
-
-.admin-sidebar {
-  height: 100%;
-  margin-top: 75px;
-  overflow-y: auto;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
-.resource-sidebar {
-  height: 100%;
-  margin-top: 75px;
-  overflow-y: auto;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
-.mobile-toggle {
-  position: absolute;
-  right: -40px;
-  top: 10px;
-  z-index: 1001;
-}
-
-/* Responsive handling */
-@media (max-width: 992px) {
-  .sidebar-wrapper {
-    transform: translateX(-100%);
+  .filter-item, .filter-item-group, .search-field {
+    flex: 1 1 100%;
+    min-width: 100%;
+    order: 0; /* Reset order */
   }
   
-  .sidebar-wrapper.open {
-    transform: translateX(0);
-  }
-
-  .admin-main-content {
+  .filter-buttons {
+    width: 100%;
+    margin-top: 8px;
     margin-left: 0;
   }
   
-  .admin-sidebar {
-    width: 100vw;
+  .button-group {
+    width: 100%;
+  }
+  
+  .action-button {
+    flex: 1;
+  }
+  
+  .reset-button {
+    width: auto;
+    padding: 0.25rem 0.75rem;
+  }
+  
+  .reset-button .button-icon {
+    margin-right: 6px;
+  }
+  
+  .reset-button::after {
+    content: " Reset";
   }
 }

@@ -5,7 +5,7 @@ import {
   Cell, ResponsiveContainer 
 } from 'recharts';
 import { COLORS, CAMPUS_COLORS } from '../constants';
-import CustomTooltip from './CustomTooltip';
+import CustomTooltip from './CustomToolTip';
 import CustomChartTick from './CustomChartTick';
 
 const CoursesByTermChart = ({ 

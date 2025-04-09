@@ -10,7 +10,7 @@ import { CrossLinkForm } from '../forms/CrosslinkForm';
  */
 export const AdminCrossLinkFolioCourseModal = ({ isOpen, toggle, resourceId, onSuccess, course }) => {
   return (
-    <Modal size="xl" fullscreen="xl" isOpen={isOpen} toggle={toggle}>
+    <Modal size="lg" isOpen={isOpen} toggle={toggle}>
       <ModalHeader toggle={toggle}>Cross-Link to Another Course</ModalHeader>
       <ModalBody>
         <CrossLinkForm
@@ -31,6 +31,7 @@ AdminCrossLinkFolioCourseModal.propTypes = {
   toggle: PropTypes.func.isRequired,
   resourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   onSuccess: PropTypes.func,
+  course: PropTypes.object,
 };
 
 export default AdminCrossLinkFolioCourseModal;

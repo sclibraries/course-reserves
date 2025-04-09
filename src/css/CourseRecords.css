@@ -49,4 +49,157 @@
   .accordion-button::after {
     background-color: '#eeeeee';
   }
+
+  /* Add these styles to enhance the visual indicators */
+
+.card.electronic-resource:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(25, 118, 210, 0.2) !important;
+}
+
+.card.print-resource:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(56, 142, 60, 0.2) !important;
+}
+
+/* Add a tooltip-style class for additional info */
+.resource-type-indicator {
+  position: absolute;
+  top: -8px;
+  right: 15px;
+  font-size: 0.75rem;
+  z-index: 1;
+}
+
+.search-container {
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.search-container .form-control:focus {
+  box-shadow: none;
+  border-color: #ced4da;
+}
+
+.search-results-info {
+  padding-left: 10px;
+}
+
+/* Enhanced records styling */
+.records-container .card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.records-container .card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.course-meta {
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+/* Type badges for resources */
+.resource-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+/* Skeleton animation for loading states */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.skeleton-title,
+.skeleton-subtitle,
+.skeleton-text,
+.skeleton-badge,
+.skeleton-button {
+  background-color: #e9ecef;
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Accessibility helper classes */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Improved focus states for accessibility */
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #4d90fe;
+  outline-offset: 3px;
+}
+
+/* Folder grouping UI */
+.folder-header {
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #6c757d;
+}
+
+/* Table enhancements */
+.course-records-table th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 10;
+}
+
+.table-record-link {
+  color: #0d6efd;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.table-record-link:hover {
+  text-decoration: underline;
+}
+
+/* Media queries for responsive layouts */
+@media (min-width: 768px) {
+  .filter-search-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   
+  .filter-search-row .search-container {
+    margin-left: auto;
+    max-width: 350px;
+  }
+}
+
+/* Scroll to top button */
+.scroll-to-top-btn {
+  transition: opacity 0.3s, transform 0.3s;
+  opacity: 0.8;
+}
+
+.scroll-to-top-btn:hover {
+  opacity: 1;
+  transform: translateY(-3px);
+}

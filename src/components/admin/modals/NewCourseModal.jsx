@@ -43,7 +43,7 @@ const NewCourseModal = ({ isOpen, toggle, onCreate }) => {
   };
 
   return (
-    <Modal size="xl" isOpen={isOpen} toggle={toggle} centered>
+    <Modal fullscreen isOpen={isOpen} toggle={toggle} centered>
       <ModalHeader toggle={toggle}>Create New Course</ModalHeader>
       <ModalBody>
         <Form onSubmit={handleSubmit}>

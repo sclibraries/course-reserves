@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
-import { Card, CardHeader, CardBody, Input, Alert } from 'reactstrap';
+import { Card, CardHeader, CardBody, Input, Alert, Button } from 'reactstrap';
 import EventsTable from './tables/EventsTable';
 import PaginationControls from './tables/PaginationControls';
+import { DEFAULT_PAGE_SIZES } from './constants';
 
 /**
  * Tab component for displaying raw event data
@@ -14,7 +15,8 @@ const RawDataTab = ({
   setServerPagination,
   sortConfig,
   requestSort,
-  handleRowsPerPageChange
+  handleRowsPerPageChange,
+  onRetry
 }) => {  
   // Handle page change
   const handlePageChange = (newPage) => {
@@ -25,7 +27,7 @@ const RawDataTab = ({
   };
 
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm fade-in">
       <CardHeader className="bg-light d-flex justify-content-between align-items-center">
         <h5 className="mb-0">Event Log Data</h5>
         <div>
@@ -35,11 +37,11 @@ const RawDataTab = ({
             value={serverPagination.pageSize}
             onChange={handleRowsPerPageChange}
             style={{width: '100px'}}
+            className="form-select"
           >
-            <option value="10">10 rows</option>
-            <option value="25">25 rows</option>
-            <option value="50">50 rows</option>
-            <option value="100">100 rows</option>
+            {DEFAULT_PAGE_SIZES.map(size => (
+              <option key={size} value={size}>{size} rows</option>
+            ))}
           </Input>
         </div>
       </CardHeader>
@@ -54,6 +56,13 @@ const RawDataTab = ({
         ) : error ? (
           <Alert color="danger">
             <strong>Error:</strong> {error}
+            {onRetry && (
+              <div className="mt-2">
+                <Button color="outline-danger" size="sm" onClick={onRetry}>
+                  Retry
+                </Button>
+              </div>
+            )}
           </Alert>
         ) : (
           <>
@@ -63,12 +72,14 @@ const RawDataTab = ({
               onSort={requestSort}
             />
             
-            <PaginationControls
-              page={serverPagination.page}
-              pageSize={serverPagination.pageSize}
-              totalItems={serverPagination.totalItems}
-              onPageChange={handlePageChange}
-            />
+            <div className="mt-4">
+              <PaginationControls
+                page={serverPagination.page}
+                pageSize={serverPagination.pageSize}
+                totalItems={serverPagination.totalItems}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         )}
       </CardBody>
@@ -122,13 +133,19 @@ RawDataTab.propTypes = {
   /**
    * Function to handle rows per page change
    */
-  handleRowsPerPageChange: PropTypes.func.isRequired
+  handleRowsPerPageChange: PropTypes.func.isRequired,
+
+  /**
+   * Function to retry data loading on error
+   */
+  onRetry: PropTypes.func
 };
 
 RawDataTab.defaultProps = {
   trackingEvents: [],
   loading: false,
-  error: null
+  error: null,
+  onRetry: null
 };
 
 export default RawDataTab;

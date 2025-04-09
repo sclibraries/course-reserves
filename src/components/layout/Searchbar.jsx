@@ -1,80 +1,28 @@
-
 /**
  * @file Advanced search interface component
  * @module Searchbar
- * @description Provides a comprehensive search interface for course reserves with filters,
- * sorting, and tracking capabilities. Allows filtering by institution, department, search area, 
- * and term, with configurable appearance based on campus settings.
- * @requires react
- * @requires reactstrap
- * @requires react-router-dom
- * @requires ../../store/searchStore
- * @requires ../../store/customizationStore
- * @requires ../../services/trackingService
- * @requires ../../util/termHelpers
- * @requires ../../config
+ * @description Provides a compact search interface for course reserves with essential filters
  */
 import { useState, useEffect } from 'react';
 import {
-  Collapse,
-  NavbarToggler,
   FormGroup,
   Label,
   Input,
   Button,
-  Row,
-  Col,
-  ButtonGroup,
+  InputGroup,
+  Form,
 } from 'reactstrap';
 import { useNavigate } from 'react-router-dom';
+import { FaSearch, FaRedo } from 'react-icons/fa';
 import useSearchStore from '../../store/searchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import { trackingService } from '../../services/trackingService';
 import { getTermName } from '../../util/termHelpers';
-import { config } from '../../config'
+import { config } from '../../config';
 import '../../css/Searchbar.css';
-
-/**
- * Search interface component for course reserves
- * 
- * Provides an expandable interface for searching and filtering course reserves with:
- * - Institution selection
- * - Department filtering
- * - Search area specification (All fields, Course Name, Course Code, etc.)
- * - Term selection
- * - Sort options
- * - Keyword search
- * 
- * Features:
- * - Responsive design with collapse/expand functionality
- * - Campus-specific styling
- * - Integration with tracking service
- * - URL-based state management
- * - Accessibility support
- * 
- * @component
- * @example
- * return (
- *   <Layout>
- *     <Searchbar />
- *     <SearchResults />
- *   </Layout>
- * )
- */
 
 function Searchbar() {
   const navigate = useNavigate();
-
-    /**
-   * Collapse/expand state for responsive design
-   * @type {boolean}
-   */
-  const [isOpen, setIsOpen] = useState(false);
-
-    /**
-   * Search state and actions from global store
-   * @type {Object}
-   */
 
   const {
     college,
@@ -92,49 +40,17 @@ function Searchbar() {
     terms,
   } = useSearchStore();
 
-   /**
-   * Campus-specific customization settings
-   * @type {Object}
-   */
-  const { searchButtonBgColor, resetButtonBgColor, campusLocation, additionalHeaderText } =
+  const { searchButtonBgColor, resetButtonBgColor, additionalHeaderText, searchBarBgColor } =
     useCustomizationStore((state) => state.getCustomizationForCollege(college));
 
-  /**
-   * Current search area selection
-   * @type {string}
-   */
   const [searchArea, setSearchArea] = useState('All fields');
-    /**
-   * Current search input value
-   * @type {string}
-   */
   const [searchInput, setSearchInput] = useState('');
-    /**
-   * Selected college display name
-   * @type {string}
-   */
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
-    /**
-   * Available departments for the current college
-   * @type {Array<Object>}
-   */
   const [departments, setDepartments] = useState([]);
 
-  const searchAreas = [
-    'All fields',
-    'Course Name',
-    'Course Code',
-    'Section',
-    'Instructor',
-  ];
-  const colleges = [
-    'All',
-    'Amherst College',
-    'Hampshire College',
-    'Mount Holyoke College',
-    'Smith College',
-    'UMass Amherst',
-  ];
+  const searchAreas = ['All fields', 'Course Name', 'Course Code', 'Section', 'Instructor'];
+  const colleges = ['All', 'Amherst College', 'Hampshire College', 'Mount Holyoke College', 'Smith College', 'UMass Amherst'];
+  
   const sortingOptions = [
     { label: 'Name (A-Z)', value: 'name' },
     { label: 'Name (Z-A)', value: 'name.descending' },
@@ -144,31 +60,21 @@ function Searchbar() {
     { label: 'Section Name (Desc)', value: 'sectionName.descending' },
   ];
 
-    /**
-   * Synchronize component state with search store
-   */
+  // Sync local state with store
   useEffect(() => {
     setSearchArea(keyToSearchArea(type));
     setSearchInput(query || '');
     setSelectedCollege(keyToCollegeName(college));
   }, [type, query, college, department, sortOption]);
 
-    /**
-   * Fetch departments when college changes
-   */
-
+  // Fetch departments when college changes
   useEffect(() => {
     setDepartments([]);
-    if (!college || college === 'all') {
-      console.log("Skipping department fetch for 'all' colleges");
-      return;
-    }
+    if (!college || college === 'all') return;
+    
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
-    if (!queryParam) {
-      console.log("No valid query parameter for college:", college);
-      return;
-    }
+    if (!queryParam) return;
     
     let url = `${config.api.urls.folio}${config.api.endpoints.folioSearch.departments}`;
     if (queryParam) {
@@ -176,30 +82,23 @@ function Searchbar() {
     }
 
     fetch(url)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('Network response was not ok');
-        }
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
       })
-      .then((data) => {
+      .then(data => {
         if (data && data.data && Array.isArray(data.data.departments)) {
           setDepartments(data.data.departments);
         } else {
           setDepartments([]);
         }
       })
-      .catch((error) => {
+      .catch(error => {
         console.error('Error fetching departments:', error);
         setDepartments([]);
       });
   }, [college]);
 
-    /**
-   * Execute search with current filters
-   * @function
-   * @returns {void}
-   */
   const handleSearch = () => {
     const areaKey = searchAreaToKey(searchArea);
     const collegeKey = collegeNameToKey(selectedCollege);
@@ -237,11 +136,6 @@ function Searchbar() {
     navigate(`/search?${queryParams.toString()}`);
   };
 
-  /**
-   * Reset all search filters
-   * @function
-   * @returns {void}
-   */
   const handleReset = () => {
     // Track the reset
     const currentTermName = getTermName(terms, termId);
@@ -265,9 +159,10 @@ function Searchbar() {
     setQuery('');
     setDepartment('');
     setSortOption('');
-
     setSearchArea('All fields');
     setSearchInput('');
+    setTermId('');
+    
     if (college) {
       navigate('/search?college=' + college);
     } else {
@@ -275,16 +170,9 @@ function Searchbar() {
     }
   };
 
-    /**
-   * Handle term selection change
-   * @function
-   * @param {Event} e - Change event from select input
-   * @returns {void}
-   */
   const handleTermChange = (e) => {
     const newTermId = e.target.value;
     if (newTermId !== termId) {
-
       const newTermName = getTermName(terms, newTermId);
       const oldTermName = getTermName(terms, termId);
       // Track the term change
@@ -306,167 +194,84 @@ function Searchbar() {
     }
   };
 
-    /**
-   * Toggle searchbar expanded/collapsed state
-   * @function
-   * @returns {void}
-   */
-  const toggle = () => setIsOpen(!isOpen);
-
-    /**
-   * Convert search area display name to internal key
-   * @function
-   * @param {string} area - Display name of search area
-   * @returns {string} Internal key value
-   */
+  // Conversion helper functions
   const searchAreaToKey = (area) => {
     switch (area) {
-      case 'All fields':
-        return 'all';
-      case 'Course Name':
-        return 'name';
-      case 'Course Code':
-        return 'code';
-      case 'Section':
-        return 'section';
-      case 'Instructor':
-        return 'instructor';
-      default:
-        return 'all';
+      case 'All fields': return 'all';
+      case 'Course Name': return 'name';
+      case 'Course Code': return 'code';
+      case 'Section': return 'section';
+      case 'Instructor': return 'instructor';
+      default: return 'all';
     }
   };
 
-    /**
-   * Convert internal key to search area display name
-   * @function
-   * @param {string} key - Internal key for search area
-   * @returns {string} Display name
-   */
   const keyToSearchArea = (key) => {
     switch (key) {
-      case 'all':
-        return 'All fields';
-      case 'name':
-        return 'Course Name';
-      case 'code':
-        return 'Course Code';
-      case 'section':
-        return 'Section';
-      case 'instructor':
-        return 'Instructor';
-      default:
-        return 'All fields';
+      case 'all': return 'All fields';
+      case 'name': return 'Course Name';
+      case 'code': return 'Course Code';
+      case 'section': return 'Section';
+      case 'instructor': return 'Instructor';
+      default: return 'All fields';
     }
   };
 
-    /**
-   * Convert college display name to internal key
-   * @function
-   * @param {string} col - Display name of college
-   * @returns {string} Internal key value
-   */
   const collegeNameToKey = (col) => {
     switch (col) {
-      case 'Smith College':
-        return 'smith';
-      case 'Hampshire College':
-        return 'hampshire';
-      case 'Mount Holyoke College':
-        return 'mtholyoke';
-      case 'Amherst College':
-        return 'amherst';
-      case 'UMass Amherst':
-        return 'umass';
+      case 'Smith College': return 'smith';
+      case 'Hampshire College': return 'hampshire';
+      case 'Mount Holyoke College': return 'mtholyoke';
+      case 'Amherst College': return 'amherst';
+      case 'UMass Amherst': return 'umass';
       case 'All':
-      default:
-        return 'all';
+      default: return 'all';
     }
   };
 
-    /**
-   * Convert internal key to college display name
-   * @function
-   * @param {string} key - Internal key for college
-   * @returns {string} Display name
-   */
   const keyToCollegeName = (key) => {
     switch (key) {
-      case 'smith':
-        return 'Smith College';
-      case 'hampshire':
-        return 'Hampshire College';
-      case 'mtholyoke':
-        return 'Mount Holyoke College';
-      case 'amherst':
-        return 'Amherst College';
-      case 'umass':
-        return 'UMass Amherst';
+      case 'smith': return 'Smith College';
+      case 'hampshire': return 'Hampshire College';
+      case 'mtholyoke': return 'Mount Holyoke College';
+      case 'amherst': return 'Amherst College';
+      case 'umass': return 'UMass Amherst';
       case 'all':
-      default:
-        return 'All';
+      default: return 'All';
     }
   };
-
-    /**
-   * Get FOLIO API query parameter for college
-   * @function
-   * @param {string} collegeKey - Internal key for college
-   * @returns {string} FOLIO API query string
-   */
 
   const getCollegeQuery = (collegeKey) => {
     switch (collegeKey) {
-      case 'smith':
-        return 'name==sc*';
-      case 'hampshire':
-        return 'name==hc*';
-      case 'mtholyoke':
-        return 'name==mh*';
-      case 'amherst':
-        return 'name==ac*';
-      case 'umass':
-        return 'name==um*';
-      default:
-        return '';
+      case 'smith': return 'name==sc*';
+      case 'hampshire': return 'name==hc*';
+      case 'mtholyoke': return 'name==mh*';
+      case 'amherst': return 'name==ac*';
+      case 'umass': return 'name==um*';
+      default: return '';
     }
   };
 
-
   return (
-    <div className="searchbar-container" role="search">
-      <NavbarToggler
-        onClick={toggle}
-        className="searchbar-toggle"
-        aria-label="Toggle search options"
-        aria-expanded={isOpen}
-        aria-controls="search-collapse"
-      />
-
-      <Collapse
-        id="search-collapse"
-        isOpen={isOpen}
-        className={isOpen ? 'searchbar-expanded' : 'searchbar-collapsed'}
-      >
-        <Row>
-          {/* College Select */}
-          <Col xs="12" md className="mb-2">
-            <FormGroup>
-              <Label for="collegeSelect" className="mr-2" style={{ color: '#212529' }}>
-                Institution
-              </Label>
+    <div className="search-panel-container" role="search" style={{backgroundColor: searchBarBgColor || '#f8f9fa'}}>
+      <div className="search-panel">
+        <Form onSubmit={(e) => {
+          e.preventDefault();
+          handleSearch();
+        }}>
+          <div className="filter-controls-row">
+            {/* College Filter */}
+            <FormGroup className="filter-item">
+              <Label for="collegeSelect" className="filter-label">Institution</Label>
               <Input
-                type="select"
-                name="college"
                 id="collegeSelect"
-                role="combobox"
+                type="select"
                 value={selectedCollege}
-                aria-expanded="false"
-                aria-controls="college-options"
                 onChange={(e) => {
                   const newCollege = e.target.value;
                   const newCollegeKey = collegeNameToKey(newCollege);
                   const currentTermName = getTermName(terms, termId);
-                  // If you want to track college changes:
+                  
                   trackingService.trackEvent({
                     event_type: "college_change",
                     college: newCollegeKey,
@@ -481,7 +286,6 @@ function Searchbar() {
                     }
                   }).catch(err => console.error("Error tracking college change:", err));
 
-                  // Reset all search parameters when college changes
                   setSelectedCollege(newCollege);
                   setCollege(newCollegeKey);
                   useCustomizationStore.getState().setCurrentCollege(newCollegeKey);
@@ -491,50 +295,28 @@ function Searchbar() {
                   setType('all');
                   setSortOption('');
 
-                  const queryParams = new URLSearchParams(location.search);
+                  const queryParams = new URLSearchParams();
                   queryParams.set('college', newCollegeKey);
-
                   navigate(`/search?${queryParams.toString()}`);
                 }}
-                aria-live="polite"
-                aria-describedby="college-reset-warning"
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.target.blur();
-                  }
-                }}
+                className="filter-select"
               >
                 {colleges.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
+                  <option key={col} value={col}>{col}</option>
                 ))}
               </Input>
-              <small id="college-reset-warning" className="visually-hidden">
-                Changing the college resets all search filters.
-              </small>
             </FormGroup>
-          </Col>
 
-          {/* Department Select */}
-          <Col xs="12" md className="mb-2">
-            <FormGroup>
-              <Label for="departmentSelect" className="mr-2" style={{ color: '#212529' }}>
-                Department
-              </Label>
+            {/* Department Filter */}
+            <FormGroup className="filter-item">
+              <Label for="departmentSelect" className="filter-label">Department</Label>
               <Input
-                type="select"
-                name="department"
                 id="departmentSelect"
-                aria-live="polite"
-                aria-expanded="false"
-                aria-controls="department-options"
-                aria-activedescendant={department ? `dept-${department}` : undefined}
+                type="select"
                 value={department}
                 onChange={(e) => {
                   const newDept = e.target.value;
                   const currentTermName = getTermName(terms, termId);
-                  // Track the department change
                   trackingService.trackEvent({
                     event_type: "department_change",
                     college,
@@ -552,201 +334,126 @@ function Searchbar() {
                   setDepartment(newDept);
                 }}
                 disabled={departments.length === 0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.target.blur();
-                  }
-                }}
+                className="filter-select"
               >
                 <option value="">All Departments</option>
                 {departments.map((dept) => (
-                  <option key={dept.id} value={dept.name}>
-                    {dept.name}
-                  </option>
+                  <option key={dept.id} value={dept.name}>{dept.name}</option>
                 ))}
               </Input>
             </FormGroup>
-          </Col>
 
-
-          {/* Search Area Select */}
-          <Col xs="12" md className="mb-2">
-            <FormGroup>
-              <Label for="searchAreaSelect" className="mr-2" style={{ color: '#212529' }}>
-                Search Area
-              </Label>
+            {/* Term Filter */}
+            <FormGroup className="filter-item">
+              <Label for="termSelect" className="filter-label">Term</Label>
               <Input
+                id="termSelect"
                 type="select"
-                name="searchArea"
+                value={termId || ''}
+                onChange={handleTermChange}
+                className="filter-select"
+              >
+                <option value="">Select term</option>
+                {terms.map((term) => (
+                  <option key={term.id} value={term.id}>{term.name}</option>
+                ))}
+              </Input>
+            </FormGroup>
+
+            {/* Search Area Select */}
+            <FormGroup className="filter-item">
+              <Label for="searchAreaSelect" className="filter-label">Search In</Label>
+              <Input
                 id="searchAreaSelect"
-                aria-expanded="false"
-                aria-controls="searchArea-options"
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.target.blur();
-                  }
-                }}
+                type="select"
                 value={searchArea}
                 onChange={(e) => {
                   setSearchArea(e.target.value);
                   setType(searchAreaToKey(e.target.value));
                 }}
+                className="filter-select"
               >
                 {searchAreas.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
-                  </option>
+                  <option key={area} value={area}>{area}</option>
                 ))}
               </Input>
             </FormGroup>
-          </Col>
 
-          {/* Term Select */}
-          <Col xs="12" md className="mb-2">
-            <FormGroup>
-              <Label for="termSelect" className="mr-2" style={{ color: '#212529' }}>
-                Term
-              </Label>
+            {/* Sort Filter */}
+            <FormGroup className="filter-item">
+              <Label for="sortSelect" className="filter-label">Sort By</Label>
               <Input
-                type="select"
-                name="term"
-                id="termSelect"
-                aria-expanded="false"
-                aria-controls="term-options"
-                value={termId || ''}
-                onChange={handleTermChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.target.blur();
-                  }
-                }}
-              >
-                <option value="" disabled>
-                  Select a term
-                </option>
-                {terms.map((term) => (
-                  <option key={term.id} value={term.id}>
-                    {term.name}
-                  </option>
-                ))}
-              </Input>
-            </FormGroup>
-          </Col>
-
-          {/* Sort By Select */}
-          <Col xs="12" md className="mb-2">
-            <FormGroup>
-              <Label for="sortSelect" className="mr-2" style={{ color: '#212529' }}>
-                Sort By
-              </Label>
-              <Input
-                type="select"
-                name="sortOption"
                 id="sortSelect"
-                aria-expanded="false"
-                aria-controls="sort-options"
-                value={sortOption}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.target.blur();
-                  }
-                }}
+                type="select"
+                value={sortOption || ''}
                 onChange={(e) => {
                   setSortOption(e.target.value);
-                  // Optionally track the sorting action
-                  trackingService.trackEvent({
-                    event_type: "sort_change",
-                    college: college,
-                    course_id: "N/A",
-                    term: termId || "N/A",
-                    course_name: "",
-                    course_code: "",
-                    instructor: null,
-                    metadata: {
-                      new_sort: e.target.value,
-                    }
-                  }).catch(err => console.error("Error tracking sort change:", err));
-
-                  handleSearch();
                 }}
+                className="filter-select"
               >
                 <option value="">Default</option>
                 {sortingOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </Input>
             </FormGroup>
-          </Col>
 
-          {/* Search Input */}
-          <Col className="mb-2">
-            <FormGroup>
-              <Label for="searchInput" id="searchInput-label" className="mr-2">
-                Search
-              </Label>
-              <Input
-                type="text"
-                name="query"
-                id="searchInput"
-                placeholder="Enter keyword"
-                aria-labelledby="searchInput-label"
-                aria-placeholder="Enter keyword"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSearch();
-                  }
-                }}
-                style={{
-                  color: '#000',
-                  backgroundColor: '#ffffff',
-                  borderColor: '#6c757d',
-                }}
-              />
+            {/* Search Input - Fixed proper nesting */}
+            <FormGroup className="filter-item search-field">
+              <Label for="searchInput" className="filter-label">Search</Label>
+              <InputGroup>
+                <Input
+                  id="searchInput"
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search courses..."
+                  className="filter-input"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearch();
+                    }
+                  }}
+                />
+              </InputGroup>
             </FormGroup>
-          </Col>
-
-          {/* Button Group for Search and Reset */}
-          <Col xs="12" md="auto" className="mb-2">
-            <div className="d-flex justify-content-end">
-              <ButtonGroup className="w-100 w-md-auto">
+                  
+            {/* Action Buttons - Fixed reset button accessibility */}
+            <div className="filter-buttons">
+              <div className="button-group">
                 <Button
                   color="primary"
                   onClick={handleSearch}
-                  style={{
-                    backgroundColor: searchButtonBgColor || '#007bff',
-                    color: campusLocation === 'hampshire' ? 'black' : 'white',
-                  }}
-                  aria-label="Search"
-                  tabIndex="0"
+                  style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
+                  className="action-button search-button"
+                  type="submit"
                 >
-                  <i className="fas fa-search" role="button"></i>
-                  <span className="d-inline ml-1">Search</span>
+                  <FaSearch className="button-icon" aria-hidden="true" /> Search
                 </Button>
-
                 <Button
                   color="secondary"
                   onClick={handleReset}
-                  style={{
-                    backgroundColor: resetButtonBgColor || '#6c757d',
-                    color: '#ffffff',
-                  }}
-                  aria-label="Reset search filters"
-                  tabIndex="0"
+                  style={{ backgroundColor: resetButtonBgColor || '#6c757d' }}
+                  className="action-button reset-button"
+                  type="button"
+                  aria-label="Reset search filters" // Added aria-label for accessibility
                 >
-                  <i className="fas fa-undo" role="button"></i>
-                  <span className="d-inline ml-1">Reset</span>
+                  <FaRedo className="button-icon" aria-hidden="true" />
+                  <span className="visually-hidden">Reset</span> {/* Hidden text for screen readers */}
                 </Button>
-              </ButtonGroup>
+              </div>
             </div>
-          </Col>
-        </Row>
-      </Collapse>
-       <p dangerouslySetInnerHTML={{__html: additionalHeaderText}} />
+          </div>
+        </Form>
+      </div>
+      
+      {additionalHeaderText && (
+        <div 
+          className="additional-header-text"
+          dangerouslySetInnerHTML={{__html: additionalHeaderText}} 
+        />
+      )}
     </div>
   );
 }

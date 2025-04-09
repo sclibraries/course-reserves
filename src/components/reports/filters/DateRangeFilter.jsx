@@ -1,79 +1,75 @@
-import React from 'react';
 import PropTypes from 'prop-types';
-import { FormGroup, Label, Input } from 'reactstrap';
+import { FormGroup, Label, Row, Col, Input } from 'reactstrap';
 
 /**
- * Component for filtering by college/campus
+ * Component for filtering data by date range
  */
-const CollegeFilter = ({ value, onChange, colleges, label, useSelect }) => {
-  // Ensure we have valid colleges data
-  const validColleges = React.useMemo(() => {
-    if (!colleges || !Array.isArray(colleges)) return [];
-    return colleges
-      .filter(college => college && typeof college === 'string' && college.trim() !== '')
-      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  }, [colleges]);
-
+const DateRangeFilter = ({ 
+  startDate, 
+  endDate, 
+  onStartDateChange, 
+  onEndDateChange,
+  label
+}) => {
   return (
     <FormGroup>
-      <Label for="collegeFilter">{label}</Label>
-      {useSelect && validColleges.length > 0 ? (
-        <Input
-          type="select"
-          id="collegeFilter"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">All Colleges</option>
-          {validColleges.map(college => (
-            <option key={college} value={college}>{college}</option>
-          ))}
-        </Input>
-      ) : (
-        <Input
-          type="text"
-          id="collegeFilter"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Filter by college"
-        />
-      )}
+      <Label>{label}</Label>
+      <Row className="g-2">
+        <Col xs={6}>
+          <Input
+            type="date"
+            value={startDate || ''}
+            onChange={(e) => onStartDateChange(e.target.value)}
+            placeholder="Start Date"
+            aria-label="Start Date"
+          />
+        </Col>
+        <Col xs={6}>
+          <Input
+            type="date"
+            value={endDate || ''}
+            onChange={(e) => onEndDateChange(e.target.value)}
+            placeholder="End Date"
+            min={startDate || ''}
+            aria-label="End Date"
+          />
+        </Col>
+      </Row>
     </FormGroup>
   );
 };
 
-CollegeFilter.propTypes = {
+DateRangeFilter.propTypes = {
   /**
-   * Currently entered/selected college
+   * Start date value (YYYY-MM-DD format)
    */
-  value: PropTypes.string,
+  startDate: PropTypes.string,
   
   /**
-   * Callback for when value changes
+   * End date value (YYYY-MM-DD format)
    */
-  onChange: PropTypes.func.isRequired,
+  endDate: PropTypes.string,
   
   /**
-   * Array of available colleges (optional - only used in select mode)
+   * Callback for when start date changes
    */
-  colleges: PropTypes.arrayOf(PropTypes.string),
+  onStartDateChange: PropTypes.func.isRequired,
+  
+  /**
+   * Callback for when end date changes
+   */
+  onEndDateChange: PropTypes.func.isRequired,
   
   /**
    * Field label
    */
-  label: PropTypes.string,
-  
-  /**
-   * Whether to use a select dropdown instead of text input
-   */
-  useSelect: PropTypes.bool
+  label: PropTypes.string
 };
 
-CollegeFilter.defaultProps = {
-  value: '',
-  colleges: [],
-  label: 'College',
-  useSelect: false
+DateRangeFilter.defaultProps = {
+  startDate: '',
+  endDate: '',
+  label: 'Date Range'
 };
 
-export default CollegeFilter;
+export default DateRangeFilter;

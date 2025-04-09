@@ -1,69 +1,136 @@
 import PropTypes from 'prop-types';
 import { Card, CardHeader, CardBody } from 'reactstrap';
-import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
-import { formatEventTypeData } from '../utils/chartUtils';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { COLORS } from '../constants';
-import { getEventBadgeColor } from '../utils/eventUtils';
 
 /**
- * Pie chart showing event types distribution
+ * Custom label for pie chart that avoids overlapping
  */
-const EventTypesPieChart = ({ eventTypeData, title }) => {
-  const formattedData = formatEventTypeData(eventTypeData);
+const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, name }) => {
+  // Only display label for segments greater than 5%
+  if (percent < 0.05) return null;
   
-  // Check if we have data to display
-  const hasData = formattedData && formattedData.length > 0;
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius * 1.1;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
   
+  const percentValue = (percent * 100).toFixed(0);
+  
+  // For very small segments, only show percentage
+  const labelText = percentValue > 7 ? `${name}: ${percentValue}%` : `${percentValue}%`;
+
   return (
-    <Card className="h-100 shadow-sm">
+    <text 
+      x={x} 
+      y={y} 
+      fill="#666"
+      textAnchor={x > cx ? 'start' : 'end'} 
+      dominantBaseline="central"
+      fontSize="12"
+    >
+      {labelText}
+    </text>
+  );
+};
+
+/**
+ * Component that displays event types distribution as a pie chart with improved label handling
+ */
+const EventTypesPieChart = ({ eventTypeData }) => {
+  // Group small event types into "Other" category to reduce clutter
+  const prepareChartData = (data) => {
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // Calculate total for percentage calculation
+    const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0);
+    
+    // If the total is 0, return empty data
+    if (total === 0) {
+      return [];
+    }
+    
+    // Set threshold for "Other" grouping (events less than 3% of total)
+    const threshold = total * 0.03;
+    let significant = [];
+    let othersValue = 0;
+    
+    data.forEach(item => {
+      const value = Number(item.value || 0);
+      if (value >= threshold) {
+        significant.push({
+          name: item.name || 'Unknown',
+          value
+        });
+      } else {
+        othersValue += value;
+      }
+    });
+    
+    // Sort by value (descending)
+    significant = significant.sort((a, b) => b.value - a.value);
+    
+    // Add "Others" category if needed
+    if (othersValue > 0) {
+      significant.push({ name: 'Other', value: othersValue });
+    }
+    
+    return significant;
+  };
+
+  const chartData = prepareChartData(eventTypeData);
+
+  // Don't render if no data
+  if (chartData.length === 0) {
+    return (
+      <Card className="shadow-sm fade-in h-100">
+        <CardHeader className="bg-light">
+          <h5 className="mb-0">Event Type Distribution</h5>
+        </CardHeader>
+        <CardBody className="text-center py-5">
+          <p className="text-muted mb-0">No event type data available</p>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="shadow-sm fade-in h-100">
       <CardHeader className="bg-light">
-        <h5 className="mb-0">{title || 'Event Types Distribution'}</h5>
+        <h5 className="mb-0">Event Type Distribution</h5>
       </CardHeader>
       <CardBody>
-        {!hasData ? (
-          <div className="text-center p-5">
-            <p>No event type data available</p>
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={formattedData}
-                cx="50%"
-                cy="50%"
-                labelLine={true}
-                outerRadius={90}
-                fill="#8884d8"
-                dataKey="value"
-                nameKey="name"
-                label={({name, percent}) => 
-                  percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''
-                }
-              >
-                {formattedData.map((entry, index) => {
-                  // Try to use event type color if available, fall back to rotation
-                  const colorName = getEventBadgeColor(entry.rawName);
-                  // Convert Bootstrap color name to hex if needed
-                  const bootstrapColors = {
-                    primary: '#0d6efd',
-                    success: '#198754',
-                    info: '#0dcaf0',
-                    warning: '#ffc107',
-                    danger: '#dc3545',
-                    secondary: '#6c757d',
-                    dark: '#212529'
-                  };
-                  const color = bootstrapColors[colorName] || COLORS[index % COLORS.length];
-                  return <Cell key={`cell-${index}`} fill={color} />;
-                })}
-              </Pie>
-              <Tooltip formatter={(value) => [`${value} events`, 'Count']} />
-              <Legend layout="vertical" align="right" verticalAlign="middle" />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
+              label={renderCustomizedLabel}
+              isAnimationActive={false}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip 
+              formatter={(value, name) => [`${value} events (${((value/chartData.reduce((sum, item) => sum + item.value, 0))*100).toFixed(1)}%)`, name]} 
+              contentStyle={{ borderRadius: '4px' }}
+            />
+            <Legend 
+              layout="vertical" 
+              verticalAlign="middle" 
+              align="right"
+              wrapperStyle={{ paddingLeft: '20px' }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </CardBody>
     </Card>
   );
@@ -71,24 +138,18 @@ const EventTypesPieChart = ({ eventTypeData, title }) => {
 
 EventTypesPieChart.propTypes = {
   /**
-   * Event type data with counts
+   * Event type data for the chart
    */
   eventTypeData: PropTypes.arrayOf(
     PropTypes.shape({
       name: PropTypes.string,
       value: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
     })
-  ),
-  
-  /**
-   * Chart title
-   */
-  title: PropTypes.string
+  )
 };
 
 EventTypesPieChart.defaultProps = {
-  eventTypeData: [],
-  title: 'Event Types Distribution'
+  eventTypeData: []
 };
 
 export default EventTypesPieChart;

@@ -29,7 +29,6 @@ const CoursesTab = ({ analyticsData, loading, error }) => {
   const [activeTermTab, setActiveTermTab] = useState('all');
 
   // Reset pagination when filters change
-  const resetPagination = () => setCoursesPagination(prev => ({...prev, page: 1}));
 
   // Processed data - move complex data processing to useMemo hooks
   const processedCourses = useMemo(() => 

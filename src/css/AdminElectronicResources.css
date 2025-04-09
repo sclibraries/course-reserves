@@ -1,0 +1,643 @@
+/* Modern styling for Admin Electronic Resources page */
+
+/* Base container styling */
+.admin-resources-container {
+  background-color: #f8fafb;
+  padding-bottom: 2rem;
+}
+
+/* Custom card styling to look less bootstrapy */
+.custom-card {
+  border-radius: 12px;
+  border: none;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.custom-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.custom-card-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #eaecef;
+  padding: 1.2rem 1.5rem;
+  font-weight: 600;
+}
+
+/* Resource cards */
+.resource-card {
+  border-radius: 12px;
+  border: none;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 2rem;
+}
+
+.resource-card-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #eaecef;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Custom badge styling */
+.custom-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1rem;
+  border-radius: 50px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.dept-badge {
+  background-color: #eef2ff;
+  color: #4f46e5;
+}
+
+.location-badge {
+  background-color: #e0f2fe;
+  color: #0284c7;
+}
+
+.term-badge {
+  background-color: #ecfdf5;
+  color: #059669;
+}
+
+.instructor-badge {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.linked-course-badge {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  cursor: pointer;
+}
+
+.linked-course-badge:hover {
+  background-color: #f9fafb;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.more-badge {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Course title styling */
+.course-title {
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.course-number {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.section-label {
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.75rem;
+}
+
+/* Custom button styling */
+.back-btn {
+  background-color: #ffffff;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+.custom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.primary-action-btn {
+  background-color: #4f46e5;
+  color: white;
+}
+
+.primary-action-btn:hover {
+  background-color: #4338ca;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+  color: white;
+}
+
+.secondary-action-btn {
+  background-color: #ffffff;
+  color: #4f46e5;
+  border: 1px solid #4f46e5;
+}
+
+.secondary-action-btn:hover {
+  background-color: #eef2ff;
+  color: #4338ca;
+  transform: translateY(-2px);
+}
+
+.tertiary-action-btn {
+  background-color: #f9fafb;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.tertiary-action-btn:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+/* Copy status styling */
+.copy-status {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: #10b981;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  background-color: #ecfdf5;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Custom permalink styling */
+.permalink-container {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.permalink-input {
+  flex-grow: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  background-color: #f9fafb;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+}
+
+.permalink-copy-btn {
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.permalink-copy-btn:hover {
+  background-color: #4338ca;
+}
+
+/* Custom tabs */
+.content-tabs {
+  margin-bottom: 2rem;
+}
+
+.custom-tabs {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.custom-tabs .tab-item {
+  margin-right: 0.5rem;
+  margin-bottom: -2px;
+}
+
+.custom-tabs .tab-item button {
+  background: none;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.custom-tabs .tab-item button:hover {
+  color: #4f46e5;
+}
+
+.custom-tabs .tab-item.active button {
+  color: #4f46e5;
+  border-bottom: 2px solid #4f46e5;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Action buttons for resources */
+.action-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.custom-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.custom-action-btn.primary {
+  background-color: #4f46e5;
+  color: white;
+  border-color: #4f46e5;
+}
+
+.custom-action-btn.primary:hover {
+  background-color: #4338ca;
+  border-color: #4338ca;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+}
+
+/* Refresh button */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.875rem;
+  background-color: #f9fafb;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* FOLIO link button */
+.folio-link-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.875rem;
+  background-color: #f9fafb;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.folio-link-btn:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+  text-decoration: none;
+}
+
+/* Custom alert styling */
+.custom-alert {
+  display: flex;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.custom-alert.info {
+  background-color: #f0f9ff;
+  border-left: 4px solid #0ea5e9;
+  color: #0c4a6e;
+}
+
+/* Empty state styling */
+.empty-state {
+  padding: 3rem 2rem;
+  text-align: center;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px dashed #e5e7eb;
+}
+
+.empty-state-icon {
+  font-size: 2.5rem;
+  color: #9ca3af;
+  margin-bottom: 1.25rem;
+}
+
+/* Custom table styling */
+.custom-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.custom-table thead th {
+  background-color: #f9fafb;
+  color: #4b5563;
+  font-weight: 600;
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.custom-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.custom-table tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.custom-table tbody td {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #1f2937;
+}
+
+.custom-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* View button for linked courses */
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(79, 70, 229, 0.3);
+}
+
+/* FOLIO action button */
+.folio-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  background-color: #ffffff;
+  color: #4f46e5;
+  border: 1px solid #4f46e5;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.folio-action-btn:hover {
+  background-color: #eef2ff;
+  color: #4338ca;
+  text-decoration: none;
+}
+
+/* Animation for fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Add link button */
+.add-link-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.add-link-btn:hover {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(79, 70, 229, 0.3);
+}
+
+/* Improved Tab styling */
+.custom-tab-header {
+  gap: 4px;
+}
+
+.tab-item {
+  border-radius: 6px 6px 0 0 !important;
+  font-weight: 500;
+  padding: 10px 16px !important;
+  transition: all 0.2s ease;
+}
+
+.tab-item:hover:not(.active):not(.disabled-tab) {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+
+.tab-item.active {
+  background-color: #fff !important;
+  border-bottom-color: #fff !important;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.disabled-tab {
+  color: #adb5bd !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Card hover effects */
+.hover-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.hover-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Nice shadows */
+.shadow {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.shadow-sm {
+  box-shadow: 0 0.1rem 0.15rem rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Animations */
+.animate__fadeIn {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Table styling improvements */
+.table thead th {
+  font-weight: 600;
+  font-size: 0.9rem;
+  background-color: #f8f9fa;
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+
+.table {
+  margin-bottom: 0;
+}
+
+/* For course status badges */
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 0.35em 0.65em;
+  font-size: 0.9rem;
+}
+
+.badge.badge-pill {
+  border-radius: 50rem;
+}
+
+/* Permalink input styling */
+.font-monospace {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+}
+
+/* Better alert styling */
+.print-resources-notice, .linked-resources-notice {
+  border-left: 4px solid #0dcaf0;
+  background-color: rgba(13, 202, 240, 0.1);
+}
+
+.alert {
+  border-radius: 0.5rem;
+}
+
+.alert-info {
+  border-left: 4px solid #0dcaf0;
+  background-color: rgba(13, 202, 240, 0.1);
+  color: #055160;
+}
+
+/* Empty state containers */
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px dashed #dee2e6;
+}
+
+/* Card styling improvements */
+.card {
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 1rem 1.25rem;
+}
+
+/* Tab styling enhancements */
+.course-content-tabs .nav-tabs {
+  border-bottom: 2px solid #dee2e6;
+  gap: 0.5rem;
+}
+
+.course-content-tabs .nav-tabs .nav-link {
+  margin-bottom: -2px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #6c757d;
+  transition: all 0.2s ease;
+}
+
+.course-content-tabs .nav-tabs .nav-link:hover:not(.active) {
+  color: #495057;
+  border-bottom-color: #adb5bd;
+}
+
+.course-content-tabs .nav-tabs .nav-link.active {
+  color: #0d6efd;
+  background: transparent;
+  border-bottom: 2px solid #0d6efd;
+}
+
+/* Input group for permalink */
+.input-group {
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Resource button group */
+.resource-buttons {
+  flex-wrap: wrap;
+}
+
+/* Button hover effects */
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}

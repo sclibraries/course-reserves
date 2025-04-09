@@ -9,7 +9,6 @@
  * @requires @/hooks/useAuth
  * @requires @/hooks/useTermSetup
  */
-
 import { Routes, Route } from 'react-router-dom';
 import Home from '../../pages/Home';
 import Search from '../../pages/Search';
@@ -22,6 +21,7 @@ import NotFound from '../../pages/NotFound';
 import useAuth from '../../hooks/useAuth';
 import useTermSetup from '../../hooks/useTermSetup';
 import TrackingReport from '../../pages/TrackingReport';
+
 
 /**
  * Application routes component

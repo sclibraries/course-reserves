@@ -4,10 +4,10 @@ import useCourseStore from '../store';
 import useSearchStore from '../store/searchStore';
 import CourseList from '../components/page-sections/search/CourseList';
 import { useBuildQuery } from '../hooks/useBuildQuery';
-import { Container, Spinner, Alert } from 'reactstrap';
+import { Container,Alert } from 'reactstrap';
 import { trackingService } from '../services/trackingService';
 import useCustomizationStore from '../store/customizationStore';
-
+import '../css/CourseList.css'; // Import the new CSS
 
 function Search() {
   const navigate = useNavigate();
@@ -33,6 +33,19 @@ function Search() {
   const error = useCourseStore((state) => state.error);
   const loading = useCourseStore((state) => state.loading);
   const currentCollege = useCustomizationStore((state) => state.currentCollege);
+  const collegeParam = new URLSearchParams(location.search).get('college') || currentCollege || 'all';
+  
+  // Get college name for heading
+  const getCollegeName = () => {
+    switch (collegeParam) {
+      case 'smith': return 'Smith College';
+      case 'hampshire': return 'Hampshire College';
+      case 'mtholyoke': return 'Mount Holyoke College';
+      case 'amherst': return 'Amherst College';
+      case 'umass': return 'UMass Amherst';
+      default: return 'Five College Consortium';
+    }
+  };
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -137,21 +150,24 @@ function Search() {
 
   return (
     <Container fluid>
+      {/* Add a proper h1 heading for the page */}
+      <h1 className={query ? "display-6" : "visually-hidden"}>
+        {query 
+          ? `Search Results for "${query}" - ${getCollegeName()} Course Reserves` 
+          : `${getCollegeName()} Course Reserves`
+        }
+      </h1>
+      
       {error && (
         <Alert color="danger" className="mt-3">
           Error loading courses: {error.message}
         </Alert>
       )}
-      {loading ? (
-        <div className="text-center mt-5">
-          <Spinner color="primary" />
-          <p className="mt-2">Loading courses...</p>
-        </div>
-      ) : (
-        <>
-          <CourseList courses={results} />
-        </>
-      )}
+      
+      <CourseList 
+        courses={results} 
+        isLoading={loading}
+      />
     </Container>
   );
 }

@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
-import { Table, Button } from 'reactstrap';
+import { Table, Button, Badge } from 'reactstrap';
 import { trackingService } from '../../../services/trackingService';
 import useSearchStore from '../../../store/searchStore';
+import { FaBook, FaChevronRight } from 'react-icons/fa';
 
 function CourseTable({ courses, customization, onRecordsClick }) {
   const {
@@ -49,28 +50,34 @@ function CourseTable({ courses, customization, onRecordsClick }) {
     onRecordsClick(courseListingId);
   };
 
+  // Determine theme colors
+  const accentColor = campusLocation === "hampshire" ? "#8A4F7D" : "#1c4f82";
+  const buttonTextColor = campusLocation === "hampshire" ? 'black' : 'white';
+  const headerBgColor = cardBorderColor || "#f8f9fa";
+  const headerTextColor = cardTitleTextColor || "#212529";
+  const termBadgeTextColor = cardButtonBgColor || "#0d4c8b"; // Darker blue for better contrast
+
   return (
-    <div className="table-responsive">
+    <div className="table-responsive course-table-container shadow-sm rounded overflow-hidden">
       <Table 
         hover 
-        bordered 
-        striped 
-        className="shadow-sm bg-body-tertiary"
+        className="mb-0 align-middle course-table"
         style={{
           backgroundColor: cardBgColor,
-          borderColor: cardBorderColor
         }}
       >
         <thead>
-          <tr style={{ color: cardTitleTextColor, backgroundColor: cardBorderColor }}>
-            <th>Course Name</th>
-            <th>Course Number</th>
-            <th>Section</th>
-            <th>Department</th>
-            <th>Instructor(s)</th>
-            <th>Term</th>
-            <th>Location</th>
-            <th>Actions</th>
+          <tr style={{ 
+            color: headerTextColor, 
+            backgroundColor: headerBgColor,
+            borderBottom: `2px solid ${cardBorderColor || "#dee2e6"}`
+          }}>
+            <th className="py-3" scope="col">Course</th> {/* Added scope for better accessibility */}
+            <th className="py-3" scope="col">Department</th>
+            <th className="py-3 d-none d-md-table-cell" scope="col">Instructor(s)</th>
+            <th className="py-3 d-none d-md-table-cell" scope="col">Term</th>
+            <th className="py-3 d-none d-lg-table-cell" scope="col">Location</th>
+            <th className="py-3 text-end" scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -88,47 +95,97 @@ function CourseTable({ courses, customization, onRecordsClick }) {
             const instructors = courseListingObject?.instructorObjects?.map((i) => i.name) || [];
             const termName = courseListingObject?.termObject?.name || 'Unknown Term';
             const locationName = courseListingObject?.locationObject?.name || 'Unknown Location';
+            const instructorList = instructors.length > 0 ? instructors.join(', ') : 'No Instructors';
 
             return (
-              <tr key={id} style={{ color: cardTextColor }}>
+              <tr 
+                key={id} 
+                style={{ color: cardTextColor }}
+                className="course-table-row"
+              >
                 <td>
-                  <button
-                    onClick={() => handleRecordsClick(course)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: cardTitleTextColor,
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      textAlign: 'inherit',
-                      padding: 0,
+                  <div className="d-flex flex-column">
+                    <button
+                      onClick={() => handleRecordsClick(course)}
+                      className="course-title-link text-start"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: cardTitleTextColor,
+                        fontWeight: "500",
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                      aria-label={`View reserves for ${name}`}
+                    >
+                      {name}
+                    </button>
+                    <div className="d-flex align-items-center mt-1">
+                      <Badge 
+                        color="light" 
+                        style={{ 
+                          backgroundColor: "#f0f0f0", 
+                          color: "#333",
+                          fontWeight: "600",
+                          fontSize: "0.75rem"
+                        }}
+                      >
+                        {courseNumber}
+                      </Badge>
+                      {sectionName && (
+                        <small className="ms-2 text-muted" style={{ fontSize: "0.8rem" }}>
+                          Section: {sectionName}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span className="department-name">{departmentName}</span>
+                </td>
+                <td className="d-none d-md-table-cell">
+                  <div className="instructor-cell">
+                    {instructors.length > 0 ? (
+                      <span className="instructor-list">{instructorList}</span>
+                    ) : (
+                      <span className="text-muted">No Instructors</span>
+                    )}
+                  </div>
+                </td>
+                <td className="d-none d-md-table-cell">
+                  <Badge 
+                    color="light" 
+                    className="term-badge"
+                    style={{ 
+                      backgroundColor: `${cardButtonBgColor}15` || "#e6f0f9",
+                      color: termBadgeTextColor, // Darker color for better contrast
+                      fontWeight: "600" // Increased weight for better contrast
                     }}
-                    aria-label={`View records for ${name}`}
                   >
-                    {name}
-                  </button>
+                    {termName}
+                  </Badge>
                 </td>
-                <td>{courseNumber}</td>
-                <td>{sectionName || '-'}</td>
-                <td>{departmentName}</td>
-                <td>
-                  {instructors.length > 0 
-                    ? instructors.join(', ')
-                    : 'No Instructors'}
+                <td className="d-none d-lg-table-cell">
+                  <small>{locationName}</small>
                 </td>
-                <td>{termName}</td>
-                <td>{locationName}</td>
-                <td>
+                <td className="text-end">
                   <Button
                     size="sm"
-                    aria-label={`See reserves for ${name}`}
+                    className="d-flex align-items-center gap-1 ms-auto"
                     style={{
-                      backgroundColor: cardButtonBgColor || '#007bff', 
-                      color: campusLocation === "hampshire" ? 'black' : 'white',
+                      backgroundColor: cardButtonBgColor || accentColor, 
+                      color: buttonTextColor,
+                      border: "none",
+                      fontWeight: "500",
+                      fontSize: "0.8rem",
+                      padding: "0.4rem 0.75rem"
                     }}
                     onClick={() => handleRecordsClick(course)}
+                    aria-label={`View reserves for ${name}`}
                   >
-                    See Reserves
+                    <FaBook size={12} className="me-1" aria-hidden="true" /> {/* Icon is decorative */}
+                    <span className="d-none d-sm-inline">View</span>
+                    <FaChevronRight size={10} aria-hidden="true" />  {/* Icon is decorative */}
                   </Button>
                 </td>
               </tr>

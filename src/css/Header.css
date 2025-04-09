@@ -1,35 +1,131 @@
-/* Header.css */
-  header .navbar {
-    padding: 0.1rem 1rem;
-  }
-  
-  header .navbar-brand img {
-    height: 40px;
-  }
-  
-  header .navbar-text {
-    width: 100%;
-  }
-  
-  header .navbar-collapse {
-    flex-grow: 1;
-  }
-  
-  @media (max-width: 768px) {
-    header .navbar-text {
-      margin-top: 10px;
-    }
-  }
+/* Header.css - Updated for better integration with new Searchbar */
+header .navbar {
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1030;
+}
 
+header .navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+header .navbar-brand img {
+  height: 40px;
+  transition: all 0.2s ease;
+}
+
+header .navbar-text {
+  width: 100%;
+}
+
+header .navbar-collapse {
+  flex-grow: 1;
+}
+
+.secondary-text {
+  font-weight: 500;
+  margin-left: 1rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+/* Navigation styling */
+header .nav-link {
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+header .nav-link:hover {
+  transform: translateY(-1px);
+}
+
+header .nav-link.active {
+  font-weight: 700;
+}
+
+/* Login/logout button styling */
+header .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+header .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.college-logo {
+  height: 50px; 
+  width: auto;
+  transition: all 0.2s ease;
+}
+
+/* Make the content area start below the header */
+.container-fluid.mt-4 {
+  margin-top: 5rem !important; /* Adjust this value based on your header height */
+}
+
+/* College theme classes */
+.smith-theme .navbar {
+  background-color: var(--smith-primary, #ffffff);
+}
+
+.mtholyoke-theme .navbar {
+  background-color: var(--mtholyoke-primary, #01295c);
+}
+
+.hampshire-theme .navbar {
+  background-color: var(--hampshire-primary, #e2e31b);
+}
+
+.amherst-theme .navbar {
+  background-color: var(--amherst-primary, #3c1053);
+}
+
+.umass-theme .navbar {
+  background-color: var(--umass-primary, #971b2f);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  header .navbar-text {
+    margin-top: 10px;
+  }
+  
+  header .navbar {
+    padding: 0.5rem 1rem;
+  }
+  
+  header .navbar-brand {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .secondary-text {
+    margin-left: 0;
+    font-size: 0.9rem;
+  }
+  
   .college-logo {
-    height: 50px; 
+    height: 30px;
     width: auto;
   }
-
-  @media (max-width: 768px) {
-    .college-logo {
-      height: 20px;
-      width: 100%;
-    }
-  }
-  
+}

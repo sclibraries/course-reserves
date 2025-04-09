@@ -3,7 +3,7 @@ import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 import { AdminEditForm } from '../forms/AdminEditForm';
 
 export const AdminEditResourceModal = ({ isOpen, toggle, onSubmit, resource }) => (
-  <Modal size="xl" fullscreen="xl" isOpen={isOpen} toggle={toggle}>
+  <Modal size="lg" isOpen={isOpen} toggle={toggle}>
     <ModalHeader toggle={toggle}>Create New Resource from EDS</ModalHeader>
     <ModalBody>
       <AdminEditForm onSubmit={onSubmit} resource={resource} />

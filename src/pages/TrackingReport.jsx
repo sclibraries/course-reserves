@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { useEffect, useState, useCallback } from 'react';
 import { Alert, Spinner } from 'reactstrap';
 import { config } from '../config';
@@ -10,9 +11,10 @@ import ActionsTab from '../components/reports/ActionsTab';
 import RawDataTab from '../components/reports/RawDataTab';
 
 /**
- * TrackingReport component - Main analytics dashboard for course reserves usage tracking
+ * TrackingReport component - Analytics dashboard for course reserves usage tracking
+ * Can be used as standalone page or embedded in Admin dashboard
  */
-const TrackingReport = () => {
+const TrackingReport = ({ isEmbedded = false }) => {
   // Base state
   const [loading, setLoading] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -250,8 +252,14 @@ const TrackingReport = () => {
   }, [sortConfig.key, sortConfig.direction]);
 
   return (
-    <div className="p-4">
-      <h1 className="mb-4">Tracking Analytics Dashboard</h1>
+    <div className={isEmbedded ? "" : "p-4"}>
+      {!isEmbedded && <h1 className="mb-4">Tracking Analytics Dashboard</h1>}
+      
+      {isEmbedded && (
+        <div className="d-flex justify-content-between align-items-center mb-4 fade-in">
+          <h1 className="h3 mb-0">Tracking Analytics</h1>
+        </div>
+      )}
       
       <FilterPanel 
         collegeFilter={collegeFilter}
@@ -267,11 +275,12 @@ const TrackingReport = () => {
         analyticsData={analyticsData}
         totalCount={analyticsData.totalCount || serverPagination.totalItems || 0}
         clearFilters={clearFilters}
+        className={isEmbedded ? "mb-3" : "mb-4"}
       />
 
       {/* Navigation Tabs */}
-      <div className="mb-4">
-        <ul className="nav nav-tabs">
+      <div className={isEmbedded ? "mb-3" : "mb-4"}>
+        <ul className="nav nav-tabs modern-tabs">
           {['overview', 'courses', 'actions', 'rawdata'].map(tab => (
             <li className="nav-item" key={tab}>
               <button 
@@ -287,7 +296,7 @@ const TrackingReport = () => {
 
       {/* Loading State */}
       {(loading || analyticsLoading) && activeTab !== 'rawdata' && (
-        <div className="text-center my-5">
+        <div className="text-center my-5 fade-in">
           <Spinner color="primary" />
           <p className="mt-2">Loading analytics data...</p>
         </div>
@@ -295,7 +304,7 @@ const TrackingReport = () => {
       
       {/* Error State */}
       {(error || analyticsError) && activeTab !== 'rawdata' && (
-        <Alert color="danger">
+        <Alert color="danger" className="fade-in">
           <h4 className="alert-heading">Error Loading Data</h4>
           <p>{error || analyticsError}</p>
           <div className="mt-3">
@@ -346,3 +355,10 @@ const TrackingReport = () => {
 };
 
 export default TrackingReport;
+
+TrackingReport.propTypes = {
+  isEmbedded: PropTypes.bool
+};
+TrackingReport.defaultProps = {
+  isEmbedded: false
+};

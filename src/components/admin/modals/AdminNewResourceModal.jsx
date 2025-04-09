@@ -3,7 +3,7 @@ import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 import { AdminResourceForm } from '../forms/AdminResourceForm';
 
 export const AdminNewResourceModal = ({ isOpen, toggle, onSubmit, course }) => (
-  <Modal size="xl" fullscreen="xl" isOpen={isOpen} toggle={toggle}>
+  <Modal size="lg" isOpen={isOpen} toggle={toggle}>
     <ModalHeader toggle={toggle}>Create New Resource</ModalHeader>
     <ModalBody>
       <AdminResourceForm 
@@ -18,5 +18,6 @@ AdminNewResourceModal.propTypes = {
     isOpen: PropTypes.bool.isRequired,
     toggle: PropTypes.func.isRequired,
     onSubmit: PropTypes.func.isRequired,
+    course: PropTypes.object.isRequired
     };
 export default AdminNewResourceModal;

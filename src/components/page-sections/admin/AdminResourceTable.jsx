@@ -48,6 +48,13 @@ const resourceShape = PropTypes.shape({
   description: PropTypes.string,
   material_type_name: PropTypes.string,
   course_resource_id: PropTypes.string,
+  links: PropTypes.arrayOf(PropTypes.shape({
+    link_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    url: PropTypes.string.isRequired,
+    title: PropTypes.string,
+    description: PropTypes.string,
+    use_proxy: PropTypes.bool
+  }))
 });
 
 /**
@@ -92,48 +99,125 @@ function adjustProxy(data) {
  * @param {Function} props.handleSelectedResource - Handler for selecting a resource to edit
  * @returns {JSX.Element} Rendered table row
  */
-const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResource }) => (
-  <tr className="resource-row">
-    <td className="text-break">{resource.name}</td>
-    <td className="text-break">
-      {resource.item_url ? (
-        <a 
-          href={resource.item_url} 
-          target="_blank" 
-          rel="noreferrer noopener"
-          className="resource-link"
-          aria-label={`Open ${resource.name} link in new tab`}
-        >
-          {resource.item_url}
-        </a>
-      ) : (
-        <span className="text-muted">N/A</span>
+const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResource }) => {
+  const [showAdditionalLinks, setShowAdditionalLinks] = useState(false);
+  
+  // Check if we have additional links
+  const hasAdditionalLinks = resource.links && resource.links.length > 0;
+  console.log(resource)
+  return (
+    <>
+      <tr className="resource-row">
+        <td className="text-break">{resource.name}</td>
+        <td className="text-break">
+          {resource.item_url ? (
+            <div>
+              <a 
+                href={resource.item_url} 
+                target="_blank" 
+                rel="noreferrer noopener"
+                className="resource-link"
+                aria-label={`Open ${resource.name} link in new tab`}
+              >
+                {resource.item_url}
+              </a>
+              
+              {/* Show toggle button for additional links if they exist */}
+              {hasAdditionalLinks && (
+                <Button
+                  color="link"
+                  size="sm"
+                  className="ms-2 p-0"
+                  onClick={() => setShowAdditionalLinks(!showAdditionalLinks)}
+                >
+                  <span className="badge bg-primary">
+                    {resource.links.length} additional {resource.links.length === 1 ? 'link' : 'links'}
+                  </span>
+                </Button>
+              )}
+            </div>
+          ) : (
+            <span className="text-muted">
+              {hasAdditionalLinks ? (
+                <Button
+                  color="link"
+                  size="sm" 
+                  className="p-0"
+                  onClick={() => setShowAdditionalLinks(!showAdditionalLinks)}
+                >
+                  <span className="badge bg-primary">
+                    {resource.links.length} {resource.links.length === 1 ? 'link' : 'links'} available
+                  </span>
+                </Button>
+              ) : (
+                'N/A'
+              )}
+            </span>
+          )}
+        </td>
+        <td className="text-break">{resource.description || '—'}</td>
+        <td>{resource.material_type_name || '—'}</td>
+        <td>
+          <div className="d-flex gap-2">
+            <Button
+              color="danger"
+              size="sm"
+              onClick={() => onUnlink(resource.course_resource_id)}
+              aria-label={`Unlink ${resource.name}`}
+            >
+              Unlink
+            </Button>
+            <Button 
+              color="primary" 
+              size="sm"
+              onClick={() => handleSelectedResource(resource)}
+              aria-label={`Edit ${resource.name}`}
+            >
+              Edit  
+            </Button>
+          </div>
+        </td>
+      </tr>
+      
+      {/* Additional Links Row - Shown when expanded */}
+      {showAdditionalLinks && (
+        <tr className="additional-links-row bg-light">
+          <td colSpan={5}>
+            <div className="p-3">
+              <h6>Additional Links</h6>
+              <ul className="list-group">
+                {resource.links.map((link, index) => (
+                  <li key={link.link_id || index} className="list-group-item">
+                    <div className="d-flex justify-content-between align-items-top">
+                      <div>
+                        {link.title && <strong className="d-block">{link.title}</strong>}
+                        <a 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noreferrer noopener"
+                          className="resource-link d-block text-truncate"
+                          style={{ maxWidth: '500px' }}
+                        >
+                          {link.url}
+                        </a>
+                        {link.description && <div className="text-muted small mt-1">{link.description}</div>}
+                      </div>
+                      <div>
+                        {link.use_proxy && (
+                          <span className="badge bg-secondary ms-2">Proxy Enabled</span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </td>
+        </tr>
       )}
-    </td>
-    <td className="text-break">{resource.description || '—'}</td>
-    <td>{resource.material_type_name || '—'}</td>
-    <td>
-      <div className="d-flex gap-2">
-        <Button
-          color="danger"
-          size="sm"
-          onClick={() => onUnlink(resource.course_resource_id)}
-          aria-label={`Unlink ${resource.name}`}
-        >
-          Unlink
-        </Button>
-        <Button 
-          color="primary" 
-          size="sm"
-          onClick={() => handleSelectedResource(resource)}
-          aria-label={`Edit ${resource.name}`}
-        >
-          Edit  
-        </Button>
-      </div>
-    </td>
-  </tr>
-));
+    </>
+  );
+});
 
 ResourceTableRow.propTypes = {
   resource: resourceShape.isRequired,

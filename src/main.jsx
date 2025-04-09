@@ -15,7 +15,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import App from './App.jsx'
-import './css/index.css'
+// import './index.css';
 
 /**
  * Creates a React root in the DOM and renders the application

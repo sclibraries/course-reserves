@@ -13,7 +13,7 @@ export const AdminReuseResourceModal = ({
   onReuse,
   isLoading 
 }) => (
-  <Modal size="xl" isOpen={isOpen} toggle={toggle} onClosed={() => {
+  <Modal fullscreen isOpen={isOpen} toggle={toggle} onClosed={() => {
     onSearchTermChange('');
   }}>
     <ModalHeader toggle={toggle}>Reuse Existing Resource</ModalHeader>

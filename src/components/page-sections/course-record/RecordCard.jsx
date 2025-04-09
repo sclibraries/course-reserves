@@ -10,12 +10,31 @@ import {
   AccordionHeader,
   AccordionItem,
   Badge,
-  Table
+  Table,
+  Button
 } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faBook } from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
 
+/**
+ * RecordCard component
+ * 
+ * @component
+ * @description Renders a detailed card for a course record item, showing resource metadata,
+ * availability information, and access options based on whether it's electronic or print.
+ * 
+ * @param {Object} props - Component properties
+ * @param {Object} props.recordItem - Record data to display
+ * @param {Object} props.availability - Availability information keyed by instance ID
+ * @param {Object} props.openAccordions - State of open/closed accordions
+ * @param {Function} props.toggleAccordion - Function to toggle accordion open state
+ * @param {Object} props.customization - UI customization settings
+ * @param {boolean} props.isGrouped - Whether the record is part of a grouped display
+ * @param {Object} props.courseInfo - Information about the associated course
+ * @param {string} props.collegeParam - College parameter for tracking
+ * @returns {JSX.Element|null} The record card or null if visibility conditions aren't met
+ */
 const RecordCard = ({
   recordItem,
   availability,
@@ -26,31 +45,27 @@ const RecordCard = ({
   courseInfo,
   collegeParam,
 }) => {
+  // Destructure customization settings with fallback values for safety
   const {
-    recordsCardTitleTextColor,
-    recordsCardTextColor,
-    recordsDiscoverLinkText,
-    recordsDiscoverLinkBgColor,
-    recordsDiscoverLinkBaseUrl,
-    accordionHeaderBgColor,
-    accordionHeaderTextColor,
-  } = customization;
+    recordsCardTitleTextColor = '#000000',
+    recordsCardTextColor = '#212529',
+    recordsDiscoverLinkText = 'View in Catalog',
+    recordsDiscoverLinkBgColor = '#0d6efd',
+    recordsDiscoverLinkBaseUrl = '',
+    accordionHeaderBgColor = '#f8f9fa',
+    accordionHeaderTextColor = '#212529',
+  } = customization || {};
 
-  const { name: courseName, courseNumber, courseListingObject } = courseInfo || {};
-  const termName = courseListingObject?.termObject?.name ?? 'N/A';
-  const instructors = courseListingObject?.instructorObjects?.map((i) => i.name) || [];
-  const { copiedItem, isElectronic, resource } = recordItem;
-  const { instanceId, title, contributors, publication } = copiedItem;
-
-  // Memoized style objects
   const textStyle = useMemo(
     () => ({ color: recordsCardTextColor }),
     [recordsCardTextColor]
   );
+  
   const titleStyle = useMemo(
     () => ({ color: recordsCardTitleTextColor }),
     [recordsCardTitleTextColor]
   );
+  
   const accordionHeaderStyle = useMemo(
     () => ({
       backgroundColor: accordionHeaderBgColor,
@@ -59,24 +74,17 @@ const RecordCard = ({
     [accordionHeaderBgColor, accordionHeaderTextColor]
   );
 
-    // Only perform the visibility check if the resource is electronic.
-    if (isElectronic && resource) {
-      const now = new Date();
-      const startVisibility = resource.start_visibility
-        ? new Date(resource.start_visibility)
-        : null;
-      const endVisibility = resource.end_visibility
-        ? new Date(resource.end_visibility)
-        : null;
-  
-      // If current time is before the start or after the end of the visibility window, don't render.
-      if ((startVisibility && now < startVisibility) || (endVisibility && now > endVisibility)) {
-        return null;
-      }
-    }
 
-  // Helper to format publication info
+  /**
+   * Format publication info into readable string
+   * 
+   * @function
+   * @param {Array} pubEntry - Publication information array
+   * @returns {string} Formatted publication text
+   */
   const formatPublication = useCallback((pubEntry) => {
+    if (!pubEntry || !Array.isArray(pubEntry)) return 'N/A';
+    
     return pubEntry
       .map((pub) => {
         const parts = [];
@@ -88,15 +96,78 @@ const RecordCard = ({
       .join(' / ');
   }, []);
 
-  // Derive discover URL for print items
+  /**
+   * Build the discover URL for print items
+   * 
+   * @function
+   * @param {string} id - Instance ID
+   * @returns {string|null} Discover URL or null if unable to build
+   */
   const getDiscoverUrl = useCallback(
     (id) => {
-      if (!id) return null;
+      if (!id || !recordsDiscoverLinkBaseUrl) return null;
       const edsLink = id.replace(/-/g, '.');
       return `${recordsDiscoverLinkBaseUrl}${edsLink}`;
     },
     [recordsDiscoverLinkBaseUrl]
   );
+
+  // Extract course info with fallbacks for missing data
+  const { 
+    name: courseName = 'N/A', 
+    courseNumber = 'N/A', 
+    courseListingObject = {},
+    courseListingId = 'N/A'
+  } = courseInfo || {};
+  
+  const termName = courseListingObject?.termObject?.name ?? 'N/A';
+  const instructors = courseListingObject?.instructorObjects?.map((i) => i.name) || [];
+  
+  // Extract record data with null checks
+  if (!recordItem || !recordItem.copiedItem) {
+    console.error('Invalid record item data:', recordItem);
+    return null;
+  }
+  
+  const { copiedItem, isElectronic, resource } = recordItem;
+  const { instanceId, title, contributors, publication } = copiedItem;
+
+  // Determine resource type styling
+  const resourceTypeStyles = isElectronic ? {
+    borderLeft: '4px solid #1976D2', // Blue for electronic resources
+    borderLeftColor: '#1976D2'
+  } : {
+    borderLeft: '4px solid #388E3C', // Green for print resources
+    borderLeftColor: '#388E3C'
+  };
+
+
+  /**
+   * Check visibility window for electronic resources
+   * @returns {boolean} Whether the resource should be visible
+   */
+  const isVisibleResource = () => {
+    if (isElectronic && resource) {
+      const now = new Date();
+      const startVisibility = resource.start_visibility
+        ? new Date(resource.start_visibility)
+        : null;
+      const endVisibility = resource.end_visibility
+        ? new Date(resource.end_visibility)
+        : null;
+
+      // If current time is before the start or after the end of the visibility window, don't render
+      if ((startVisibility && now < startVisibility) || (endVisibility && now > endVisibility)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Don't render if resource should be hidden based on visibility window
+  if (!isVisibleResource()) {
+    return null;
+  }
 
   const discoverUrl = !isElectronic ? getDiscoverUrl(instanceId) : null;
 
@@ -104,37 +175,50 @@ const RecordCard = ({
   const availabilityData = availability[instanceId] || {};
   const holdings = availabilityData.holdings || [];
 
-  
-
-  // ——————————————————————————————————————————
-  // Tracking link clicks before opening them
-  // ——————————————————————————————————————————
-
-  // Generic helper to track a link click, then open in a new tab
+  /**
+   * Track a link click event and open the URL in a new tab
+   * 
+   * @async
+   * @function
+   * @param {Event} e - Click event object
+   * @param {string} eventType - Type of event for tracking
+   * @param {string} url - URL to open
+   * @param {Object} extraMetadata - Additional metadata for tracking
+   */
   const handleExternalLinkClick = (e, eventType, url, extraMetadata = {}) => {
+    if (!url) {
+      console.warn('Attempted to open external link with empty URL');
+      return;
+    }
+    
     e.preventDefault();
-    trackingService.trackEvent({
-      // Use collegeParam or fallback
-      college: collegeParam || 'Unknown',
-
-      event_type: eventType,
-      course_id: courseInfo?.courseListingId ?? 'N/A',
-      term: termName,
-      course_name: courseName,
-      course_code: courseNumber,
-      instructor: instructors.map((inst) => ({ name: inst })),
-
-      metadata: {
-        record_title: recordItem.copiedItem?.title || 'N/A',
-        instanceId: recordItem.copiedItem?.instanceId || 'N/A',
-        target_url: url,
-        ...extraMetadata,
-      },
-    }).finally(() => {
+    
+    try {
+      trackingService.trackEvent({
+        college: collegeParam || 'Unknown',
+        event_type: eventType,
+        course_id: courseListingId,
+        term: termName,
+        course_name: courseName,
+        course_code: courseNumber,
+        instructor: instructors.map((inst) => ({ name: inst })),
+        metadata: {
+          record_title: recordItem.copiedItem?.title || 'N/A',
+          instanceId: recordItem.copiedItem?.instanceId || 'N/A',
+          target_url: url,
+          ...extraMetadata,
+        },
+      }).finally(() => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      });
+    } catch (error) {
+      console.error('Error tracking event:', error);
+      // Still open the URL if tracking fails
       window.open(url, '_blank', 'noopener,noreferrer');
-    });
+    }
   };
-  // Render the “Holdings” section (for print items)
+  
+  // Render the "Holdings" section (for print items)
   const renderHoldingsSection = () => {
     if (isElectronic || !instanceId) return null;
 
@@ -143,7 +227,7 @@ const RecordCard = ({
 
     return (
       <div className="mt-3">
-        <p className="mb-2">Availability Details</p>
+        <h3 className="h6 mb-2">Availability Details</h3>
         <Accordion
           flush
           open={openAccordions[instanceId]}
@@ -172,6 +256,7 @@ const RecordCard = ({
               <AccordionHeader
                 targetId={`holdings-${instanceId}`}
                 style={accordionHeaderStyle}
+                aria-expanded={openAccordions[instanceId] === `holdings-${instanceId}`}
               >
                 Other Holdings ({otherHoldings.length})
               </AccordionHeader>
@@ -215,7 +300,7 @@ const RecordCard = ({
     return (
       <div className="table-responsive">
         <Table striped className="table mb-0">
-          <caption className="sr-only">List of holdings and availability details</caption>
+          <caption className="visually-hidden">List of holdings and availability details</caption>
           <thead>
             <tr>
               {showLocation && <th scope="col">Location</th>}
@@ -244,11 +329,6 @@ const RecordCard = ({
                           color: '#ffffff',
                           padding: '4px 8px',
                         }}
-                        aria-label={
-                          holding.status === 'Available'
-                            ? 'Available copy'
-                            : 'Checked out copy'
-                        }
                       >
                         {holding.status}
                       </Badge>
@@ -261,13 +341,13 @@ const RecordCard = ({
                   {showAccess && (
                     <td>
                       {resourceUrl && (
-                        <button
-                          className="btn btn-sm btn-success"
+                        <Button
+                          size="sm"
+                          color="success"
                           style={{
                             backgroundColor: recordsDiscoverLinkBgColor,
                             color: '#fff',
                           }}
-                          aria-label="View this record in another library platform (opens in a new tab)"
                           onClick={(e) =>
                             handleExternalLinkClick(e, 'resource_click', resourceUrl, {
                               location: holding.location,
@@ -276,9 +356,10 @@ const RecordCard = ({
                               isReserve: holding.location?.includes('Reserve') || false,
                             })
                           }
+                          aria-label={`Access resource for ${title} (opens in a new tab)`}
                         >
-                          Link to resource <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        </button>
+                          Access <FontAwesomeIcon icon={faExternalLinkAlt} aria-hidden="true" />
+                        </Button>
                       )}
                     </td>
                   )}
@@ -294,7 +375,8 @@ const RecordCard = ({
   // For electronic items, render relevant info
   const renderElectronicResource = () => {
     if (!isElectronic || !resource) return null;
-    // We track the "Access Resource" link click
+    
+    // Track the "Access Resource" link click
     const handleElectronicClick = (e) => {
       if (!resource.item_url) return;
       handleExternalLinkClick(e, 'resource_click', resource.item_url, {
@@ -303,30 +385,82 @@ const RecordCard = ({
       });
     };
 
+    // Handle additional link click with tracking
+    const handleAdditionalLinkClick = (e, link) => {
+      handleExternalLinkClick(e, 'resource_link_click', link.url, {
+        resourceId: resource.resource_id || 'N/A',
+        linkId: link.link_id || 'N/A',
+        linkTitle: link.title || 'Unknown Link',
+      });
+    };
+
+    // Check if resource has additional links
+    const hasAdditionalLinks = resource.links && resource.links.length > 0;
+
     return (
       <div className="mt-3">
-        <div className="d-flex align-items-center gap-2 mb-2">
-          <Badge color="info" style={{ color: 'black' }}>
-            Electronic Resource
-          </Badge>
-          {resource.item_url && (
-            <button
-              onClick={handleElectronicClick}
-              className="btn btn-sm btn-success"
-            >
-              Access Resource <FontAwesomeIcon icon={faExternalLinkAlt} />
-            </button>
-          )}
-        </div>
+        {resource.item_url && (
+          <Button
+            color="primary"
+            onClick={handleElectronicClick}
+            className="mb-3 d-inline-flex align-items-center"
+            style={{
+              backgroundColor: recordsDiscoverLinkBgColor,
+              borderColor: recordsDiscoverLinkBgColor,
+            }}
+            aria-label={`Access electronic resource for ${title} (opens in a new tab)`}
+          >
+            <FontAwesomeIcon icon={faBook} className="me-2" aria-hidden="true" /> 
+            Access Resource
+            <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
+          </Button>
+        )}
 
         {resource.external_note && (
-          <div className="alert alert-info small mb-2">{resource.external_note}</div>
+          <div className="alert alert-info small mb-2" role="alert">
+            {resource.external_note}
+          </div>
         )}
 
         {resource.description && (
           <CardText style={textStyle}>
             <strong>Description:</strong> {resource.description}
           </CardText>
+        )}
+
+        {/* Display additional links if available */}
+        {hasAdditionalLinks && (
+          <div className="additional-links mt-3">
+            <h3 className="h6 fw-bold mb-2">Additional Resources</h3>
+            <div className="list-group">
+              {resource.links.map((link, index) => (
+                <div key={link.link_id || index} className="list-group-item list-group-item-action">
+                  <div className="d-flex w-100 justify-content-between">
+                    <h4 className="h6 mb-1">{link.title || 'Additional Resource'}</h4>
+                    {link.use_proxy === "1" && (
+                      <Badge color="secondary">Proxy Enabled</Badge>
+                    )}
+                  </div>
+                  <a 
+                    href={link.url}
+                    onClick={(e) => handleAdditionalLinkClick(e, link)}
+                    className="text-primary d-block mb-1"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label={`Access ${link.title || 'additional resource'} (opens in new tab)`}
+                  >
+                    <span className="text-truncate d-inline-block" style={{ maxWidth: "100%" }}>
+                      {link.url}
+                    </span>
+                    <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
+                  </a>
+                  {link.description && (
+                    <p className="mb-1 small text-muted">{link.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {resource.metadata?.map((meta, index) => (
@@ -342,7 +476,7 @@ const RecordCard = ({
   const renderPrintDetails = () => {
     if (isElectronic) return null;
 
-    // Track the “Discover” link click
+    // Track the "Discover" link click
     const handleDiscoverClick = (e) => {
       if (!discoverUrl) return;
       handleExternalLinkClick(e, 'record_discover_link', discoverUrl, {
@@ -365,50 +499,46 @@ const RecordCard = ({
         )}
 
         {discoverUrl && (
-          <button
+          <Button
+            color="primary"
             onClick={handleDiscoverClick}
-            className="btn mb-3"
+            className="mb-3 d-inline-flex align-items-center"
             style={{
               backgroundColor: recordsDiscoverLinkBgColor,
-              color: '#fff',
+              borderColor: recordsDiscoverLinkBgColor,
             }}
-            aria-label="View this record in the discovery system (opens in a new tab)"
+            aria-label={`View ${title} in library catalog (opens in a new tab)`}
           >
-            {recordsDiscoverLinkText} <FontAwesomeIcon icon={faExternalLinkAlt} />
-          </button>
+            {recordsDiscoverLinkText} <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
+          </Button>
         )}
       </>
     );
   };
 
+  // Main render
   return (
     <Card
-      className={`shadow p-3 mb-5 bg-body-tertiary ${
+      className={`shadow-sm mb-4 bg-body-tertiary ${
         isGrouped ? 'ms-4 border-start border-3 border-secondary-color-rgb' : ''
       }`}
       style={{
-        backgroundColor: isGrouped ? '#f8f9fa' : 'inherit',
-        borderLeft: isGrouped ? '3px solid #0d6efd' : 'inherit',
+        ...resourceTypeStyles,
+        transition: 'all 0.2s ease-in-out'
       }}
     >
       <CardBody>
-        {isGrouped && (
-          <div className="position-absolute top-0 start-0 translate-middle">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              fill="#CCCDCE"
-              className="bi bi-folder"
-              viewBox="0 0 16 16"
-              role="img"
-              aria-label="Grouped records icon"
-            >
-              <path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a2 2 0 0 1 .342-1.31zm6.339-1.577A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139C1.72 3.042 1.95 3 2.19 3h5.396l-.707-.707z" />
-            </svg>
-          </div>
-        )}
-        <CardTitle tag="h2" style={titleStyle} className="h3 mb-3">
+        {/* Resource type badge */}
+        <Badge 
+          color={isElectronic ? "primary" : "success"}
+          className="resource-badge"
+          pill
+        >
+          {isElectronic ? "Electronic Resource" : "Physical Resource"}
+        </Badge>
+
+        {/* Card heading - use appropriate heading level for accessibility */}
+        <CardTitle tag="h2" style={titleStyle} className="h3 mb-3 mt-4">
           {title}
         </CardTitle>
 
@@ -421,6 +551,9 @@ const RecordCard = ({
 };
 
 RecordCard.propTypes = {
+  /**
+   * Record item data containing all necessary information
+   */
   recordItem: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     copiedItem: PropTypes.shape({
@@ -446,7 +579,13 @@ RecordCard.propTypes = {
     isElectronic: PropTypes.bool,
     resource: PropTypes.object,
   }).isRequired,
+  /**
+   * Whether the record is displayed as part of a group
+   */
   isGrouped: PropTypes.bool,
+  /**
+   * Availability information keyed by instance ID
+   */
   availability: PropTypes.objectOf(
     PropTypes.shape({
       holdings: PropTypes.arrayOf(
@@ -463,8 +602,17 @@ RecordCard.propTypes = {
       ),
     })
   ).isRequired,
+  /**
+   * Map of which accordions are open, keyed by ID
+   */
   openAccordions: PropTypes.object.isRequired,
+  /**
+   * Function to toggle accordion open state
+   */
   toggleAccordion: PropTypes.func.isRequired,
+  /**
+   * UI customization settings
+   */
   customization: PropTypes.shape({
     recordsCardTitleTextColor: PropTypes.string,
     recordsCardTextColor: PropTypes.string,
@@ -474,6 +622,9 @@ RecordCard.propTypes = {
     accordionHeaderBgColor: PropTypes.string,
     accordionHeaderTextColor: PropTypes.string,
   }).isRequired,
+  /**
+   * Course information for tracking and display
+   */
   courseInfo: PropTypes.shape({
     name: PropTypes.string,
     courseNumber: PropTypes.string,
@@ -489,8 +640,17 @@ RecordCard.propTypes = {
       ),
     }),
   }),
+  /**
+   * College parameter for tracking
+   */
   collegeParam: PropTypes.string,
+};
 
+// Default props
+RecordCard.defaultProps = {
+  isGrouped: false,
+  courseInfo: {},
+  collegeParam: 'Unknown'
 };
 
 export default RecordCard;

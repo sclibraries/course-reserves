@@ -5,7 +5,8 @@ import useCustomizationStore from '../store/customizationStore';
 
 export const useCurrentCollege = () => {
   const location = useLocation();
-  const setCollege = useCustomizationStore((state) => state.setCollege);
+  const setCollege = useCustomizationStore(state => state.setCollege);
+  const currentCollege = useCustomizationStore(state => state.currentCollege);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -13,5 +14,5 @@ export const useCurrentCollege = () => {
     setCollege(college);
   }, [location.search, setCollege]);
 
-  return useCustomizationStore((state) => state.currentCollege);
+  return currentCollege;
 };
