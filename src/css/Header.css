@@ -53,6 +53,85 @@ header .nav-link.active {
   font-weight: 700;
 }
 
+/* Navigation links */
+.nav-link {
+  color: #4b5563;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.nav-link:hover {
+  color: #4f46e5;
+}
+
+.nav-link.active {
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+/* User menu styling */
+.user-menu-toggle {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+  color: #4b5563 !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.user-menu-toggle:hover, 
+.user-menu-toggle:focus {
+  background-color: #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.user-menu-toggle::after {
+  display: none; /* Remove default caret */
+}
+
+.user-menu-toggle .user-name {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu {
+  min-width: 200px;
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  color: #4b5563;
+}
+
+.dropdown-item:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-item.active {
+  background-color: #f3f4f6;
+  color: #4f46e5;
+}
+
+.dropdown-header {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Login/logout button styling */
 header .btn {
   display: inline-flex;
@@ -127,5 +206,23 @@ header .btn:hover {
   .college-logo {
     height: 30px;
     width: auto;
+  }
+
+  .user-menu-toggle .user-name {
+    max-width: 80px;
+  }
+  
+  .nav-link {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-menu-toggle .user-name {
+    display: none;
+  }
+  
+  .nav-link {
+    padding: 0.5rem;
   }
 }

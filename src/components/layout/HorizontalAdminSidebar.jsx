@@ -1,9 +1,3 @@
-/**
- * @file HorizontalAdminSidebar component
- * @module HorizontalAdminSidebar
- * @description Provides a horizontal search and filter bar for admin pages with all options visible
- */
-
 import { useState, useEffect } from 'react';
 import {
   Form,
@@ -17,6 +11,7 @@ import { FaSearch, FaRedo } from 'react-icons/fa';
 import useAdminSearchStore from '../../store/adminSearchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import useSearchStore from '../../store/searchStore';
+import { useAuth } from '../../contexts/AuthContext';
 import '../../css/Admin.css';
 
 function HorizontalAdminSidebar() {
@@ -45,6 +40,9 @@ function HorizontalAdminSidebar() {
   } = useCustomizationStore((state) =>
     state.getCustomizationForCollege(college)
   );
+  
+  // Get user info and permissions from auth context
+  const { user, isAdmin } = useAuth();
 
   // Local states for dropdowns
   const [searchArea, setSearchArea] = useState('All fields');
@@ -52,6 +50,7 @@ function HorizontalAdminSidebar() {
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
   const [selectedSort, setSelectedSort] = useState('name');
+  const [availableColleges, setAvailableColleges] = useState(['All Colleges']);
 
   const searchAreas = [
     'All fields',
@@ -61,7 +60,7 @@ function HorizontalAdminSidebar() {
     'Instructor',
   ];
   
-  const colleges = [
+  const allColleges = [
     'All Colleges',
     'Smith',
     'Hampshire',
@@ -80,6 +79,55 @@ function HorizontalAdminSidebar() {
     { label: 'Term (Recent First)', value: 'term.desc' },
     { label: 'Term (Oldest First)', value: 'term' },
   ];
+
+  // Map full institution names to college keys
+  const institutionToCollegeKey = {
+    'Smith College': 'smith',
+    'Hampshire College': 'hampshire',
+    'Mount Holyoke College': 'mtholyoke',
+    'Amherst College': 'amherst',
+    'UMass Amherst': 'umass'
+  };
+
+  // Map institution names to UI college names
+  const institutionToCollegeName = {
+    'Smith College': 'Smith',
+    'Hampshire College': 'Hampshire',
+    'Mount Holyoke College': 'MtHolyoke',
+    'Amherst College': 'Amherst',
+    'UMass Amherst': 'UMass'
+  };
+
+  // Set available colleges based on user permissions
+  useEffect(() => {
+    if (!user) return;
+    
+    // Admin users can see all colleges
+    if (isAdmin) {
+      setAvailableColleges(allColleges);
+      return;
+    }
+    
+    // Regular users can only see their own institution
+    if (user.institution) {
+      const userCollegeKey = institutionToCollegeKey[user.institution];
+      const userCollegeName = institutionToCollegeName[user.institution];
+      
+      if (userCollegeKey && userCollegeName) {
+        // If user's institution maps to a valid college, use that
+        setAvailableColleges(['All Colleges', userCollegeName]);
+        
+        // If no college is selected yet, set it to user's college
+        if (college === 'all' || !college) {
+          setCollege(userCollegeKey);
+          setSelectedCollege(userCollegeName);
+        }
+      } else {
+        // Fallback if we can't map the institution
+        setAvailableColleges(['All Colleges']);
+      }
+    }
+  }, [user, isAdmin]);
 
   useEffect(() => {
     // Sync local state with store
@@ -127,7 +175,24 @@ function HorizontalAdminSidebar() {
     setSelectedSort('name');
     setType('all');
     setQuery('');
-    setCollege('smith');
+    
+    // Reset college to user's college if they're not an admin
+    if (!isAdmin && user?.institution) {
+      const userCollegeKey = institutionToCollegeKey[user.institution];
+      const userCollegeName = institutionToCollegeName[user.institution];
+      
+      if (userCollegeKey && userCollegeName) {
+        setCollege(userCollegeKey);
+        setSelectedCollege(userCollegeName);
+      } else {
+        setCollege('all');
+        setSelectedCollege('All Colleges');
+      }
+    } else {
+      setCollege('all');
+      setSelectedCollege('All Colleges');
+    }
+    
     setDepartment('');
     setSort('name');
     setTermId(null);
@@ -218,7 +283,7 @@ function HorizontalAdminSidebar() {
               </InputGroup>
             </FormGroup>
 
-            {/* College Filter */}
+            {/* College Filter - Only show options user has access to */}
             <FormGroup className="filter-item">
               <Label for="collegeSelect" className="filter-label">College</Label>
               <Input
@@ -230,8 +295,9 @@ function HorizontalAdminSidebar() {
                   setCollege(collegeNameToKey(e.target.value));
                 }}
                 className="filter-select"
+                disabled={availableColleges.length <= 2 && !isAdmin} // Disable if user only has access to one college
               >
-                {colleges.map((col) => (
+                {availableColleges.map((col) => (
                   <option key={col} value={col}>{col}</option>
                 ))}
               </Input>

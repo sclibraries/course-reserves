@@ -73,7 +73,7 @@ html, body {
 
 @media (max-width: 576px) {
   .main-content {
-    padding-top: 12em;
+    padding-top: 1em;
   }
   
   .main-content-no-search {

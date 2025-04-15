@@ -24,7 +24,7 @@ function Home() {
       try {
         setLoading(true);
         const url = `${config.api.urls.courseReserves}${config.api.endpoints.admin.reports}/top-courses?limit=10` +
-          (college ? `&college=${encodeURIComponent(college)}` : '');
+          (college && college !== 'default' ? `&college=${encodeURIComponent(college)}` : '');
         const response = await fetch(url);
         
         if (!response.ok) {

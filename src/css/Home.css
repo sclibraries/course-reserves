@@ -2,6 +2,8 @@
 
 .home-container {
     margin-top: 60px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
   }
   
   .home-container h1 {
@@ -36,4 +38,52 @@
       font-size: 1.25rem;
     }
   }
-  
+
+/* Home page styling */
+.hero-section {
+  padding: 3rem 0;
+  margin-bottom: 2rem;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,245,255,0.95) 100%);
+  border-radius: 10px;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+}
+
+.stats-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.course-card {
+  border: 1px solid #e7e7e7;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.college-card {
+  border: 1px solid #e7e7e7;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.college-card:hover {
+  border-color: #bbdefb;
+  box-shadow: 0 5px 12px rgba(33, 150, 243, 0.15);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 2rem 1rem;
+  }
+}

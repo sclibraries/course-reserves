@@ -151,24 +151,66 @@
   padding-bottom: 1px;
 }
 
-.modern-tabs .nav-link {
+/* Tab button styling */
+.tab-button {
+  background: none;
   border: none;
   padding: 0.75rem 1rem;
   font-weight: 500;
   color: #6b7280;
   border-bottom: 2px solid transparent;
-  background-color: transparent;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.modern-tabs .nav-link:hover {
+.tab-button:hover {
   color: #4338ca;
 }
 
-.modern-tabs .nav-link.active {
+.tab-button.active {
   color: #4f46e5;
   border-bottom: 2px solid #4f46e5;
-  background-color: transparent;
+}
+
+/* Mobile tabs dropdown */
+.mobile-tabs-dropdown .dropdown-toggle {
+  background-color: white;
+  color: #4f46e5;
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.mobile-tabs-dropdown .dropdown-toggle:focus,
+.mobile-tabs-dropdown .dropdown-toggle:hover {
+  background-color: #f9fafb;
+  color: #4f46e5;
+  box-shadow: none;
+  border-color: #4f46e5;
+}
+
+.mobile-tabs-dropdown .dropdown-menu {
+  border-radius: 8px;
+  margin-top: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+.mobile-tabs-dropdown .dropdown-item {
+  padding: 0.75rem 1rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.mobile-tabs-dropdown .dropdown-item:hover {
+  background-color: #f9fafb;
+  color: #4f46e5;
+}
+
+.mobile-tabs-dropdown .dropdown-item.active {
+  background-color: #f3f4f6;
+  color: #4f46e5;
 }
 
 /* Animation classes */

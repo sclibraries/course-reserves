@@ -1,14 +1,12 @@
-/* Fixed horizontal searchbar styles */
-
-/* Main container - NOT fixed position */
+/* Main container */
 .search-panel-container {
-  position: relative; /* Change from fixed to relative */
+  position: relative;
   background-color: #f8f9fa;
   padding: 0.75rem 1.5rem;
-  z-index: 1010; /* Lower than header */
+  z-index: 1010;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  margin-top: 70px; /* Space for fixed header */
+  margin-top: 70px;
   margin-bottom: 1rem;
 }
 
@@ -19,7 +17,85 @@
   margin: 0 auto;
 }
 
-/* Filter controls layout - compact horizontal */
+/* Mobile search container - improved layout */
+.mobile-search-container {
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.mobile-search-row {
+  display: flex;
+  width: 100%;
+}
+
+.mobile-search-field {
+  flex-grow: 1;
+  margin-bottom: 0;
+}
+
+.mobile-input-group {
+  display: flex;
+  align-items: stretch;
+  height: 38px; /* Set consistent height for the entire input group */
+}
+
+.mobile-search-field .input-group {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.mobile-search-field .filter-input {
+  height: 38px; /* Explicit height for input */
+  display: flex;
+  align-items: center;
+}
+
+.mobile-search-button {
+  border-radius: 0 4px 4px 0;
+  width: 42px;
+  height: 38px !important; /* Force same height */
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-filter-toggle {
+  border-radius: 4px;
+  margin-left: 6px;
+  width: 42px;
+  height: 38px !important; /* Force same height */
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #6b7280;
+}
+
+.mobile-filter-toggle:hover {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+/* Mobile advanced filters */
+.mobile-advanced-filters {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mobile-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.mobile-filter-item {
+  margin-bottom: 0;
+}
+
+/* Desktop filter controls */
 .filter-controls-row {
   display: flex;
   flex-wrap: nowrap;
@@ -27,31 +103,18 @@
   gap: 8px;
 }
 
-/* Filter items - smaller and more compact */
 .filter-item {
   flex: 0.8;
   min-width: 100px;
   margin-bottom: 0;
 }
 
-/* Search field - positioned next to search button, more prominence */
 .search-field {
   flex: 1.5;
   min-width: 150px;
 }
 
-/* Filter item group - horizontal aligned pair */
-.filter-item-group {
-  display: flex;
-  gap: 8px;
-  flex: 1.5;
-}
-
-.filter-item-group .filter-item {
-  flex: 1;
-}
-
-/* Form element styling - more compact */
+/* Form styling */
 .filter-label {
   font-size: 0.7rem;
   font-weight: 500;
@@ -75,7 +138,20 @@
   outline: none;
 }
 
-/* Button styling - compact */
+/* Mobile filter action buttons */
+.mobile-filter-actions {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.reset-button-mobile, .apply-button-mobile {
+  padding: 0.375rem 1rem;
+  height: 38px;
+  min-width: 100px;
+}
+
+/* Desktop button styling */
 .filter-buttons {
   display: flex;
   min-width: auto;
@@ -109,33 +185,33 @@
   font-size: 12px;
 }
 
-/* Additional header text - smaller and more compact */
+/* Additional header text */
 .additional-header-text {
   padding: 0.5rem 0 0;
   font-size: 0.8rem;
   color: #6b7280;
 }
 
-/* Content spacing to account for fixed searchbar */
+/* Content spacing */
 .content-container {
-  margin-top: 140px; /* Header height + searchbar height + some spacing */
+  margin-top: 140px;
   padding-top: 1rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 1200px) {
+/* Responsive adjustments for desktop */
+@media (min-width: 768px) {
   .filter-controls-row {
     flex-wrap: wrap;
     gap: 6px;
   }
 
   .filter-item {
-    flex: 1 1 calc(20% - 8px);  /* 5 items per row minus gap */
+    flex: 1 1 calc(20% - 8px);
     min-width: calc(20% - 8px);
   }
   
   .search-field {
-    flex: 2 0 calc(40% - 8px);  /* Search takes more space */
+    flex: 2 0 calc(40% - 8px);
     min-width: calc(40% - 8px);
   }
 
@@ -145,71 +221,52 @@
   }
 }
 
-@media (max-width: 992px) {
-  .filter-item, .filter-item-group, .search-field {
+/* Tablet breakpoint */
+@media (max-width: 992px) and (min-width: 768px) {
+  .filter-item, .search-field {
     flex: 1 1 calc(33% - 6px);
     min-width: calc(33% - 6px);
   }
 }
 
-@media (max-width: 768px) {
+/* Mobile breakpoint adjustments */
+@media (max-width: 767px) {
   .search-panel-container {
-    margin-top: 70px; /* Keep space for header */
     padding: 0.5rem 1rem;
   }
   
-  .filter-item, .filter-item-group {
-    flex: 1 1 calc(50% - 6px);
-    min-width: calc(50% - 6px);
-  }
-  
-  .search-field {
-    flex: 1 1 calc(100% - 80px); /* Full width minus buttons */
-    order: -1; /* Move to top on mobile */
-  }
-  
-  .filter-buttons {
-    flex: 0 0 74px;
-    margin-left: 6px;
-    align-self: flex-end;
-  }
-  
-  .content-container {
-    margin-top: 1rem; /* Reset when searchbar is not fixed */
+  .mobile-filter-actions .action-button {
+    flex: 1;
+    font-size: 0.8rem;
   }
 }
 
-@media (max-width: 576px) {
-  .filter-item, .filter-item-group, .search-field {
-    flex: 1 1 100%;
-    min-width: 100%;
-    order: 0; /* Reset order */
+/* Small mobile adjustments */
+@media (max-width: 400px) {
+  .mobile-search-container .input-group {
+    flex-wrap: nowrap;
   }
   
-  .filter-buttons {
-    width: 100%;
-    margin-top: 8px;
-    margin-left: 0;
+  .mobile-search-field .filter-input {
+    min-width: 0;
   }
   
-  .button-group {
-    width: 100%;
+  /* Ensure button height matches input height on small screens */
+  .mobile-search-button,
+  .mobile-filter-toggle {
+    height: 38px !important;
   }
-  
-  .action-button {
-    flex: 1;
-  }
-  
-  .reset-button {
-    width: auto;
-    padding: 0.25rem 0.75rem;
-  }
-  
-  .reset-button .button-icon {
-    margin-right: 6px;
-  }
-  
-  .reset-button::after {
-    content: " Reset";
-  }
+}
+
+/* For screen readers */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

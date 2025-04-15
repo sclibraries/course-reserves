@@ -6,19 +6,76 @@ import {
 } from 'reactstrap';
 import { toast } from 'react-toastify';
 import { adminCustomizationService } from '../../../services/admin/adminCustomizationService';
+import { useAuth } from '../../../contexts/AuthContext'; // Import the auth context
+
 
 function AdminCustomizations() {
     const [customizations, setCustomizations] = useState([]);
+    const [filteredCustomizations, setFilteredCustomizations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [activeTab, setActiveTab] = useState(0);
     const [editedCustomization, setEditedCustomization] = useState(null);
     const [sectionLoading, setSectionLoading] = useState({});
+    const { user } = useAuth(); // Get the current user from auth context
 
     useEffect(() => {
         fetchCustomizations();
     }, []);
+
+    // Filter customizations based on user permissions
+    useEffect(() => {
+        if (customizations.length > 0 && user) {
+            // If user is admin, show all customizations
+            if (user.role === 'admin') {
+                setFilteredCustomizations(customizations);
+            } else {
+                // Convert institution domain to campus_location format
+                // This mapping should match your actual data format
+                const institutionToCampusMap = {
+                    'Smith College': 'smith',
+                    'Hampshire College': 'hampshire',
+                    'Amherst College': 'amherst',
+                    'Mount Holyoke College': 'mtholyoke',
+                    'UMass Amherst': 'umass'
+                };
+
+                const userInstitutionMap = {
+                    'Smith College' : 'smith.edu',
+                    'Hampshire College' : 'hampshire.edu',
+                    'Amherst College' : 'amherst.edu',
+                    'Mount Holyoke College' : 'mtholyoke.edu',
+                    'UMass Amherst' : 'umass.edu'
+                }
+
+                const userCampus = institutionToCampusMap[user.institution] || '';
+
+                
+                // Check if user has permission to customize their institution
+                const canCustomize = user.permissions && 
+                    user.permissions.includes(`customize_${userInstitutionMap[user.institution]}`);
+
+                if (canCustomize) {
+                    // Filter to only show the user's institution
+                    const userCustomizations = customizations.filter(
+                        c => c.campus_location.toLowerCase() === userCampus.toLowerCase()
+                    );
+                    setFilteredCustomizations(userCustomizations);
+                } else {
+                    // User doesn't have permission to customize any institution
+                    setFilteredCustomizations([]);
+                    setError("You don't have permission to customize any institution settings.");
+                }
+            }
+
+            // Reset active tab and edited customization if needed
+            if (filteredCustomizations.length > 0) {
+                setActiveTab(0);
+                setEditedCustomization({...filteredCustomizations[0]});
+            }
+        }
+    }, [customizations, user]);
 
     const fetchCustomizations = async () => {
         try {
@@ -26,11 +83,6 @@ function AdminCustomizations() {
             setError(null);
             const data = await adminCustomizationService.getCustomization();
             setCustomizations(data);
-            // Initialize with the first campus
-            if (data && data.length > 0) {
-                setEditedCustomization({...data[0]});
-                setActiveTab(0);
-            }
         } catch (error) {
             console.error('Error fetching customizations:', error);
             setError('Failed to load customization data. Please try again.');
@@ -40,11 +92,12 @@ function AdminCustomizations() {
     };
 
     const handleTabChange = (tabIndex) => {
-        if (customizations && customizations.length > tabIndex) {
-            setEditedCustomization({...customizations[tabIndex]});
+        if (filteredCustomizations && filteredCustomizations.length > tabIndex) {
+            setEditedCustomization({...filteredCustomizations[tabIndex]});
             setActiveTab(tabIndex);
         }
     };
+
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -231,10 +284,10 @@ function AdminCustomizations() {
                 </Alert>
             )}
             
-            {customizations && customizations.length > 0 ? (
+            {filteredCustomizations && filteredCustomizations.length > 0 ? (
                 <div className="mt-4">
                     <Nav tabs className="mb-4">
-                        {customizations.map((campus, index) => (
+                        {filteredCustomizations.map((campus, index) => (
                             <NavItem key={campus.id}>
                                 <NavLink
                                     className={activeTab === index ? 'active' : ''}
@@ -247,7 +300,7 @@ function AdminCustomizations() {
                     </Nav>
                     
                     <TabContent activeTab={activeTab}>
-                        {customizations.map((campus, index) => (
+                        {filteredCustomizations.map((campus, index) => (
                             <TabPane tabId={index} key={campus.id}>
                                 {editedCustomization && activeTab === index && (
                                     <Form onSubmit={handleSubmit}>
@@ -412,9 +465,12 @@ function AdminCustomizations() {
                         ))}
                     </TabContent>
                 </div>
-            ) : !loading && (
+             ) : !loading && (
                 <Alert color="info">
-                    No customization data found. Please contact your system administrator.
+                    {filteredCustomizations.length === 0 && customizations.length > 0 ?
+                        "You don't have permission to customize any institution settings." :
+                        "No customization data found. Please contact your system administrator."
+                    }
                 </Alert>
             )}
         </div>

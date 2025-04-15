@@ -11,9 +11,10 @@ import {
   Button,
   InputGroup,
   Form,
+  Collapse,
 } from 'reactstrap';
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaRedo } from 'react-icons/fa';
+import { FaSearch, FaRedo, FaFilter, FaAngleDown, FaAngleUp } from 'react-icons/fa';
 import useSearchStore from '../../store/searchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import { trackingService } from '../../services/trackingService';
@@ -47,6 +48,8 @@ function Searchbar() {
   const [searchInput, setSearchInput] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const toggleAdvancedFilters = () => setAdvancedFiltersOpen(!advancedFiltersOpen);
 
   const searchAreas = ['All fields', 'Course Name', 'Course Code', 'Section', 'Instructor'];
   const colleges = ['All', 'Amherst College', 'Hampshire College', 'Mount Holyoke College', 'Smith College', 'UMass Amherst'];
@@ -161,7 +164,6 @@ function Searchbar() {
     setSortOption('');
     setSearchArea('All fields');
     setSearchInput('');
-    setTermId('');
     
     if (college) {
       navigate('/search?college=' + college);
@@ -259,192 +261,379 @@ function Searchbar() {
           e.preventDefault();
           handleSearch();
         }}>
-          <div className="filter-controls-row">
-            {/* College Filter */}
-            <FormGroup className="filter-item">
-              <Label for="collegeSelect" className="filter-label">Institution</Label>
-              <Input
-                id="collegeSelect"
-                type="select"
-                value={selectedCollege}
-                onChange={(e) => {
-                  const newCollege = e.target.value;
-                  const newCollegeKey = collegeNameToKey(newCollege);
-                  const currentTermName = getTermName(terms, termId);
-                  
-                  trackingService.trackEvent({
-                    event_type: "college_change",
-                    college: newCollegeKey,
-                    course_id: "N/A",
-                    term: currentTermName || "N/A",
-                    course_name: "",
-                    course_code: "",
-                    instructor: null,
-                    metadata: {
-                      old_college_key: college,
-                      new_college_key: newCollegeKey,
-                    }
-                  }).catch(err => console.error("Error tracking college change:", err));
-
-                  setSelectedCollege(newCollege);
-                  setCollege(newCollegeKey);
-                  useCustomizationStore.getState().setCurrentCollege(newCollegeKey);
-                  setDepartment('');
-                  setSearchInput('');
-                  setSearchArea('All fields');
-                  setType('all');
-                  setSortOption('');
-
-                  const queryParams = new URLSearchParams();
-                  queryParams.set('college', newCollegeKey);
-                  navigate(`/search?${queryParams.toString()}`);
-                }}
-                className="filter-select"
-              >
-                {colleges.map((col) => (
-                  <option key={col} value={col}>{col}</option>
-                ))}
-              </Input>
-            </FormGroup>
-
-            {/* Department Filter */}
-            <FormGroup className="filter-item">
-              <Label for="departmentSelect" className="filter-label">Department</Label>
-              <Input
-                id="departmentSelect"
-                type="select"
-                value={department}
-                onChange={(e) => {
-                  const newDept = e.target.value;
-                  const currentTermName = getTermName(terms, termId);
-                  trackingService.trackEvent({
-                    event_type: "department_change",
-                    college,
-                    course_id: "N/A",
-                    term: currentTermName || "N/A",
-                    course_name: "",
-                    course_code: "",
-                    instructor: null,
-                    metadata: {
-                      old_department: department || "none",
-                      new_department: newDept,
-                    },
-                  }).catch(err => console.error("Error tracking department change:", err));
-
-                  setDepartment(newDept);
-                }}
-                disabled={departments.length === 0}
-                className="filter-select"
-              >
-                <option value="">All Departments</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.name}>{dept.name}</option>
-                ))}
-              </Input>
-            </FormGroup>
-
-            {/* Term Filter */}
-            <FormGroup className="filter-item">
-              <Label for="termSelect" className="filter-label">Term</Label>
-              <Input
-                id="termSelect"
-                type="select"
-                value={termId || ''}
-                onChange={handleTermChange}
-                className="filter-select"
-              >
-                <option value="">Select term</option>
-                {terms.map((term) => (
-                  <option key={term.id} value={term.id}>{term.name}</option>
-                ))}
-              </Input>
-            </FormGroup>
-
-            {/* Search Area Select */}
-            <FormGroup className="filter-item">
-              <Label for="searchAreaSelect" className="filter-label">Search In</Label>
-              <Input
-                id="searchAreaSelect"
-                type="select"
-                value={searchArea}
-                onChange={(e) => {
-                  setSearchArea(e.target.value);
-                  setType(searchAreaToKey(e.target.value));
-                }}
-                className="filter-select"
-              >
-                {searchAreas.map((area) => (
-                  <option key={area} value={area}>{area}</option>
-                ))}
-              </Input>
-            </FormGroup>
-
-            {/* Sort Filter */}
-            <FormGroup className="filter-item">
-              <Label for="sortSelect" className="filter-label">Sort By</Label>
-              <Input
-                id="sortSelect"
-                type="select"
-                value={sortOption || ''}
-                onChange={(e) => {
-                  setSortOption(e.target.value);
-                }}
-                className="filter-select"
-              >
-                <option value="">Default</option>
-                {sortingOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </Input>
-            </FormGroup>
-
-            {/* Search Input - Fixed proper nesting */}
-            <FormGroup className="filter-item search-field">
-              <Label for="searchInput" className="filter-label">Search</Label>
-              <InputGroup>
-                <Input
-                  id="searchInput"
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search courses..."
-                  className="filter-input"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                />
-              </InputGroup>
-            </FormGroup>
-                  
-            {/* Action Buttons - Fixed reset button accessibility */}
-            <div className="filter-buttons">
-              <div className="button-group">
-                <Button
-                  color="primary"
-                  onClick={handleSearch}
-                  style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
-                  className="action-button search-button"
-                  type="submit"
-                >
-                  <FaSearch className="button-icon" aria-hidden="true" /> Search
-                </Button>
-                <Button
-                  color="secondary"
-                  onClick={handleReset}
-                  style={{ backgroundColor: resetButtonBgColor || '#6c757d' }}
-                  className="action-button reset-button"
-                  type="button"
-                  aria-label="Reset search filters" // Added aria-label for accessibility
-                >
-                  <FaRedo className="button-icon" aria-hidden="true" />
-                  <span className="visually-hidden">Reset</span> {/* Hidden text for screen readers */}
-                </Button>
-              </div>
+          {/* Mobile Search Bar - Always visible on mobile */}
+          <div className="mobile-search-container d-flex d-md-none">
+            <div className="mobile-search-row">
+              <FormGroup className="mobile-search-field">
+                <Label for="mobileSearchInput" className="filter-label d-none">Search</Label>
+                <InputGroup className="mobile-input-group">
+                  <Input
+                    id="mobileSearchInput"
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search courses..."
+                    className="filter-input"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearch();
+                      }
+                    }}
+                  />
+                  <Button
+                    color="primary"
+                    onClick={handleSearch}
+                    style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
+                    className="mobile-search-button"
+                    type="submit"
+                  >
+                    <FaSearch className="button-icon" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    color="light"
+                    onClick={toggleAdvancedFilters}
+                    className="mobile-filter-toggle"
+                    type="button"
+                    aria-expanded={advancedFiltersOpen}
+                    aria-controls="advancedFilters"
+                  >
+                    <FaFilter className="button-icon" aria-hidden="true" />
+                    {advancedFiltersOpen ? <FaAngleUp className="ms-1" /> : <FaAngleDown className="ms-1" />}
+                  </Button>
+                </InputGroup>
+              </FormGroup>
             </div>
           </div>
+
+          {/* Advanced Filters Section */}
+          <Collapse isOpen={advancedFiltersOpen} className="d-md-block" id="advancedFilters">
+            {/* Desktop Search Bar - Hidden on mobile */}
+            <div className="d-none d-md-block mb-3">
+              <div className="filter-controls-row">
+                {/* College Filter */}
+                <FormGroup className="filter-item">
+                  <Label for="collegeSelect" className="filter-label">Institution</Label>
+                  <Input
+                    id="collegeSelect"
+                    type="select"
+                    value={selectedCollege}
+                    onChange={(e) => {
+                      const newCollege = e.target.value;
+                      const newCollegeKey = collegeNameToKey(newCollege);
+                      const currentTermName = getTermName(terms, termId);
+                      
+                      trackingService.trackEvent({
+                        event_type: "college_change",
+                        college: newCollegeKey,
+                        course_id: "N/A",
+                        term: currentTermName || "N/A",
+                        course_name: "",
+                        course_code: "",
+                        instructor: null,
+                        metadata: {
+                          old_college_key: college,
+                          new_college_key: newCollegeKey,
+                        }
+                      }).catch(err => console.error("Error tracking college change:", err));
+
+                      setSelectedCollege(newCollege);
+                      setCollege(newCollegeKey);
+                      useCustomizationStore.getState().setCurrentCollege(newCollegeKey);
+                      setDepartment('');
+                      setSearchInput('');
+                      setSearchArea('All fields');
+                      setType('all');
+                      setSortOption('');
+
+                      const queryParams = new URLSearchParams();
+                      queryParams.set('college', newCollegeKey);
+                      navigate(`/search?${queryParams.toString()}`);
+                    }}
+                    className="filter-select"
+                  >
+                    {colleges.map((col) => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Department Filter */}
+                <FormGroup className="filter-item">
+                  <Label for="departmentSelect" className="filter-label">Department</Label>
+                  <Input
+                    id="departmentSelect"
+                    type="select"
+                    value={department}
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      const currentTermName = getTermName(terms, termId);
+                      trackingService.trackEvent({
+                        event_type: "department_change",
+                        college,
+                        course_id: "N/A",
+                        term: currentTermName || "N/A",
+                        course_name: "",
+                        course_code: "",
+                        instructor: null,
+                        metadata: {
+                          old_department: department || "none",
+                          new_department: newDept,
+                        },
+                      }).catch(err => console.error("Error tracking department change:", err));
+
+                      setDepartment(newDept);
+                    }}
+                    disabled={departments.length === 0}
+                    className="filter-select"
+                  >
+                    <option value="">All Departments</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Term Filter */}
+                <FormGroup className="filter-item">
+                  <Label for="termSelect" className="filter-label">Term</Label>
+                  <Input
+                    id="termSelect"
+                    type="select"
+                    value={termId || ''}
+                    onChange={handleTermChange}
+                    className="filter-select"
+                  >
+                    <option value="">Select term</option>
+                    {terms.map((term) => (
+                      <option key={term.id} value={term.id}>{term.name}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Search Area Select */}
+                <FormGroup className="filter-item">
+                  <Label for="searchAreaSelect" className="filter-label">Search In</Label>
+                  <Input
+                    id="searchAreaSelect"
+                    type="select"
+                    value={searchArea}
+                    onChange={(e) => {
+                      setSearchArea(e.target.value);
+                      setType(searchAreaToKey(e.target.value));
+                    }}
+                    className="filter-select"
+                  >
+                    {searchAreas.map((area) => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Sort Filter */}
+                <FormGroup className="filter-item">
+                  <Label for="sortSelect" className="filter-label">Sort By</Label>
+                  <Input
+                    id="sortSelect"
+                    type="select"
+                    value={sortOption || ''}
+                    onChange={(e) => {
+                      setSortOption(e.target.value);
+                    }}
+                    className="filter-select"
+                  >
+                    <option value="">Default</option>
+                    {sortingOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Search Input - Only on desktop */}
+                <FormGroup className="filter-item search-field">
+                  <Label for="searchInput" className="filter-label">Search</Label>
+                  <InputGroup>
+                    <Input
+                      id="searchInput"
+                      type="text"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="Search courses..."
+                      className="filter-input"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearch();
+                        }
+                      }}
+                    />
+                  </InputGroup>
+                </FormGroup>
+                      
+                {/* Action Buttons */}
+                <div className="filter-buttons">
+                  <div className="button-group">
+                    <Button
+                      color="primary"
+                      onClick={handleSearch}
+                      style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
+                      className="action-button search-button"
+                      type="submit"
+                    >
+                      <FaSearch className="button-icon" aria-hidden="true" /> Search
+                    </Button>
+                    <Button
+                      color="secondary"
+                      onClick={handleReset}
+                      style={{ backgroundColor: resetButtonBgColor || '#6c757d' }}
+                      className="action-button reset-button"
+                      type="button"
+                      aria-label="Reset search filters"
+                    >
+                      <FaRedo className="button-icon" aria-hidden="true" />
+                      <span className="visually-hidden">Reset</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Advanced Filters */}
+            <div className="d-md-none mobile-advanced-filters">
+              {/* Mobile Filter Items */}
+              <div className="mobile-filter-grid">
+                {/* College Filter */}
+                <FormGroup className="mobile-filter-item">
+                  <Label for="mobileCollegeSelect" className="filter-label">Institution</Label>
+                  <Input
+                    id="mobileCollegeSelect"
+                    type="select"
+                    value={selectedCollege}
+                    onChange={(e) => {
+                      const newCollege = e.target.value;
+                      const newCollegeKey = collegeNameToKey(newCollege);
+                      // Same logic as desktop dropdown
+                      setSelectedCollege(newCollege);
+                      setCollege(newCollegeKey);
+                      useCustomizationStore.getState().setCurrentCollege(newCollegeKey);
+                      setDepartment('');
+                      const queryParams = new URLSearchParams();
+                      queryParams.set('college', newCollegeKey);
+                      navigate(`/search?${queryParams.toString()}`);
+                    }}
+                    className="filter-select"
+                  >
+                    {colleges.map((col) => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Department Filter */}
+                <FormGroup className="mobile-filter-item">
+                  <Label for="mobileDepartmentSelect" className="filter-label">Department</Label>
+                  <Input
+                    id="mobileDepartmentSelect"
+                    type="select"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    disabled={departments.length === 0}
+                    className="filter-select"
+                  >
+                    <option value="">All Departments</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Term Filter */}
+                <FormGroup className="mobile-filter-item">
+                  <Label for="mobileTermSelect" className="filter-label">Term</Label>
+                  <Input
+                    id="mobileTermSelect"
+                    type="select"
+                    value={termId || ''}
+                    onChange={handleTermChange}
+                    className="filter-select"
+                  >
+                    <option value="">Select term</option>
+                    {terms.map((term) => (
+                      <option key={term.id} value={term.id}>{term.name}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Search Area Select */}
+                <FormGroup className="mobile-filter-item">
+                  <Label for="mobileSearchAreaSelect" className="filter-label">Search In</Label>
+                  <Input
+                    id="mobileSearchAreaSelect"
+                    type="select"
+                    value={searchArea}
+                    onChange={(e) => {
+                      setSearchArea(e.target.value);
+                      setType(searchAreaToKey(e.target.value));
+                    }}
+                    className="filter-select"
+                  >
+                    {searchAreas.map((area) => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+
+                {/* Sort Filter */}
+                <FormGroup className="mobile-filter-item">
+                  <Label for="mobileSortSelect" className="filter-label">Sort By</Label>
+                  <Input
+                    id="mobileSortSelect"
+                    type="select"
+                    value={sortOption || ''}
+                    onChange={(e) => {
+                      setSortOption(e.target.value);
+                    }}
+                    className="filter-select"
+                  >
+                    <option value="">Default</option>
+                    {sortingOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </Input>
+                </FormGroup>
+              </div>
+
+              {/* Mobile Action Buttons */}
+              <div className="mobile-filter-actions mt-3">
+                <div className="d-flex justify-content-between">
+                  <Button
+                    color="secondary"
+                    onClick={() => {
+                      handleReset();
+                      setAdvancedFiltersOpen(false);
+                    }}
+                    style={{ backgroundColor: resetButtonBgColor || '#6c757d' }}
+                    className="action-button reset-button-mobile"
+                    type="button"
+                  >
+                    <FaRedo className="button-icon" aria-hidden="true" /> Reset
+                  </Button>
+                  <Button
+                    color="primary"
+                    onClick={() => {
+                      handleSearch();
+                      setAdvancedFiltersOpen(false);
+                    }}
+                    style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
+                    className="action-button apply-button-mobile"
+                    type="submit"
+                  >
+                    Apply Filters
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Collapse>
         </Form>
       </div>
       

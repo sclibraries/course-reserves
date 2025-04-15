@@ -1,7 +1,7 @@
 // src/hooks/useRefreshToken.js
 import { useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { config } from '../config';
+import { apiConfig } from '../config/api.config';
 
 /**
  * Custom hook to automatically refresh the access token.
@@ -50,9 +50,10 @@ const useRefreshToken = (token, setToken, logout) => {
         if (!storedRefreshToken) {
           throw new Error('No refresh token available');
         }
-        const REFRESH_TOKEN_URL = `${config.api.urls.courseReserves}${config.api.endpoints.auth.refreshToken}`;
+        const refreshUrl = apiConfig.getRefreshTokenUrl();
+          
         // Call the backend refresh endpoint
-        const response = await fetch(REFRESH_TOKEN_URL, {
+        const response = await fetch(refreshUrl, {
           method: 'POST',
           credentials: 'include', // if your backend uses cookies
           headers: {

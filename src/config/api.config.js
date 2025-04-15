@@ -17,10 +17,12 @@ export const apiConfig = {
   },
   endpoints: {
     auth: {
-        refreshToken: '/admin/refresh-token',
+        refreshToken: '/refresh-token.php',
+        developmentRefreshToken: '/refresh-token-dev.php',
         login: '/admin/login',
         developmentLogin: '/authorize-dev.php',
         productionLogin: '/authorize.php',
+        register: '/registration/register'
     },
     folioApplicationEndpoints: {
         courses: '/cr/courses/',
@@ -36,7 +38,23 @@ export const apiConfig = {
         deleteResourceLink: '/course/unlink-resource', 
         updateResourceOrder: '/course/update-resource-order',
         reports: "/tracking"
-    },    
+    },
+    users: {
+      list: '/user',
+      pending: '/user/pending',
+      approve: '/user/approve/', 
+      reject: '/user/reject/', 
+      view: '/user/', 
+      viewByUsername: '/user/username/',
+      me: 'user/ne',
+      update: '/user/', 
+      current: '/user/current'
+    },
+    permissions: {
+      grouped: '/permission/grouped',
+      available: '/permission/available',
+      toggle: '/permission/toggle/',
+    },
     course: {
       exists: '/course/check-course-exists',
       reactivate: '/course/reactivate-course',
@@ -73,6 +91,13 @@ export const apiConfig = {
       : this.endpoints.auth.developmentLogin;
     
     return `${this.urls.auth}${authEndpoint}`;
+  },
+  getRefreshTokenUrl: function() {
+    const refreshEndpoint = this.environment === 'production' 
+      ? this.endpoints.auth.refreshToken 
+      : this.endpoints.auth.developmentRefreshToken;
+    
+    return `${this.urls.auth}${refreshEndpoint}`;
   },
   getAuthToken: function() {
     const token = localStorage.getItem('authToken');

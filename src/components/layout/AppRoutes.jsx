@@ -21,7 +21,8 @@ import NotFound from '../../pages/NotFound';
 import useAuth from '../../hooks/useAuth';
 import useTermSetup from '../../hooks/useTermSetup';
 import TrackingReport from '../../pages/TrackingReport';
-
+import Registration from '../../pages/Registration';
+import RegistrationConfirmation from '../../pages/RegistrationConfirmation';
 
 /**
  * Application routes component
@@ -73,6 +74,10 @@ const AppRoutes = () => {
       <Route path="/records/:uuid" element={<CourseRecords />} />
       <Route path="/records/course-code/:courseCode" element={<CourseRecords />} />
       <Route path="/protected-route" element={<ProtectedRoutePage />} />
+      
+      {/* Registration Routes */}
+      <Route path="/register" element={<Registration />} />
+      <Route path="/registration-confirmation" element={<RegistrationConfirmation />} />
       
       {/* Protected Admin Routes */}
       <Route

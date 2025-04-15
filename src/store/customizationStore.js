@@ -4,7 +4,7 @@ import { config } from '../config';
 // Default customization values to prevent undefined errors
 const defaultCustomization = {
   campusLocation: 'default',
-  logoUrl: '/logo-placeholder.png',
+  logoUrl: '',
   secondaryText: '',
   altText: 'Library Course Reserves',
   headerBgColor: '#ffffff',
@@ -30,7 +30,6 @@ const defaultCustomization = {
 };
 
 const useCustomizationStore = create((set, get) => {
-  console.log('Creating customization store...');
   
   // Initialize with defaults to prevent undefined errors
   return {
@@ -41,19 +40,13 @@ const useCustomizationStore = create((set, get) => {
 
     // Load customizations from backend
     loadCustomizations: async () => {
-      console.log('loadCustomizations called');
       set({ isLoading: true, error: null });
       
       const apiUrl = `${config.api.urls.courseReserves}/college-customization`;
-      console.log('Fetching customizations from:', apiUrl);
       
       try {
         // Debug the actual URL being called
-        console.log('Full URL:', apiUrl);
-        console.log('API config:', JSON.stringify(config.api.urls, null, 2));
         
-        const authToken = config.api.getAuthToken();
-        console.log('Auth token available:', Boolean(authToken));
         
         const response = await fetch(apiUrl, {
           method: 'GET'
@@ -62,11 +55,9 @@ const useCustomizationStore = create((set, get) => {
           throw err;
         });
 
-        console.log('Response received:', response ? response.status : 'No response');
         
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Could not get error text');
-          console.error('Error response:', errorText);
           throw new Error(`Error fetching customizations: ${response.status} - ${errorText}`);
         }
 
@@ -74,7 +65,6 @@ const useCustomizationStore = create((set, get) => {
         console.log('Customizations loaded:', data);
 
         if (!data || !Array.isArray(data) || data.length === 0) {
-          console.warn('No customization data received or data is empty');
           // Keep the default but don't overwrite with empty data
           set({ isLoading: false });
           return;
@@ -111,9 +101,7 @@ const useCustomizationStore = create((set, get) => {
         }, { 'default': defaultCustomization }); // Always include default
 
         set({ customizations, isLoading: false });
-        console.log('Customizations stored:', customizations);
       } catch (error) {
-        console.error('Failed to load customizations:', error);
         set({ error: error.message, isLoading: false });
       }
     },
@@ -127,7 +115,6 @@ const useCustomizationStore = create((set, get) => {
     getCustomization: () => {
       const state = get();
       const college = state.currentCollege;
-      console.log('Getting customization for college:', college, 'Available:', Object.keys(state.customizations));
       return state.customizations[college] || state.customizations.default || defaultCustomization;
     },
 
@@ -156,7 +143,6 @@ const useCustomizationStore = create((set, get) => {
     },
 
     setCurrentCollege: (college) => {
-      console.log('Setting current college to:', college);
       set({ currentCollege: college });
     },
   };
