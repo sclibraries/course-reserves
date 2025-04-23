@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Card, CardHeader, CardBody, Table, Spinner, Button, 
   Badge, TabContent, TabPane, Nav, NavItem, NavLink, 
-  Row, Col, FormGroup, Label, Input, Alert
+  Alert
 } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import PropTypes from 'prop-types';

@@ -1,20 +1,23 @@
 // src/pages/CourseRecords.jsx
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Row, Col, Button, Spinner, Alert, ButtonGroup, Badge } from 'reactstrap';
+import { Row, Col, Button, Spinner, Alert,  Badge } from 'reactstrap';
 import { config } from '../config';
 import useRecordStore from '../store/recordStore';
 import useCustomizationStore from '../store/customizationStore';
 import { trackingService } from '../services/trackingService';
 import { adminCourseService } from '../services/admin/adminCourseService';
-import {  useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faExclamationCircle, faArrowAltCircleLeft } from '@fortawesome/free-solid-svg-icons';
 
 import {
   fetchRecords,
   fetchCourseData,
-  fetchElectronicReserves,
   fetchItemAvailabilityData,
-  fetchCrossLinkedCourses
+  fetchCrossLinkedCourses,
+  fetchMergedResources,
 } from '../components/page-sections/course-record/api';
 
 import RecordCard from '../components/page-sections/course-record/RecordCard';
@@ -39,10 +42,14 @@ function CourseRecords() {
   const [hasElectronicReserves, setHasElectronicReserves] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const { isAuthenticated } = useAuth();
 
   // Display mode: "card" (detailed) vs. "table" (compact)
   const [displayMode, setDisplayMode] = useState('card');
   const [filter, setFilter] = useState('all'); // 'all', 'print', 'electronic'
+
+  // Add a new state variable for the view mode
+  const [viewMode, setViewMode] = useState('combined'); // 'combined', 'split'
 
   // Extract the first course from the course details array
   const courseInfo = useMemo(() => (course.length > 0 ? course[0] : null), [course]);
@@ -53,8 +60,8 @@ function CourseRecords() {
       const fetchFOLIOCourseListingId = async () => {
         try {
           const courseListingId = await adminCourseService.getFolioCourseId(uuid);
-          if(courseListingId) {
-            if(courseListingId?.exists == true){
+          if (courseListingId) {
+            if (courseListingId?.exists == true) {
               setRecord(courseListingId?.folio_course_id);
             }
           }
@@ -68,21 +75,21 @@ function CourseRecords() {
 
   useEffect(() => {
     if (!courseCode) return;
-  
+
     const fetchFOLIOCourseListingId = async () => {
       try {
         const response = await fetch(`${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}?query=(courseNumber=="${courseCode}")`);
         if (!response.ok) {
           throw new Error(`Network response was not ok: ${response.status}`);
         }
-  
+
         const result = await response.json();
-  
+
         if (result?.data?.courses?.length > 0) {
           // Sort courses by startDate descending to find the most recent
           const currentCourse = result.data.courses
             .sort((a, b) => new Date(b.courseListingObject.termObject.startDate) - new Date(a.courseListingObject.termObject.startDate))[0];
-  
+
           if (currentCourse?.courseListingId) {
             setRecord(currentCourse.courseListingId);
           } else {
@@ -95,13 +102,10 @@ function CourseRecords() {
         console.error(`Failed to fetch course data: ${e.message}`);
       }
     };
-  
-    fetchFOLIOCourseListingId();
-  
-  }, [courseCode, config.api.urls.folio]);
-            
-      //We need to grab the courseListingId from the uuid
 
+    fetchFOLIOCourseListingId();
+
+  }, [courseCode, config.api.urls.folio]);
 
   // Update record from URL parameter (if it differs)
   useEffect(() => {
@@ -121,90 +125,274 @@ function CourseRecords() {
     setSearchQuery(e.target.value);
   };
 
+  // Add this new function to fetch detailed inventory data
+  const fetchInventoryDetails = useCallback(async (instanceId) => {
+    if (!instanceId) return null;
+    
+    try {
+      const response = await fetch(`https://libtools2.smith.edu/folio/web/search/search-inventory?query=id==${instanceId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch inventory details: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data?.data?.instances) {
+        return data.data.instances[0];
+      }
+      return null;
+    } catch (error) {
+      console.warn(`Error fetching inventory details for ${instanceId}:`, error);
+      return null;
+    }
+  }, [config.api.urls.folio]);
+
   // Fetch all required data (print reserves, course data, electronic reserves)
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+  
     try {
-      // Use Promise.allSettled to gracefully handle potential errors
-      const [printResult, courseResult, electronicResult, crossLinkedResult] = await Promise.allSettled([
-        fetchRecords(record),
-        fetchCourseData(record),
-        fetchElectronicReserves(record).catch(() => []),
-        fetchCrossLinkedCourses(record).catch(() => [])
-      ]);
-
-      if (printResult.status === 'rejected') {
-        throw new Error('Failed to fetch print reserves');
+      // 1) try the merged endpoint; on 404 just pretend we got back an empty list
+      let mergedResources = [];
+      try {
+        const { resources } = await fetchMergedResources(record);
+        mergedResources = resources || [];
+        console.log('Merged resources:', mergedResources); // Debug log
+      } catch (err) {
+        // if the server says "Not Found" (404), we fall back
+        const is404 = err.status === 404 || (err.message && err.message.includes('404'));
+        if (!is404) throw err;
+        // else mergedResources stays []
       }
-      const printReserves = printResult.value;
-
-      if (courseResult.status === 'rejected') {
-        throw new Error('Failed to fetch course information');
+  
+      // 2) if no physical resources in the merged payload, pull the print list from FOLIO
+      const hasAnyPhysical = mergedResources.some(r => r.resource_type === 'physical');
+      
+      let allMerged = mergedResources;
+      if (!hasAnyPhysical) {
+        const printReserves = await fetchRecords(record);
+        const fallbackPhysical = printReserves.map(rec => ({
+          _isFallbackPrint: true,
+          __orig: rec
+        }));
+        allMerged = [...mergedResources, ...fallbackPhysical];
       }
-      const courseData = courseResult.value;
+  
+      // 2.5) ADDED: Fetch cross-linked courses and merge them in
+      let crossLinkedCourses = [];
+      try {
+        crossLinkedCourses = await fetchCrossLinkedCourses(record);
+        console.log('Cross-linked courses:', crossLinkedCourses); // Debug log
+      } catch (err) {
+        console.warn('Failed to fetch cross-linked courses:', err);
+        crossLinkedCourses = [];
+      }
 
-      // For electronic reserves, use the value if fulfilled; otherwise, use an empty array.
-      const electronicReserves = electronicResult.status === 'fulfilled'
-        ? electronicResult.value
-        : [];
+      if (crossLinkedCourses.length > 0) {
+        const crossLinkedResources = crossLinkedCourses.map(resource => ({
+          _isCrossLinked: true,
+          id: resource.resource_id,
+          resource_type: 'electronic',
+          title: resource.name,
+          folder_id: resource.folder_id || null,
+          folder_name: resource.folder_name || 'Cross-linked Courses',
+          __resource: resource
+        }));
         
-      setHasElectronicReserves(electronicReserves.length > 0);
-
-      // Transform electronic reserves so they match the print reserves structure.
-      const electronicReservesTransformed = electronicReserves.map(resource => ({
-        id: resource.resource_id,
-        folder_id: resource.folder_id || null,
-        folder_name: resource.folder_name || 'Electronic Resources',
-        copiedItem: {
-          instanceId: resource.resource_id,
-          title: resource.name,
-          contributors: [],
-          publication: [],
-          callNumber: '',
-        },
-        isElectronic: true,
-        resource,
-      }));
-
-      //Check for cross linked courses
-      const crossLinkedCourses = crossLinkedResult.status === 'fulfilled'
-        ? crossLinkedResult.value
-        : [];
-
-      setHasElectronicReserves(crossLinkedCourses.length > 0);
-
-      const crossLinkedCoursesTransformed = crossLinkedCourses.map(resource => ({
-        id: resource.resource_id,
-        folder_id: resource.folder_id || null,
-        folder_name: resource.folder_name || 'Electronic Resources',
-        copiedItem: {
-          instanceId: resource.resource_id,
-          title: resource.name,
-          contributors: [],
-          publication: [],
-          callNumber: '',
-        },
-        isElectronic: true,
-        resource,
-      }));
-
-      // Merge print and electronic reserves
-      const mergedReserves = [...printReserves, ...electronicReservesTransformed, ...crossLinkedCoursesTransformed];
-
-      if (mergedReserves.length === 0 && courseData.length === 0) {
-        throw new Error('No course data found');
+        allMerged = [...allMerged, ...crossLinkedResources];
       }
 
-      setRecords(mergedReserves);
+      // 3) normalize everything *and* copy over the `order` field
+      let normalized = allMerged.map(item => {
+        if (item._isFallbackPrint) {
+          return item.__orig;
+        }
+
+        // Cross-linked course handling
+        if (item._isCrossLinked) {
+          return {
+            id: item.id,
+            order: item.order != null ? Number(item.order) : null,
+            isElectronic: true,
+            folder_id: item.folder_id,
+            folder_name: item.folder_name,
+            resource: {
+              resource_id: item.id,
+              name: item.title,
+              item_url: item.__resource.item_url,
+              description: item.__resource.description,
+              external_note: item.__resource.external_note,
+              internal_note: item.__resource.internal_note,
+              start_visibility: item.__resource.start_visibility,
+              end_visibility: item.__resource.end_visibility,
+              use_proxy: item.__resource.use_proxy,
+              links: item.__resource.links || [],
+              metadata: item.__resource.metadata || []
+            },
+            copiedItem: {
+              instanceId: item.id,
+              title: item.title,
+              contributors: [],
+              publication: [],
+              callNumber: ''
+            }
+          };
+        }
+  
+        // pull numeric order out of the merged payload
+        const order = item.order != null ? Number(item.order) : null;
+  
+        if (item.resource_type === 'electronic') {
+          return {
+            id: item.id,
+            order,               // ← now everyone has `order`
+            isElectronic: true,
+            folder_id: item.folder_id,
+            folder_name: item.folder_name,
+            resource: {
+              resource_id:     item.id,
+              name:            item.title,
+              item_url:        item.item_url,
+              description:     item.description,
+              external_note:   item.external_note,
+              internal_note:   item.internal_note,
+              start_visibility:item.start_visibility,
+              end_visibility:  item.end_visibility,
+              use_proxy:       item.use_proxy,
+              links:           item.links || [],
+              metadata:        item.metadata || []
+            },
+            copiedItem: {
+              instanceId:     item.id,
+              title:          item.title,
+              contributors:   [],
+              publication:    [],
+              callNumber:     ''
+            }
+          };
+        } else {
+          return {
+            id: item.id,
+            order,             
+            isElectronic: false,
+            resource: null,
+            copiedItem: {
+              instanceId:   item.id,
+              title:        item.title,
+              contributors: [],
+              publication:  [],
+              callNumber:   item.callNumber  || '',
+              barcode:      item.barcode     || '',
+              holdingsId:   item.holdingsId  || '',
+              instanceHrid: item.instanceHrid|| ''
+            }
+          };
+        }
+      });
+
+      // NEW STEP: Enhance physical resources with complete inventory data
+      if (hasAnyPhysical) {
+        const physicalResources = normalized.filter(item => 
+          !item.isElectronic);
+        
+        
+        // Fetch detailed inventory data for each physical resource in parallel
+        const detailPromises = physicalResources.map(async (item) => {
+          // Use the instanceId directly for lookup
+          const instanceId = item.id;
+
+          const instanceDetails = await fetchInventoryDetails(instanceId);
+
+          if (instanceDetails) {
+            // Process contributors if available
+            let contributors = [];
+            if (instanceDetails.contributors) {
+              if (Array.isArray(instanceDetails.contributors)) {
+                contributors = instanceDetails.contributors.map(c => ({ name: c.name }));
+              } else if (instanceDetails.contributors) {
+                contributors = [{ name: instanceDetails.contributors.name }];
+              }
+            }
+            
+            // Process publication if available
+            let publication = [];
+            if (instanceDetails.publication) {
+              if (Array.isArray(instanceDetails.publication)) {
+                publication = instanceDetails.publication.map(p => ({
+                  publisher: p.publisher || '',
+                  place: p.place || '',
+                  dateOfPublication: p.dateOfPublication || ''
+                }));
+              } else if (instanceDetails.publication) {
+                publication = [{
+                  publisher: instanceDetails.publication.publisher || '',
+                  place: instanceDetails.publication.place || '',
+                  dateOfPublication: instanceDetails.publication.dateOfPublication || ''
+                }];
+              }
+            }
+            console.log('Publication:', publication); // Debug publication
+
+            // Return enhanced item with contributors and publication data
+            const enhancedItem = {
+              ...item,
+              copiedItem: {
+                ...item.copiedItem,
+                contributors,
+                publication
+              }
+            };
+            console.log('Enhanced item:', enhancedItem.id, enhancedItem.copiedItem.contributors?.length, enhancedItem.copiedItem.publication?.length); // Debug enhanced item
+            return enhancedItem;
+          }
+          return item;
+        });
+        
+        // Wait for all detail fetches to complete
+        const enhancedItems = await Promise.all(detailPromises);
+        
+        // Replace the physical items with their enhanced versions
+        normalized = normalized.map(item => {
+          if (!item.isElectronic) {
+            const enhancedItem = enhancedItems.find(enhanced => enhanced.id === item.id);
+            if (enhancedItem) {
+              console.log('Using enhanced data for item:', item.id); // Debug log
+              return enhancedItem;
+            }
+            console.log('No enhanced data found for item:', item.id); // Debug log
+            return item;
+          }
+          return item;
+        });
+
+        // Add a log to verify what data is actually in the records after enhancement
+        console.log('First 3 records after enhancement:', 
+          normalized.slice(0, 3).map(r => ({
+            id: r.id,
+            title: r.copiedItem.title,
+            isElectronic: r.isElectronic,
+            contributors: r.copiedItem.contributors?.length || 0,
+            publication: r.copiedItem.publication?.length || 0
+          }))
+        );
+      }
+  
+      setRecords(normalized);
+  
+      // 4) finally fetch course info & set the electronic‐flag
+      const courseData = await fetchCourseData(record);
       setCourse(courseData);
+      // Update hasElectronicReserves to check for both regular electronic resources and cross-linked courses
+      setHasElectronicReserves(normalized.some(r => r.isElectronic));
+  
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(`${err.message}`);
+      console.error(err);
+      setError(err.message || 'Failed to load course materials');
     } finally {
       setIsLoading(false);
     }
-  }, [record]);
+  }, [record, fetchInventoryDetails]);
 
   // For print reserves only: Fetch item availability data.
   useEffect(() => {
@@ -255,91 +443,149 @@ function CourseRecords() {
     });
   }, []);
 
-
   // NEW: Combine grouped and ungrouped items into a single alphabetically sorted list
   // so that folder groups (using the folder name as the sort key) are interleaved
   // with individual records.
   const combinedResults = useMemo(() => {
-
-    const filteredBySearch = searchQuery.trim() !== '' 
-    ? records.filter(item => 
-        item.copiedItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.copiedItem.contributors && 
-         item.copiedItem.contributors.some(c => 
-           c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())
-         ))
-      )
-    : records;
-
-    // Separate records into groups and individual items.
+    // 1) Filter by search string
+    const filteredBySearch = searchQuery.trim() !== ''
+      ? records.filter(item =>
+          item.copiedItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.copiedItem.contributors?.some(c =>
+            c.name?.toLowerCase().includes(searchQuery.toLowerCase())
+          ))
+        )
+      : records;
+  
+    // 2) Filter by print/electronic if needed
+    const filtered = filter === 'all'
+      ? filteredBySearch
+      : filteredBySearch.filter(item =>
+          filter === 'electronic' ? item.isElectronic : !item.isElectronic
+        );
+  
+    // 3) If any item has a designated admin order, just sort flat by order → title
+    const hasDesignatedOrder = filtered.some(item => item.order != null);
+    if (hasDesignatedOrder) {
+      return filtered
+        .slice() // copy so we don’t mutate state
+        .sort((a, b) => {
+          const ao = a.order != null ? a.order : Infinity;
+          const bo = b.order != null ? b.order : Infinity;
+          if (ao !== bo) return ao - bo;
+          // tie‑break alphabetically
+          return a.copiedItem.title
+            .toLowerCase()
+            .localeCompare(b.copiedItem.title.toLowerCase());
+        });
+    }
+  
+    // 4) Otherwise fallback to your old grouping + ABC merge logic
     const groupedTemp = {};
     let ungroupedTemp = [];
-    filteredBySearch.forEach(item => {
+  
+    filtered.forEach(item => {
       if (item.folder_id) {
-        const groupName = item.folder_name;
-        if (!groupedTemp[groupName]) {
-          groupedTemp[groupName] = [];
-        }
-        groupedTemp[groupName].push(item);
+        const key = item.folder_name;
+        (groupedTemp[key] ||= []).push(item);
       } else {
         ungroupedTemp.push(item);
       }
     });
-
-
-    // Apply filtering if needed.
-    if (filter !== 'all') {
-      const filterFunc = filter === 'print' ? item => !item.isElectronic : item => item.isElectronic;
-      for (const groupName in groupedTemp) {
-        groupedTemp[groupName] = groupedTemp[groupName].filter(filterFunc);
-        if (groupedTemp[groupName].length === 0) {
-          delete groupedTemp[groupName];
-        }
-      }
-      ungroupedTemp = ungroupedTemp.filter(filterFunc);
-    }
-
-    // Sort ungrouped items alphabetically by title.
+  
+    // Sort the ungrouped ABC
     ungroupedTemp.sort((a, b) =>
-      a.copiedItem.title.toLowerCase().localeCompare(b.copiedItem.title.toLowerCase())
+      a.copiedItem.title.toLowerCase()
+        .localeCompare(b.copiedItem.title.toLowerCase())
     );
-
-    // Create an array of grouped items (each with a folder header and its sorted items).
-    let groupedArray = Object.keys(groupedTemp).map(groupName => {
-      const items = groupedTemp[groupName];
-      items.sort((a, b) =>
-        a.copiedItem.title.toLowerCase().localeCompare(b.copiedItem.title.toLowerCase())
+  
+    // Build sorted groups
+    const groupedArray = Object.entries(groupedTemp)
+      .map(([folder, items]) => ({
+        folder,
+        items: items.sort((a, b) =>
+          a.copiedItem.title.toLowerCase()
+            .localeCompare(b.copiedItem.title.toLowerCase())
+        )
+      }))
+      .sort((a, b) =>
+        a.folder.toLowerCase().localeCompare(b.folder.toLowerCase())
       );
-      return { folder: groupName, items };
-    });
-    // Sort groups alphabetically by folder name.
-    groupedArray.sort((a, b) => a.folder.toLowerCase().localeCompare(b.folder.toLowerCase()));
-
-    // Merge the two sorted arrays using a simple two‐pointer merge.
-    let i = 0,
-      j = 0;
+  
+    // Merge two lists with two‑pointer method
     const merged = [];
+    let i = 0, j = 0;
     while (i < ungroupedTemp.length && j < groupedArray.length) {
-      const ungroupedTitle = ungroupedTemp[i].copiedItem.title.toLowerCase();
-      const groupTitle = groupedArray[j].folder.toLowerCase();
-      if (ungroupedTitle.localeCompare(groupTitle) <= 0) {
-        merged.push(ungroupedTemp[i]);
-        i++;
+      const titleA = ungroupedTemp[i].copiedItem.title.toLowerCase();
+      const titleG = groupedArray[j].folder.toLowerCase();
+      if (titleA <= titleG) {
+        merged.push(ungroupedTemp[i++]);
       } else {
-        merged.push(groupedArray[j]);
-        j++;
+        merged.push(groupedArray[j++]);
       }
     }
-    while (i < ungroupedTemp.length) {
-      merged.push(ungroupedTemp[i]);
-      i++;
-    }
-    while (j < groupedArray.length) {
-      merged.push(groupedArray[j]);
-      j++;
-    }
+    // flush any leftovers
+    while (i < ungroupedTemp.length) merged.push(ungroupedTemp[i++]);
+    while (j < groupedArray.length)   merged.push(groupedArray[j++]);
+  
     return merged;
   }, [records, filter, searchQuery]);
+
+  // Process visibility for all records (similar to RecordTable component)
+  const processedRecords = useMemo(() => {
+    let hiddenCount = 0;
+    let visibleCount = 0;
+    let upcomingDates = [];
+
+    // Check record visibility
+    const checkRecordVisibility = (item) => {
+      if (item.isElectronic && item.resource) {
+        if (isAuthenticated) return { isVisible: true };
+
+        const now = new Date();
+        const startVisibility = item.resource.start_visibility
+          ? new Date(item.resource.start_visibility)
+          : null;
+        const endVisibility = item.resource.end_visibility
+          ? new Date(item.resource.end_visibility)
+          : null;
+
+        if ((startVisibility && now < startVisibility)) {
+          upcomingDates.push(startVisibility);
+          return { isVisible: false, startDate: startVisibility };
+        }
+
+        if ((endVisibility && now > endVisibility)) {
+          return { isVisible: false };
+        }
+      }
+      return { isVisible: true };
+    };
+
+    // Check visibility for all records
+    records.forEach(record => {
+      const visibility = checkRecordVisibility(record);
+      if (visibility.isVisible) {
+        visibleCount++;
+      } else {
+        hiddenCount++;
+      }
+    });
+
+    // Find the closest upcoming date
+    const nextAvailableDate = upcomingDates.length > 0
+      ? new Date(Math.min(...upcomingDates.map(d => d.getTime())))
+      : null;
+
+    return {
+      hiddenCount,
+      visibleCount,
+      totalCount: hiddenCount + visibleCount,
+      nextAvailableDate
+    };
+  }, [records, isAuthenticated]);
+
+  const { hiddenCount, visibleCount, nextAvailableDate } = processedRecords;
 
   // Get customization settings from the store.
   const [customization, setCustomization] = useState(
@@ -396,7 +642,7 @@ function CourseRecords() {
   const handleToggleDisplay = () => {
     const oldMode = displayMode;
     const newMode = oldMode === 'card' ? 'table' : 'card';
-  
+
     // Fire tracking event
     trackingService.trackEvent({
       college: collegeParam || 'Unknown',
@@ -414,7 +660,7 @@ function CourseRecords() {
         new_mode: newMode,
       },
     }).catch((err) => console.error('Error tracking view toggle:', err));
-  
+
     setDisplayMode(newMode);
   };
 
@@ -436,59 +682,120 @@ function CourseRecords() {
         new_filter: newFilter,
       },
     }).catch((err) => console.error('Error tracking filter change:', err));
-  
+
     // Update the filter state
     setFilter(newFilter);
   };
-  
 
-  const renderFilterButtons = () => (
-    <ButtonGroup className="mb-3">
-      <Button
-        style={{backgroundColor: recordsDiscoverLinkBgColor}}
-        active={filter === 'all'}
-        onClick={() => handleFilterChange('all')}
-      >
-        All
-      </Button>
-      <Button
-        style={{backgroundColor: recordsDiscoverLinkBgColor}}
-        active={filter === 'print'}
-        onClick={() => handleFilterChange('print')}
-      >
-        Print
-      </Button>
-      <Button
-        style={{backgroundColor: recordsDiscoverLinkBgColor}}
-        active={filter === 'electronic'}
-        onClick={() => handleFilterChange('electronic')}
-      >
-        Electronic
-      </Button>
-    </ButtonGroup>
-  );
+  // Replace the renderFilterButtons function with this enhanced ViewControls component
+  const renderViewControls = () => {
+    if (!hasElectronicReserves) return null;
+    
+    return (
+      <div className="view-controls mb-4">
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+          {/* Left side: View mode toggle */}
+          <div className="view-toggle">
+            <div className="btn-group" role="group" aria-label="Select view mode">
+              <Button 
+                color={viewMode === 'combined' ? 'primary' : 'outline-primary'}
+                onClick={() => {
+                  trackingService.trackEvent({
+                    college: collegeParam || 'Unknown',
+                    event_type: 'view_mode_change',
+                    course_id: courseInfo?.courseListingId ?? 'N/A',
+                    term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
+                    metadata: { old_mode: viewMode, new_mode: 'combined' },
+                  }).catch(err => console.error('Error tracking view mode change:', err));
+                  setViewMode('combined');
+                }}
+                className="px-3"
+              >
+                <i className="fas fa-th-list me-2"></i>
+                Combined View
+              </Button>
+              <Button 
+                color={viewMode === 'split' ? 'primary' : 'outline-primary'}
+                onClick={() => {
+                  trackingService.trackEvent({
+                    college: collegeParam || 'Unknown',
+                    event_type: 'view_mode_change',
+                    course_id: courseInfo?.courseListingId ?? 'N/A',
+                    term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
+                    metadata: { old_mode: viewMode, new_mode: 'split' },
+                  }).catch(err => console.error('Error tracking view mode change:', err));
+                  setViewMode('split');
+                }}
+                className="px-3"
+              >
+                <i className="fas fa-columns me-2"></i>
+                Split View
+              </Button>
+            </div>
+          </div>
+
+          {/* Right side: Filter pills (only in combined view) */}
+          {viewMode === 'combined' && (
+            <div className="filters d-flex gap-2">
+              <Button
+                color={filter === 'all' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                className="rounded-pill"
+                onClick={() => handleFilterChange('all')}
+              >
+                <i className="fas fa-layer-group me-1"></i> All Materials
+              </Button>
+              <Button
+                color={filter === 'print' ? 'success' : 'outline-success'}
+                size="sm"
+                className="rounded-pill"
+                onClick={() => handleFilterChange('print')}
+              >
+                <i className="fas fa-book me-1"></i> Physical Only
+              </Button>
+              <Button
+                color={filter === 'electronic' ? 'info' : 'outline-info'}
+                size="sm"
+                className="rounded-pill"
+                onClick={() => handleFilterChange('electronic')}
+              >
+                <i className="fas fa-laptop me-1"></i> Electronic Only
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {/* Split view mode stats */}
+        {viewMode === 'split' && (
+          <div className="resource-stats text-muted small mt-2">
+            <Row>
+              <Col md={6}>
+                <span className="badge bg-success me-2">Physical</span>
+                {records.filter(r => !r.isElectronic).length} items
+              </Col>
+              <Col md={6}>
+                <span className="badge bg-info me-2">Electronic</span>
+                {records.filter(r => r.isElectronic).length} items
+              </Col>
+            </Row>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="container mt-4">
       {/* Back button and heading */}
       {courseInfo && (
         <div className="mb-3 d-flex align-items-center">
-          <Button color="link" className="p-0 me-2" onClick={() => navigate(-1)} aria-label="Go back">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                fill="currentColor"
-                className="bi bi-arrow-left-circle"
-                viewBox="0 0 16 16"
-                role="img"
-                aria-hidden="true"
-              >
-              <path
-                fillRule="evenodd"
-                d="M8 15A7 7 0 1 1 8 .999a7 7 0 0 1 0 14.002ZM8 1.999A6 6 0 1 0 8 13.999a6 6 0 0 0 0-11.998Zm.146 3.646a.5.5 0 0 1 .708.708L6.707 7.5H12.5a.5.5 0 1 1 0 1H6.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3Z"
-              />
-            </svg>
+          <Button
+            color="link"
+            className="p-0 me-2 text-primary"
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+          >
+            <FontAwesomeIcon icon={faArrowAltCircleLeft} size="lg" />
             <span className="visually-hidden">Go Back</span>
           </Button>
           <h1 className="h4 mb-0">Back to results</h1>
@@ -545,7 +852,7 @@ function CourseRecords() {
                 aria-hidden="true"
               >
                 <path
-                  d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 15 10.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"
+                  d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 15 10.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"
                 />
               </svg>
               <span className="ms-1 visually-hidden">Switch to Detailed (Card) View</span>
@@ -554,7 +861,7 @@ function CourseRecords() {
         </Button>
       </div>
 
-      {hasElectronicReserves && renderFilterButtons()}
+      {hasElectronicReserves && renderViewControls()}
 
       {/* Search Input */}
       <div className="mb-3 search-container">
@@ -571,7 +878,7 @@ function CourseRecords() {
             aria-label="Search records"
           />
           {searchQuery && (
-            <button 
+            <button
               className="btn btn-outline-secondary border-start-0"
               type="button"
               onClick={() => setSearchQuery('')}
@@ -602,84 +909,162 @@ function CourseRecords() {
       ) : error ? (
         <Alert color="danger">{error}</Alert>
       ) : records && records.length > 0 ? (
-        displayMode === 'card' ? (
-          <>
-            {/* Card View: Render combined results (folders interleaved with individual records) */}
-            {combinedResults.map((result) => {
-              // If the item is a folder group (has a 'folder' property), render a folder block.
-              if (result.folder) {
-                return (
-                  <div key={`folder-${result.folder}`} className="folder-group mb-5">
-                    <header className="folder-header text-white p-3 rounded-top" style={{backgroundColor:recordsDiscoverLinkBgColor}}>
-                      <div className="d-flex align-items-center gap-2">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20" 
-                          height="20"
-                          fill="currentColor"
-                          className="bi bi-folder"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a2 2 0 0 1 .342-1.31zm6.339-1.577A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139C1.72 3.042 1.95 3 2.19 3h5.396l-.707-.707z"/>
-                        </svg>
-                        <h2 className="h5 mb-0">{result.folder}</h2>
-                        <span className="badge bg-light text-dark ms-2">
-                          {result.items.length} items
-                        </span>
-                      </div>
-                    </header>
-                    <div className="folder-items border-start border-end border-bottom p-3">
-                      <Row className="g-4">
-                        {result.items.map(recordItem => ( 
-                          <Col xs="12" key={recordItem.id}>
+        <>
+          {/* Show unavailable message if all items are hidden and user is not authenticated */}
+          {!isAuthenticated && visibleCount === 0 && hiddenCount > 0 ? (
+            <Alert color="warning" className="d-flex align-items-center">
+              <FontAwesomeIcon icon={faExclamationCircle} className="me-3 fa-lg" />
+              <div>
+                <h4 className="alert-heading">Course Materials Not Currently Available</h4>
+                <p>
+                  {hiddenCount} {hiddenCount === 1 ? 'resource is' : 'resources are'} scheduled for this course,
+                  but {hiddenCount === 1 ? 'it is' : 'they are'} not currently available.
+                </p>
+                {nextAvailableDate && (
+                  <p className="mb-0">
+                    <strong>Next available date:</strong> {nextAvailableDate.toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </Alert>
+          ) : (
+            displayMode === 'card' ? (
+              <>
+                {/* Card View: Render combined results or split view */}
+                {viewMode === 'combined' ? (
+                  // Original rendering logic for combined view
+                  combinedResults.map((result) => {
+                    // If the item is a folder group (has a 'folder' property), render a folder block.
+                    if (result.folder) {
+                      // Skip rendering the folder completely if it has no visible items
+                      if (result.items.length === 0) return null;
+
+                      return (
+                        <div key={`folder-${result.folder}`} className="folder-group mb-5">
+                          <header className="folder-header text-white p-3 rounded-top" style={{ backgroundColor: recordsDiscoverLinkBgColor }}>
+                            {/* ...existing code... */}
+                          </header>
+                          <div className="folder-items border-start border-end border-bottom p-3">
+                            <Row className="g-4">
+                              {result.items.map(recordItem => (
+                                <Col xs="12" key={recordItem.id}>
+                                  <RecordCard
+                                    recordItem={recordItem}
+                                    availability={availability}
+                                    openAccordions={openAccordions}
+                                    toggleAccordion={toggleAccordion}
+                                    customization={customizationProps}
+                                    courseInfo={courseInfo}
+                                    collegeParam={collegeParam}
+                                    isAuthenticated={isAuthenticated}
+                                    isGrouped
+                                  />
+                                </Col>
+                              ))}
+                            </Row>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // Render an individual (ungrouped) record.
+                      return (
+                        <Row className="g-4 mb-4" key={result.id}>
+                          <Col xs="12">
                             <RecordCard
-                              recordItem={recordItem}
+                              recordItem={result}
                               availability={availability}
                               openAccordions={openAccordions}
                               toggleAccordion={toggleAccordion}
                               customization={customizationProps}
                               courseInfo={courseInfo}
                               collegeParam={collegeParam}
-                              isGrouped
+                              isAuthenticated={isAuthenticated}
                             />
                           </Col>
-                        ))}
-                      </Row>
-                    </div>
-                  </div>
-                );
-              } else {
-                // Render an individual (ungrouped) record.
-                return (
-                  <Row className="g-4 mb-4" key={result.id}>
-                    <Col xs="12">
-                      <RecordCard
-                        recordItem={result}
-                        availability={availability}
-                        openAccordions={openAccordions}
-                        toggleAccordion={toggleAccordion}
-                        customization={customizationProps}
-                        courseInfo={courseInfo}
-                        collegeParam={collegeParam}
-                      />
+                        </Row>
+                      );
+                    }
+                  })
+                ) : (
+                  // New split-view rendering with two columns
+                  <Row>
+                    {/* Print resources column */}
+                    <Col md={6} className="print-resources">
+                      <div className="column-header mb-3">
+                        <h3 className="h4">
+                          <i className="fas fa-book text-success me-2"></i>
+                          Physical Materials
+                        </h3>
+                      </div>
+                      {records.filter(item => !item.isElectronic).length === 0 ? (
+                        <p className="text-muted">No physical materials available for this course.</p>
+                      ) : (
+                        records
+                          .filter(item => !item.isElectronic)
+                          .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
+                          .map(item => (
+                            <RecordCard
+                              key={item.id}
+                              recordItem={item}
+                              availability={availability}
+                              openAccordions={openAccordions}
+                              toggleAccordion={toggleAccordion}
+                              customization={customizationProps}
+                              courseInfo={courseInfo}
+                              collegeParam={collegeParam}
+                              isAuthenticated={isAuthenticated}
+                            />
+                          ))
+                      )}
+                    </Col>
+                    
+                    {/* Electronic resources column */}
+                    <Col md={6} className="electronic-resources">
+                      <div className="column-header mb-3">
+                        <h3 className="h4">
+                          <i className="fas fa-laptop text-info me-2"></i>
+                          Electronic Materials
+                        </h3>
+                      </div>
+                      {records.filter(item => item.isElectronic).length === 0 ? (
+                        <p className="text-muted">No electronic materials available for this course.</p>
+                      ) : (
+                        records
+                          .filter(item => item.isElectronic)
+                          .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
+                          .map(item => (
+                            <RecordCard
+                              key={item.id}
+                              recordItem={item}
+                              availability={availability}
+                              openAccordions={openAccordions}
+                              toggleAccordion={toggleAccordion}
+                              customization={customizationProps}
+                              courseInfo={courseInfo}
+                              collegeParam={collegeParam}
+                              isAuthenticated={isAuthenticated}
+                            />
+                          ))
+                      )}
                     </Col>
                   </Row>
-                );
-              }
-            })}
-          </>
-        ) : (
-          // Compact table view using the RecordTable component.
-          <RecordTable
-            combinedResults={combinedResults}
-            availability={availability}
-            customization={customizationProps}
-            hasElectronicReserves={hasElectronicReserves}
-            courseInfo={courseInfo}
-            collegeParam={collegeParam}
-          />
-
-        )
+                )}
+              </>
+            ) : (
+              // Table view - keep the existing RecordTable but pass viewMode
+              <RecordTable
+                combinedResults={combinedResults}
+                availability={availability}
+                customization={customizationProps}
+                hasElectronicReserves={hasElectronicReserves}
+                courseInfo={courseInfo}
+                collegeParam={collegeParam}
+                viewMode={viewMode}
+                records={records} // Pass all records for split view
+              />
+            )
+          )}
+        </>
       ) : (
         <p>No records found.</p>
       )}

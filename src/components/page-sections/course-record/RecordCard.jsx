@@ -11,11 +11,12 @@ import {
   AccordionItem,
   Badge,
   Table,
-  Button
+  Button,
 } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faBook } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faBook} from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
+import { useAuth } from '../../../contexts/AuthContext';
 
 /**
  * RecordCard component
@@ -33,6 +34,7 @@ import { trackingService } from '../../../services/trackingService';
  * @param {boolean} props.isGrouped - Whether the record is part of a grouped display
  * @param {Object} props.courseInfo - Information about the associated course
  * @param {string} props.collegeParam - College parameter for tracking
+ * @param {boolean} props.showVisibilityMessage - Whether to show visibility messages instead of hiding items
  * @returns {JSX.Element|null} The record card or null if visibility conditions aren't met
  */
 const RecordCard = ({
@@ -45,6 +47,9 @@ const RecordCard = ({
   courseInfo,
   collegeParam,
 }) => {
+  // Get authentication state directly from context
+  const { isAuthenticated } = useAuth();
+
   // Destructure customization settings with fallback values for safety
   const {
     recordsCardTitleTextColor = '#000000',
@@ -73,7 +78,6 @@ const RecordCard = ({
     }),
     [accordionHeaderBgColor, accordionHeaderTextColor]
   );
-
 
   /**
    * Format publication info into readable string
@@ -141,13 +145,17 @@ const RecordCard = ({
     borderLeftColor: '#388E3C'
   };
 
-
   /**
    * Check visibility window for electronic resources
-   * @returns {boolean} Whether the resource should be visible
+   * @returns {Object} Object containing visibility status and message
    */
-  const isVisibleResource = () => {
+  const checkVisibility = () => {
     if (isElectronic && resource) {
+      // Authenticated users can see all resources regardless of visibility window
+      if (isAuthenticated) {
+        return { isVisible: true };
+      }
+
       const now = new Date();
       const startVisibility = resource.start_visibility
         ? new Date(resource.start_visibility)
@@ -155,18 +163,34 @@ const RecordCard = ({
       const endVisibility = resource.end_visibility
         ? new Date(resource.end_visibility)
         : null;
-
-      // If current time is before the start or after the end of the visibility window, don't render
-      if ((startVisibility && now < startVisibility) || (endVisibility && now > endVisibility)) {
-        return false;
+        
+      // If current time is before the start of the visibility window
+      if (startVisibility && now < startVisibility) {
+        return { 
+          isVisible: false,
+          message: `Available from ${startVisibility.toLocaleDateString()}`,
+          startDate: startVisibility
+        };
+      }
+      
+      // If current time is after the end of the visibility window
+      if (endVisibility && now > endVisibility) {
+        return {
+          isVisible: false,
+          message: `Available until ${endVisibility.toLocaleDateString()}`,
+          endDate: endVisibility
+        };
       }
     }
-    return true;
+    return { isVisible: true };
   };
 
-  // Don't render if resource should be hidden based on visibility window
-  if (!isVisibleResource()) {
-    return null;
+  // Check visibility
+  const { isVisible } = checkVisibility();
+
+  // For non-authenticated users, completely skip rendering resources that aren't visible
+  if (!isVisible && !isAuthenticated) {
+    return null; // Simply return null for invisible resources, let parent component show the message
   }
 
   const discoverUrl = !isElectronic ? getDiscoverUrl(instanceId) : null;
@@ -397,6 +421,9 @@ const RecordCard = ({
     // Check if resource has additional links
     const hasAdditionalLinks = resource.links && resource.links.length > 0;
 
+    // Show visibility dates for authenticated users
+    const showVisibilityDates = isAuthenticated && (resource.start_visibility || resource.end_visibility);
+
     return (
       <div className="mt-3">
         {resource.item_url && (
@@ -414,6 +441,14 @@ const RecordCard = ({
             Access Resource
             <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
           </Button>
+        )}
+
+        {showVisibilityDates && (
+          <div className="alert alert-info small mb-2" role="alert">
+            <strong>Visibility Window:</strong>{' '}
+            {resource.start_visibility ? `From ${new Date(resource.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
+            {resource.end_visibility ? `until ${new Date(resource.end_visibility).toLocaleDateString()}` : 'No end date'}
+          </div>
         )}
 
         {resource.external_note && (
@@ -521,10 +556,11 @@ const RecordCard = ({
     <Card
       className={`shadow-sm mb-4 bg-body-tertiary ${
         isGrouped ? 'ms-4 border-start border-3 border-secondary-color-rgb' : ''
-      }`}
+      } ${!isVisible ? 'border border-warning' : ''}`}
       style={{
         ...resourceTypeStyles,
-        transition: 'all 0.2s ease-in-out'
+        transition: 'all 0.2s ease-in-out',
+        opacity: isVisible ? 1 : 0.8
       }}
     >
       <CardBody>
@@ -536,6 +572,16 @@ const RecordCard = ({
         >
           {isElectronic ? "Electronic Resource" : "Physical Resource"}
         </Badge>
+        
+        {!isVisible && (
+          <Badge 
+            color="warning"
+            className="ms-2 resource-badge"
+            pill
+          >
+            Not Currently Available
+          </Badge>
+        )}
 
         {/* Card heading - use appropriate heading level for accessibility */}
         <CardTitle tag="h2" style={titleStyle} className="h3 mb-3 mt-4">
@@ -644,13 +690,18 @@ RecordCard.propTypes = {
    * College parameter for tracking
    */
   collegeParam: PropTypes.string,
+  /**
+   * Whether to show visibility messages instead of hiding items
+   */
+  showVisibilityMessage: PropTypes.bool,
 };
 
 // Default props
 RecordCard.defaultProps = {
   isGrouped: false,
   courseInfo: {},
-  collegeParam: 'Unknown'
+  collegeParam: 'Unknown',
+  showVisibilityMessage: true
 };
 
 export default RecordCard;

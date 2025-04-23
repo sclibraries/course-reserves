@@ -79,12 +79,12 @@ const AppRoutes = () => {
       <Route path="/register" element={<Registration />} />
       <Route path="/registration-confirmation" element={<RegistrationConfirmation />} />
       
-      {/* Protected Admin Routes */}
+      {/* Protected Admin Routes - pass isAdmin prop */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute isAuthorized={isAuthorized}>
-            <Admin />
+            <Admin isAdmin={isAuthorized} />
           </ProtectedRoute>
         }
       />
@@ -92,7 +92,7 @@ const AppRoutes = () => {
         path="/admin/electronic/:folioCourseId"
         element={
           <ProtectedRoute isAuthorized={isAuthorized}>
-            <AdminElectronicResources />
+            <AdminElectronicResources isAdmin={isAuthorized} />
           </ProtectedRoute>
         }
       />
@@ -100,7 +100,7 @@ const AppRoutes = () => {
         path="/admin/reports"
         element={
           <ProtectedRoute isAuthorized={isAuthorized}>
-            <TrackingReport />
+            <TrackingReport isAdmin={isAuthorized} />
           </ProtectedRoute>
         }
       />

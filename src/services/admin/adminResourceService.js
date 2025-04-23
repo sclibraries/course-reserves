@@ -162,5 +162,37 @@ export const adminResourceService = {
       console.error('Update metadata failed:', error);
       throw error;
     }
+  },
+
+  /**
+   * Update both electronic and physical resource ordering in a single request
+   * @param {string} offeringId - ID of the course offering
+   * @param {Object} resources - Object containing electronic and print resources with order values
+   * @returns {Promise} - Promise resolving to the update result
+   */
+  async updateUnifiedResourceOrder(offeringId, { electronic, print }) {
+    try {
+      const response = await fetch(`${API_BASE}/resource/update-unified-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.getAuthToken()
+        },
+        body: JSON.stringify({
+          offering_id: offeringId,
+          electronic_resources: electronic,
+          physical_resources: print
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update unified resource order');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating unified resource order:', error);
+      throw error;
+    }
   }
 };

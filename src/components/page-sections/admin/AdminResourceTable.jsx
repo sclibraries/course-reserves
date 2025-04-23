@@ -2,7 +2,7 @@
  * @file AdminResourceTable component
  * @module AdminResourceTable
  * @description Displays a table of electronic resources associated with a course.
- * Supports unlinking resources from courses and editing resource details.
+ * Supports unlinking resources from courses, editing resource details, and drag-and-drop reordering.
  * @requires react
  * @requires prop-types
  * @requires reactstrap
@@ -11,13 +11,15 @@
  * @requires ../../../services/admin/adminResourceService
  */
 
-import React, { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Button, Alert } from 'reactstrap';
 import { useAdminModal } from '../../../hooks/admin/useAdminModal';
 import { AdminEditResourceModal } from '../../admin/modals/AdminEditResourceModel';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { toast } from 'react-toastify';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useDrag, useDrop } from 'react-dnd';
 
 /**
  * Configuration for table headers
@@ -90,24 +92,73 @@ function adjustProxy(data) {
 }
 
 /**
- * Individual table row for a resource
- * 
- * @component
- * @param {Object} props - Component props
- * @param {Object} props.resource - Resource data
- * @param {Function} props.onUnlink - Handler for unlinking a resource
- * @param {Function} props.handleSelectedResource - Handler for selecting a resource to edit
- * @returns {JSX.Element} Rendered table row
+ * Define item type for drag and drop
+ * @constant {string}
  */
-const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResource }) => {
+const RESOURCE_ITEM_TYPE = 'resource';
+
+/**
+ * Individual table row for a resource with drag-and-drop functionality
+ */
+const DraggableResourceRow = ({ 
+  resource, 
+  onUnlink, 
+  handleSelectedResource,
+  index,
+  moveRow,
+  onDrop
+}) => {
   const [showAdditionalLinks, setShowAdditionalLinks] = useState(false);
-  
-  // Check if we have additional links
   const hasAdditionalLinks = resource.links && resource.links.length > 0;
-  console.log(resource)
+  const ref = useRef(null);
+  
+  const [, drop] = useDrop({
+    accept: RESOURCE_ITEM_TYPE,
+    hover(item) {
+      if (!ref.current) {
+        return;
+      }
+      const dragIndex = item.index;
+      const hoverIndex = index;
+      
+      // Don't replace items with themselves
+      if (dragIndex === hoverIndex) {
+        return;
+      }
+      
+      moveRow(dragIndex, hoverIndex);
+      
+      // Note: we're mutating the monitor item here!
+      // Generally it's better to avoid mutations,
+      // but it's good here for performance reasons
+      item.index = hoverIndex;
+    },
+    drop() {
+        onDrop && onDrop();
+    }
+  });
+  
+  const [{ isDragging }, drag] = useDrag({
+    type: RESOURCE_ITEM_TYPE,
+    item: { id: resource.resource_id, index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+  
+  // Initialize drag and drop refs
+  drag(drop(ref));
+  
   return (
     <>
-      <tr className="resource-row">
+      <tr 
+        ref={ref} 
+        className={isDragging ? 'dragging' : ''}
+        style={{ opacity: isDragging ? 0.5 : 1 }}
+      >
+        <td className="drag-handle">
+          <FontAwesomeIcon icon="fa-solid fa-grip-vertical" />
+        </td>
         <td className="text-break">{resource.name}</td>
         <td className="text-break">
           {resource.item_url ? (
@@ -122,7 +173,6 @@ const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResourc
                 {resource.item_url}
               </a>
               
-              {/* Show toggle button for additional links if they exist */}
               {hasAdditionalLinks && (
                 <Button
                   color="link"
@@ -179,10 +229,9 @@ const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResourc
         </td>
       </tr>
       
-      {/* Additional Links Row - Shown when expanded */}
       {showAdditionalLinks && (
         <tr className="additional-links-row bg-light">
-          <td colSpan={5}>
+          <td colSpan={6}>
             <div className="p-3">
               <h6>Additional Links</h6>
               <ul className="list-group">
@@ -217,89 +266,84 @@ const ResourceTableRow = React.memo(({ resource, onUnlink, handleSelectedResourc
       )}
     </>
   );
-});
+};
 
-ResourceTableRow.propTypes = {
+DraggableResourceRow.propTypes = {
   resource: resourceShape.isRequired,
   onUnlink: PropTypes.func.isRequired,
   handleSelectedResource: PropTypes.func.isRequired,
+  index: PropTypes.number.isRequired,
+  moveRow: PropTypes.func.isRequired,
+  onDrop: PropTypes.func.isRequired
 };
-
-ResourceTableRow.displayName = 'ResourceTableRow';
 
 /**
  * Administrative resource table component
- * 
- * Displays a table of resources with options to edit and unlink.
- * Includes modal for editing resource details.
- * 
- * @component
- * @example
- * const resources = [
- *   {
- *     resource_id: '123',
- *     name: 'Introduction to React',
- *     item_url: 'https://example.com/resource',
- *     description: 'A guide to React',
- *     material_type_name: 'E-Book',
- *     course_resource_id: '456'
- *   }
- * ];
- * 
- * return (
- *   <AdminResourceTable 
- *     resources={resources}
- *     unlink={handleUnlink}
- *     handleUpdateResources={refreshResources}
- *   />
- * );
- * 
- * @param {Object} props - Component props
- * @param {Array<Object>} props.resources - List of resources to display
- * @param {Function} props.unlink - Handler for unlinking resources
- * @param {Function} props.handleUpdateResources - Function to refresh resources after updates
- * @returns {JSX.Element} Resource table or empty state message
  */
 export const AdminResourceTable = ({ 
   resources, 
   unlink, 
+  onReorder,
   handleUpdateResources 
 }) => {
-  /**
-   * Currently selected resource for editing
-   * @type {Object|null}
-   */
   const [selectedResource, setSelectedResource] = useState(null);
-  
-  /**
-   * Modal state and toggle from custom hook
-   * @type {[boolean, Function]}
-   */
   const [editResourceModalOpen, toggleEditResourceModal] = useAdminModal();
-
-  /**
-   * Opens the edit modal for a selected resource
-   * 
-   * @function
-   * @param {Object} resource - The resource to edit
-   * @returns {void}
-   */
+  const [sortedResources, setSortedResources] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Initialize resources with order
+  useEffect(() => {
+    if (!Array.isArray(resources)) {
+      setSortedResources([]);
+      return;
+    }
+    
+    const resourcesWithOrder = resources.map((res, index) => ({
+      ...res,
+      order: res.order || index + 1
+    }));
+    
+    resourcesWithOrder.sort((a, b) => a.order - b.order);
+    setSortedResources(resourcesWithOrder);
+  }, [resources]);
+  
+  // Handle moving rows (drag and drop)
+  const moveRow = useCallback(
+    (dragIndex, hoverIndex) => {
+      setIsDragging(true);
+      const draggedRow = sortedResources[dragIndex];
+      const newOrder = [...sortedResources];
+      
+      // Remove the dragged item
+      newOrder.splice(dragIndex, 1);
+      // Insert it at the new position
+      newOrder.splice(hoverIndex, 0, draggedRow);
+      
+      // Update order property on each item
+      const updatedItems = newOrder.map((item, index) => ({
+        ...item,
+        order: index + 1
+      }));
+      
+      setSortedResources(updatedItems);
+    },
+    [sortedResources],
+  );
+  
+  // Save the new order when drag ends
+  const handleDragEnd = useCallback(() => {
+    if (onReorder && sortedResources.length > 0 && isDragging) {
+      console.log('Saving electronic resource order to backend');
+      onReorder(sortedResources);
+      setIsDragging(false);
+    }
+  }, [sortedResources, onReorder, isDragging]);
+  
   const handleSelectedResource = (resource) => {
     setSelectedResource(resource);
     toggleEditResourceModal();
   };
 
-  /**
-   * Handle resource edit form submission
-   * 
-   * Updates the resource via API and refreshes the resource list
-   * 
-   * @async
-   * @function
-   * @param {Object} formData - Form data from the edit modal
-   * @param {string} formData.resource_id - ID of the resource to update
-   * @returns {Promise<void>}
-   */
   const handleEdit = async (formData) => {
     const { resource_id, ...data } = formData;
     
@@ -320,7 +364,6 @@ export const AdminResourceTable = ({
     }
   };
 
-  // Show message if no resources are available
   if (!resources?.length) {
     return (
       <Alert color="info" className="text-center">
@@ -331,28 +374,37 @@ export const AdminResourceTable = ({
 
   return (
     <div className="admin-resource-table">
-      {/* Resources Table */}
+      <div className="mb-3">
+        <small className="text-muted">
+          <FontAwesomeIcon icon="fa-solid fa-info-circle" className="me-1" />
+          Drag and drop resources to reorder them.
+        </small>
+      </div>
+      
       <Table bordered responsive hover>
         <thead>
           <tr>
+            <th style={{ width: '40px' }}></th>
             {TABLE_HEADERS.map(({ key, label }) => (
               <th key={key}>{label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {resources.map((resource) => (
-            <ResourceTableRow
+          {sortedResources.map((resource, index) => (
+            <DraggableResourceRow
               key={resource.resource_id}
               resource={resource}
               onUnlink={unlink}
               handleSelectedResource={handleSelectedResource}
+              index={index}
+              moveRow={moveRow}
+              onDrop={handleDragEnd}
             />
           ))}
         </tbody>
       </Table>
 
-      {/* Edit Resource Modal */}
       <AdminEditResourceModal
         isOpen={editResourceModalOpen}
         toggle={toggleEditResourceModal}
@@ -366,5 +418,6 @@ export const AdminResourceTable = ({
 AdminResourceTable.propTypes = {
   resources: PropTypes.arrayOf(resourceShape).isRequired,
   unlink: PropTypes.func.isRequired,
+  onReorder: PropTypes.func,
   handleUpdateResources: PropTypes.func.isRequired,
 };

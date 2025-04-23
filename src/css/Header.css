@@ -53,24 +53,42 @@ header .nav-link.active {
   font-weight: 700;
 }
 
-/* Navigation links */
+/* Navigation links - updated to fix double underline */
 .nav-link {
   color: #4b5563;
-  text-decoration: none;
+  text-decoration: none !important; /* Force no text-decoration */
   font-weight: 500;
   font-size: 0.95rem;
   transition: color 0.2s ease;
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 .nav-link:hover {
   color: #4f46e5;
+  text-decoration: none !important;
 }
 
 .nav-link.active {
   color: #4f46e5;
   font-weight: 600;
+}
+
+/* Single underline for active links */
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: currentColor;
+}
+
+.nav-link:focus {
+  outline: 2px solid #4d90fe;
+  outline-offset: 2px;
 }
 
 /* User menu styling */
@@ -100,6 +118,15 @@ header .nav-link.active {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.user-menu-toggle.btn-dark {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.user-menu-toggle.btn-light {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .user-menu {
@@ -151,9 +178,14 @@ header .btn:hover {
 }
 
 .college-logo {
-  height: 50px; 
+  height: auto; /* Use auto height instead of fixed */
+  max-height: 50px; /* Maximum height on desktop */
   width: auto;
+  min-height: 30px; /* Add minimum height to prevent too small logos */
+  min-width: 30px; /* Ensure minimum width as well */
+  max-width: 240px; /* More generous max width for desktop */
   transition: all 0.2s ease;
+  object-fit: contain; /* Ensures the logo maintains aspect ratio */
 }
 
 /* Make the content area start below the header */
@@ -204,8 +236,9 @@ header .btn:hover {
   }
   
   .college-logo {
-    height: 30px;
-    width: auto;
+    max-height: 40px; /* Increase from 35px */
+    min-height: 30px;
+    max-width: 180px; /* Increase from 160px */
   }
 
   .user-menu-toggle .user-name {
@@ -224,5 +257,34 @@ header .btn:hover {
   
   .nav-link {
     padding: 0.5rem;
+  }
+  
+  .college-logo {
+    max-height: 35px; /* Increase from 30px */
+    min-height: 28px;
+    max-width: 160px; /* Increase from 120px */
+  }
+  
+  .secondary-text {
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 375px) {
+  .college-logo {
+    max-height: 30px; /* Increase from 24px */
+    min-height: 25px;
+    max-width: 130px; /* Increase from 100px */
+  }
+  
+  .secondary-text {
+    font-size: 0.75rem;
+    margin-left: 0.3rem;
+  }
+  
+  header .navbar {
+    padding: 0.4rem 0.75rem;
   }
 }

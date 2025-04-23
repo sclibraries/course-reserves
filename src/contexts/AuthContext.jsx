@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { config } from '../config';
 import { jwtDecode } from 'jwt-decode';
+import { apiConfig } from '../config/api.config';
+
 
 // Create the context
 const AuthContext = createContext(null);
@@ -182,9 +184,9 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No refresh token available');
       }
       
-      const REFRESH_TOKEN_URL = `${config.api.urls.courseReserves}${config.api.endpoints.auth.refreshToken}`;
-      
-      const response = await fetch(REFRESH_TOKEN_URL, {
+      const refreshUrl = apiConfig.getRefreshTokenUrl();     
+
+      const response = await fetch(refreshUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

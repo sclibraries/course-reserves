@@ -2,12 +2,62 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Course Reserves</title>
+    <meta name="description" content="Five College Course Reserves - Access your course materials online" />
+    <meta name="theme-color" content="#4f46e5" />
+    
+    <!-- Accessibility meta tags -->
+    <meta name="application-name" content="Course Reserves" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Course Reserves" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Disable automatic detection of phone numbers for better accessibility control -->
+    <meta name="format-detection" content="telephone=no">
+    
+    <title>Library Course Reserves</title>
+    
+    <!-- Include skip navigation link styles for keyboard users -->
+    <style>
+      .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #4f46e5;
+        color: white;
+        padding: 8px;
+        z-index: 9999;
+        transition: top 0.2s;
+      }
+      
+      .skip-link:focus {
+        top: 0;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <div id="root" role="main" aria-live="polite"></div>
+    
+    <!-- Hidden element to allow screen readers to announce when page content changes -->
+    <div id="announcer" aria-live="polite" class="visually-hidden"></div>
+    
+    <!-- No-script notice for users without JavaScript -->
+    <noscript>
+      <div style="padding: 20px; text-align: center; max-width: 600px; margin: 0 auto;">
+        <h1>JavaScript Required</h1>
+        <p>We're sorry, but Course Reserves requires JavaScript to function properly. Please enable JavaScript in your browser settings and reload the page.</p>
+      </div>
+    </noscript>
+    
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

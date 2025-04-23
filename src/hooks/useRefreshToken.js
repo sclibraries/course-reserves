@@ -55,7 +55,7 @@ const useRefreshToken = (token, setToken, logout) => {
         // Call the backend refresh endpoint
         const response = await fetch(refreshUrl, {
           method: 'POST',
-          credentials: 'include', // if your backend uses cookies
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
           },

@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Table, Popover, PopoverBody, Button, Collapse } from 'reactstrap';
+import { Table, Popover, PopoverBody, Button, Collapse, Alert, Row, Col } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faExternalLinkAlt, 
+  faChevronDown, 
+  faChevronUp, 
+  faInfoCircle,
+  faClock,
+  faExclamationCircle
+} from '@fortawesome/free-solid-svg-icons';
 // Import tracking service
 import { trackingService } from '../../../services/trackingService';
+// Import Auth Context
+import { useAuth } from '../../../contexts/AuthContext';
 
 /**
  * RecordTable component
@@ -20,6 +29,9 @@ import { trackingService } from '../../../services/trackingService';
  * @param {boolean} props.hasElectronicReserves - Whether electronic reserves are enabled
  * @param {Object} props.courseInfo - Information about the current course
  * @param {string} props.collegeParam - College identifier for tracking
+ * @param {boolean} props.showVisibilityMessages - Whether to show visibility messages
+ * @param {string} props.viewMode - View mode for the table ('combined' or 'split')
+ * @param {Array} props.records - Array of individual record items
  * @returns {JSX.Element} A table of course records with interactive elements
  */
 const RecordTable = ({
@@ -29,9 +41,16 @@ const RecordTable = ({
   hasElectronicReserves,
   courseInfo,
   collegeParam,
+  showVisibilityMessages = true,
+  viewMode = 'combined',
+  records = []
 }) => {
   const [activePopover, setActivePopover] = useState(null);
   const [expandedLinkItems, setExpandedLinkItems] = useState({});
+  const [showHiddenItems] = useState(false);
+  
+  // Get authentication state from context
+  const { isAuthenticated } = useAuth();
 
   // Calculate total columns for table layout - define before use
   const totalColumns = (hasElectronicReserves ? 1 : 0) + 7 + 2; // Base columns + conditional folder column
@@ -58,6 +77,149 @@ const RecordTable = ({
       [itemId]: !prev[itemId]
     }));
   };
+
+  /**
+   * Check visibility window for electronic resources
+   * @param {Object} item - Record item to check
+   * @returns {Object} Object containing visibility status and message
+   */
+  const checkVisibility = (item) => {
+    if (item.isElectronic && item.resource) {
+      // Authenticated users can see all resources regardless of visibility window
+      if (isAuthenticated) {
+        return { isVisible: true };
+      }
+
+      const now = new Date();
+      const startVisibility = item.resource.start_visibility
+        ? new Date(item.resource.start_visibility)
+        : null;
+      const endVisibility = item.resource.end_visibility
+        ? new Date(item.resource.end_visibility)
+        : null;
+        
+      // If current time is before the start of the visibility window
+      if (startVisibility && now < startVisibility) {
+        return { 
+          isVisible: false,
+          message: `Available from ${startVisibility.toLocaleDateString()}`,
+          startDate: startVisibility
+        };
+      }
+      
+      // If current time is after the end of the visibility window
+      if (endVisibility && now > endVisibility) {
+        return {
+          isVisible: false,
+          message: `Available until ${endVisibility.toLocaleDateString()}`,
+          endDate: endVisibility
+        };
+      }
+    }
+    return { isVisible: true };
+  };
+
+  // Process visibility for all items
+  const processedResults = useMemo(() => {
+    let hiddenCount = 0;
+    let visibleCount = 0;
+    let scheduleInfo = [];
+    
+    const processedItems = combinedResults.map(result => {
+      if (result.folder) {
+        // For grouped items
+        const processedGroupItems = result.items.map(item => {
+          const visibility = checkVisibility(item);
+          if (!visibility.isVisible) {
+            hiddenCount++;
+            // Gather information about scheduled items
+            if (item.resource?.start_visibility) {
+              scheduleInfo.push({
+                title: item.copiedItem?.title,
+                date: new Date(item.resource.start_visibility),
+                type: 'upcoming'
+              });
+            } else if (item.resource?.end_visibility) {
+              scheduleInfo.push({
+                title: item.copiedItem?.title,
+                date: new Date(item.resource.end_visibility),
+                type: 'past'
+              });
+            }
+          } else {
+            visibleCount++;
+          }
+          return { ...item, visibility };
+        });
+        
+        // Only include visible items in the processed group
+        const visibleItems = processedGroupItems.filter(item => 
+          item.visibility.isVisible || isAuthenticated
+        );
+        
+        return {
+          ...result,
+          items: visibleItems,
+          hasHiddenItems: processedGroupItems.some(item => !item.visibility.isVisible)
+        };
+      } else {
+        // For individual items
+        const visibility = checkVisibility(result);
+        if (!visibility.isVisible) {
+          hiddenCount++;
+          // Gather information about scheduled items
+          if (result.resource?.start_visibility) {
+            scheduleInfo.push({
+              title: result.copiedItem?.title,
+              date: new Date(result.resource.start_visibility),
+              type: 'upcoming'
+            });
+          } else if (result.resource?.end_visibility) {
+            scheduleInfo.push({
+              title: result.copiedItem?.title,
+              date: new Date(result.resource.end_visibility),
+              type: 'past'
+            });
+          }
+        } else {
+          visibleCount++;
+        }
+        return { ...result, visibility };
+      }
+    });
+    
+    // Filter out items that aren't visible (unless user is authenticated)
+    const filteredItems = processedItems.filter(item => {
+      if ('items' in item) {
+        // Group items
+        return item.items.length > 0; // Only keep groups with visible items
+      }
+      // Individual items
+      return item.visibility.isVisible || isAuthenticated;
+    });
+    
+    // Sort upcoming items by date
+    const upcomingItems = scheduleInfo
+      .filter(item => item.type === 'upcoming')
+      .sort((a, b) => a.date - b.date);
+    
+    return { 
+      items: filteredItems, 
+      hiddenCount,
+      visibleCount,
+      totalCount: hiddenCount + visibleCount,
+      upcomingItems,
+      nextAvailableDate: upcomingItems.length > 0 ? upcomingItems[0].date : null
+    };
+  }, [combinedResults, isAuthenticated]);
+  
+  const { 
+    items: processedItems, 
+    hiddenCount, 
+    visibleCount, 
+    totalCount,
+    nextAvailableDate 
+  } = processedResults;
 
   /**
    * Generate discover link URL from instance ID
@@ -165,6 +327,13 @@ const RecordTable = ({
       return null;
     }
     
+    const { isVisible, message } = item.visibility || { isVisible: true };
+    
+    // Skip items that should be hidden based on visibility window when not showing all
+    if (!isVisible && !showHiddenItems && !showVisibilityMessages) {
+      return null;
+    }
+    
     const instanceId = item.copiedItem?.instanceId;
     const holdings = availability[instanceId]?.holdings || [];
     const reserveCount = holdings.filter(h => h.location?.includes('Reserve')).length;
@@ -183,25 +352,70 @@ const RecordTable = ({
     
     const isExpanded = expandedLinkItems[item.id] || false;
 
+    // For authenticated users, check if the item has visibility dates to display
+    const showVisibilityDates = isAuthenticated && 
+                               item.isElectronic && 
+                               item.resource && 
+                               (item.resource.start_visibility || item.resource.end_visibility);
+
     return (
       <React.Fragment key={item.id}>
-        <tr>
+        <tr className={!isVisible ? 'table-warning' : ''}>
           {hasElectronicReserves && (
             <td>{item.folder_name || 'N/A'}</td>
           )}
-          <td>{item.copiedItem.title}</td>
+          <td>
+            {item.copiedItem.title}
+            {!isVisible && (
+              <div className="small text-warning mt-1">
+                <FontAwesomeIcon icon={faClock} className="me-1" />
+                {message}
+              </div>
+            )}
+            {showVisibilityDates && (
+              <span 
+                id={`visibility-${item.id}`}
+                className="ms-2 text-muted"
+              >
+                <FontAwesomeIcon 
+                  icon={faInfoCircle} 
+                  className="cursor-pointer"
+                />
+              </span>
+            )}
+            {showVisibilityDates && (
+              <Popover
+                placement="auto"
+                isOpen={activePopover === `visibility-${item.id}`}
+                target={`visibility-${item.id}`}
+                trigger="hover"
+                toggle={() => togglePopover(`visibility-${item.id}`)}
+              >
+                <PopoverBody>
+                  <h6 className="mb-2">Visibility Window</h6>
+                  <div className="small">
+                    {item.resource.start_visibility && (
+                      <div><strong>From:</strong> {new Date(item.resource.start_visibility).toLocaleDateString()}</div>
+                    )}
+                    {item.resource.end_visibility && (
+                      <div><strong>Until:</strong> {new Date(item.resource.end_visibility).toLocaleDateString()}</div>
+                    )}
+                  </div>
+                </PopoverBody>
+              </Popover>
+            )}
+          </td>
           <td>{item.copiedItem.contributors?.map(c => c.name).join(', ') || 'N/A'}</td>
           <td>
             {holdings.length > 0 && holdings[0].materialType?.name
               ? holdings[0].materialType.name
               : (item.isElectronic ? 'Electronic' : 'Print')}
           </td>
-          <td>{item.copiedItem.callNumber || 'N/A'}</td>
           <td>{formatPublication(item.copiedItem.publication)}</td>
           <td>
             <span
               id={popoverId}
-              className="text-primary cursor-pointer"
+              style={{ color: customization.buttonPrimaryColor, cursor: 'pointer', textDecoration: 'underline' }}
               onMouseEnter={() => togglePopover(item.id)}
               onMouseLeave={() => togglePopover(null)}
               onKeyDown={(e) => {
@@ -231,6 +445,7 @@ const RecordTable = ({
                     <div key={holding.id} className="mb-2 small">
                       <div><strong>Location:</strong> {holding.location}</div>
                       <div><strong>Library:</strong> {holding.library?.name || 'Unknown'}</div>
+                      <div><strong>Call Number:</strong> {holding.callNumber || 'N/A'}</div>
                       <div><strong>Status:</strong> {holding.status}</div>
                       <div>
                         <strong>Loan Type:</strong> {holding.temporaryLoanType || holding.permanentLoanType}
@@ -249,7 +464,7 @@ const RecordTable = ({
                   handleExternalLinkClick(e, 'record_discover_link', discoverUrl, item)
                 }
                 className="btn btn-link p-0"
-                style={{ textDecoration: 'underline' }}
+                style={{ textDecoration: 'underline', color: customization.buttonSecondaryColor }}
               >
                 {customization.recordsDiscoverLinkText || 'View in Catalog'}
               </button>
@@ -267,7 +482,7 @@ const RecordTable = ({
                     })
                   }
                   className="btn btn-link p-0"
-                  style={{ textDecoration: 'underline' }}
+                  style={{ textDecoration: 'underline', color: customization.buttonPrimaryColor }}
                   aria-label="Access resource (opens in a new tab)"
                 >
                   Access Resource <FontAwesomeIcon icon={faExternalLinkAlt} />
@@ -281,8 +496,9 @@ const RecordTable = ({
                       className="p-0"
                       onClick={() => toggleLinksExpand(item.id)}
                       aria-expanded={isExpanded}
+                      style={{ color: customization.buttonPrimaryColor }}
                     >
-                      <span className="badge bg-primary">
+                      <span className="badge bg-secondary">
                         {item.resource.links.length} additional {item.resource.links.length === 1 ? 'link' : 'links'}
                       </span>
                       <FontAwesomeIcon 
@@ -300,8 +516,9 @@ const RecordTable = ({
                 className="p-0"
                 onClick={() => toggleLinksExpand(item.id)}
                 aria-expanded={isExpanded}
+                style={{ color: customization.buttonPrimaryColor }}
               >
-                <span className="badge bg-primary">
+                <span className="badge bg-secondary">
                   {item.resource.links.length} {item.resource.links.length === 1 ? 'link' : 'links'} available
                 </span>
                 <FontAwesomeIcon 
@@ -341,7 +558,7 @@ const RecordTable = ({
                                 )}
                                 target="_blank"
                                 rel="noreferrer noopener"
-                                className="text-primary"
+                                style={{ color: customization.buttonPrimaryColor }}
                               >
                                 {link.url}
                                 <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
@@ -352,7 +569,7 @@ const RecordTable = ({
                             )}
                           </div>
                           {link.use_proxy === "1" && (
-                            <span className="badge bg-secondary">Proxy Enabled</span>
+                            <span className="badge bg-light text-dark">Proxy Enabled</span>
                           )}
                         </div>
                       </li>
@@ -367,7 +584,249 @@ const RecordTable = ({
     );
   };
 
-  return (
+  /**
+   * Render the table in split view mode
+   */
+  const renderSplitView = () => {
+    const printRecords = records.filter(item => !item.isElectronic);
+    const electronicRecords = records.filter(item => item.isElectronic);
+    
+    return (
+      <Row>
+        {/* Print resources column */}
+        <Col md={6}>
+          <div className="column-header mb-3 p-3 bg-light border rounded">
+            <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
+              <i className="fas fa-book text-muted me-2"></i>
+              Print Materials
+            </h3>
+          </div>
+          
+          {printRecords.length === 0 ? (
+            <p className="text-muted">No print materials available for this course.</p>
+          ) : (
+            <Table bordered responsive className="align-middle">
+              <thead className="table-light">
+                <tr>
+                  <th scope="col">Title</th>
+                  <th scope="col">Authors</th>
+                  <th scope="col">Publication</th>
+                  <th scope="col">Holdings</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printRecords
+                  .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
+                  .map(item => {
+                    const instanceId = item.copiedItem?.instanceId;
+                    const holdings = availability[instanceId]?.holdings || [];
+                    const discoverUrl = getDiscoverLink(instanceId);
+                    
+                    return (
+                      <tr key={item.id}>
+                        <td>{item.copiedItem.title}</td>
+                        <td>{item.copiedItem.contributors?.map(c => c.name).join(', ') || 'N/A'}</td>
+                        <td>{formatPublication(item.copiedItem.publication)}</td>
+                        <td>{holdings.length > 0 ? `${holdings.length} items` : 'N/A'}</td>
+                        <td>
+                          {discoverUrl ? (
+                            <button
+                              onClick={(e) =>
+                                handleExternalLinkClick(e, 'record_discover_link', discoverUrl, item)
+                              }
+                              className="btn btn-sm btn-outline-secondary"
+                            >
+                              View in Catalog <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            </button>
+                          ) : 'N/A'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          )}
+        </Col>
+        
+        {/* Electronic resources column */}
+        <Col md={6}>
+          <div className="column-header mb-3 p-3 bg-light border rounded">
+            <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
+              <i className="fas fa-laptop text-muted me-2"></i>
+              Electronic Materials
+            </h3>
+          </div>
+          
+          {electronicRecords.length === 0 ? (
+            <p className="text-muted">No electronic materials available for this course.</p>
+          ) : (
+            <Table bordered responsive className="align-middle">
+              <thead className="table-light">
+                <tr>
+                  <th scope="col">Title</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Access</th>
+                </tr>
+              </thead>
+              <tbody>
+                {electronicRecords
+                  .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
+                  .map(item => {
+                    const resourceUrl = item.resource?.item_url;
+                    const hasAdditionalLinks = item.resource?.links?.length > 0;
+                    const isExpanded = expandedLinkItems[item.id] || false;
+                    
+                    return (
+                      <React.Fragment key={item.id}>
+                        <tr>
+                          <td>{item.copiedItem.title}</td>
+                          <td>
+                            {item.resource?.description ? (
+                              <div className="small">{item.resource.description}</div>
+                            ) : 'N/A'}
+                          </td>
+                          <td>
+                            {resourceUrl ? (
+                              <div>
+                                <button
+                                  onClick={(e) =>
+                                    handleExternalLinkClick(e, 'resource_click', resourceUrl, item, {
+                                      isElectronic: true,
+                                    })
+                                  }
+                                  className="btn btn-sm btn-outline-secondary"
+                                  aria-label="Access resource (opens in a new tab)"
+                                >
+                                  Access <FontAwesomeIcon icon={faExternalLinkAlt} />
+                                </button>
+                                
+                                {hasAdditionalLinks && (
+                                  <Button 
+                                    color="link" 
+                                    size="sm" 
+                                    className="ms-2"
+                                    onClick={() => toggleLinksExpand(item.id)}
+                                    aria-expanded={isExpanded}
+                                    style={{ color: customization.buttonPrimaryColor }}
+                                  >
+                                    {item.resource.links.length} more
+                                    <FontAwesomeIcon 
+                                      icon={isExpanded ? faChevronUp : faChevronDown} 
+                                      className="ms-1" 
+                                    />
+                                  </Button>
+                                )}
+                              </div>
+                            ) : hasAdditionalLinks ? (
+                              <Button 
+                                color="link" 
+                                size="sm"
+                                onClick={() => toggleLinksExpand(item.id)}
+                                aria-expanded={isExpanded}
+                                style={{ color: customization.buttonPrimaryColor }}
+                              >
+                                {item.resource.links.length} links
+                                <FontAwesomeIcon 
+                                  icon={isExpanded ? faChevronUp : faChevronDown} 
+                                  className="ms-1" 
+                                />
+                              </Button>
+                            ) : 'N/A'}
+                          </td>
+                        </tr>
+                        
+                        {/* Additional links row (collapsible) */}
+                        {hasAdditionalLinks && (
+                          <tr className={isExpanded ? '' : 'd-none'}>
+                            <td colSpan={3} className="p-0">
+                              <Collapse isOpen={isExpanded}>
+                                <div className="p-3 bg-light">
+                                  <ul className="list-group list-group-flush">
+                                    {item.resource.links.map((link, idx) => (
+                                      <li key={link.link_id || idx} className="list-group-item bg-transparent px-0">
+                                        <div>
+                                          <strong>{link.title || `Link ${idx + 1}`}</strong>
+                                          <div>
+                                            <a 
+                                              href={link.url}
+                                              onClick={(e) => handleExternalLinkClick(
+                                                e, 
+                                                'resource_link_click', 
+                                                link.url, 
+                                                item, 
+                                                {
+                                                  linkId: link.link_id,
+                                                  linkTitle: link.title
+                                                }
+                                              )}
+                                              target="_blank"
+                                              rel="noreferrer noopener"
+                                              style={{ color: customization.buttonPrimaryColor }}
+                                            >
+                                              {link.url}
+                                              <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
+                                            </a>
+                                          </div>
+                                          {link.description && (
+                                            <div className="text-muted small mt-1">{link.description}</div>
+                                          )}
+                                        </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </Collapse>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          )}
+        </Col>
+      </Row>
+    );
+  };
+
+  // If there are no items at all, show a notice
+  if (totalCount === 0) {
+    return (
+      <Alert color="info" className="d-flex align-items-center">
+        <FontAwesomeIcon icon={faInfoCircle} className="me-3 fa-lg" />
+        <div>
+          <h4 className="alert-heading">No Course Materials Found</h4>
+          <p className="mb-0">No materials have been added to this course yet.</p>
+        </div>
+      </Alert>
+    );
+  }
+
+  // If all items are hidden, show a message about scheduled materials
+  if (visibleCount === 0 && hiddenCount > 0) {
+    return (
+      <Alert color="warning" className="d-flex align-items-center">
+        <FontAwesomeIcon icon={faExclamationCircle} className="me-3 fa-lg" />
+        <div>
+          <h4 className="alert-heading">Course Materials Not Currently Available</h4>
+          <p>
+            {hiddenCount} {hiddenCount === 1 ? 'resource is' : 'resources are'} scheduled for this course, 
+            but {hiddenCount === 1 ? 'it is' : 'they are'} not currently available.
+          </p>
+          {nextAvailableDate && (
+            <p className="mb-0">
+              <strong>Next available date:</strong> {nextAvailableDate.toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      </Alert>
+    );
+  }
+
+  // For the main return, add split view support
+  return viewMode === 'split' ? renderSplitView() : (
     <Table bordered responsive className="align-middle">
       <caption className="sr-only">
         List of available records, their types, holdings, and access links
@@ -378,7 +837,6 @@ const RecordTable = ({
           <th scope="col">Title</th>
           <th scope="col">Authors</th>
           <th scope="col">Type</th>
-          <th scope="col">Call Number</th>
           <th scope="col">Publication</th>
           <th scope="col">Holdings</th>
           <th scope="col">Discover</th>
@@ -386,13 +844,13 @@ const RecordTable = ({
         </tr>
       </thead>
       <tbody>
-        {combinedResults.length > 0 ? (
-          combinedResults.map((result) => {
+        {processedItems.length > 0 ? (
+          processedItems.map((result) => {
             if (result.folder) {
               return (
                 <React.Fragment key={`group-${result.folder}`}>
                   <tr className="table-group-divider">
-                    <td colSpan={totalColumns} className="bg-dark text-white p-2">
+                    <td colSpan={totalColumns} className="bg-light text-dark p-2 fw-bold">
                       {result.folder}
                     </td>
                   </tr>
@@ -454,6 +912,8 @@ RecordTable.propTypes = {
           description: PropTypes.string,
           external_note: PropTypes.string,
           internal_note: PropTypes.string,
+          start_visibility: PropTypes.string,
+          end_visibility: PropTypes.string,
           links: PropTypes.arrayOf(
             PropTypes.shape({
               link_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -482,6 +942,9 @@ RecordTable.propTypes = {
   customization: PropTypes.shape({
     recordsDiscoverLinkBaseUrl: PropTypes.string,
     recordsDiscoverLinkText: PropTypes.string,
+    buttonPrimaryColor: PropTypes.string,
+    buttonSecondaryColor: PropTypes.string,
+    cardTextColor: PropTypes.string,
   }).isRequired,
   /**
    * Course information for tracking and display
@@ -491,12 +954,27 @@ RecordTable.propTypes = {
    * College parameter for tracking
    */
   collegeParam: PropTypes.string,
+  /**
+   * Whether to show visibility messages for unavailable items
+   */
+  showVisibilityMessages: PropTypes.bool,
+  /**
+   * View mode for the table ('combined' or 'split')
+   */
+  viewMode: PropTypes.oneOf(['combined', 'split']),
+  /**
+   * Array of individual record items
+   */
+  records: PropTypes.array,
 };
 
 RecordTable.defaultProps = {
   hasElectronicReserves: false,
   courseInfo: {},
   collegeParam: 'Unknown',
+  showVisibilityMessages: true,
+  viewMode: 'combined',
+  records: []
 };
 
 export default RecordTable;

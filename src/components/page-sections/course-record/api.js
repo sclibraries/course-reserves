@@ -1,4 +1,13 @@
+import { config } from '../../../config/index';
 
+export async function fetchMergedResources(courseListingId) {
+  const res = await fetch(
+    `https://libtools2.smith.edu/course-reserves/backend/web/course/get-merged-resources?courseListingId=${courseListingId}`
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  return json; 
+}
 /**
  * Fetch all reserves/records for a given courseListingId.
  */
@@ -87,4 +96,6 @@ export async function fetchCrossLinkedCourses(courseListingId) {
   
     return holding;
   }
+
+  
   

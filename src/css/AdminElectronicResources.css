@@ -641,3 +641,169 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
+
+/* Drag and drop styling */
+.drag-handle {
+  cursor: grab;
+  text-align: center;
+  color: #6c757d;
+  width: 40px;
+  position: relative;
+}
+
+.drag-handle:hover {
+  color: #495057;
+}
+
+.drag-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  opacity: 0;
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: opacity 0.2s;
+}
+
+.drag-handle:hover::after {
+  opacity: 1;
+}
+
+tr.dragging {
+  background-color: #f0f0f0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+
+/* Table styling */
+.print-resource-table tbody tr,
+.admin-resource-table tbody tr,
+.unified-resource-table tbody tr {
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.print-resource-table tbody tr:hover,
+.admin-resource-table tbody tr:hover,
+.unified-resource-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Make sure the table maintains its structure during drag */
+.print-resource-table,
+.admin-resource-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+/* Avoid text selection during drag operations */
+.drag-handle, 
+tr.dragging {
+  user-select: none;
+}
+
+/* Animation for drag-and-drop operation */
+.draggable-transition {
+  transition: transform 0.2s;
+}
+
+/* Style for the placeholder during dragging */
+[data-rbd-placeholder-context-id] {
+  background-color: #e9ecef;
+  height: 50px !important;
+  border: 2px dashed #ced4da;
+  opacity: 0.6 !important;
+}
+
+/* Style for rows being dragged */
+tr.dragging td {
+  background-color: #e9ecef;
+  border: 1px dashed #adb5bd;
+}
+
+/* Unified resource table styling */
+.unified-resource-table tr.dragging {
+  background-color: #f8f9fa;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.unified-resource-table th,
+.unified-resource-table td {
+  vertical-align: middle;
+}
+
+.unified-resource-table .resource-type-badge {
+  min-width: 85px;
+  text-align: center;
+}
+
+.unified-resource-table .badge {
+  font-size: 0.85em;
+  padding: 0.35em 0.65em;
+}
+
+.unified-resource-table .badge.bg-info {
+  background-color: #17a2b8 !important;
+}
+
+.unified-resource-table .badge.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+/* Toggle button styles */
+.resource-view-toggle {
+  margin-bottom: 1.5rem;
+}
+
+.resource-view-toggle .btn-group {
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Additional Links Section */
+.additional-links-row td {
+  padding: 0 !important;
+}
+
+/* Fix for React DnD z-index issues */
+.react-dnd-draggable {
+  z-index: 1000;
+}
+
+/* Avoid text selection during drag operations */
+.drag-handle, 
+tr.dragging {
+  user-select: none;
+}
+
+/* Animation for drag-and-drop operation */
+.draggable-transition {
+  transition: transform 0.2s;
+}
+
+/* Style for the placeholder during dragging */
+[data-rbd-placeholder-context-id] {
+  background-color: #e9ecef;
+  height: 50px !important;
+  border: 2px dashed #ced4da;
+  opacity: 0.6 !important;
+}
+
+/* Style for rows being dragged */
+tr.dragging td {
+  background-color: #e9ecef;
+  border: 1px dashed #adb5bd;
+}
+
+/* Unified resource table styling */
+.unified-resource-table tr.dragging {
+  background-color: #f8f9fa;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.unified-resource-table .resource-type-badge {
+  min-width: 85px;
+  text-align: center;
+}
