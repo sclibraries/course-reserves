@@ -287,8 +287,10 @@ function Searchbar() {
                     style={{ backgroundColor: searchButtonBgColor || '#0066cc' }}
                     className="mobile-search-button"
                     type="submit"
+                    aria-label="Search courses"
                   >
                     <FaSearch className="button-icon" aria-hidden="true" />
+                    <span className="visually-hidden">Search</span>
                   </Button>
                   <Button
                     color="light"
@@ -297,9 +299,13 @@ function Searchbar() {
                     type="button"
                     aria-expanded={advancedFiltersOpen}
                     aria-controls="advancedFilters"
+                    aria-label={advancedFiltersOpen ? "Hide advanced filters" : "Show advanced filters"}
                   >
                     <FaFilter className="button-icon" aria-hidden="true" />
                     {advancedFiltersOpen ? <FaAngleUp className="ms-1" /> : <FaAngleDown className="ms-1" />}
+                    <span className="visually-hidden">
+                      {advancedFiltersOpen ? "Hide" : "Show"} advanced filters
+                    </span>
                   </Button>
                 </InputGroup>
               </FormGroup>

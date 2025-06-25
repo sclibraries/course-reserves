@@ -11,10 +11,46 @@ import {
   Col
 } from 'reactstrap';
 import { FaPlus, FaTrash, FaLink, FaTags, FaFileAlt, FaInfoCircle } from 'react-icons/fa';
-import '../../../css/AdminForms.css';
+import '../../../../css/AdminForms.css';
 
 /**
- * ResourceLinks component for managing additional links for resources
+ * ResourceLinks Component
+ * =======================
+ * 
+ * **Purpose**: Manages additional URL links for resources, allowing multiple
+ * related links beyond the primary resource URL.
+ * 
+ * **Key Features**:
+ * - Dynamic addition/removal of link entries
+ * - Individual proxy settings per link
+ * - Structured data with URL, title, and description
+ * - Responsive card-based layout
+ * - Validation for required fields
+ * - Empty state with helpful messaging
+ * 
+ * **Use Cases**:
+ * - Related articles or resources
+ * - Alternative access points (e.g., different databases)
+ * - Supplementary materials
+ * - Help or instruction pages
+ * 
+ * **Data Structure**:
+ * Each link object contains:
+ * - `url` (required): The link URL
+ * - `title` (optional): Display name for the link
+ * - `description` (optional): Brief description
+ * - `use_proxy` (boolean): Whether to apply proxy for off-campus access
+ * 
+ * **Proxy Handling**:
+ * Links with use_proxy=true will be automatically wrapped with the 
+ * institutional proxy URL during form submission.
+ * 
+ * @component
+ * @example
+ * <ResourceLinks
+ *   links={formData.links}
+ *   setLinks={updateLinks}
+ * />
  */
 const ResourceLinks = ({ links, setLinks }) => {
   // Function to add a new empty link
@@ -52,7 +88,7 @@ const ResourceLinks = ({ links, setLinks }) => {
       </div>
 
       {links.length === 0 ? (
-        <Alert color="light" className="text-center p-4 border">
+        <Alert color="light" className="text-center p-4 border" fade={false}>
           <FaInfoCircle className="mb-2" size={24} />
           <p className="mb-0">No additional links added. Click &quot;Add Link&quot; to include related resources.</p>
         </Alert>

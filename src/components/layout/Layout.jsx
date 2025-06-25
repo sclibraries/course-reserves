@@ -58,9 +58,9 @@ const Layout = () => {
       {showSearchbar && <Searchbar />}
       
       {/* Content with different styling based on whether searchbar is shown */}
-      <div className={showSearchbar ? "main-content" : "main-content-no-search"}>
+      <main id="main-content" className={showSearchbar ? "main-content" : "main-content-no-search"}>
         <AppRoutes />
-      </div>
+      </main>
     </>
   );
 };

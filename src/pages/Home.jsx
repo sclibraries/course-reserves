@@ -46,7 +46,7 @@ function Home() {
     };
 
     fetchPopularCourses();
-  }, []);
+  }, [college]);
 
   const collegeNameConverter = (college) => {
     switch (college) {

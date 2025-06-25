@@ -12,7 +12,7 @@ export const TypeSpecificFields = ({ materialTypeFields, metadata = {}, handleFi
   // If no fields are available, show a message
   if (!materialTypeFields || materialTypeFields.length === 0) {
     return (
-      <Alert color="info" className="mb-0">
+      <Alert color="info" className="mb-0" fade={false}>
         <FaInfoCircle className="me-2" />
         Select a material type to see specific fields.
       </Alert>

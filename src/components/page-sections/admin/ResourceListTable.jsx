@@ -18,8 +18,9 @@ import {
   Spinner
 } from 'reactstrap';
 import { FaEdit, FaTrash, FaExternalLinkAlt, FaSort, FaSortUp, FaSortDown, FaSearch } from 'react-icons/fa';
-import { AdminEditResourceModal } from '../../admin/modals/AdminEditResourceModel';
-import { useAdminModal } from '../../../hooks/admin/useAdminModal';
+import ResourceFormManager from '../../admin/forms/ResourceFormManager';
+import { ResourceFormType } from '../../admin/forms/constants/formTypes';
+import { useResourceFormModal } from '../../../hooks/admin/useResourceFormModal';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { toast } from 'react-toastify';
 
@@ -99,8 +100,7 @@ DeleteConfirmationModal.propTypes = {
  * @component
  */
 const ResourceListTable = ({ resources, refreshResources }) => {
-  const [editResourceModalOpen, toggleEditResourceModal] = useAdminModal();
-  const [selectedResource, setSelectedResource] = useState(null);
+  const editResourceModal = useResourceFormModal();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [resourceToDelete, setResourceToDelete] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -117,7 +117,7 @@ const ResourceListTable = ({ resources, refreshResources }) => {
       const update = await adminResourceService.updateResource(resource_id, data);
       
       if (update) {
-        toggleEditResourceModal();
+        editResourceModal.closeModal();
         toast.success('Resource updated successfully');
         refreshResources();
       } else {
@@ -154,8 +154,7 @@ const ResourceListTable = ({ resources, refreshResources }) => {
   };
 
   const handleSelectedResource = (resource) => {
-    setSelectedResource(resource);
-    toggleEditResourceModal();
+    editResourceModal.openEditResourceForm(resource);
   };
 
   const handleSort = (field) => {
@@ -313,11 +312,13 @@ const ResourceListTable = ({ resources, refreshResources }) => {
       </Table>
 
       {/* Edit Resource Modal */}
-      <AdminEditResourceModal
-        isOpen={editResourceModalOpen}
-        toggle={toggleEditResourceModal}
+      <ResourceFormManager
+        isOpen={editResourceModal.isOpen}
+        onClose={editResourceModal.closeModal}
         onSubmit={handleEdit}
-        resource={selectedResource}
+        formType={ResourceFormType.EDIT}
+        initialData={editResourceModal.initialData}
+        {...editResourceModal.additionalProps}
       />
 
       {/* Delete Confirmation Modal */}

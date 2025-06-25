@@ -6,50 +6,6 @@ const FOLIO_API = config.api.urls.folio;
 const getAuthToken = config.api.getAuthToken;
 
 /**
- * Update the order of electronic resources
- * @param {string} offeringId - ID of the course offering
- * @param {Array} resources - Array of resources with order values
- * @returns {Promise} - Promise resolving to the update result
- */
-const updateResourceOrder = async (offeringId, resources) => {
-  try {
-    console.log(`Updating resource order for offering ${offeringId}`, resources);
-    
-    const response = await fetch(`${config.api.urls.courseReserves}/offering-link/update-resource-order`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': getAuthToken()
-      },
-      body: JSON.stringify({
-        offering_id: offeringId,
-        resources: resources
-      })
-    });
-    
-    const responseText = await response.text();
-    console.log('API raw response:', responseText);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to update resource order: ${responseText}`);
-    }
-    
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch (e) {
-      console.warn('Could not parse JSON response', e);
-      result = { success: response.ok };
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('Error updating resource order:', error);
-    throw error;
-  }
-};
-
-/**
  * Update the order of physical resources
  * @param {string} offeringId - ID of the course offering
  * @param {Array} resources - Array of physical resources with order values
@@ -131,31 +87,6 @@ const updateGlobalResourceOrder = async (offeringId, resources) => {
 };
 
 /**
- * Get physical resource references for a course offering
- * 
- * @param {string} offeringId - The course offering ID to fetch references for
- * @returns {Promise<Array>} - Array of physical resource references
- */
-const getPhysicalResourceReferences = async (offeringId) => {
-  try {
-    console.log(`Fetching physical resource references for offering ${offeringId}`);
-    
-    const response = await fetch(`${config.api.urls.courseReserves}/physical-resource/get-references?offering_id=${offeringId}`, {
-      headers: {
-        'Authorization': getAuthToken(),
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch physical resource references');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching physical resource references:', error);
-    throw error;
-  }
 };
 
 /**
@@ -250,7 +181,7 @@ export const adminCourseService = {
       }
     );
     if (!response.ok) {
-      throw new Error(ADMIN_ERROR_MESSAGES.COURSE_CREATE_FAILED);
+      throw new Error(ADMIN_ERROR_MESSAGES.COURSE_EXISTS_CHECK_FAILED || 'Failed to check if course exists');
     }
     return response.json();
   },
@@ -263,6 +194,24 @@ export const adminCourseService = {
         'Authorization': `${getAuthToken()}`,
       },
       body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      throw new Error(ADMIN_ERROR_MESSAGES.COURSE_CREATE_FAILED);
+    }
+    return response.json();
+  },
+
+  async createFromFolio(courseData, offeringData) {
+    const response = await fetch(`${COURSE_API}${config.api.endpoints.admin.createCourse}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `${getAuthToken()}`,
+      },
+      body: JSON.stringify({
+        course: courseData,
+        offering: offeringData
+      })
     });
     if (!response.ok) {
       throw new Error(ADMIN_ERROR_MESSAGES.COURSE_CREATE_FAILED);
@@ -320,6 +269,32 @@ export const adminCourseService = {
       })
     });
     if (!response.ok) throw new Error('Failed to link courses');
+    return response.json();
+  },
+
+  async unlinkCourses(offeringLinkId) {
+    // Use the offering_link_id in the URL path as expected by the backend
+    const url = `${COURSE_API}${config.api.endpoints.offeringLink.delete}/${offeringLinkId}`;
+    
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `${getAuthToken()}`,
+      }
+      // No body needed - the link ID is in the URL path
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to unlink courses: ${response.status} ${errorText}`);
+    }
+    
+    // Handle empty response (204 No Content)
+    if (response.status === 204) {
+      return { success: true };
+    }
+    
     return response.json();
   },
 
@@ -443,9 +418,8 @@ export const adminCourseService = {
     }
   },
 
-  getPhysicalResourceReferences,
+  // Functions imported at top of file
   getPhysicalResourceByExternalId,
-  updateResourceOrder,
   updatePhysicalResourceOrder,
   updateGlobalResourceOrder,
 };

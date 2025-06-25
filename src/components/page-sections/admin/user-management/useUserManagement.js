@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { config } from '../../../../config';
 
@@ -48,7 +48,7 @@ const useUserManagement = (token) => {
     } else {
       fetchAllUsers();
     }
-  }, [activeTab, token]);
+  }, [activeTab, token, fetchPendingUsers, fetchAllUsers]);
 
   // Filter and sort users
   const filteredUsers = useMemo(() => {
@@ -91,7 +91,7 @@ const useUserManagement = (token) => {
   }, [activeTab, pendingUsers, users, searchTerm, sortField, sortDirection]);
 
   // Fetch pending user requests
-  const fetchPendingUsers = async () => {
+  const fetchPendingUsers = useCallback(async () => {
     setLoading(true);
     
     try {
@@ -116,10 +116,10 @@ const useUserManagement = (token) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
   
   // Fetch all users
-  const fetchAllUsers = async () => {
+  const fetchAllUsers = useCallback(async () => {
     setLoading(true);
     
     try {
@@ -144,7 +144,7 @@ const useUserManagement = (token) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   // Handle user approval
   const handleApprove = async (user) => {

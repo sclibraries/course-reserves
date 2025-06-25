@@ -75,7 +75,7 @@ function AdminCustomizations() {
                 setEditedCustomization({...filteredCustomizations[0]});
             }
         }
-    }, [customizations, user]);
+    }, [customizations, user, filteredCustomizations]);
 
     const fetchCustomizations = async () => {
         try {

@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Button, Alert, Spinner } from 'reactstrap';
 import { fetchCourseData, fetchRecords } from '../components/page-sections/course-record/api';
 import { adminCourseService } from '../services/admin/adminCourseService';
-import { useAdminModal } from '../hooks/admin/useAdminModal';
 import { useAdminResourceStore } from '../store/adminResourceStore';
 import { transformFolioCourseToLocal } from '../util/adminTransformers';
-import { AdminNewResourceModal } from '../components/admin/modals/AdminNewResourceModal';
-import { AdminReuseResourceModal } from '../components/admin/modals/AdminReuseResourceModal';
-import { AdminEDSResourceModal } from '../components/admin/modals/AdminEDSResourceModal';
-import { AdminHitchCockResourceModal } from '../components/admin/modals/AdminHitchcockResourceModal';
-import { AdminCrossLinkFolioCourseModal } from '../components/admin/modals/AdminCrossLinkFolioCourseModal';
+
+// Import unified form system
+import ResourceFormManager from '../components/admin/forms/ResourceFormManager';
+import { useResourceFormModal } from '../hooks/admin/useResourceFormModal';
+
 import { useAdminCourseStore } from '../store/adminCourseStore';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { toast } from 'react-toastify';
@@ -21,6 +20,9 @@ import AdminCourseHeader from '../components/page-sections/admin/electronic-reso
 import AdminCoursePermalink from '../components/page-sections/admin/electronic-resources/AdminCoursePermalink';
 import AdminResourcesTabs from '../components/page-sections/admin/electronic-resources/AdminResourcesTabs';
 import '../css/AdminElectronicResources.css';
+
+// Constants
+const TERM_ORDER = { 'Winter': 0, 'Spring': 1, 'Summer': 2, 'Fall': 3 };
 
 function AdminElectronicResources() {
   // Navigation and store state
@@ -38,19 +40,11 @@ function AdminElectronicResources() {
   const [printResources, setPrintResources] = useState([]);
   const [linkedCourses, setLinkedCourses] = useState([]);
   const [copyStatus, setCopyStatus] = useState('');
-  const [physicalResourceReferences, setPhysicalResourceReferences] = useState([]);
 
-  // Modal state
-  const [newResourceModalOpen, toggleNewResourceModal] = useAdminModal();
-  const [reuseModalOpen, toggleReuseModal] = useAdminModal();
-  const [edsResourceModalOpen, toggleEDSResourceModal] = useAdminModal();
-  const [hitchcockModalOpen, toggleHitchcockModal] = useAdminModal();
-  const [crossLinkModalOpen, toggleCrossLinkModal] = useAdminModal();
+  // Unified modal state
+  const resourceFormModal = useResourceFormModal();
 
-  // Helper functions for term comparison
-  const TERM_ORDER = { 'Winter': 0, 'Spring': 1, 'Summer': 2, 'Fall': 3 };
-
-  const isTermLater = (currentTermName, latestTermName) => {
+  const isTermLater = useCallback((currentTermName, latestTermName) => {
     if (!latestTermName) return true; 
     
     const [currentYear, currentSemester] = currentTermName.split(' ');
@@ -63,7 +57,7 @@ function AdminElectronicResources() {
     }
 
     return false;
-  };
+  }, []);
 
   // Clear state on course ID change
   useEffect(() => {
@@ -117,46 +111,8 @@ useEffect(() => {
   loadPrintsWithOrder();
 }, [folioCourseId, course?.offering_id]);
 
-
-  // Fetch course data from FOLIO and set up the course
-  useEffect(() => {
-    const checkAndSetupCourse = async () => {
-      setLoading(true);
-      setError(null);
-      setResources([]);
-      try {
-        // Fetch course data from FOLIO
-        const folioCourseData = await fetchCourseData(folioCourseId);
-        if (!folioCourseData || !folioCourseData.length) {
-          toast.error('Course not found in FOLIO.');
-          return;
-        }
-        const courseDetails = folioCourseData[0];
-        setFolioCourseData(courseDetails);
-  
-        // Extract term name from FOLIO course details.
-        const folioTermName = courseDetails?.courseListingObject?.termObject?.name;
-        if (!folioTermName) {
-          toast.error('FOLIO course data is missing term information.');
-          return;
-        }
-  
-        await setupCourse(courseDetails, folioTermName);
-      } catch (err) {
-        console.error(err);
-        setError('Error setting up course');
-      } finally {
-        setLoading(false);
-      }
-    };
-  
-    if (folioCourseId && !course) {
-      checkAndSetupCourse();
-    }
-  }, [folioCourseId, course, setCourse, setFolioCourseData, setResources]);
-
   // Helper function to set up course based on FOLIO data
-  const setupCourse = async (courseDetails, folioTermName) => {
+  const setupCourse = useCallback(async (courseDetails, folioTermName) => {
     try {
       // Check if permanent course exists
       const checkResponse = await adminCourseService.checkPermanentCourseExists({
@@ -204,7 +160,44 @@ useEffect(() => {
       console.error('Error in setupCourse:', err);
       throw err;
     }
-  };
+  }, [setCourse, setResources, setShowReusePrompt, isTermLater]);
+
+  // Fetch course data from FOLIO and set up the course
+  useEffect(() => {
+    const checkAndSetupCourse = async () => {
+      setLoading(true);
+      setError(null);
+      setResources([]);
+      try {
+        // Fetch course data from FOLIO
+        const folioCourseData = await fetchCourseData(folioCourseId);
+        if (!folioCourseData || !folioCourseData.length) {
+          toast.error('Course not found in FOLIO.');
+          return;
+        }
+        const courseDetails = folioCourseData[0];
+        setFolioCourseData(courseDetails);
+  
+        // Extract term name from FOLIO course details.
+        const folioTermName = courseDetails?.courseListingObject?.termObject?.name;
+        if (!folioTermName) {
+          toast.error('FOLIO course data is missing term information.');
+          return;
+        }
+  
+        await setupCourse(courseDetails, folioTermName);
+      } catch (err) {
+        console.error(err);
+        setError('Error setting up course');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    if (folioCourseId && !course) {
+      checkAndSetupCourse();
+    }
+  }, [folioCourseId, course, setCourse, setFolioCourseData, setResources, setupCourse]);
 
   // Fetch linked courses for current course
   useEffect(() => {
@@ -224,21 +217,20 @@ useEffect(() => {
     }
   }, [course]);
 
-  // Fetch physical resource references
-  useEffect(() => {
+  // Function to refresh linked courses (can be called from modals)
+  const refreshLinkedCourses = useCallback(async () => {
     if (course?.offering_id) {
-      const fetchPhysicalResourceReferences = async () => {
-        try {
-          const references = await adminCourseService.getPhysicalResourceReferences(course.offering_id);
-          setPhysicalResourceReferences(references);
-        } catch (err) {
-          console.error('Error fetching physical resource references:', err);
+      try {
+        const results = await adminCourseService.getLinkedCourses(course.offering_id);
+        if (results) {
+          setLinkedCourses(results);
         }
-      };
-      
-      fetchPhysicalResourceReferences();
+      } catch (err) {
+        console.error('Error refreshing linked courses:', err);
+        toast.error('Failed to refresh linked courses.');
+      }
     }
-  }, [course]);
+  }, [course?.offering_id]);
 
   // Course action handlers
   const handleReuseExistingCourse = async () => {
@@ -329,7 +321,13 @@ useEffect(() => {
       const { resources: updated } = await adminCourseService.fetchCourseResources(course.offering_id);
       setResources(updated);
       toast.success('Resource linked successfully.');
-      toggleReuseModal();
+      resourceFormModal.openReuseForm({
+        searchTerm,
+        searchResults,
+        onSearchTermChange: setSearchTerm,
+        onSearch: handleSearchResources,
+        onReuse: handleReuseResource
+      });
     } catch (err) {
       console.error(err);
       toast.error('Failed to link resource.');
@@ -548,11 +546,17 @@ useEffect(() => {
         resources={resources}
         printResources={printResources}
         linkedCourses={linkedCourses}
-        toggleNewResourceModal={toggleNewResourceModal}
-        toggleEDSResourceModal={toggleEDSResourceModal}
-        toggleHitchcockModal={toggleHitchcockModal}
-        toggleReuseModal={toggleReuseModal}
-        toggleCrossLinkModal={toggleCrossLinkModal}
+        toggleNewResourceModal={resourceFormModal.openNewResourceForm}
+        toggleEDSResourceModal={resourceFormModal.openEDSForm}
+        toggleHitchcockModal={resourceFormModal.openHitchcockForm}
+        toggleReuseModal={() => resourceFormModal.openReuseForm({
+          searchTerm,
+          searchResults,
+          onSearchTermChange: setSearchTerm,
+          onSearch: handleSearchResources,
+          onReuse: handleReuseResource
+        })}
+        toggleCrossLinkModal={resourceFormModal.openCrosslinkForm}
         unlinkResource={unlinkResource}
         handleUpdateResources={handleUpdateResources}
         handleReorder={handleReorder}
@@ -560,42 +564,19 @@ useEffect(() => {
         handleUnifiedReorder={handleUnifiedReorder}
         buildFolioCourseUrl={() => buildFolioCourseUrl(folioCourseData?.id)}
         navigate={navigate}
+        editResourceModal={resourceFormModal}
       />
 
-      {/* Modals for Resource Actions */}
-      <AdminNewResourceModal
-        isOpen={newResourceModalOpen}
-        toggle={toggleNewResourceModal}
+      {/* Unified Resource Form Modal */}
+      <ResourceFormManager
+        isOpen={resourceFormModal.isOpen}
+        onClose={resourceFormModal.closeModal}
         onSubmit={handleUpdateResources}
+        formType={resourceFormModal.formType}
+        initialData={resourceFormModal.initialData}
         course={course}
-      />
-      <AdminReuseResourceModal
-        isOpen={reuseModalOpen}
-        toggle={toggleReuseModal}
-        searchTerm={searchTerm}
-        searchResults={searchResults}
-        onSearchTermChange={setSearchTerm}
-        onSearch={handleSearchResources}
-        onReuse={handleReuseResource}
-        isLoading={loading}
-      />
-      <AdminEDSResourceModal
-        isOpen={edsResourceModalOpen}
-        toggle={toggleEDSResourceModal}
-        onSubmit={handleUpdateResources}
-        course={course}
-      />
-      <AdminHitchCockResourceModal
-        isOpen={hitchcockModalOpen}
-        toggle={toggleHitchcockModal}
-        onSubmit={handleUpdateResources}
-        course={course}
-      />
-      <AdminCrossLinkFolioCourseModal
-        isOpen={crossLinkModalOpen}
-        toggle={toggleCrossLinkModal}
-        onLinkSuccess={handleUpdateResources} 
-        course={course}
+        refreshLinkedCourses={refreshLinkedCourses}
+        {...resourceFormModal.additionalProps}
       />
     </Container>
   );

@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Card, CardHeader, CardBody, Table, Badge, Button, Input } from 'reactstrap';
 import { CAMPUS_COLORS, COLORS } from '../constants';
+import CourseDetailModal from '../modals/CourseDetailModal';
 
 /**
  * Table component for displaying all courses with sorting and pagination
@@ -19,6 +20,9 @@ const CoursesTable = ({
   setTermFilter,
   setCourseSearchTerm
 }) => {
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [courseDetailModalOpen, setCourseDetailModalOpen] = useState(false);
+
   // Filter and sort courses
   const filteredAndSortedCourses = useMemo(() => {
     try {
@@ -180,6 +184,7 @@ const CoursesTable = ({
                   )}
                 </th>
                 <th style={{ width: '120px' }}>Percentage</th>
+                <th style={{ width: '120px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -224,6 +229,18 @@ const CoursesTable = ({
                           ></div>
                         </div>
                       </div>
+                    </td>
+                    <td>
+                      <Button
+                        color="primary"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCourse(course);
+                          setCourseDetailModalOpen(true);
+                        }}
+                      >
+                        View Details
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -280,7 +297,23 @@ const CoursesTable = ({
             </div>
           </div>
         )}
+
+        {/* Course Detail Modal */}
+        {selectedCourse && (
+          <CourseDetailModal 
+            isOpen={courseDetailModalOpen}
+            toggle={() => setCourseDetailModalOpen(!courseDetailModalOpen)}
+            course={selectedCourse}
+          />
+        )}
       </CardBody>
+      
+      {/* Course Detail Modal */}
+      <CourseDetailModal
+        isOpen={courseDetailModalOpen}
+        toggle={() => setCourseDetailModalOpen(false)}
+        course={selectedCourse}
+      />
     </Card>
   );
 };

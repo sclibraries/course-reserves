@@ -67,7 +67,7 @@ export function useCurrentTermId(termsApiUrl) {
       }
     }
     fetchTerms();
-  }, [termsApiUrl]);
+  }, [termsApiUrl, TERMS_API_URL]);
 
 
   return { termId, terms, loading, error };

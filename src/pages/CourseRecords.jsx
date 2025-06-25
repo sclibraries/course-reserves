@@ -71,7 +71,7 @@ function CourseRecords() {
       };
       fetchFOLIOCourseListingId();
     }
-  }, [uuid]);
+  }, [uuid, setRecord]);
 
   useEffect(() => {
     if (!courseCode) return;
@@ -105,7 +105,7 @@ function CourseRecords() {
 
     fetchFOLIOCourseListingId();
 
-  }, [courseCode, config.api.urls.folio]);
+  }, [courseCode, setRecord]);
 
   // Update record from URL parameter (if it differs)
   useEffect(() => {
@@ -119,7 +119,7 @@ function CourseRecords() {
     if (record) {
       fetchAllData();
     }
-  }, [record]);
+  }, [record, fetchAllData]);
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -145,7 +145,7 @@ function CourseRecords() {
       console.warn(`Error fetching inventory details for ${instanceId}:`, error);
       return null;
     }
-  }, [config.api.urls.folio]);
+  }, []);
 
   // Fetch all required data (print reserves, course data, electronic reserves)
   const fetchAllData = useCallback(async () => {
@@ -178,6 +178,7 @@ function CourseRecords() {
         }));
         allMerged = [...mergedResources, ...fallbackPhysical];
       }
+
   
       // 2.5) ADDED: Fetch cross-linked courses and merge them in
       let crossLinkedCourses = [];
@@ -376,6 +377,17 @@ function CourseRecords() {
             publication: r.copiedItem.publication?.length || 0
           }))
         );
+      }
+
+      // NEW: dedupe by instanceId
+      {
+        const seen = new Set();
+        normalized = normalized.filter(item => {
+          const instId = item.copiedItem?.instanceId;
+          if (!instId || seen.has(instId)) return false;
+          seen.add(instId);
+          return true;
+        });
       }
   
       setRecords(normalized);

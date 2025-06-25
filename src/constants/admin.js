@@ -18,6 +18,7 @@ export const MATERIAL_TYPES = {
   
   export const ADMIN_ERROR_MESSAGES = {
     COURSE_CREATE_FAILED: 'Failed to create local course',
+    COURSE_EXISTS_CHECK_FAILED: 'Failed to check if course exists',
     RESOURCE_FETCH_FAILED: 'Failed to fetch course resources',
     RESOURCE_CREATE_FAILED: 'Failed to create resource',
     RESOURCE_LINK_FAILED: 'Failed to link resource',

@@ -11,7 +11,7 @@ import { FaSearch, FaRedo } from 'react-icons/fa';
 import useAdminSearchStore from '../../store/adminSearchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import useSearchStore from '../../store/searchStore';
-import { useAuth } from '../../contexts/AuthContext';
+import useCollegeManagement from '../../hooks/useCollegeManagement';
 import '../../css/Admin.css';
 
 function HorizontalAdminSidebar() {
@@ -34,6 +34,16 @@ function HorizontalAdminSidebar() {
     terms,
   } = useSearchStore();
 
+  // Use the centralized college management hook
+  const {
+    selectedCollege,
+    availableColleges,
+    handleCollegeChange,
+    resetCollege,
+    isCollegeDisabled
+  } = useCollegeManagement(college, setCollege); // Pass setCollege to sync with store
+
+
   const {
     searchButtonBgColor,
     resetButtonBgColor,
@@ -41,16 +51,11 @@ function HorizontalAdminSidebar() {
     state.getCustomizationForCollege(college)
   );
   
-  // Get user info and permissions from auth context
-  const { user, isAdmin } = useAuth();
-
   // Local states for dropdowns
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
-  const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
   const [selectedSort, setSelectedSort] = useState('name');
-  const [availableColleges, setAvailableColleges] = useState(['All Colleges']);
 
   const searchAreas = [
     'All fields',
@@ -58,15 +63,6 @@ function HorizontalAdminSidebar() {
     'Course Code',
     'Section',
     'Instructor',
-  ];
-  
-  const allColleges = [
-    'All Colleges',
-    'Smith',
-    'Hampshire',
-    'MtHolyoke',
-    'Amherst',
-    'UMass',
   ];
 
   const sortOptions = [
@@ -80,60 +76,10 @@ function HorizontalAdminSidebar() {
     { label: 'Term (Oldest First)', value: 'term' },
   ];
 
-  // Map full institution names to college keys
-  const institutionToCollegeKey = {
-    'Smith College': 'smith',
-    'Hampshire College': 'hampshire',
-    'Mount Holyoke College': 'mtholyoke',
-    'Amherst College': 'amherst',
-    'UMass Amherst': 'umass'
-  };
-
-  // Map institution names to UI college names
-  const institutionToCollegeName = {
-    'Smith College': 'Smith',
-    'Hampshire College': 'Hampshire',
-    'Mount Holyoke College': 'MtHolyoke',
-    'Amherst College': 'Amherst',
-    'UMass Amherst': 'UMass'
-  };
-
-  // Set available colleges based on user permissions
-  useEffect(() => {
-    if (!user) return;
-    
-    // Admin users can see all colleges
-    if (isAdmin) {
-      setAvailableColleges(allColleges);
-      return;
-    }
-    
-    // Regular users can only see their own institution
-    if (user.institution) {
-      const userCollegeKey = institutionToCollegeKey[user.institution];
-      const userCollegeName = institutionToCollegeName[user.institution];
-      
-      if (userCollegeKey && userCollegeName) {
-        // If user's institution maps to a valid college, use that
-        setAvailableColleges(['All Colleges', userCollegeName]);
-        
-        // If no college is selected yet, set it to user's college
-        if (college === 'all' || !college) {
-          setCollege(userCollegeKey);
-          setSelectedCollege(userCollegeName);
-        }
-      } else {
-        // Fallback if we can't map the institution
-        setAvailableColleges(['All Colleges']);
-      }
-    }
-  }, [user, isAdmin]);
-
   useEffect(() => {
     // Sync local state with store
     setSearchArea(keyToSearchArea(type));
     setSearchInput(query || '');
-    setSelectedCollege(keyToCollegeName(college));
     setSelectedSort(sort || 'name');
   }, [type, query, college, department, termId, sort]);
 
@@ -160,13 +106,12 @@ function HorizontalAdminSidebar() {
 
   const handleSearch = () => {
     const areaKey = searchAreaToKey(searchArea);
-    const collegeKey = collegeNameToKey(selectedCollege);
     const sanitizedInput = searchInput.trim();
 
     setType(areaKey);
-    setCollege(collegeKey);
     setQuery(sanitizedInput);
     setSort(selectedSort);
+    // College is already managed by the hook and synced with the store
   };
 
   const handleReset = () => {
@@ -176,22 +121,8 @@ function HorizontalAdminSidebar() {
     setType('all');
     setQuery('');
     
-    // Reset college to user's college if they're not an admin
-    if (!isAdmin && user?.institution) {
-      const userCollegeKey = institutionToCollegeKey[user.institution];
-      const userCollegeName = institutionToCollegeName[user.institution];
-      
-      if (userCollegeKey && userCollegeName) {
-        setCollege(userCollegeKey);
-        setSelectedCollege(userCollegeName);
-      } else {
-        setCollege('all');
-        setSelectedCollege('All Colleges');
-      }
-    } else {
-      setCollege('all');
-      setSelectedCollege('All Colleges');
-    }
+    // Reset college using the hook
+    resetCollege();
     
     setDepartment('');
     setSort('name');
@@ -217,30 +148,6 @@ function HorizontalAdminSidebar() {
       case 'section': return 'Section';
       case 'instructor': return 'Instructor';
       default: return 'All fields';
-    }
-  };
-
-  const collegeNameToKey = (col) => {
-    switch (col) {
-      case 'Smith': return 'smith';
-      case 'Hampshire': return 'hampshire';
-      case 'MtHolyoke': return 'mtholyoke';
-      case 'Amherst': return 'amherst';
-      case 'UMass': return 'umass';
-      case 'All Colleges':
-      default: return 'all';
-    }
-  };
-
-  const keyToCollegeName = (key) => {
-    switch (key) {
-      case 'smith': return 'Smith';
-      case 'hampshire': return 'Hampshire';
-      case 'mtholyoke': return 'MtHolyoke';
-      case 'amherst': return 'Amherst';
-      case 'umass': return 'UMass';
-      case 'all':
-      default: return 'All Colleges';
     }
   };
 
@@ -291,11 +198,10 @@ function HorizontalAdminSidebar() {
                 type="select"
                 value={selectedCollege}
                 onChange={(e) => {
-                  setSelectedCollege(e.target.value);
-                  setCollege(collegeNameToKey(e.target.value));
+                  handleCollegeChange(e.target.value);
                 }}
                 className="filter-select"
-                disabled={availableColleges.length <= 2 && !isAdmin} // Disable if user only has access to one college
+                disabled={isCollegeDisabled}
               >
                 {availableColleges.map((col) => (
                   <option key={col} value={col}>{col}</option>

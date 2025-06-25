@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Popover, PopoverBody, Button, Collapse, Alert, Row, Col } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -83,7 +83,7 @@ const RecordTable = ({
    * @param {Object} item - Record item to check
    * @returns {Object} Object containing visibility status and message
    */
-  const checkVisibility = (item) => {
+  const checkVisibility = useCallback((item) => {
     if (item.isElectronic && item.resource) {
       // Authenticated users can see all resources regardless of visibility window
       if (isAuthenticated) {
@@ -117,7 +117,7 @@ const RecordTable = ({
       }
     }
     return { isVisible: true };
-  };
+  }, [isAuthenticated]);
 
   // Process visibility for all items
   const processedResults = useMemo(() => {
@@ -211,7 +211,7 @@ const RecordTable = ({
       upcomingItems,
       nextAvailableDate: upcomingItems.length > 0 ? upcomingItems[0].date : null
     };
-  }, [combinedResults, isAuthenticated]);
+  }, [combinedResults, isAuthenticated, checkVisibility]);
   
   const { 
     items: processedItems, 

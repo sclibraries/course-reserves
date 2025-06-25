@@ -178,14 +178,17 @@ function Header() {
           </NavbarBrand>
 
           <div className="d-flex align-items-center">
-            <Link
-              to={"/search?college=" + college}
-              className={`nav-link me-3 ${!isAdminPath ? 'active' : ''}`}
-              aria-label="Go to course reserves home page"
-              style={!isAdminPath ? activeNavLinkStyle : navLinkStyle}
-            >
-              <FaHome className="me-1" /> Home
-            </Link>
+            {/* Only show Home link when on admin pages, since the logo already links to home */}
+            {isAdminPath && (
+              <Link
+                to={"/search?college=" + college}
+                className="nav-link me-3"
+                aria-label="Go to course reserves home page"
+                style={navLinkStyle}
+              >
+                <FaHome className="me-1" /> Home
+              </Link>
+            )}
 
             {isAuthenticated && (
               <Link

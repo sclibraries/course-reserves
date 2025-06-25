@@ -25,7 +25,8 @@ function AdminResourcesTabs({
   handlePrintResourceReorder,
   handleUnifiedReorder,
   buildFolioCourseUrl,
-  navigate
+  navigate,
+  editResourceModal
 }) {
   const [activeTab, setActiveTab] = useState('resources');
   const [resourceView, setResourceView] = useState('separate'); // 'separate' or 'unified'
@@ -137,7 +138,7 @@ function AdminResourcesTabs({
                           resources={resources} 
                           unlink={unlinkResource} 
                           onReorder={handleReorder}
-                          handleUpdateResources={handleUpdateResources}
+                          editResourceModal={editResourceModal}
                         />
                       ) : (
                         <EmptyState 
@@ -286,7 +287,8 @@ AdminResourcesTabs.propTypes = {
   handlePrintResourceReorder: PropTypes.func.isRequired,
   handleUnifiedReorder: PropTypes.func.isRequired,
   buildFolioCourseUrl: PropTypes.func.isRequired,
-  navigate: PropTypes.func.isRequired
+  navigate: PropTypes.func.isRequired,
+  editResourceModal: PropTypes.object.isRequired
 };
 
 export default AdminResourcesTabs;

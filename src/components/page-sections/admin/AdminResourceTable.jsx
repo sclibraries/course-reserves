@@ -14,10 +14,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Button, Alert } from 'reactstrap';
-import { useAdminModal } from '../../../hooks/admin/useAdminModal';
-import { AdminEditResourceModal } from '../../admin/modals/AdminEditResourceModel';
-import { adminResourceService } from '../../../services/admin/adminResourceService';
-import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useDrag, useDrop } from 'react-dnd';
 
@@ -32,12 +28,6 @@ const TABLE_HEADERS = [
   { key: 'material_type_name', label: 'Type' },
   { key: 'action', label: 'Action' },
 ];
-
-/**
- * Smith College proxy URL prefix
- * @constant {string}
- */
-const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
 
 /**
  * Resource shape definition for PropTypes
@@ -63,34 +53,6 @@ const resourceShape = PropTypes.shape({
  * Adjusts the proxy settings in a resource URL
  * 
  * Adds or removes the proxy prefix based on the use_proxy flag.
- * 
- * @function
- * @param {Object} data - Resource data
- * @param {string} data.link - The URL to adjust
- * @param {number} data.use_proxy - Whether to use proxy (1) or not (0)
- * @throws {Error} If data or link property is invalid
- * @returns {void}
- */
-function adjustProxy(data) {
-  // Basic error checking
-  if (!data || typeof data.link !== "string") {
-    throw new Error("Invalid data or missing link property");
-  }
-  
-  // Check explicitly against the numbers 1 or 0.
-  if (data.use_proxy == 1) {
-    // Add the proxy prefix if it's not already present.
-    if (!data.link.startsWith(PROXY_PREFIX)) {
-      data.link = PROXY_PREFIX + data.link;
-    }
-  } else if (data.use_proxy == 0) {
-    // Remove the proxy prefix if it's present.
-    if (data.link.startsWith(PROXY_PREFIX)) {
-      data.link = data.link.replace(PROXY_PREFIX, "");
-    }
-  }
-}
-
 /**
  * Define item type for drag and drop
  * @constant {string}
@@ -284,10 +246,9 @@ export const AdminResourceTable = ({
   resources, 
   unlink, 
   onReorder,
-  handleUpdateResources 
+  editResourceModal
 }) => {
-  const [selectedResource, setSelectedResource] = useState(null);
-  const [editResourceModalOpen, toggleEditResourceModal] = useAdminModal();
+  // Remove the local useResourceFormModal since we're using the one passed as prop
   const [sortedResources, setSortedResources] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   
@@ -340,28 +301,7 @@ export const AdminResourceTable = ({
   }, [sortedResources, onReorder, isDragging]);
   
   const handleSelectedResource = (resource) => {
-    setSelectedResource(resource);
-    toggleEditResourceModal();
-  };
-
-  const handleEdit = async (formData) => {
-    const { resource_id, ...data } = formData;
-    
-    try {
-      adjustProxy(data);
-      const update = await adminResourceService.updateResource(resource_id, data);
-      
-      if (update) {
-        toggleEditResourceModal();
-        handleUpdateResources();
-        toast.success('Resource updated successfully');
-      } else {
-        toast.error('Resource update failed');
-      }
-    } catch (error) {
-      console.error('Resource Update Failed:', error);
-      toast.error(`Resource update failed: ${error.message || 'Unknown error'}`);
-    }
+    editResourceModal.openEditResourceForm(resource);
   };
 
   if (!resources?.length) {
@@ -404,13 +344,6 @@ export const AdminResourceTable = ({
           ))}
         </tbody>
       </Table>
-
-      <AdminEditResourceModal
-        isOpen={editResourceModalOpen}
-        toggle={toggleEditResourceModal}
-        onSubmit={handleEdit}
-        resource={selectedResource}
-      />
     </div>
   );
 };
@@ -419,5 +352,7 @@ AdminResourceTable.propTypes = {
   resources: PropTypes.arrayOf(resourceShape).isRequired,
   unlink: PropTypes.func.isRequired,
   onReorder: PropTypes.func,
-  handleUpdateResources: PropTypes.func.isRequired,
+  editResourceModal: PropTypes.shape({
+    openEditResourceForm: PropTypes.func.isRequired
+  }).isRequired,
 };

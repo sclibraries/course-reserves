@@ -27,11 +27,6 @@ export const mapEdsRecordToResource = async (record) => {
       record.PLink ||
       "";
 
-    // Extract author (fallback to BibEntity if needed)
-    const author =
-      items.find((it) => it.Name === "Author")?.plainText ||
-      (recordInfo.Authors ? recordInfo.Authors.map((a) => a.Name).join(", ") : "") ||
-      "";
 
     // Extract publication type (TypePub)
     const typePub =

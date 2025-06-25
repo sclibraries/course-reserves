@@ -132,6 +132,7 @@ const RecordCard = ({
     console.error('Invalid record item data:', recordItem);
     return null;
   }
+
   
   const { copiedItem, isElectronic, resource } = recordItem;
   const { instanceId, title, contributors, publication } = copiedItem;
@@ -319,6 +320,7 @@ const RecordCard = ({
     const showCallNumber = holdings.some((h) => h.callNumber);
     const showBarcode = holdings.some((h) => h.barcode);
     const showVolume = holdings.some((h) => h.volume);
+    const itemCopyNumber = holdings.some((h) => h.itemCopyNumber);
     const showAccess = holdings.some((h) => getHoldingUrl(h));
 
     return (
@@ -334,6 +336,7 @@ const RecordCard = ({
               {showCallNumber && <th scope="col">Call Number</th>}
               {showBarcode && <th scope="col">Barcode</th>}
               {showVolume && <th scope="col">Volume</th>}
+              {itemCopyNumber && <th scope="col">Item Copy Number</th>}
               {showAccess && <th scope="col">Access</th>}
             </tr>
           </thead>
@@ -362,6 +365,7 @@ const RecordCard = ({
                   {showCallNumber && <td>{holding.callNumber}</td>}
                   {showBarcode && <td>{holding.barcode}</td>}
                   {showVolume && <td>{holding.volume || ''}</td>}
+                  {itemCopyNumber && <td>{holding.itemCopyNumber || ''}</td>}
                   {showAccess && (
                     <td>
                       {resourceUrl && (
@@ -396,6 +400,7 @@ const RecordCard = ({
     );
   };
 
+
   // For electronic items, render relevant info
   const renderElectronicResource = () => {
     if (!isElectronic || !resource) return null;
@@ -423,7 +428,6 @@ const RecordCard = ({
 
     // Show visibility dates for authenticated users
     const showVisibilityDates = isAuthenticated && (resource.start_visibility || resource.end_visibility);
-
     return (
       <div className="mt-3">
         {resource.item_url && (
@@ -532,7 +536,6 @@ const RecordCard = ({
             <strong>Publication:</strong> {formatPublication(publication)}
           </CardText>
         )}
-
         {discoverUrl && (
           <Button
             color="primary"

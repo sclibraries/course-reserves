@@ -27,6 +27,55 @@ export const AuthProvider = ({ children }) => {
     return permissions.includes(permissionKey);
   }, [user, permissions]);
 
+  // Logout handler
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    setToken(null);
+    setUser(null);
+    setPermissions([]);
+    setIsAuthenticated(false);
+    navigate('/');
+  }, [navigate]);
+
+  // Refresh token function
+  const refreshToken = useCallback(async () => {
+    try {
+      const refreshTokenValue = localStorage.getItem('refreshToken');
+      if (!refreshTokenValue) {
+        throw new Error('No refresh token available');
+      }
+      
+      const refreshUrl = apiConfig.getRefreshTokenUrl();     
+
+      const response = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken: refreshTokenValue })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+      
+      const data = await response.json();
+      
+      if (data.accessToken && data.refreshToken) {
+        localStorage.setItem('authToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        setToken(data.accessToken);
+        console.log('Token refreshed successfully');
+      } else {
+        throw new Error('Invalid token data received');
+      }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      handleLogout();
+    }
+  }, [handleLogout]);
+
   // Initialize auth state from stored tokens
   useEffect(() => {
     const initializeAuth = () => {
@@ -146,7 +195,7 @@ export const AuthProvider = ({ children }) => {
     if (!hasProcessedUrlParams) {
       initializeAuth();
     }
-  }, [location, navigate]);
+  }, [location, navigate, handleLogout]);
 
   // Set up token refresh mechanism
   useEffect(() => {
@@ -174,56 +223,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       if (refreshTimeout) clearTimeout(refreshTimeout);
     };
-  }, [token]);
-
-  // Refresh token function
-  const refreshToken = async () => {
-    try {
-      const refreshTokenValue = localStorage.getItem('refreshToken');
-      if (!refreshTokenValue) {
-        throw new Error('No refresh token available');
-      }
-      
-      const refreshUrl = apiConfig.getRefreshTokenUrl();     
-
-      const response = await fetch(refreshUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken: refreshTokenValue })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to refresh token');
-      }
-      
-      const data = await response.json();
-      
-      if (data.accessToken && data.refreshToken) {
-        localStorage.setItem('authToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        setToken(data.accessToken);
-        console.log('Token refreshed successfully');
-      } else {
-        throw new Error('Invalid token data received');
-      }
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      handleLogout();
-    }
-  };
-
-  // Logout handler
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
-    setToken(null);
-    setUser(null);
-    setPermissions([]);
-    setIsAuthenticated(false);
-    navigate('/');
-  }, [navigate]);
+  }, [token, handleLogout, refreshToken]);
 
   const value = {
     isAuthenticated,

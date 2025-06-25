@@ -107,6 +107,28 @@ const DraggableResourceRow = ({ item, index, moveRow, onDrop }) => {
   }
 };
 
+// Add PropTypes for DraggableResourceRow
+DraggableResourceRow.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    resourceType: PropTypes.string,
+    name: PropTypes.string,
+    item_url: PropTypes.string,
+    onUnlink: PropTypes.func,
+    course_resource_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    copiedItem: PropTypes.shape({
+      title: PropTypes.string,
+      callNumber: PropTypes.string,
+      instanceId: PropTypes.string,
+      holdingsId: PropTypes.string,
+      copy: PropTypes.string
+    })
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  moveRow: PropTypes.func.isRequired,
+  onDrop: PropTypes.func.isRequired
+};
+
 /**
  * UnifiedResourceTable combines electronic and print resources into a single
  * sortable table that maintains a shared order between them.

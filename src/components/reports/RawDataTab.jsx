@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody, Input, Alert, Button } from 'reactstrap';
 import EventsTable from './tables/EventsTable';
 import PaginationControls from './tables/PaginationControls';
 import { DEFAULT_PAGE_SIZES } from './constants';
+import { exportEventsToCSV, generateTimestampedFilename } from './utils/csvExportUtils';
 
 /**
  * Tab component for displaying raw event data
@@ -26,11 +27,25 @@ const RawDataTab = ({
     }));
   };
 
+  // Handle CSV export
+  const handleExportCSV = () => {
+    const filename = generateTimestampedFilename('raw-events-data');
+    exportEventsToCSV(trackingEvents || [], filename);
+  };
+
   return (
     <Card className="shadow-sm fade-in">
       <CardHeader className="bg-light d-flex justify-content-between align-items-center">
         <h5 className="mb-0">Event Log Data</h5>
-        <div>
+        <div className="d-flex align-items-center gap-2">
+          <Button
+            color="primary"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={loading || !trackingEvents || trackingEvents.length === 0}
+          >
+            Export CSV
+          </Button>
           <Input
             type="select"
             bsSize="sm"
@@ -79,6 +94,17 @@ const RawDataTab = ({
                 totalItems={serverPagination.totalItems}
                 onPageChange={handlePageChange}
               />
+            </div>
+
+            <div className="mt-4 text-end">
+              <Button 
+                color="primary" 
+                size="sm" 
+                onClick={handleExportCSV}
+                disabled={loading || error}
+              >
+                Export to CSV
+              </Button>
             </div>
           </>
         )}

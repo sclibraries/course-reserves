@@ -72,6 +72,7 @@ export const apiConfig = {
     },
     offeringLink: {
       create: '/offering-link',
+      delete: '/offering-link',
       findLinked: '/offering-link/find-linked-offerings',
       linkExisting: '/offering-link/link-existing-resources',
     },

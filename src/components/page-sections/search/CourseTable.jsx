@@ -157,7 +157,7 @@ function CourseTable({ courses, customization, onRecordsClick }) {
                     color="light" 
                     className="term-badge"
                     style={{ 
-                      backgroundColor: `${cardButtonBgColor}15` || "#e6f0f9",
+                      backgroundColor: cardButtonBgColor ? `${cardButtonBgColor}15` : "#e6f0f9",
                       color: termBadgeTextColor, // Darker color for better contrast
                       fontWeight: "600" // Increased weight for better contrast
                     }}

@@ -28,16 +28,29 @@
       .skip-link {
         position: absolute;
         top: -40px;
-        left: 0;
+        left: 6px;
         background: #4f46e5;
         color: white;
-        padding: 8px;
+        padding: 8px 12px;
+        text-decoration: none;
+        border-radius: 0 0 4px 4px;
         z-index: 9999;
-        transition: top 0.2s;
+        font-weight: bold;
+        transition: top 0.2s ease-in-out;
+        border: 2px solid transparent;
       }
       
       .skip-link:focus {
         top: 0;
+        color: white;
+        text-decoration: none;
+        outline: none;
+        border-color: #ffffff;
+      }
+      
+      .skip-link:hover {
+        color: white;
+        text-decoration: none;
       }
     </style>
   </head>
@@ -45,16 +58,23 @@
     <!-- Skip to main content link for keyboard users -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     
-    <div id="root" role="main" aria-live="polite"></div>
+    <div id="root"></div>
     
     <!-- Hidden element to allow screen readers to announce when page content changes -->
     <div id="announcer" aria-live="polite" class="visually-hidden"></div>
     
     <!-- No-script notice for users without JavaScript -->
     <noscript>
-      <div style="padding: 20px; text-align: center; max-width: 600px; margin: 0 auto;">
-        <h1>JavaScript Required</h1>
-        <p>We're sorry, but Course Reserves requires JavaScript to function properly. Please enable JavaScript in your browser settings and reload the page.</p>
+      <div style="padding: 20px; text-align: center; max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;">
+        <h1 style="color: #d32f2f; margin-bottom: 16px;">JavaScript Required</h1>
+        <p style="margin-bottom: 16px;">Course Reserves requires JavaScript to function properly. This application uses modern web technologies to provide the best user experience.</p>
+        <p style="margin-bottom: 16px;"><strong>To enable JavaScript:</strong></p>
+        <ul style="text-align: left; max-width: 400px; margin: 0 auto 16px;">
+          <li>In most browsers, check your settings or preferences</li>
+          <li>Look for "JavaScript", "Active Scripting", or "Content Settings"</li>
+          <li>Enable JavaScript and reload this page</li>
+        </ul>
+        <p>If you continue to have problems, please contact your library's technical support.</p>
       </div>
     </noscript>
     

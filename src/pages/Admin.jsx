@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Container, Spinner, Alert, Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
 import HorizontalAdminSidebar from '../components/layout/HorizontalAdminSidebar';
 import HorizontalResourceSidebar from '../components/layout/HorizontalResourceSidebar';
@@ -60,7 +60,7 @@ function Admin() {
     if(activeTab === 'resources' && canManageResources) {
       fetchResources();
     }
-  }, [activeTab, canManageResources]);
+  }, [activeTab, canManageResources, fetchResources]);
 
   // Redirect to appropriate tab based on permissions
   useEffect(() => {
@@ -91,7 +91,7 @@ function Admin() {
     }
   }, [searchParams, canManageCourses, canManageResources, canViewReports, canCustomize, isAdmin, setSearchParams]);
 
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     try {
       const data = await adminResourceService.getAllResources();
       setSearchResults(data);
@@ -99,7 +99,7 @@ function Admin() {
     catch (error) {
       console.error('Fetch resources failed:', error);
     }
-  }
+  }, [setSearchResults]);
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);

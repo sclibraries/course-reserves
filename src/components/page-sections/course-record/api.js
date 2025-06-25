@@ -1,4 +1,3 @@
-import { config } from '../../../config/index';
 
 export async function fetchMergedResources(courseListingId) {
   const res = await fetch(

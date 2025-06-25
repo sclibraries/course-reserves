@@ -276,6 +276,7 @@ const TrackingReport = ({ isEmbedded = false }) => {
         totalCount={analyticsData.totalCount || serverPagination.totalItems || 0}
         clearFilters={clearFilters}
         className={isEmbedded ? "mb-3" : "mb-4"}
+        trackingEvents={trackingEvents}
       />
 
       {/* Navigation Tabs */}

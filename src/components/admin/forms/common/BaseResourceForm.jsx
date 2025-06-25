@@ -18,8 +18,8 @@ import FormSection from './FormSection';
 import FormActions from './FormActions';
 import FolderSelector from './FolderSelector';
 import VisibilityDates from './VisibilityDates';
-import { TypeSpecificFields } from '../TypeSpecificFields';
-import ResourceLinks from '../ResourceLinks';
+import { TypeSpecificFields } from '../fields/TypeSpecificFields';
+import ResourceLinks from '../fields/ResourceLinks';
 
 // Import services
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
@@ -28,7 +28,58 @@ import { toast } from 'react-toastify';
 import '../../../../css/AdminForms.css';
 
 /**
- * BaseResourceForm - Core functionality for resource forms
+ * BaseResourceForm - Core Resource Form Component
+ * ===============================================
+ * 
+ * **Purpose**: Provides the complete, unified form interface for creating and editing
+ * course resources. This is the foundation component that combines all field types
+ * and form sections into a cohesive user experience.
+ * 
+ * **Key Features**:
+ * - Complete resource form with all field types
+ * - Material type-specific field rendering
+ * - Automatic visibility date handling for video content
+ * - Integrated folder selection with creation capability
+ * - Additional links management
+ * - Form validation and error handling
+ * - Loading states and user feedback
+ * - Responsive design with consistent styling
+ * 
+ * **Form Sections**:
+ * 1. **Basic Fields**: Name, URL, description, notes, proxy settings
+ * 2. **Material Type**: Dropdown with dynamic field loading
+ * 3. **Folder Selection**: With inline folder creation
+ * 4. **Type-Specific Fields**: Dynamic based on material type
+ * 5. **Additional Links**: Multiple related URLs
+ * 6. **Visibility Settings**: Start/end dates with smart defaults
+ * 
+ * **Smart Defaults**:
+ * - Visibility dates auto-populate from course term dates
+ * - Video material types automatically enable visibility controls
+ * - Proxy settings inherit from primary URL
+ * 
+ * **Data Flow**:
+ * 1. Receives initialData and transforms to internal format
+ * 2. Loads material types and field definitions from API
+ * 3. Handles real-time form state and validation
+ * 4. Processes submission data and calls onSubmit callback
+ * 5. Provides success/error feedback to user
+ * 
+ * **Usage Context**:
+ * - Used directly by ResourceFormManager for NEW/EDIT operations
+ * - Used by EDS/Hitchcock forms in modal contexts
+ * - Can be used standalone for custom implementations
+ * 
+ * @component
+ * @example
+ * <BaseResourceForm
+ *   initialData={resource}
+ *   onSubmit={handleSave}
+ *   title="Edit Resource"
+ *   submitButtonText="Save Changes"
+ *   onCancel={handleCancel}
+ *   showCancel={true}
+ * />
  */
 export const BaseResourceForm = ({ 
   initialData = {}, 
@@ -55,11 +106,25 @@ export const BaseResourceForm = ({
   
   const defaultDates = getDefaultVisibilityDates();
   
+  /**
+   * Convert string/number proxy values to boolean
+   */
+  const normalizeProxyValue = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return value === '1' || value === 'true' || value === 'TRUE';
+    }
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+    return false;
+  };
+  
   // State for form data
   const [formData, setFormData] = useState({
     title: initialData.title || initialData.name || '',
     link: initialData.link || initialData.item_url || '',
-    use_proxy: initialData.use_proxy || false,
+    use_proxy: normalizeProxyValue(initialData.use_proxy),
     notes: initialData.notes || initialData.description || '',
     internal_note: initialData.internal_note || '',
     external_note: initialData.external_note || '',
@@ -73,6 +138,14 @@ export const BaseResourceForm = ({
     ...(initialData.order && { order: initialData.order }),
     ...(initialData.course_count && { course_count: initialData.course_count })
   });
+
+  // State for visibility dates toggle
+  const [useVisibilityDates, setUseVisibilityDates] = useState(
+    // Enable by default if it's a video type or if dates were previously set
+    initialData.material_type_id === '3' || 
+    initialData.material_type_id === 3 ||
+    !!(initialData.start_visibility || initialData.end_visibility)
+  );
 
   // Update visibility dates if they're not set and folioCourseData changes
   useEffect(() => {
@@ -149,13 +222,49 @@ export const BaseResourceForm = ({
   // Handle material type change specifically to clear metadata
   const handleMaterialTypeChange = (e) => {
     const { value } = e.target;
+    const isVideoType = value === '3' || value === 3;
+    
     setFormData(prev => ({ 
       ...prev, 
       material_type_id: value,
-      metadata: {} // Clear existing metadata when type changes
+      metadata: {}, // Clear existing metadata when type changes
+      // Set visibility dates to term dates if it's a video type
+      ...(isVideoType && {
+        start_visibility: prev.start_visibility || defaultDates.startDate,
+        end_visibility: prev.end_visibility || defaultDates.endDate
+      })
     }));
     
+    // Auto-enable visibility dates for video types
+    if (isVideoType) {
+      setUseVisibilityDates(true);
+    }
+    
     fetchMaterialTypeFields(value);
+  };
+
+  // Handle visibility dates toggle
+  const handleVisibilityToggle = (e) => {
+    const { checked } = e.target;
+    setUseVisibilityDates(checked);
+    
+    // If enabling visibility dates and they're empty, set to term dates
+    if (checked && (!formData.start_visibility || !formData.end_visibility)) {
+      setFormData(prev => ({
+        ...prev,
+        start_visibility: prev.start_visibility || defaultDates.startDate,
+        end_visibility: prev.end_visibility || defaultDates.endDate
+      }));
+    }
+    
+    // If disabling visibility dates (and not a video type), clear the dates
+    if (!checked && formData.material_type_id !== '3' && formData.material_type_id !== 3) {
+      setFormData(prev => ({
+        ...prev,
+        start_visibility: '',
+        end_visibility: ''
+      }));
+    }
   };
 
   // Handle form submission
@@ -173,15 +282,22 @@ export const BaseResourceForm = ({
       // Filter out empty links
       const validLinks = links.filter(link => link.url && link.url.trim() !== '');
       
+      // Determine if visibility dates should be included
+      const isVideoType = formData.material_type_id === '3' || formData.material_type_id === 3;
+      const shouldIncludeVisibilityDates = useVisibilityDates || isVideoType;
+      
       // Prepare final submission data
       const submissionData = {
         ...formData,
-        links: validLinks
+        links: validLinks,
+        // Only include visibility dates if they should be active, otherwise clear them
+        start_visibility: shouldIncludeVisibilityDates ? formData.start_visibility : '',
+        end_visibility: shouldIncludeVisibilityDates ? formData.end_visibility : ''
       };
       
       // Submit the data
       await onSubmit(submissionData);
-      toast.success('Resource saved successfully');
+      // Success toast is handled by ResourceFormManager
       
     } catch (error) {
       console.error('Error saving resource:', error);
@@ -257,6 +373,9 @@ export const BaseResourceForm = ({
                 startDate={formData.start_visibility}
                 endDate={formData.end_visibility}
                 handleChange={handleFieldChange}
+                materialTypeId={formData.material_type_id}
+                useVisibilityDates={useVisibilityDates}
+                onVisibilityToggle={handleVisibilityToggle}
               />
             </FormSection>
             
