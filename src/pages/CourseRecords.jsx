@@ -114,13 +114,6 @@ function CourseRecords() {
     }
   }, [courseListingIdParam, record, setRecord]);
 
-  // Fetch data when `record` changes
-  useEffect(() => {
-    if (record) {
-      fetchAllData();
-    }
-  }, [record, fetchAllData]);
-
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
   };
@@ -405,6 +398,13 @@ function CourseRecords() {
       setIsLoading(false);
     }
   }, [record, fetchInventoryDetails]);
+
+  // Fetch data when `record` changes
+  useEffect(() => {
+    if (record) {
+      fetchAllData();
+    }
+  }, [record, fetchAllData]);
 
   // For print reserves only: Fetch item availability data.
   useEffect(() => {

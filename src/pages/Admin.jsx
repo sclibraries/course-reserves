@@ -49,6 +49,16 @@ function Admin() {
   // Build the query for fetching courses.
   const cqlQuery = useBuildQuery(college, type, query, department);
 
+  const fetchResources = useCallback(async () => {
+    try {
+      const data = await adminResourceService.getAllResources();
+      setSearchResults(data);
+    }
+    catch (error) {
+      console.error('Fetch resources failed:', error);
+    }
+  }, [setSearchResults]);
+
   // Fetch course results whenever the query changes.
   useEffect(() => {
     if (termId && cqlQuery && canManageCourses) {
@@ -90,16 +100,6 @@ function Admin() {
       setActiveTab(tab);
     }
   }, [searchParams, canManageCourses, canManageResources, canViewReports, canCustomize, isAdmin, setSearchParams]);
-
-  const fetchResources = useCallback(async () => {
-    try {
-      const data = await adminResourceService.getAllResources();
-      setSearchResults(data);
-    }
-    catch (error) {
-      console.error('Fetch resources failed:', error);
-    }
-  }, [setSearchResults]);
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
