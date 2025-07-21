@@ -19,6 +19,7 @@ function Search() {
     query,
     department,
     sortOption,
+    termId,
     setCollege,
     setType,
     setQuery,
@@ -113,7 +114,7 @@ function Search() {
   }, [college, type, query, department, sortOption, displayMode]);
 
   // Build the query using the updated buildQuery function that can handle department and sort
-  const cqlQuery = useBuildQuery(college, type, query, department, sortOption);
+  const cqlQuery = useBuildQuery(college, type, query, department, sortOption, termId);
 
   useEffect(() => {
     if (!isInitialized) return;

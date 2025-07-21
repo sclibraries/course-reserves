@@ -1,12 +1,9 @@
-import useSearchStore from '../store/searchStore';
-
-export function useBuildQuery(college, key, input, department, sortOption) {
+export function useBuildQuery(college, key, input, department, sortOption, termId = null) {
   // Sanitize the input (append wildcard if input is provided)
   const sanitizedInput = input ? input.trim() + '*' : '';
   let collegePrefix = '';
   
-  // Retrieve termId from the search store
-  const { termId } = useSearchStore.getState();
+  // Use the passed termId parameter instead of getting it from store
   // Only include the term filter if termId exists; otherwise, leave it blank.
   const termClause = termId ? ` and courseListing.termId=="${termId}"` : '';
 

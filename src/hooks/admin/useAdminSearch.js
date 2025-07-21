@@ -11,7 +11,7 @@ import useAdminSearchStore from '../../store/adminSearchStore';
  */
 export function useAdminSearch() {
   // Get shared search parameters from the store
-  const { college, type, query, department, sortOption } = useAdminSearchStore();
+  const { college, type, query, department, sortOption, termId } = useAdminSearchStore();
 
   // Local state for search results and status
   const [results, setResults] = useState([]);
@@ -19,7 +19,7 @@ export function useAdminSearch() {
   const [error, setError] = useState(null);
 
   // Build the CQL query using the shared state values
-  const cqlQuery = useBuildQuery(college, type, query, department, sortOption);
+  const cqlQuery = useBuildQuery(college, type, query, department, sortOption, termId);
 
   const fetchResults = async () => {
     try {

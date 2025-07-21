@@ -57,7 +57,7 @@ const AppRoutes = () => {
    * @property {boolean} loading - Whether term data is being loaded
    * @property {string|null} error - Error message if term loading failed
    */
-  const { loading, error } = useTermSetup();
+  const { loading, error } = useTermSetup(true); // Auto-set default term for regular routes
 
   // Show loading state while terms are being fetched
   if (loading) return <div>Loading terms...</div>;

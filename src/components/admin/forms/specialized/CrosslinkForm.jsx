@@ -125,7 +125,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
   const loading = useCourseStore((state) => state.loading);
 
   // Build the CQL query using the current search parameters and term filter
-  const cqlQuery = useBuildQuery(college, searchArea, query, department, sortOption);
+  const cqlQuery = useBuildQuery(college, searchArea, query, department, sortOption, termId);
 
   // Sync local search parameters with adminSearchStore
   useEffect(() => {

@@ -41,55 +41,6 @@ const useUserManagement = (token) => {
   const [createFormErrors, setCreateFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch users on component mount
-  useEffect(() => {
-    if (activeTab === 'pending') {
-      fetchPendingUsers();
-    } else {
-      fetchAllUsers();
-    }
-  }, [activeTab, token, fetchPendingUsers, fetchAllUsers]);
-
-  // Filter and sort users
-  const filteredUsers = useMemo(() => {
-    const currentUserList = activeTab === 'pending' ? pendingUsers : users;
-    
-    if (!searchTerm.trim()) {
-      return [...currentUserList].sort((a, b) => {
-        const aValue = a[sortField] ? String(a[sortField]).toLowerCase() : '';
-        const bValue = b[sortField] ? String(b[sortField]).toLowerCase() : '';
-        
-        if (sortDirection === 'asc') {
-          return aValue.localeCompare(bValue);
-        } else {
-          return bValue.localeCompare(aValue);
-        }
-      });
-    }
-    
-    return [...currentUserList]
-      .filter(user => {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          (user.username && user.username.toLowerCase().includes(searchLower)) ||
-          (user.full_name && user.full_name.toLowerCase().includes(searchLower)) ||
-          (user.email && user.email.toLowerCase().includes(searchLower)) ||
-          (user.department && user.department.toLowerCase().includes(searchLower)) ||
-          (user.institution && user.institution.toLowerCase().includes(searchLower))
-        );
-      })
-      .sort((a, b) => {
-        const aValue = a[sortField] ? String(a[sortField]).toLowerCase() : '';
-        const bValue = b[sortField] ? String(b[sortField]).toLowerCase() : '';
-        
-        if (sortDirection === 'asc') {
-          return aValue.localeCompare(bValue);
-        } else {
-          return bValue.localeCompare(aValue);
-        }
-      });
-  }, [activeTab, pendingUsers, users, searchTerm, sortField, sortDirection]);
-
   // Fetch pending user requests
   const fetchPendingUsers = useCallback(async () => {
     setLoading(true);
@@ -145,6 +96,55 @@ const useUserManagement = (token) => {
       setLoading(false);
     }
   }, [token]);
+
+  // Fetch users on component mount
+  useEffect(() => {
+    if (activeTab === 'pending') {
+      fetchPendingUsers();
+    } else {
+      fetchAllUsers();
+    }
+  }, [activeTab, token, fetchPendingUsers, fetchAllUsers]);
+
+  // Filter and sort users
+  const filteredUsers = useMemo(() => {
+    const currentUserList = activeTab === 'pending' ? pendingUsers : users;
+    
+    if (!searchTerm.trim()) {
+      return [...currentUserList].sort((a, b) => {
+        const aValue = a[sortField] ? String(a[sortField]).toLowerCase() : '';
+        const bValue = b[sortField] ? String(b[sortField]).toLowerCase() : '';
+        
+        if (sortDirection === 'asc') {
+          return aValue.localeCompare(bValue);
+        } else {
+          return bValue.localeCompare(aValue);
+        }
+      });
+    }
+    
+    return [...currentUserList]
+      .filter(user => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          (user.username && user.username.toLowerCase().includes(searchLower)) ||
+          (user.full_name && user.full_name.toLowerCase().includes(searchLower)) ||
+          (user.email && user.email.toLowerCase().includes(searchLower)) ||
+          (user.department && user.department.toLowerCase().includes(searchLower)) ||
+          (user.institution && user.institution.toLowerCase().includes(searchLower))
+        );
+      })
+      .sort((a, b) => {
+        const aValue = a[sortField] ? String(a[sortField]).toLowerCase() : '';
+        const bValue = b[sortField] ? String(b[sortField]).toLowerCase() : '';
+        
+        if (sortDirection === 'asc') {
+          return aValue.localeCompare(bValue);
+        } else {
+          return bValue.localeCompare(aValue);
+        }
+      });
+  }, [activeTab, pendingUsers, users, searchTerm, sortField, sortDirection]);
 
   // Handle user approval
   const handleApprove = async (user) => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { config } from '../config'
+import { config } from '../config';
+import { sortTerms } from '../utils/termSorting';
 /**
  * Custom hook to fetch all terms from the backend and
  * auto-detect the current term ID by picking the one with
@@ -33,9 +34,10 @@ export function useCurrentTermId(termsApiUrl) {
           throw new Error(`Failed to fetch terms: ${response.status}`);
         }
         const data = await response.json();
-        const allTerms = (data?.data?.terms || []).slice().sort((a, b) => 
-          b.name.localeCompare(a.name)
-        );
+        
+        // Sort terms using utility function
+        const allTerms = sortTerms(data?.data?.terms || []);
+        
         console.log("useCurrentTermId: allTerms", allTerms);
         setTerms(allTerms);
         

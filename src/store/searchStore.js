@@ -1,6 +1,7 @@
 // store/searchStore.js
 import { create } from 'zustand';
 import { config } from '../config';
+import { sortTerms } from '../utils/termSorting';
 
 const useSearchStore = create(
     (set) => ({
@@ -58,10 +59,13 @@ const useSearchStore = create(
           // Get terms from the response (adjust path if needed)
           const termItems = json?.data?.terms || []; 
           
+          // Sort terms using utility function
+          const sortedTerms = sortTerms(termItems);
+          
           // Only set termId if explicitly requested AND no termId is currently set
           const currentState = useSearchStore.getState();
           const stateUpdate = { 
-            terms: termItems, 
+            terms: sortedTerms, 
             termsLoading: false 
           };
           

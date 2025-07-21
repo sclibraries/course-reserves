@@ -13,20 +13,22 @@ import useResourceSearchStore from '../store/resourceSearchStore';
 import { useBuildQuery } from '../hooks/useBuildQuery';
 import { adminResourceService } from '../services/admin/adminResourceService';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import useSearchStore from '../store/searchStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentTermId } from '../hooks/useCurrentTermId';
 import '../css/AdminComponents.css';
 import '../css/Admin.css';
 
 function Admin() {
   const navigate = useNavigate();
-  const { college, type, query, department } = useAdminSearchStore();
-  const { termId } = useSearchStore();
+  const { college, type, query, department, termId, fetchTerms, initializeDefaults, defaultsSet } = useAdminSearchStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'courses';
   const [activeTab, setActiveTab] = useState(initialTab);
   const { fetchResults, results: courses, error: courseError, loading: courseLoading } = useCourseStore();
   const { user, isAdmin } = useAuth();
+  
+  // Get current term information
+  const { termId: currentTermId, loading: termLoading } = useCurrentTermId();
 
   const { 
     results: resources,
@@ -47,7 +49,7 @@ function Admin() {
   const canCustomize = isAdmin || userPermissions.some(perm => perm.startsWith('customize_'));
   
   // Build the query for fetching courses.
-  const cqlQuery = useBuildQuery(college, type, query, department);
+  const cqlQuery = useBuildQuery(college, type, query, department, null, termId);
 
   const fetchResources = useCallback(async () => {
     try {
@@ -59,9 +61,23 @@ function Admin() {
     }
   }, [setSearchResults]);
 
+  // Fetch terms for admin store on mount
+  useEffect(() => {
+    fetchTerms();
+  }, [fetchTerms]);
+
+  // Set defaults when component first loads and user data is available
+  useEffect(() => {
+    // Only set defaults if we have user data and current term, and haven't set them yet
+    if (user?.institution && currentTermId && !termLoading && !defaultsSet) {
+      // Initialize defaults based on user institution and current term
+      initializeDefaults(user.institution, currentTermId);
+    }
+  }, [user?.institution, currentTermId, termLoading, defaultsSet, initializeDefaults]);
+
   // Fetch course results whenever the query changes.
   useEffect(() => {
-    if (termId && cqlQuery && canManageCourses) {
+    if (cqlQuery && canManageCourses) {
       fetchResults(cqlQuery);
     }
   }, [cqlQuery, fetchResults, termId, canManageCourses]);

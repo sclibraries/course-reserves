@@ -10,7 +10,6 @@ import {
 import { FaSearch, FaRedo } from 'react-icons/fa';
 import useAdminSearchStore from '../../store/adminSearchStore';
 import useCustomizationStore from '../../store/customizationStore';
-import useSearchStore from '../../store/searchStore';
 import useCollegeManagement from '../../hooks/useCollegeManagement';
 import '../../css/Admin.css';
 
@@ -21,25 +20,22 @@ function HorizontalAdminSidebar() {
     query,
     department,
     sort,
+    termId,
+    terms,
     setCollege,
     setType,
     setQuery,
     setDepartment,
-    setSort
-  } = useAdminSearchStore();
-
-  const {
-    termId,
+    setSort,
     setTermId,
-    terms,
-  } = useSearchStore();
+    fetchTerms,
+  } = useAdminSearchStore();
 
   // Use the centralized college management hook
   const {
     selectedCollege,
     availableColleges,
     handleCollegeChange,
-    resetCollege,
     isCollegeDisabled
   } = useCollegeManagement(college, setCollege); // Pass setCollege to sync with store
 
@@ -83,6 +79,13 @@ function HorizontalAdminSidebar() {
     setSelectedSort(sort || 'name');
   }, [type, query, college, department, termId, sort]);
 
+  // Fetch terms on mount if not already available
+  useEffect(() => {
+    if (terms.length === 0) {
+      fetchTerms();
+    }
+  }, [fetchTerms, terms.length]);
+
   // Fetch departments whenever the selected college changes
   useEffect(() => {
     const collegeKey = college;
@@ -121,12 +124,14 @@ function HorizontalAdminSidebar() {
     setType('all');
     setQuery('');
     
-    // Reset college using the hook
-    resetCollege();
+    // Do NOT reset college - preserve user's college selection
+    // resetCollege(); // Commented out to preserve college selection
     
     setDepartment('');
     setSort('name');
-    setTermId(null);
+    
+    // Do NOT reset term - preserve user's term selection  
+    // setTermId(null); // Commented out to preserve term selection
   };
 
   const searchAreaToKey = (area) => {

@@ -200,6 +200,8 @@ const RecordCard = ({
   const availabilityData = availability[instanceId] || {};
   const holdings = availabilityData.holdings || [];
 
+  console.log(holdings)
+
   /**
    * Track a link click event and open the URL in a new tab
    * 
