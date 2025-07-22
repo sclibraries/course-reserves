@@ -6,4 +6,9 @@ export default defineConfig({
   plugins: [react()],
   // Add base configuration for the /course-reserves path
   base: '/course-reserves/',
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    assetsDir: 'assets' // Vite outputs to /dist/assets/*
+  }
 });

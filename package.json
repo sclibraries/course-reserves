@@ -12,7 +12,9 @@
     "generate-readme": "npx readme-md-generator",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "generate-docs": "jsdoc -c jsdoc.json"
+    "generate-docs": "jsdoc -c jsdoc.json",
+    "check-case": "./scripts/check-case-sensitivity.sh",
+    "prebuild": "npm run check-case"
   },
   "dependencies": {
     "@awesome.me/kit-48b7df1f35": "^1.0.4",

@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { COLORS, CAMPUS_COLORS } from '../constants';
 import CustomChartTick from './CustomChartTick';
-import CustomTooltip from './CustomToolTip';
+import CustomTooltip from './CustomTooltip';
 
 /**
  * Component for displaying top courses by campus
