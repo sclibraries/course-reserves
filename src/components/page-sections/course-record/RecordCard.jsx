@@ -200,7 +200,46 @@ const RecordCard = ({
   const availabilityData = availability[instanceId] || {};
   const holdings = availabilityData.holdings || [];
 
-  console.log(holdings)
+  /**
+   * Get material types from reserve holdings
+   * @returns {Array} Array of unique material type names from reserve holdings
+   */
+  const getReserveMaterialTypes = () => {
+    if (isElectronic) return [];
+    
+    // Filter for reserve holdings only
+    const reserveHoldings = holdings.filter((h) => 
+      h.location && h.location.toLowerCase().includes('reserve')
+    );
+    
+    // Extract unique material type names, excluding those containing "Admin"
+    const materialTypes = reserveHoldings
+      .filter((h) => h.materialType?.name)
+      .map((h) => h.materialType.name)
+      .filter((typeName) => !typeName.toLowerCase().includes('admin'));
+    
+    // Return unique material types
+    return [...new Set(materialTypes)];
+  };
+
+  const reserveMaterialTypes = getReserveMaterialTypes();
+
+  /**
+   * Get the display text for the resource type badge
+   * @returns {string} Badge display text
+   */
+  const getResourceBadgeText = () => {
+    if (isElectronic) return "Electronic Resource";
+    
+    if (reserveMaterialTypes.length === 0) {
+      return "Physical Resource"; // Fallback if no material type found
+    } else if (reserveMaterialTypes.length === 1) {
+      return reserveMaterialTypes[0];
+    } else {
+      // Multiple material types - join them
+      return reserveMaterialTypes.join(" / ");
+    }
+  };
 
   /**
    * Track a link click event and open the URL in a new tab
@@ -575,7 +614,7 @@ const RecordCard = ({
           className="resource-badge"
           pill
         >
-          {isElectronic ? "Electronic Resource" : "Physical Resource"}
+          {getResourceBadgeText()}
         </Badge>
         
         {!isVisible && (
