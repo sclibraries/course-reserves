@@ -455,9 +455,32 @@ function CourseRecords() {
     });
   }, []);
 
-  // NEW: Combine grouped and ungrouped items into a single alphabetically sorted list
-  // so that folder groups (using the folder name as the sort key) are interleaved
-  // with individual records.
+  // Helper function to check if a record should be visible
+  const isRecordVisible = useCallback((item) => {
+    if (item.isElectronic && item.resource) {
+      if (isAuthenticated) return true;
+
+      const now = new Date();
+      const startVisibility = item.resource.start_visibility
+        ? new Date(item.resource.start_visibility)
+        : null;
+      const endVisibility = item.resource.end_visibility
+        ? new Date(item.resource.end_visibility)
+        : null;
+
+      if ((startVisibility && now < startVisibility)) {
+        return false;
+      }
+
+      if ((endVisibility && now > endVisibility)) {
+        return false;
+      }
+    }
+    return true;
+  }, [isAuthenticated]);
+
+  // NEW: Combine grouped and ungrouped items with improved ordering logic
+  // Handle different sorting scenarios based on order values
   const combinedResults = useMemo(() => {
     // 1) Filter by search string
     const filteredBySearch = searchQuery.trim() !== ''
@@ -476,23 +499,144 @@ function CourseRecords() {
           filter === 'electronic' ? item.isElectronic : !item.isElectronic
         );
   
-    // 3) If any item has a designated admin order, just sort flat by order → title
-    const hasDesignatedOrder = filtered.some(item => item.order != null);
-    if (hasDesignatedOrder) {
-      return filtered
-        .slice() // copy so we don’t mutate state
+        // 3) Determine sorting strategy based on order values
+    const electronicResources = filtered.filter(item => item.isElectronic);
+    const hasElectronic = electronicResources.length > 0;
+    
+    // Check if all electronic resources have order 999 (auto-assigned)
+    const allElectronicHave999 = hasElectronic && 
+      electronicResources.every(item => item.order === 999 || item.order === "999");
+    
+    // Check if there are any specific orders (not 999 and not null)
+    const hasSpecificOrders = filtered.some(item => 
+      item.order != null && item.order !== 999 && item.order !== "999"
+    );
+
+    // CASE 1: No electronic resources OR all electronic resources have order 999
+    // Use original server order (preserve the order from the API response)
+    if (!hasElectronic || (allElectronicHave999 && !hasSpecificOrders)) {
+      console.log('Using original server order - no electronic or all 999 orders');
+      
+      // Still need to handle folder grouping even when preserving server order
+      const groupedTemp = {};
+      let ungroupedTemp = [];
+    
+      filtered.forEach(item => {
+        if (item.folder_id) {
+          const key = item.folder_name;
+          (groupedTemp[key] ||= []).push(item);
+        } else {
+          ungroupedTemp.push(item);
+        }
+      });
+    
+      // Build sorted groups (maintain original order within groups)
+      const groupedArray = Object.entries(groupedTemp)
+        .map(([folder, items]) => ({
+          folder,
+          items // Keep original order from server
+        }))
+        .sort((a, b) =>
+          a.folder.toLowerCase().localeCompare(b.folder.toLowerCase())
+        );
+    
+      // Merge ungrouped and grouped items maintaining server order
+      const merged = [];
+      let i = 0, j = 0;
+      while (i < ungroupedTemp.length && j < groupedArray.length) {
+        // For server order, we'll interleave based on the first item in each group
+        const firstUngrouped = ungroupedTemp[i];
+        const firstInGroup = groupedArray[j].items[0];
+        
+        // Get the original indices to maintain server order
+        const ungroupedIndex = filtered.indexOf(firstUngrouped);
+        const groupedIndex = filtered.indexOf(firstInGroup);
+        
+        if (ungroupedIndex <= groupedIndex) {
+          merged.push(ungroupedTemp[i++]);
+        } else {
+          merged.push(groupedArray[j++]);
+        }
+      }
+      // flush any leftovers
+      while (i < ungroupedTemp.length) merged.push(ungroupedTemp[i++]);
+      while (j < groupedArray.length)   merged.push(groupedArray[j++]);
+    
+      return merged;
+    }
+    
+    // CASE 2: There are specific orders (not 999) - sort by order values
+    if (hasSpecificOrders) {
+      console.log('Using specific order sorting');
+      const sortedFiltered = filtered
+        .slice() // copy so we don't mutate state
         .sort((a, b) => {
-          const ao = a.order != null ? a.order : Infinity;
-          const bo = b.order != null ? b.order : Infinity;
+          const ao = a.order != null ? Number(a.order) : Infinity;
+          const bo = b.order != null ? Number(b.order) : Infinity;
+          
+          // If both have order 999, maintain their original relative position
+          if (ao === 999 && bo === 999) {
+            return 0; // Keep original order
+          }
+          
+          // Sort by order value
           if (ao !== bo) return ao - bo;
+          
           // tie‑break alphabetically
           return a.copiedItem.title
             .toLowerCase()
             .localeCompare(b.copiedItem.title.toLowerCase());
         });
+
+      // Handle folder grouping for sorted items
+      const groupedTemp = {};
+      let ungroupedTemp = [];
+    
+      sortedFiltered.forEach(item => {
+        if (item.folder_id) {
+          const key = item.folder_name;
+          (groupedTemp[key] ||= []).push(item);
+        } else {
+          ungroupedTemp.push(item);
+        }
+      });
+    
+      // Build sorted groups
+      const groupedArray = Object.entries(groupedTemp)
+        .map(([folder, items]) => ({
+          folder,
+          items // Items are already sorted from sortedFiltered
+        }))
+        .sort((a, b) =>
+          a.folder.toLowerCase().localeCompare(b.folder.toLowerCase())
+        );
+    
+      // Merge maintaining sort order
+      const merged = [];
+      let i = 0, j = 0;
+      while (i < ungroupedTemp.length && j < groupedArray.length) {
+        const firstUngrouped = ungroupedTemp[i];
+        const firstInGroup = groupedArray[j].items[0];
+        
+        // Get the sorted indices
+        const ungroupedIndex = sortedFiltered.indexOf(firstUngrouped);
+        const groupedIndex = sortedFiltered.indexOf(firstInGroup);
+        
+        if (ungroupedIndex <= groupedIndex) {
+          merged.push(ungroupedTemp[i++]);
+        } else {
+          merged.push(groupedArray[j++]);
+        }
+      }
+      // flush any leftovers
+      while (i < ungroupedTemp.length) merged.push(ungroupedTemp[i++]);
+      while (j < groupedArray.length)   merged.push(groupedArray[j++]);
+    
+      return merged;
     }
   
-    // 4) Otherwise fallback to your old grouping + ABC merge logic
+    // CASE 3: Fallback to old grouping + ABC merge logic for edge cases
+    console.log('Using fallback grouping logic');
     const groupedTemp = {};
     let ungroupedTemp = [];
   
@@ -948,8 +1092,11 @@ function CourseRecords() {
                   combinedResults.map((result) => {
                     // If the item is a folder group (has a 'folder' property), render a folder block.
                     if (result.folder) {
+                      // Filter out invisible items from the folder
+                      const visibleItems = result.items.filter(item => isRecordVisible(item));
+                      
                       // Skip rendering the folder completely if it has no visible items
-                      if (result.items.length === 0) return null;
+                      if (visibleItems.length === 0) return null;
 
                       return (
                         <div key={`folder-${result.folder}`} className="folder-group mb-5">
@@ -958,7 +1105,7 @@ function CourseRecords() {
                           </header>
                           <div className="folder-items border-start border-end border-bottom p-3">
                             <Row className="g-4">
-                              {result.items.map(recordItem => (
+                              {visibleItems.map(recordItem => (
                                 <Col xs="12" key={recordItem.id}>
                                   <RecordCard
                                     recordItem={recordItem}
@@ -979,6 +1126,11 @@ function CourseRecords() {
                       );
                     } else {
                       // Render an individual (ungrouped) record.
+                      // Check visibility before creating Row/Col structure
+                      if (!isRecordVisible(result)) {
+                        return null;
+                      }
+                      
                       return (
                         <Row className="g-4 mb-4" key={result.id}>
                           <Col xs="12">
@@ -1008,11 +1160,11 @@ function CourseRecords() {
                           Physical Materials
                         </h3>
                       </div>
-                      {records.filter(item => !item.isElectronic).length === 0 ? (
+                      {records.filter(item => !item.isElectronic && isRecordVisible(item)).length === 0 ? (
                         <p className="text-muted">No physical materials available for this course.</p>
                       ) : (
                         records
-                          .filter(item => !item.isElectronic)
+                          .filter(item => !item.isElectronic && isRecordVisible(item))
                           .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
                           .map(item => (
                             <RecordCard
@@ -1038,11 +1190,11 @@ function CourseRecords() {
                           Electronic Materials
                         </h3>
                       </div>
-                      {records.filter(item => item.isElectronic).length === 0 ? (
+                      {records.filter(item => item.isElectronic && isRecordVisible(item)).length === 0 ? (
                         <p className="text-muted">No electronic materials available for this course.</p>
                       ) : (
                         records
-                          .filter(item => item.isElectronic)
+                          .filter(item => item.isElectronic && isRecordVisible(item))
                           .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
                           .map(item => (
                             <RecordCard

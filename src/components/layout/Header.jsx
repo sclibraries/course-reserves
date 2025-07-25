@@ -201,35 +201,34 @@ function Header() {
               </Link>
             )}
 
-            {(college === 'smith' || isAdminPath) && (
-              isAuthenticated ? (
-                <Dropdown isOpen={userMenuOpen} toggle={toggleUserMenu} direction="down">
-                  <DropdownToggle
-                    caret
-                    color={textColorMode === 'light' ? 'dark' : 'light'}
-                    className="user-menu-toggle"
-                  >
-                    <FaUser className="me-2" />
-                    <span className="user-name">{getUserDisplayName()}</span>
-                    <FaChevronDown className="ms-2" />
-                  </DropdownToggle>
-                  <DropdownMenu end className="user-menu">
-                    {user && user.role && (
-                      <DropdownItem header>Role: {user.role}</DropdownItem>
-                    )}
-                    <DropdownItem divider />
-                    <DropdownItem onClick={logout}>
-                      Logout
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
-              ) : (
-                <LoginButton
-                  aria-label="Login to staff account"
-                  className="custom-action-btn primary-action-btn"
-                  color={textColorMode === 'light' ? 'light' : 'primary'}
-                />
-              )
+            {isAuthenticated ? (
+              <Dropdown isOpen={userMenuOpen} toggle={toggleUserMenu} direction="down">
+                <DropdownToggle
+                  caret
+                  color={textColorMode === 'light' ? 'dark' : 'light'}
+                  className="user-menu-toggle"
+                >
+                  <FaUser className="me-2" />
+                  <span className="user-name">{getUserDisplayName()}</span>
+                  <FaChevronDown className="ms-2" />
+                </DropdownToggle>
+                <DropdownMenu end className="user-menu">
+                  {user && user.role && (
+                    <DropdownItem header>Role: {user.role}</DropdownItem>
+                  )}
+                  <DropdownItem divider />
+                  <DropdownItem onClick={logout}>
+                    Logout
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            ) : (
+              <LoginButton
+                aria-label="Login to admin account"
+                className="custom-action-btn primary-action-btn"
+                color={textColorMode === 'light' ? 'light' : 'primary'}
+                textColor={textColorMode === 'light' ? '#ffffff' : '#1A2C57'}
+              />
             )}
           </div>
         </div>

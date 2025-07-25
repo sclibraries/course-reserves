@@ -1,6 +1,7 @@
 import { apiConfig } from '../../config/api.config';
+import PropTypes from 'prop-types';
 
-const LoginButton = () => {
+const LoginButton = ({ textColor = "#1A2C57" }) => {
   // Get the appropriate auth URL for the current environment
   const authUrl = apiConfig.getAuthUrl();
   const isDevelopment = apiConfig.environment !== 'production';
@@ -13,13 +14,13 @@ const LoginButton = () => {
         href={authUrl}
         className="staff-login-link"
         role="link"
-        aria-label="Staff Login (opens Shibboleth authentication page)"
+        aria-label="Admin Login (opens Shibboleth authentication page)"
         style={{ 
-          color: "#1A2C57",
+          color: textColor,
           textDecoration: 'underline',
         }}
       >
-        Staff Login {isDevelopment && '(DEV)'}
+        Admin Login {isDevelopment && '(DEV)'}
       </a>
       
       {isDevelopment && (
@@ -36,6 +37,11 @@ const LoginButton = () => {
       )}
     </>
   );
+};
+
+
+LoginButton.propTypes = {
+  textColor: PropTypes.string
 };
 
 export default LoginButton;

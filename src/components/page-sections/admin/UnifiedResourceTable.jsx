@@ -116,6 +116,8 @@ DraggableResourceRow.propTypes = {
     item_url: PropTypes.string,
     onUnlink: PropTypes.func,
     course_resource_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    resource_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    order: PropTypes.number,
     copiedItem: PropTypes.shape({
       title: PropTypes.string,
       callNumber: PropTypes.string,
@@ -149,7 +151,8 @@ function UnifiedResourceTable({
         ...res,
         resourceType: 'electronic',
         id: `e-${res.resource_id}`,
-        order: res.order || 999,
+        order: res.order,
+        course_resource_id: res.course_resource_id,
         onUnlink: unlinkResource
       })) : [];
       
@@ -158,14 +161,44 @@ function UnifiedResourceTable({
         ...res,
         resourceType: 'print',
         id: `p-${res.id}`,
-        order: res.order || 999
+        order: res.order
       })) : [];
     
-    // Combine and sort by order
-    const combined = [...electronic, ...print];
-    combined.sort((a, b) => a.order - b.order);
+    // Sort logic: 
+    // 1. If any resources have a manual order (not 999), sort by order field
+    // 2. Otherwise, default sort: electronic resources by course_resource_id, then print resources
+    const hasManualOrder = [...electronic, ...print].some(res => 
+      res.order !== null && res.order !== undefined && res.order !== 999
+    );
     
-    setResources(combined);
+    console.log('UnifiedResourceTable sorting:', {
+      hasManualOrder,
+      electronicCount: electronic.length,
+      printCount: print.length,
+      electronicSample: electronic[0],
+      printSample: print[0]
+    });
+    
+    if (hasManualOrder) {
+      // Manual ordering has been applied - sort by order field
+      const combined = [...electronic, ...print];
+      combined.sort((a, b) => {
+        const orderA = (a.order === 999 || a.order === null || a.order === undefined) ? 999999 : a.order;
+        const orderB = (b.order === 999 || b.order === null || b.order === undefined) ? 999999 : b.order;
+        return orderA - orderB;
+      });
+      console.log('Using manual order sorting');
+      setResources(combined);
+    } else {
+      // Default server order: electronic resources by course_resource_id, then print resources
+      electronic.sort((a, b) => (a.course_resource_id || 0) - (b.course_resource_id || 0));
+      print.sort((a, b) => (a.order === 999 ? 0 : a.order || 0) - (b.order === 999 ? 0 : b.order || 0));
+      
+      // Combine with electronic resources first, then print resources
+      const combined = [...electronic, ...print];
+      console.log('Using default server order sorting - electronic first by course_resource_id, then print');
+      setResources(combined);
+    }
   }, [electronicResources, printResources, unlinkResource]);
 
   // Handle row movement
