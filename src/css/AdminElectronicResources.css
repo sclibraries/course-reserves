@@ -6,6 +6,59 @@
   padding-bottom: 2rem;
 }
 
+/* Resource Sort Dropdown Styling */
+.resource-sort-dropdown .dropdown-toggle {
+  min-width: 200px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resource-sort-dropdown .dropdown-item {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 2px 4px;
+  transition: all 0.2s ease;
+}
+
+.resource-sort-dropdown .dropdown-item:hover {
+  background-color: #f8f9ff;
+  border-color: #6366f1;
+}
+
+.resource-sort-dropdown .dropdown-item.active {
+  background-color: #6366f1;
+  border-color: #6366f1;
+  color: white;
+}
+
+.resource-sort-dropdown .dropdown-item.active .text-muted {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Disable dragging styles when not in manual mode */
+.unified-resource-table .table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.unified-resource-table .drag-handle {
+  cursor: grab;
+  color: #6b7280;
+  text-align: center;
+  padding: 8px !important;
+}
+
+.unified-resource-table .drag-handle:hover {
+  color: #374151;
+  background-color: #f9fafb;
+}
+
+.unified-resource-table .dragging {
+  background-color: #f0f9ff;
+  border: 2px dashed #3b82f6;
+}
+
 /* Custom card styling to look less bootstrapy */
 .custom-card {
   border-radius: 12px;

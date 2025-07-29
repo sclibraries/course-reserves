@@ -66,11 +66,12 @@ function AdminElectronicResources() {
   }, [folioCourseId, clearCourse, setResources]);
 
   // Fetch print resources from FOLIO API
-  // at top, make sure you have both course and folioCourseId
+  // Only run when course offering changes, not on every render
 useEffect(() => {
-  if (!folioCourseId) return;
+  if (!folioCourseId || !course?.offering_id) return;
 
   const loadPrintsWithOrder = async () => {
+    console.log('Loading print resources with order for offering:', course.offering_id);
     setLoading(true);
     setError(null);
 
@@ -79,24 +80,27 @@ useEffect(() => {
       const reserves = await fetchRecords(folioCourseId);
 
       // 2) get your local order refs
-      let refs = [];
-      if (course?.offering_id) {
-        refs = await adminCourseService.getPhysicalResourceReferences(
-          course.offering_id
-        );
-      }
+      const refs = await adminCourseService.getPhysicalResourceReferences(
+        course.offering_id
+      );
 
       // 3) merge .order from refs into each FOLIO item
       const merged = reserves.map((item, idx) => {
-        const match = refs.find(r => r.external_resource_id === item.id);
+        const match = refs.find(r => r.external_resource_id === item.copiedItem?.instanceId);
         return {
           ...item,
-          order: match ? match.order : idx + 1
+          order: match ? match.order : (idx + 1)
         };
       });
 
       // 4) sort by that order
-      merged.sort((a, b) => a.order - b.order);
+      merged.sort((a, b) => (a.order || 999) - (b.order || 999));
+
+      console.log('Print resources loaded and sorted:', merged.map(m => ({ 
+        title: m.copiedItem?.title, 
+        order: m.order,
+        instanceId: m.copiedItem?.instanceId
+      })));
 
       // 5) store in state
       setPrintResources(merged);
@@ -109,7 +113,7 @@ useEffect(() => {
   };
 
   loadPrintsWithOrder();
-}, [folioCourseId, course?.offering_id]);
+}, [folioCourseId, course?.offering_id]); // Remove the dependency on course object to prevent unnecessary re-runs
 
   // Helper function to set up course based on FOLIO data
   const setupCourse = useCallback(async (courseDetails, folioTermName) => {
@@ -350,6 +354,12 @@ useEffect(() => {
   };
 
   const handleUpdateResources = async () => {
+    // Don't attempt to fetch resources if course isn't loaded yet
+    if (!course?.offering_id) {
+      console.log('handleUpdateResources: Course not ready, skipping fetch');
+      return;
+    }
+
     try {
       const { resources: updated } = await adminCourseService.fetchCourseResources(course.offering_id);
       setResources(updated);
@@ -360,106 +370,90 @@ useEffect(() => {
     }
   };
 
-  const handleReorder = async (updatedResources) => {
-    try {
-      console.log('Electronic resources reordering triggered', updatedResources);
-      // Immediately update UI with the new order
-      setResources(updatedResources);
-      
-      if (course?.offering_id) {
-        // Transform data for API call if needed
-        const apiPayload = updatedResources.map(resource => ({
-          resource_id: resource.resource_id,
-          order: resource.order
-        }));
-        
-        console.log('Sending order update to API:', apiPayload);
-        // Send updated order to the backend
-        const result = await adminCourseService.updateResourceOrder(course.offering_id, apiPayload);
-        console.log('API response:', result);
-        toast.success('Resource order updated successfully');
-      }
-    } catch (err) {
-      console.error('Error updating resource order:', err);
-      toast.error('Failed to update resource order.');
-      
-      // Refresh to get the original order if update failed
-      handleUpdateResources();
-    }
-  };
-  
-  const handlePrintResourceReorder = async (updatedPrintResources) => {
-    try {
-      console.log('Print resources reordering triggered', updatedPrintResources);
-      
-      if (course?.offering_id) {
-        // Transform print resources to the format expected by the backend
-        const apiPayload = updatedPrintResources.map(resource => ({
-          external_resource_id: resource.copiedItem.instanceId,
-          order: resource.order,
-          display_name: resource.copiedItem?.title || ''
-        }));
-        
-        console.log('Sending print resource order update to API:', apiPayload);
-        const result = await adminCourseService.updatePhysicalResourceOrder(course.offering_id, apiPayload);
-        console.log('API response:', result);
-        toast.success('Print resource order updated successfully');
-      }
-    } catch (err) {
-      console.error('Error updating print resource order:', err);
-      toast.error('Failed to update print resource order.');
-    }
-  };
-
   // New handler for unified resource reordering
   const handleUnifiedReorder = async ({ electronic, print }) => {
     try {
-      // 1) Write both batches in parallel
-      await Promise.all([
-        adminCourseService.updateResourceOrder(
-          course.offering_id,
-          electronic.map(e => ({ resource_id: e.resource_id, order: e.order }))
-        ),
-        adminCourseService.updatePhysicalResourceOrder(
-          course.offering_id,
-          print.map(p => ({
-            external_resource_id: p.copiedItem.instanceId, 
-            order:                p.order,
-            display_name:         p.copiedItem?.title || ''
-          }))
-        )
+      console.log('Starting unified reorder with:', { electronic, print });
+      
+      // Prepare API payloads - IMPORTANT: backend needs course_resource_id, not resource_id
+      const electronicPayload = electronic.map(e => ({ 
+        course_resource_id: e.course_resource_id, // This is the key field the backend expects
+        order: e.order 
+      }));
+      
+      const printPayload = print.map(p => ({
+        external_resource_id: p.copiedItem?.instanceId || p.id?.replace('p-', ''), 
+        order: p.order,
+        display_name: p.copiedItem?.title || ''
+      }));
+
+      console.log('Sending updates:', { electronicPayload, printPayload });
+
+      // 1) Update both batches sequentially to avoid race conditions
+      console.log(electronicPayload)
+      if (electronicPayload.length > 0) {
+        await adminCourseService.updateResourceOrder(course.offering_id, electronicPayload);
+      }
+      
+      if (printPayload.length > 0) {
+        await adminCourseService.updatePhysicalResourceOrder(course.offering_id, printPayload);
+      }
+
+      // 2) Wait a brief moment for backend processing
+      await new Promise(resolve => setTimeout(resolve, 100));
+  
+      // 3) Re-fetch all data in the correct sequence
+      const [
+        { resources: freshElectronic },
+        freshPrint,
+        refs
+      ] = await Promise.all([
+        adminCourseService.fetchCourseResources(course.offering_id),
+        fetchRecords(folioCourseId),
+        adminCourseService.getPhysicalResourceReferences(course.offering_id)
       ]);
   
-      // 2) Re-fetch all electronic resources (with full metadata)
-      const { resources: freshElectronic } = 
-        await adminCourseService.fetchCourseResources(course.offering_id);
-  
-      // 3) Re-fetch all print items from FOLIO (with metadata)
-      const freshPrint = await fetchRecords(folioCourseId);
-  
-      // 4) Re-fetch only the order‐references for physicals
-      const refs = await adminCourseService.getPhysicalResourceReferences(
-        course.offering_id
-      );
-      // refs: [{ external_resource_id, order }, ...]
-  
-      // 5) Merge the order back into your FOLIO items
+      // 4) Merge the order back into FOLIO items and sort by order
       const mergedPrint = freshPrint.map(item => {
-        const ref = refs.find(r => r.external_resource_id === item.copiedItem.instanceId);
+        const ref = refs.find(r => r.external_resource_id === item.copiedItem?.instanceId);
         return {
           ...item,
-          order: ref ? ref.order : item.order
+          order: ref ? ref.order : (item.order || 999)
         };
-      });
+      }).sort((a, b) => (a.order || 999) - (b.order || 999));
   
-      // 6) Commit into state
-      setResources(freshElectronic);
+      // 5) Sort electronic resources by order
+      const sortedElectronic = freshElectronic.sort((a, b) => (a.order || 999) - (b.order || 999));
+  
+      console.log('Final sorted data:', { 
+        electronic: sortedElectronic.map(e => ({ id: e.resource_id, order: e.order })),
+        print: mergedPrint.map(p => ({ id: p.copiedItem?.instanceId, order: p.order }))
+      });
+
+      // 6) Update state
+      setResources(sortedElectronic);
       setPrintResources(mergedPrint);
   
       toast.success('Resource order updated successfully');
     } catch (err) {
       console.error('Error updating unified resource order:', err);
       toast.error('Failed to update resource order.');
+      
+      // On error, try to refresh the data to get back to a consistent state
+      try {
+        const { resources: fallbackElectronic } = await adminCourseService.fetchCourseResources(course.offering_id);
+        setResources(fallbackElectronic);
+        
+        const fallbackPrint = await fetchRecords(folioCourseId);
+        const fallbackRefs = await adminCourseService.getPhysicalResourceReferences(course.offering_id);
+        const fallbackMerged = fallbackPrint.map(item => {
+          const ref = fallbackRefs.find(r => r.external_resource_id === item.copiedItem?.instanceId);
+          return { ...item, order: ref ? ref.order : (item.order || 999) };
+        });
+        setPrintResources(fallbackMerged);
+      } catch (fallbackErr) {
+        console.error('Error during fallback refresh:', fallbackErr);
+      }
     }
   };
   
@@ -559,8 +553,6 @@ useEffect(() => {
         toggleCrossLinkModal={resourceFormModal.openCrosslinkForm}
         unlinkResource={unlinkResource}
         handleUpdateResources={handleUpdateResources}
-        handleReorder={handleReorder}
-        handlePrintResourceReorder={handlePrintResourceReorder}
         handleUnifiedReorder={handleUnifiedReorder}
         buildFolioCourseUrl={() => buildFolioCourseUrl(folioCourseData?.id)}
         navigate={navigate}

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Button, Card, CardHeader, CardBody, Table, ButtonGroup } from 'reactstrap';
+import { Button, Card, CardHeader, CardBody, Table, ButtonGroup, Alert } from 'reactstrap';
 import { AdminResourceTable } from '../../admin/AdminResourceTable';
 import AdminPrintResourceTable from './AdminPrintResourceTable';
 import AdminResourceActions from './AdminResourceActions';
@@ -9,8 +9,10 @@ import EmptyState from './EmptyState';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import UnifiedResourceTable from '../../admin/UnifiedResourceTable';
+import { useResourceSortStore } from '../../../../store/resourceSortStore';
 
 function AdminResourcesTabs({
+  course,
   resources,
   printResources,
   linkedCourses,
@@ -21,15 +23,28 @@ function AdminResourcesTabs({
   toggleCrossLinkModal,
   unlinkResource,
   handleUpdateResources,
-  handleReorder,
-  handlePrintResourceReorder,
   handleUnifiedReorder,
   buildFolioCourseUrl,
   navigate,
   editResourceModal
 }) {
   const [activeTab, setActiveTab] = useState('resources');
-  const [resourceView, setResourceView] = useState('separate'); // 'separate' or 'unified'
+  const [resourceView, setResourceView] = useState('unified'); // 'unified' or 'separate' - unified first for better UX
+  
+  // Use Zustand store for sort state management
+  const { 
+    unifiedSort, 
+    setUnifiedSort
+  } = useResourceSortStore();
+
+  // Refresh data from backend whenever view changes to ensure sync
+  useEffect(() => {
+    // Only refresh if course is available
+    if (course?.offering_id) {
+      handleUpdateResources();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resourceView]); // Refresh on every view change
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -70,16 +85,16 @@ function AdminResourcesTabs({
                     onClick={() => setResourceView('separate')}
                     outline={resourceView !== 'separate'}
                   >
-                    <FontAwesomeIcon icon="fa-solid fa-table-columns" className="me-1" />
-                    Separate Tables
+                    <FontAwesomeIcon icon="fa-solid fa-eye" className="me-1" />
+                    View by Type
                   </Button>
                   <Button
                     color={resourceView === 'unified' ? 'primary' : 'secondary'}
                     onClick={() => setResourceView('unified')}
                     outline={resourceView !== 'unified'}
                   >
-                    <FontAwesomeIcon icon="fa-solid fa-table" className="me-1" />
-                    Unified Table
+                    <FontAwesomeIcon icon="fa-solid fa-arrows-up-down" className="me-1" />
+                    Sort & Manage
                   </Button>
                 </ButtonGroup>
               </div>
@@ -104,6 +119,8 @@ function AdminResourcesTabs({
                         printResources={printResources}
                         onReorder={handleUnifiedReorder}
                         unlinkResource={unlinkResource}
+                        currentSort={unifiedSort}
+                        onSortChange={setUnifiedSort}
                       />
                     ) : (
                       <EmptyState 
@@ -120,12 +137,19 @@ function AdminResourcesTabs({
               ) : (
                 /* Separate Resource Tables */
                 <>
+                  {/* Info Alert for View-Only Mode */}
+                  <Alert color="info" className="mb-4">
+                    <FontAwesomeIcon icon="fa-solid fa-info-circle" className="me-2" />
+                    <strong>View Only Mode:</strong> These tables show resources organized by type. 
+                    To sort, reorder, or manage resources, use the &ldquo;Sort &amp; Manage&rdquo; view above.
+                  </Alert>
+
                   {/* Electronic Resources Section */}
                   <Card className="mb-4 resource-card">
                     <CardHeader className="resource-card-header">
                       <h5 className="m-0">
                         <FontAwesomeIcon icon="fa-solid fa-laptop" className="me-2" />
-                        Electronic Resources
+                        Electronic Resources (View Only)
                       </h5>
                       <Button color="light" className="refresh-btn" onClick={handleUpdateResources}>
                         <FontAwesomeIcon icon="fa-solid fa-arrows-rotate" className="me-1" />
@@ -137,7 +161,6 @@ function AdminResourcesTabs({
                         <AdminResourceTable 
                           resources={resources} 
                           unlink={unlinkResource} 
-                          onReorder={handleReorder}
                           editResourceModal={editResourceModal}
                         />
                       ) : (
@@ -158,7 +181,7 @@ function AdminResourcesTabs({
                     <CardHeader className="resource-card-header">
                       <h5 className="m-0">
                         <FontAwesomeIcon icon="fa-solid fa-book" className="me-2" />
-                        Physical Resources
+                        Physical Resources (View Only)
                       </h5>
                       <div>
                         <a 
@@ -187,7 +210,6 @@ function AdminResourcesTabs({
                       {printResources.length > 0 ? (
                         <AdminPrintResourceTable 
                           printResources={printResources}
-                          onReorder={handlePrintResourceReorder}
                         />
                       ) : (
                         <EmptyState 
@@ -283,8 +305,6 @@ AdminResourcesTabs.propTypes = {
   toggleCrossLinkModal: PropTypes.func.isRequired,
   unlinkResource: PropTypes.func.isRequired,
   handleUpdateResources: PropTypes.func.isRequired,
-  handleReorder: PropTypes.func.isRequired,
-  handlePrintResourceReorder: PropTypes.func.isRequired,
   handleUnifiedReorder: PropTypes.func.isRequired,
   buildFolioCourseUrl: PropTypes.func.isRequired,
   navigate: PropTypes.func.isRequired,

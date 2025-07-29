@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Table, Button, Alert } from 'reactstrap';
+import { Table, Button, Alert, Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useDrag, useDrop } from 'react-dnd';
 import { buildFolioVerificationUrl } from '../../../util/urlHelpers';
+import ResourceSortDropdown from './ResourceSortDropdown';
+import BulkOperationsPanel from './BulkOperationsPanel';
+import { applySortOrder, isManualSort } from '../../../utils/resourceSorting';
 
 // Define item type for drag and drop
 const UNIFIED_ITEM_TYPE = 'unified-resource';
@@ -11,7 +14,7 @@ const UNIFIED_ITEM_TYPE = 'unified-resource';
 /**
  * Draggable component for both electronic and print resources
  */
-const DraggableResourceRow = ({ item, index, moveRow, onDrop }) => {
+const DraggableResourceRow = ({ item, index, moveRow, onDrop, isSelected, onSelect }) => {
   const ref = useRef(null);
   
   const [, drop] = useDrop({
@@ -47,9 +50,16 @@ const DraggableResourceRow = ({ item, index, moveRow, onDrop }) => {
     return (
       <tr 
         ref={ref} 
-        className={isDragging ? 'dragging' : ''}
+        className={`${isDragging ? 'dragging' : ''} ${isSelected ? 'table-primary' : ''}`}
         style={{ opacity: isDragging ? 0.5 : 1 }}
       >
+        <td className="text-center" style={{ width: '40px' }}>
+          <Input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
+          />
+        </td>
         <td className="drag-handle">
           <FontAwesomeIcon icon="fa-solid fa-grip-vertical" />
         </td>
@@ -81,9 +91,16 @@ const DraggableResourceRow = ({ item, index, moveRow, onDrop }) => {
     return (
       <tr 
         ref={ref} 
-        className={isDragging ? 'dragging' : ''}
+        className={`${isDragging ? 'dragging' : ''} ${isSelected ? 'table-primary' : ''}`}
         style={{ opacity: isDragging ? 0.5 : 1 }}
       >
+        <td className="text-center" style={{ width: '40px' }}>
+          <Input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
+          />
+        </td>
         <td className="drag-handle">
           <FontAwesomeIcon icon="fa-solid fa-grip-vertical" />
         </td>
@@ -128,7 +145,101 @@ DraggableResourceRow.propTypes = {
   }).isRequired,
   index: PropTypes.number.isRequired,
   moveRow: PropTypes.func.isRequired,
-  onDrop: PropTypes.func.isRequired
+  onDrop: PropTypes.func.isRequired,
+  isSelected: PropTypes.bool.isRequired,
+  onSelect: PropTypes.func.isRequired
+};
+
+/**
+ * Static (non-draggable) component for sorted resources
+ */
+const StaticResourceRow = ({ item, isSelected, onSelect }) => {
+  // Render differently based on resource type
+  if (item.resourceType === 'electronic') {
+    return (
+      <tr className={isSelected ? 'table-primary' : ''}>
+        <td className="text-center" style={{ width: '40px' }}>
+          <Input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
+          />
+        </td>
+        <td>
+          <span className="badge bg-info me-2">Electronic</span>
+        </td>
+        <td className="text-break">{item.name}</td>
+        <td>
+          {item.item_url ? (
+            <a href={item.item_url} target="_blank" rel="noreferrer">
+              {item.item_url}
+            </a>
+          ) : (
+            '—'
+          )}
+        </td>
+        <td>
+          <Button 
+            size="sm" 
+            color="danger" 
+            onClick={() => item.onUnlink && item.onUnlink(item.course_resource_id)}
+          >
+            Unlink
+          </Button>
+        </td>
+      </tr>
+    );
+  } else {
+    return (
+      <tr className={isSelected ? 'table-primary' : ''}>
+        <td className="text-center" style={{ width: '40px' }}>
+          <Input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
+          />
+        </td>
+        <td>
+          <span className="badge bg-secondary me-2">Print</span>
+        </td>
+        <td>{item?.copiedItem?.title}</td>
+        <td>{item?.copiedItem?.callNumber || '—'}</td>
+        <td>
+          <a
+            href={buildFolioVerificationUrl(item?.copiedItem?.instanceId, item?.copiedItem?.holdingsId)}
+            target="_blank"
+            rel="noopener"
+            className="btn btn-sm btn-outline-primary"
+          >
+            View
+          </a>
+        </td>
+      </tr>
+    );
+  }
+};
+
+// Add PropTypes for StaticResourceRow
+StaticResourceRow.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    resourceType: PropTypes.string,
+    name: PropTypes.string,
+    item_url: PropTypes.string,
+    onUnlink: PropTypes.func,
+    course_resource_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    resource_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    order: PropTypes.number,
+    copiedItem: PropTypes.shape({
+      title: PropTypes.string,
+      callNumber: PropTypes.string,
+      instanceId: PropTypes.string,
+      holdingsId: PropTypes.string,
+      copy: PropTypes.string
+    })
+  }).isRequired,
+  isSelected: PropTypes.bool.isRequired,
+  onSelect: PropTypes.func.isRequired
 };
 
 /**
@@ -139,10 +250,262 @@ function UnifiedResourceTable({
   electronicResources,
   printResources,
   onReorder,
-  unlinkResource
+  unlinkResource,
+  currentSort: externalCurrentSort,
+  onSortChange: externalOnSortChange,
+  isDropdownOpen: externalIsDropdownOpen,
+  setDropdownOpen: externalSetDropdownOpen
 }) {
   const [resources, setResources] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [showBulkOps, setShowBulkOps] = useState(false);
+
+  // Use external sort state if provided, fallback to internal state
+  const [internalCurrentSort, setInternalCurrentSort] = useState('manual');
+  const [internalIsDropdownOpen, setInternalDropdownOpen] = useState(false);
+  
+  const currentSort = externalCurrentSort !== undefined ? externalCurrentSort : internalCurrentSort;
+  const onSortChange = externalOnSortChange || setInternalCurrentSort;
+  const isDropdownOpen = externalIsDropdownOpen !== undefined ? externalIsDropdownOpen : internalIsDropdownOpen;
+  const setDropdownOpen = externalSetDropdownOpen || setInternalDropdownOpen;
+
+  // Update showBulkOps when selection changes
+  useEffect(() => {
+    setShowBulkOps(selectedItems.length > 0);
+  }, [selectedItems]);
+
+  // Apply sort when currentSort changes externally (but not when resources change)
+  useEffect(() => {
+    if (!isManualSort(currentSort) && resources.length > 0) {
+      const sortedResources = applySortOrder([...resources], currentSort);
+      // Only update if the order actually changed
+      const currentIds = resources.map(r => r.id).join(',');
+      const sortedIds = sortedResources.map(r => r.id).join(',');
+      
+      if (currentIds !== sortedIds) {
+        setResources(sortedResources);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSort]); // Intentionally only watching currentSort
+
+  // Handle sort change
+  const handleSortChange = useCallback((newSortType) => {
+    onSortChange(newSortType);
+    
+    if (isManualSort(newSortType)) {
+      // For manual sort, don't change the order - just update the sorting method
+      return;
+    }
+    
+    // Apply the new sort and update backend if not manual
+    const sortedResources = applySortOrder(resources, newSortType);
+    setResources(sortedResources);
+    
+    // Send the new order to the backend
+    if (onReorder && sortedResources.length > 0) {
+      const electronic = [];
+      const print = [];
+      
+      sortedResources.forEach((resource) => {
+        if (resource.resourceType === 'electronic') {
+          electronic.push({
+            ...resource,
+            resource_id: resource.resource_id,
+            course_resource_id: resource.course_resource_id,
+            order: resource.order
+          });
+        } else {
+          print.push({
+            ...resource,
+            id: resource.id,
+            order: resource.order,
+            copiedItem: resource.copiedItem
+          });
+        }
+      });
+
+      onReorder({
+        electronic,
+        print
+      });
+    }
+  }, [resources, onReorder, onSortChange]);
+
+  // Selection handlers
+  const handleSelectItem = useCallback((itemId, isSelected) => {
+    setSelectedItems(prev => {
+      if (isSelected) {
+        return [...prev, itemId];
+      } else {
+        return prev.filter(id => id !== itemId);
+      }
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((selectAll) => {
+    if (selectAll) {
+      setSelectedItems(resources.map(r => r.id));
+    } else {
+      setSelectedItems([]);
+    }
+  }, [resources]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedItems([]);
+  }, []);
+
+  // Bulk operations handler
+  const handleBulkMove = useCallback((selectedResources, operation, value) => {
+    const newResources = [...resources];
+    
+    // Remove selected items from their current positions
+    const otherResources = newResources.filter(r => !selectedItems.includes(r.id));
+    const selectedResourcesOrdered = selectedResources.sort((a, b) => 
+      newResources.findIndex(r => r.id === a.id) - newResources.findIndex(r => r.id === b.id)
+    );
+
+    let finalResources = [];
+
+    switch (operation) {
+      case 'moveToTop':
+        finalResources = [...selectedResourcesOrdered, ...otherResources];
+        break;
+      
+      case 'moveToBottom':
+        finalResources = [...otherResources, ...selectedResourcesOrdered];
+        break;
+      
+      case 'moveAfter': {
+        const targetIndex = otherResources.findIndex(r => r.id === value);
+        if (targetIndex !== -1) {
+          finalResources = [
+            ...otherResources.slice(0, targetIndex + 1),
+            ...selectedResourcesOrdered,
+            ...otherResources.slice(targetIndex + 1)
+          ];
+        } else {
+          finalResources = [...otherResources, ...selectedResourcesOrdered];
+        }
+        break;
+      }
+      
+      case 'moveToPosition': {
+        const position = Math.max(1, Math.min(value, otherResources.length + selectedResourcesOrdered.length));
+        const insertIndex = position - 1;
+        
+        if (insertIndex === 0) {
+          finalResources = [...selectedResourcesOrdered, ...otherResources];
+        } else if (insertIndex >= otherResources.length) {
+          finalResources = [...otherResources, ...selectedResourcesOrdered];
+        } else {
+          finalResources = [
+            ...otherResources.slice(0, insertIndex),
+            ...selectedResourcesOrdered,
+            ...otherResources.slice(insertIndex)
+          ];
+        }
+        break;
+      }
+      
+      case 'moveUp': {
+        // Find the earliest position of selected items
+        const selectedIndices = selectedResources.map(res => 
+          newResources.findIndex(r => r.id === res.id)
+        ).sort((a, b) => a - b);
+        
+        const firstSelectedIndex = selectedIndices[0];
+        
+        // Can't move up if already at the top
+        if (firstSelectedIndex === 0) {
+          finalResources = newResources;
+          break;
+        }
+        
+        // Move all selected items up by one position
+        finalResources = [...newResources];
+        selectedIndices.forEach(currentIndex => {
+          if (currentIndex > 0) {
+            // Swap with the item above
+            [finalResources[currentIndex], finalResources[currentIndex - 1]] = 
+            [finalResources[currentIndex - 1], finalResources[currentIndex]];
+          }
+        });
+        break;
+      }
+      
+      case 'moveDown': {
+        // Find the latest position of selected items
+        const selectedIndices = selectedResources.map(res => 
+          newResources.findIndex(r => r.id === res.id)
+        ).sort((a, b) => b - a); // Sort descending
+        
+        const lastSelectedIndex = selectedIndices[0];
+        
+        // Can't move down if already at the bottom
+        if (lastSelectedIndex === newResources.length - 1) {
+          finalResources = newResources;
+          break;
+        }
+        
+        // Move all selected items down by one position
+        finalResources = [...newResources];
+        selectedIndices.forEach(currentIndex => {
+          if (currentIndex < finalResources.length - 1) {
+            // Swap with the item below
+            [finalResources[currentIndex], finalResources[currentIndex + 1]] = 
+            [finalResources[currentIndex + 1], finalResources[currentIndex]];
+          }
+        });
+        break;
+      }
+      
+      default:
+        finalResources = newResources;
+    }
+
+    // Update order properties
+    finalResources.forEach((resource, index) => {
+      resource.order = index + 1;
+    });
+
+    setResources(finalResources);
+    
+    // Only clear selection for major moves, preserve for incremental arrow moves
+    if (operation !== 'moveUp' && operation !== 'moveDown') {
+      setSelectedItems([]);
+    }
+
+    // Trigger backend update
+    if (onReorder && finalResources.length > 0) {
+      const electronic = [];
+      const print = [];
+      
+      finalResources.forEach((resource) => {
+        if (resource.resourceType === 'electronic') {
+          electronic.push({
+            ...resource,
+            resource_id: resource.resource_id,
+            course_resource_id: resource.course_resource_id,
+            order: resource.order
+          });
+        } else {
+          print.push({
+            ...resource,
+            id: resource.id,
+            order: resource.order,
+            copiedItem: resource.copiedItem
+          });
+        }
+      });
+      
+      onReorder({
+        electronic,
+        print
+      });
+    }
+  }, [resources, selectedItems, onReorder]);
 
   // Combine resources with type information
   useEffect(() => {
@@ -151,7 +514,7 @@ function UnifiedResourceTable({
         ...res,
         resourceType: 'electronic',
         id: `e-${res.resource_id}`,
-        order: res.order,
+        order: parseInt(res.order) || 999,
         course_resource_id: res.course_resource_id,
         onUnlink: unlinkResource
       })) : [];
@@ -161,13 +524,13 @@ function UnifiedResourceTable({
         ...res,
         resourceType: 'print',
         id: `p-${res.id}`,
-        order: res.order
+        order: parseInt(res.order) || 999
       })) : [];
     
-    // Sort logic: 
-    // 1. If any resources have a manual order (not 999), sort by order field
-    // 2. Otherwise, default sort: electronic resources by course_resource_id, then print resources
-    const hasManualOrder = [...electronic, ...print].some(res => 
+    const allResources = [...electronic, ...print];
+    
+    // Check if we have manual ordering (any order that's not 999)
+    const hasManualOrder = allResources.some(res => 
       res.order !== null && res.order !== undefined && res.order !== 999
     );
     
@@ -175,34 +538,56 @@ function UnifiedResourceTable({
       hasManualOrder,
       electronicCount: electronic.length,
       printCount: print.length,
-      electronicSample: electronic[0],
-      printSample: print[0]
+      currentSort,
+      allOrders: allResources.map(r => ({ type: r.resourceType, order: r.order, id: r.id }))
     });
     
-    if (hasManualOrder) {
-      // Manual ordering has been applied - sort by order field
-      const combined = [...electronic, ...print];
-      combined.sort((a, b) => {
-        const orderA = (a.order === 999 || a.order === null || a.order === undefined) ? 999999 : a.order;
-        const orderB = (b.order === 999 || b.order === null || b.order === undefined) ? 999999 : b.order;
+    let sortedResources = [];
+    
+    if (currentSort !== 'manual') {
+      // Apply the selected sort method
+      sortedResources = applySortOrder(allResources, currentSort);
+      console.log(`Using ${currentSort} sorting`);
+    } else if (hasManualOrder) {
+      // Manual ordering exists - sort all resources by order field
+      sortedResources = allResources.sort((a, b) => {
+        // Treat 999 as a very high number for sorting
+        const orderA = a.order === 999 ? 999999 : (a.order || 999999);
+        const orderB = b.order === 999 ? 999999 : (b.order || 999999);
         return orderA - orderB;
       });
-      console.log('Using manual order sorting');
-      setResources(combined);
+      console.log('Using manual order sorting, final order:', 
+        sortedResources.map(r => ({ 
+          type: r.resourceType, 
+          order: r.order, 
+          title: r.name || r.copiedItem?.title,
+          id: r.resourceType === 'electronic' ? r.resource_id : r.copiedItem?.instanceId
+        }))
+      );
     } else {
-      // Default server order: electronic resources by course_resource_id, then print resources
-      electronic.sort((a, b) => (a.course_resource_id || 0) - (b.course_resource_id || 0));
-      print.sort((a, b) => (a.order === 999 ? 0 : a.order || 0) - (b.order === 999 ? 0 : b.order || 0));
-      
-      // Combine with electronic resources first, then print resources
-      const combined = [...electronic, ...print];
-      console.log('Using default server order sorting - electronic first by course_resource_id, then print');
-      setResources(combined);
+      // No manual ordering - use default behavior
+      if (electronic.length > 0 && print.length === 0) {
+        // Only electronic resources - sort by course_resource_id
+        sortedResources = electronic.sort((a, b) => (a.course_resource_id || 0) - (b.course_resource_id || 0));
+        console.log('Electronic only - sorting by course_resource_id:', 
+          sortedResources.map(r => ({ course_resource_id: r.course_resource_id, order: r.order, title: r.name }))
+        );
+      } else {
+        // Mixed or print only - electronic first by course_resource_id, then print by order
+        electronic.sort((a, b) => (a.course_resource_id || 0) - (b.course_resource_id || 0));
+        print.sort((a, b) => (a.order || 0) - (b.order || 0));
+        sortedResources = [...electronic, ...print];
+        console.log('Mixed resources - electronic first, then print');
+      }
     }
-  }, [electronicResources, printResources, unlinkResource]);
+    
+    setResources(sortedResources);
+  }, [electronicResources, printResources, unlinkResource, currentSort]);
 
-  // Handle row movement
+  // Handle row movement (only active in manual mode)
   const moveRow = useCallback((dragIndex, hoverIndex) => {
+    if (currentSort !== 'manual') return; // Disable drag in non-manual modes
+    
     setIsDragging(true);
     const draggedRow = resources[dragIndex];
     const newOrder = [...resources];
@@ -217,12 +602,14 @@ function UnifiedResourceTable({
     }));
     
     setResources(updatedItems);
-  }, [resources]);
+  }, [resources, currentSort]);
 
-  // Handle drag end and update backend
+  // Handle drag end and update backend (only active in manual mode)
   const handleDragEnd = useCallback(() => {
-    if (onReorder && resources.length > 0 && isDragging) {
-      // Split resources back into their types
+    if (onReorder && resources.length > 0 && isDragging && currentSort === 'manual') {
+      console.log('Drag ended, processing reorder with resources:', resources.length);
+      
+      // Split resources back into their types with proper structure
       const electronic = [];
       const print = [];
       
@@ -231,16 +618,34 @@ function UnifiedResourceTable({
         
         if (resource.resourceType === 'electronic') {
           electronic.push({
+            ...resource,
             resource_id: resource.resource_id,
+            course_resource_id: resource.course_resource_id, // This is critical for backend updates
             order
           });
         } else {
+          // For print resources, we need to preserve the structure
           print.push({
-            id: resource.id.replace('p-', ''),
+            ...resource,
+            id: resource.id,
             order,
             copiedItem: resource.copiedItem
           });
         }
+      });
+      
+      console.log('Sending reorder data:', {
+        electronic: electronic.map(e => ({ 
+          resource_id: e.resource_id, 
+          course_resource_id: e.course_resource_id,
+          order: e.order 
+        })),
+        print: print.map(p => ({ 
+          id: p.id, 
+          order: p.order, 
+          instanceId: p.copiedItem?.instanceId,
+          title: p.copiedItem?.title 
+        }))
       });
       
       // Send updates to backend
@@ -251,7 +656,7 @@ function UnifiedResourceTable({
       
       setIsDragging(false);
     }
-  }, [resources, onReorder, isDragging]);
+  }, [resources, onReorder, isDragging, currentSort]);
 
   if (!resources.length) {
     return (
@@ -259,19 +664,51 @@ function UnifiedResourceTable({
     );
   }
 
+  const allSelected = resources.length > 0 && selectedItems.length === resources.length;
+  const someSelected = selectedItems.length > 0 && selectedItems.length < resources.length;
+
   return (
     <div className="unified-resource-table mb-4">
+      <ResourceSortDropdown
+        currentSort={currentSort}
+        onSortChange={handleSortChange}
+        isDropdownOpen={isDropdownOpen}
+        setDropdownOpen={setDropdownOpen}
+      />
+
+      <BulkOperationsPanel
+        selectedItems={selectedItems}
+        resources={resources}
+        onBulkMove={handleBulkMove}
+        onClearSelection={handleClearSelection}
+        isVisible={showBulkOps}
+      />
+      
       <div className="mb-3">
         <small className="text-muted">
           <FontAwesomeIcon icon="fa-solid fa-info-circle" className="me-1" />
-          Drag and drop resources to reorder. This view shows both electronic and print resources together.
+          {currentSort === 'manual' 
+            ? 'Using default order (custom order + creation order). Select resources for bulk operations, drag and drop, or use arrow buttons to reorder individually.'
+            : `Resources are sorted by ${currentSort.replace('-', ' ')}. Switch to Default Order to enable drag and drop.`
+          }
         </small>
       </div>
       
       <Table bordered responsive hover>
         <thead>
           <tr>
-            <th style={{ width: '40px' }}></th>
+            <th style={{ width: '40px' }}>
+              <Input
+                type="checkbox"
+                checked={allSelected}
+                ref={input => {
+                  if (input) input.indeterminate = someSelected;
+                }}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                title={allSelected ? 'Deselect all' : 'Select all'}
+              />
+            </th>
+            {currentSort === 'manual' && <th style={{ width: '40px' }}></th>}
             <th style={{ width: '120px' }}>Type</th>
             <th>Title</th>
             <th>Information</th>
@@ -279,15 +716,28 @@ function UnifiedResourceTable({
           </tr>
         </thead>
         <tbody>
-          {resources.map((item, index) => (
-            <DraggableResourceRow
-              key={item.id}
-              item={item}
-              index={index}
-              moveRow={moveRow}
-              onDrop={handleDragEnd}
-            />
-          ))}
+          {resources.map((item, index) => {
+            const isSelected = selectedItems.includes(item.id);
+            
+            return currentSort === 'manual' ? (
+              <DraggableResourceRow
+                key={item.id}
+                item={item}
+                index={index}
+                moveRow={moveRow}
+                onDrop={handleDragEnd}
+                isSelected={isSelected}
+                onSelect={handleSelectItem}
+              />
+            ) : (
+              <StaticResourceRow
+                key={item.id}
+                item={item}
+                isSelected={isSelected}
+                onSelect={handleSelectItem}
+              />
+            );
+          })}
         </tbody>
       </Table>
     </div>
@@ -298,7 +748,11 @@ UnifiedResourceTable.propTypes = {
   electronicResources: PropTypes.array,
   printResources: PropTypes.array,
   onReorder: PropTypes.func.isRequired,
-  unlinkResource: PropTypes.func
+  unlinkResource: PropTypes.func,
+  currentSort: PropTypes.string,
+  onSortChange: PropTypes.func,
+  isDropdownOpen: PropTypes.bool,
+  setDropdownOpen: PropTypes.func
 };
 
 export default UnifiedResourceTable;
