@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Card,
@@ -12,11 +12,15 @@ import {
   Badge,
   Table,
   Button,
+  Popover,
+  PopoverBody,
 } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faBook} from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faBook, faClock, faInfoCircle} from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
 import { useAuth } from '../../../contexts/AuthContext';
+import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
+import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
 
 /**
  * RecordCard component
@@ -34,7 +38,7 @@ import { useAuth } from '../../../contexts/AuthContext';
  * @param {boolean} props.isGrouped - Whether the record is part of a grouped display
  * @param {Object} props.courseInfo - Information about the associated course
  * @param {string} props.collegeParam - College parameter for tracking
- * @param {boolean} props.showVisibilityMessage - Whether to show visibility messages instead of hiding items
+ * @param {boolean} props.showVisibilityMessages - Whether to show visibility messages instead of hiding items
  * @returns {JSX.Element|null} The record card or null if visibility conditions aren't met
  */
 const RecordCard = ({
@@ -46,9 +50,23 @@ const RecordCard = ({
   isGrouped = false,
   courseInfo,
   collegeParam,
+  showVisibilityMessages = true,
 }) => {
   // Get authentication state directly from context
   const { isAuthenticated } = useAuth();
+
+  // State for managing popover visibility
+  const [activePopover, setActivePopover] = useState(null);
+
+  /**
+   * Toggle the active popover
+   * 
+   * @function
+   * @param {string|number} itemId - The ID of the item to toggle popover for
+   */
+  const togglePopover = (itemId) => {
+    setActivePopover(activePopover === itemId ? null : itemId);
+  };
 
   // Destructure customization settings with fallback values for safety
   const {
@@ -158,39 +176,42 @@ const RecordCard = ({
       }
 
       const now = new Date();
-      const startVisibility = resource.start_visibility
-        ? new Date(resource.start_visibility)
-        : null;
-      const endVisibility = resource.end_visibility
-        ? new Date(resource.end_visibility)
-        : null;
-        
-      // If current time is before the start of the visibility window
-      if (startVisibility && now < startVisibility) {
-        return { 
-          isVisible: false,
-          message: `Available from ${startVisibility.toLocaleDateString()}`,
-          startDate: startVisibility
-        };
-      }
       
-      // If current time is after the end of the visibility window
-      if (endVisibility && now > endVisibility) {
-        return {
-          isVisible: false,
-          message: `Available until ${endVisibility.toLocaleDateString()}`,
-          endDate: endVisibility
-        };
-      }
+    
+        // Use resource-level visibility dates
+        const startVisibility = resource.start_visibility
+          ? new Date(resource.start_visibility)
+          : null;
+        const endVisibility = resource.end_visibility
+          ? new Date(resource.end_visibility)
+          : null;
+          
+        // If current time is before the start of the visibility window
+        if (startVisibility && now < startVisibility) {
+          return { 
+            isVisible: false,
+            message: `Available from ${startVisibility.toLocaleDateString()}`,
+            startDate: startVisibility
+          };
+        }
+        
+        // If current time is after the end of the visibility window
+        if (endVisibility && now > endVisibility) {
+          return {
+            isVisible: false,
+            message: `Available until ${endVisibility.toLocaleDateString()}`,
+            endDate: endVisibility
+          };
+        }
     }
     return { isVisible: true };
   };
 
   // Check visibility
-  const { isVisible } = checkVisibility();
+  const { isVisible, message } = checkVisibility();
 
   // For non-authenticated users, completely skip rendering resources that aren't visible
-  if (!isVisible && !isAuthenticated) {
+  if (!isVisible && !isAuthenticated && !showVisibilityMessages) {
     return null; // Simply return null for invisible resources, let parent component show the message
   }
 
@@ -223,6 +244,10 @@ const RecordCard = ({
   };
 
   const reserveMaterialTypes = getReserveMaterialTypes();
+
+  // Get visibility information for electronic resources
+  const visibilityInfo = isElectronic && resource ? getVisibilityInfo(resource, isAuthenticated) : { showVisibilityDates: false };
+  const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
   /**
    * Get the display text for the resource type badge
@@ -467,11 +492,12 @@ const RecordCard = ({
     // Check if resource has additional links
     const hasAdditionalLinks = resource.links && resource.links.length > 0;
 
-    // Show visibility dates for authenticated users
-    const showVisibilityDates = isAuthenticated && (resource.start_visibility || resource.end_visibility);
+    // Check if the primary resource link is visible based on visibility settings
+    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(resource, isAuthenticated);
+
     return (
       <div className="mt-3">
-        {resource.item_url && (
+        {resource.item_url && isPrimaryLinkVisibleCheck && (
           <Button
             color="primary"
             onClick={handleElectronicClick}
@@ -488,23 +514,56 @@ const RecordCard = ({
           </Button>
         )}
 
+        {/* Show message when primary link is not available */}
+        {resource.item_url && !isPrimaryLinkVisibleCheck && (
+          <div className="alert alert-warning small mb-2" role="alert">
+            <strong>Access Resource:</strong> The link to this resource is not currently available due to visibility restrictions.
+          </div>
+        )}
+
         {showVisibilityDates && (
           <div className="alert alert-info small mb-2" role="alert">
             <strong>Visibility Window:</strong>{' '}
-            {resource.start_visibility ? `From ${new Date(resource.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
-            {resource.end_visibility ? `until ${new Date(resource.end_visibility).toLocaleDateString()}` : 'No end date'}
+            {visibilityInfo.usePrimaryLinkVisibility ? (
+              <>
+                {visibilityInfo.startDate ? `From ${new Date(visibilityInfo.startDate).toLocaleDateString()}` : 'No start date'}{' '}
+                {visibilityInfo.endDate ? `until ${new Date(visibilityInfo.endDate).toLocaleDateString()}` : 'No end date'}
+              </>
+            ) : (
+              <>
+                {visibilityInfo.startDate ? `From ${new Date(visibilityInfo.startDate).toLocaleDateString()}` : 'No start date'}{' '}
+                {visibilityInfo.endDate ? `until ${new Date(visibilityInfo.endDate).toLocaleDateString()}` : 'No end date'}
+              </>
+            )}
           </div>
         )}
 
         {resource.external_note && (
           <div className="alert alert-info small mb-2" role="alert">
-            {resource.external_note}
+            {containsHtml(resource.external_note) ? (
+              <span 
+                dangerouslySetInnerHTML={{ 
+                  __html: sanitizeHtml(resource.external_note) 
+                }} 
+              />
+            ) : (
+              resource.external_note
+            )}
           </div>
         )}
 
         {resource.description && (
           <CardText style={textStyle}>
-            <strong>Description:</strong> {resource.description}
+            <strong>Description:</strong>{' '}
+            {containsHtml(resource.description) ? (
+              <span 
+                dangerouslySetInnerHTML={{ 
+                  __html: sanitizeHtml(resource.description) 
+                }} 
+              />
+            ) : (
+              resource.description
+            )}
           </CardText>
         )}
 
@@ -513,32 +572,64 @@ const RecordCard = ({
           <div className="additional-links mt-3">
             <h3 className="h6 fw-bold mb-2">Additional Resources</h3>
             <div className="list-group">
-              {resource.links.map((link, index) => (
-                <div key={link.link_id || index} className="list-group-item list-group-item-action">
-                  <div className="d-flex w-100 justify-content-between">
-                    <h4 className="h6 mb-1">{link.title || 'Additional Resource'}</h4>
-                    {link.use_proxy === "1" && (
-                      <Badge color="secondary">Proxy Enabled</Badge>
+              {resource.links.map((link, index) => {
+                // Check if this individual link is visible
+                const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
+                
+                // Always render the link item, but conditionally show the actual link
+                return (
+                  <div key={link.link_id || index} className="list-group-item list-group-item-action">
+                    <div className="d-flex w-100 justify-content-between">
+                      <h4 className="h6 mb-1">{link.title || 'Additional Resource'}</h4>
+                      <div>
+                        {link.use_proxy === "1" && (
+                          <Badge color="secondary" className="me-1">Proxy Enabled</Badge>
+                        )}
+                        {!isCurrentLinkVisible && (
+                          <Badge color="warning">Not Currently Available</Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {link.description && (
+                      <p className="mb-2">{link.description}</p>
+                    )}
+
+                    {/* Show link visibility dates for authenticated users */}
+                    {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                      <div className="small text-muted mb-2">
+                        <strong>Link Visibility:</strong>{' '}
+                        {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
+                        {link.end_visibility ? `until ${new Date(link.end_visibility).toLocaleDateString()}` : 'No end date'}
+                      </div>
+                    )}
+                    
+                    {/* Only show the actual link if it's visible */}
+                    {isCurrentLinkVisible && (
+                      <a 
+                        href={link.url}
+                        onClick={(e) => handleAdditionalLinkClick(e, link)}
+                        className="text-primary d-block mb-1"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        aria-label={`Access ${link.title || 'additional resource'} (opens in new tab)`}
+                      >
+                        <span className="text-truncate d-inline-block" style={{ maxWidth: "100%" }}>
+                          {link.url}
+                        </span>
+                        <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
+                      </a>
+                    )}
+                    
+                    {/* Show a message when link is not available */}
+                    {!isCurrentLinkVisible && (
+                      <p className="mb-1 small text-muted fst-italic">
+                        Link not currently available due to visibility restrictions.
+                      </p>
                     )}
                   </div>
-                  <a 
-                    href={link.url}
-                    onClick={(e) => handleAdditionalLinkClick(e, link)}
-                    className="text-primary d-block mb-1"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    aria-label={`Access ${link.title || 'additional resource'} (opens in new tab)`}
-                  >
-                    <span className="text-truncate d-inline-block" style={{ maxWidth: "100%" }}>
-                      {link.url}
-                    </span>
-                    <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
-                  </a>
-                  {link.description && (
-                    <p className="mb-1 small text-muted">{link.description}</p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -630,7 +721,49 @@ const RecordCard = ({
         {/* Card heading - use appropriate heading level for accessibility */}
         <CardTitle tag="h2" style={titleStyle} className="h3 mb-3 mt-4">
           {title}
+          {/* Display visibility message for items that aren't currently visible */}
+          {!isVisible && showVisibilityMessages && (
+            <div className="small text-warning mt-2">
+              <FontAwesomeIcon icon={faClock} className="me-1" />
+              {message}
+            </div>
+          )}
+          {/* Display visibility information for authenticated users */}
+          {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+            <span 
+              id={`visibility-${recordItem.id}`}
+              className="ms-2 text-muted"
+            >
+              <FontAwesomeIcon 
+                icon={faInfoCircle} 
+                className="cursor-pointer"
+              />
+            </span>
+          )}
         </CardTitle>
+        
+        {/* Popover for visibility dates (authenticated users only) */}
+        {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+          <Popover
+            placement="auto"
+            isOpen={activePopover === `visibility-${recordItem.id}`}
+            target={`visibility-${recordItem.id}`}
+            trigger="hover"
+            toggle={() => togglePopover(`visibility-${recordItem.id}`)}
+          >
+            <PopoverBody>
+              <h6 className="mb-2">Visibility Window</h6>
+              <div className="small">
+                {visibilityInfo.startDate && (
+                  <div><strong>From:</strong> {new Date(visibilityInfo.startDate).toLocaleDateString()}</div>
+                )}
+                {visibilityInfo.endDate && (
+                  <div><strong>Until:</strong> {new Date(visibilityInfo.endDate).toLocaleDateString()}</div>
+                )}
+              </div>
+            </PopoverBody>
+          </Popover>
+        )}
 
         {renderPrintDetails()}
         {renderElectronicResource()}
@@ -737,7 +870,7 @@ RecordCard.propTypes = {
   /**
    * Whether to show visibility messages instead of hiding items
    */
-  showVisibilityMessage: PropTypes.bool,
+  showVisibilityMessages: PropTypes.bool,
 };
 
 // Default props
@@ -745,7 +878,7 @@ RecordCard.defaultProps = {
   isGrouped: false,
   courseInfo: {},
   collegeParam: 'Unknown',
-  showVisibilityMessage: true
+  showVisibilityMessages: true
 };
 
 export default RecordCard;

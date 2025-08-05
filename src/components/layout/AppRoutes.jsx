@@ -73,6 +73,8 @@ const AppRoutes = () => {
       <Route path="/records" element={<CourseRecords />} />
       <Route path="/records/:uuid" element={<CourseRecords />} />
       <Route path="/records/course-code/:courseCode" element={<CourseRecords />} />
+      {/* Friendly course URL route */}
+      <Route path="/course/:termSlug/:courseSlug/:nameSlug" element={<CourseRecords />} />
       <Route path="/protected-route" element={<ProtectedRoutePage />} />
       
       {/* Registration Routes */}

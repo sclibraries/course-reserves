@@ -1,14 +1,22 @@
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import RecordCard from './RecordCard';
-import { groupRecordsByInstanceId } from '../../../utils/recordUtils';
-
 /**
- * CourseRecords component
+ * CourseRecords component (Refactored)
  * 
  * @component
- * @description Renders a list of course record items, grouped by instance ID to avoid duplicates.
- * Each record is displayed using the RecordCard component, with accordion functionality for availability details.
+ * @description This component has been refactored to follow SOLID principles and DRY patterns.
+ * It now serves as a wrapper that delegates to the new CourseRecordsContainer for better
+ * separation of concerns and maintainability.
+ * 
+ * SOLID Principles Applied:
+ * - Single Responsibility: Separated business logic into custom hooks and container
+ * - Open/Closed: Extensible through options and callbacks
+ * - Liskov Substitution: Maintains the same interface as before
+ * - Interface Segregation: Clean, focused prop interfaces
+ * - Dependency Inversion: Depends on abstractions (hooks) rather than concrete implementations
+ * 
+ * DRY Improvements:
+ * - Extracted accordion management into reusable useAccordionManager hook
+ * - Centralized record processing logic in useCourseRecords hook
+ * - Separated presentation logic into CourseRecordsDisplay component
  * 
  * @param {Object} props - Component properties
  * @param {Array} props.records - Array of record data objects to display
@@ -18,34 +26,23 @@ import { groupRecordsByInstanceId } from '../../../utils/recordUtils';
  * @param {string} props.collegeParam - College parameter for tracking
  * @returns {JSX.Element} The course records component
  */
+
+import PropTypes from 'prop-types';
+import CourseRecordsContainer from './CourseRecordsContainer';
+
 const CourseRecords = ({ records, availability, courseInfo, customization, collegeParam }) => {
-  const [openAccordions, setOpenAccordions] = useState({});
-
-  // Group records by instanceId to avoid duplicates
-  const groupedRecords = groupRecordsByInstanceId(records);
-
-  const toggleAccordion = (instanceId, accordionId) => {
-    setOpenAccordions({
-      ...openAccordions,
-      [instanceId]: openAccordions[instanceId] === accordionId ? null : accordionId
-    });
-  };
-
   return (
-    <div className="records-container">
-      {groupedRecords.map((record) => (
-        <RecordCard
-          key={record.id}
-          recordItem={record}
-          availability={availability}
-          openAccordions={openAccordions}
-          toggleAccordion={toggleAccordion}
-          customization={customization}
-          courseInfo={courseInfo}
-          collegeParam={collegeParam}
-        />
-      ))}
-    </div>
+    <CourseRecordsContainer
+      records={records}
+      availability={availability}
+      courseInfo={courseInfo}
+      customization={customization}
+      collegeParam={collegeParam}
+      options={{
+        groupByInstanceId: true,
+        showHeader: false, // Maintain existing behavior
+      }}
+    />
   );
 };
 

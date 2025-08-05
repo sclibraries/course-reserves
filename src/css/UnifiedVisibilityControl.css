@@ -1,0 +1,172 @@
+/**
+ * UnifiedVisibilityControl.css
+ * Styles for the unified visibility control component and form navigation
+ */
+
+/* Navigation anchor styles */
+.form-navigation-anchor {
+  border: 1px solid #e3e6f0;
+  background-color: #f8f9fc;
+  position: sticky;
+  top: 20px;
+  z-index: 100;
+}
+
+.form-navigation-anchor .nav-link {
+  color: #5a5c69 !important;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease-in-out;
+  font-size: 0.875rem;
+}
+
+.form-navigation-anchor .nav-link:hover {
+  background-color: #eaecf4;
+  color: #3a3b45 !important;
+}
+
+.form-navigation-anchor .nav-link:focus {
+  box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+/* Visibility control card styles */
+.visibility-control-card {
+  border: 1px solid #e3e6f0;
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.visibility-control-card .card-body {
+  padding: 1.5rem;
+}
+
+.visibility-control-card h5 {
+  color: #5a5c69;
+  font-weight: 600;
+}
+
+.visibility-control-card h6 {
+  color: #6c757d;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.visibility-control-card .border-top {
+  border-color: #e3e6f0 !important;
+}
+
+.visibility-control-card .bg-light {
+  background-color: #f8f9fc !important;
+  border: 1px solid #e3e6f0;
+}
+
+.visibility-control-card .form-check-input:checked {
+  background-color: #4e73df;
+  border-color: #4e73df;
+}
+
+.visibility-control-card .form-check-label {
+  color: #5a5c69;
+  font-weight: 500;
+}
+
+.visibility-control-card .text-muted {
+  color: #858796 !important;
+  font-size: 0.85rem;
+}
+
+.visibility-control-card .alert {
+  border-radius: 0.35rem;
+  border: 1px solid transparent;
+}
+
+.visibility-control-card .alert-info {
+  color: #0c5460;
+  background-color: #d1ecf1;
+  border-color: #bee5eb;
+}
+
+.visibility-control-card .alert-light {
+  color: #6c757d;
+  background-color: #fefefe;
+  border-color: #e9ecef;
+}
+
+.additional-links-visibility .card {
+  transition: all 0.15s ease-in-out;
+}
+
+.additional-links-visibility .card:hover {
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.additional-links-visibility .card-body {
+  padding: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .visibility-control-card .card-body {
+    padding: 1rem;
+  }
+  
+  .visibility-control-card h5 {
+    font-size: 1.1rem;
+  }
+  
+  .visibility-control-card h6 {
+    font-size: 0.9rem;
+  }
+}
+
+/* Form input styling within visibility control */
+.visibility-control-card .form-control {
+  border: 1px solid #d1d3e2;
+  border-radius: 0.35rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.visibility-control-card .form-control:focus {
+  border-color: #bac8f3;
+  box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+.visibility-control-card .form-control[type="date"] {
+  padding: 0.375rem 0.75rem;
+}
+
+/* Small form controls */
+.visibility-control-card .form-control.form-control-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+/* Improved spacing for form groups */
+.visibility-control-card .form-group {
+  margin-bottom: 1rem;
+}
+
+.visibility-control-card .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Icons styling */
+.visibility-control-card .fa,
+.visibility-control-card .fas,
+.visibility-control-card .far,
+.visibility-control-card .fab {
+  color: #5a5c69;
+}
+
+.visibility-control-card .text-primary .fa,
+.visibility-control-card .text-primary .fas,
+.visibility-control-card .text-primary .far,
+.visibility-control-card .text-primary .fab {
+  color: #4e73df;
+}
+
+.visibility-control-card .text-secondary .fa,
+.visibility-control-card .text-secondary .fas,
+.visibility-control-card .text-secondary .far,
+.visibility-control-card .text-secondary .fab {
+  color: #6c757d;
+}

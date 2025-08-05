@@ -7,7 +7,8 @@ import {
   Col,
   Card,
   CardBody,
-  CardHeader
+  CardHeader,
+  Alert
 } from 'reactstrap';
 import { FaInfoCircle, FaLink, FaFolder } from 'react-icons/fa';
 
@@ -17,7 +18,8 @@ import ResourceTypeSelector from './ResourceTypeSelector';
 import FormSection from './FormSection';
 import FormActions from './FormActions';
 import FolderSelector from './FolderSelector';
-import VisibilityDates from './VisibilityDates';
+import UnifiedVisibilityControl from './UnifiedVisibilityControl';
+import FormNavigationAnchor from './FormNavigationAnchor';
 import { TypeSpecificFields } from '../fields/TypeSpecificFields';
 import ResourceLinks from '../fields/ResourceLinks';
 
@@ -119,33 +121,72 @@ export const BaseResourceForm = ({
     }
     return false;
   };
+
+  /**
+   * Convert string/number boolean values to boolean (same logic as proxy)
+   */
+  const normalizeBooleanValue = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return value === '1' || value === 'true' || value === 'TRUE';
+    }
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+    return false;
+  };
   
   // State for form data
-  const [formData, setFormData] = useState({
-    title: initialData.title || initialData.name || '',
-    link: initialData.link || initialData.item_url || '',
-    use_proxy: normalizeProxyValue(initialData.use_proxy),
-    notes: initialData.notes || initialData.description || '',
-    internal_note: initialData.internal_note || '',
-    external_note: initialData.external_note || '',
-    folder: initialData.folder || initialData.folder_id || '',
-    start_visibility: initialData.start_visibility || defaultDates.startDate,
-    end_visibility: initialData.end_visibility || defaultDates.endDate,
-    material_type_id: initialData.material_type_id || initialData.material_type || '',
-    metadata: initialData.metadata || {},
-    // Keep any existing data that might be needed later
-    ...(initialData.resource_id && { resource_id: initialData.resource_id }),
-    ...(initialData.order && { order: initialData.order }),
-    ...(initialData.course_count && { course_count: initialData.course_count })
+  const [formData, setFormData] = useState(() => {
+    // Check if primary link visibility is enabled directly from the resource
+    // Use the normalize function for consistency
+    const hasPrimaryLinkControl = normalizeBooleanValue(initialData.use_primary_link_visibility);
+    
+    // Check if URL matches Hitchcock video pattern
+    const primaryUrl = initialData.link || initialData.item_url || '';
+    const isHitchcockVideo = primaryUrl.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
+    
+    // Debug logging - show all related fields
+    console.log('BaseResourceForm initialData:', initialData);
+    console.log('use_primary_link_visibility raw value:', initialData.use_primary_link_visibility);
+    console.log('use_primary_link_visibility type:', typeof initialData.use_primary_link_visibility);
+    console.log('primary_link_start_visibility:', initialData.primary_link_start_visibility);
+    console.log('primary_link_end_visibility:', initialData.primary_link_end_visibility);
+    console.log('item_url:', initialData.link);
+    console.log('Has primary link control (calculated):', hasPrimaryLinkControl);
+    console.log('Is Hitchcock video URL:', isHitchcockVideo);
+    
+    return {
+      title: initialData.title || initialData.name || '',
+      link: initialData.link || initialData.item_url || '',
+      use_proxy: normalizeProxyValue(initialData.use_proxy),
+      notes: initialData.notes || initialData.description || '',
+      internal_note: initialData.internal_note || '',
+      external_note: initialData.external_note || '',
+      folder: initialData.folder || initialData.folder_id || '',
+      start_visibility: initialData.start_visibility || defaultDates.startDate,
+      end_visibility: initialData.end_visibility || defaultDates.endDate,
+      material_type_id: initialData.material_type_id || initialData.material_type || '',
+      metadata: initialData.metadata || {},
+      // Primary link visibility fields - auto-enable for NEW Hitchcock videos only
+      use_primary_link_visibility: hasPrimaryLinkControl || (isHitchcockVideo && !initialData.resource_id),
+      primary_link_start_visibility: initialData.primary_link_start_visibility || ((isHitchcockVideo && !initialData.resource_id) ? defaultDates.startDate : ''),
+      primary_link_end_visibility: initialData.primary_link_end_visibility || ((isHitchcockVideo && !initialData.resource_id) ? defaultDates.endDate : ''),
+      // Keep any existing data that might be needed later
+      ...(initialData.resource_id && { resource_id: initialData.resource_id }),
+      ...(initialData.order && { order: initialData.order }),
+      ...(initialData.course_count && { course_count: initialData.course_count })
+    };
   });
 
   // State for visibility dates toggle
   const [useVisibilityDates, setUseVisibilityDates] = useState(
-    // Enable by default if it's a video type or if dates were previously set
-    initialData.material_type_id === '3' || 
-    initialData.material_type_id === 3 ||
+    // Only enable by default if dates were previously set (not for new video types)
     !!(initialData.start_visibility || initialData.end_visibility)
   );
+
+  // State for cascade visibility settings
+  const [cascadeVisibilityToLinks, setCascadeVisibilityToLinks] = useState(false);
 
   // Update visibility dates if they're not set and folioCourseData changes
   useEffect(() => {
@@ -159,8 +200,11 @@ export const BaseResourceForm = ({
     }
   }, [folioCourseData]);
 
-  // State for links
-  const [links, setLinks] = useState(initialData.links || []);
+  // State for links - filter out primary link (order = 0) since it's handled separately
+  const [links, setLinks] = useState(() => {
+    const existingLinks = (initialData.links || []).filter(link => link.order !== 0 && link.order !== '0');
+    return existingLinks;
+  });
   
   // State for additional data
   const [materialTypes, setMaterialTypes] = useState([]);
@@ -209,7 +253,20 @@ export const BaseResourceForm = ({
     if (type === 'checkbox') {
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (name in formData) {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      const updatedFormData = { ...formData, [name]: value };
+      
+      // Check if the link field changed and it's a Hitchcock video URL
+      if (name === 'link') {
+        const isHitchcockVideo = value.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
+        if (isHitchcockVideo && !updatedFormData.use_primary_link_visibility) {
+          // Only auto-enable if not already configured
+          updatedFormData.use_primary_link_visibility = true;
+          updatedFormData.primary_link_start_visibility = updatedFormData.primary_link_start_visibility || defaultDates.startDate;
+          updatedFormData.primary_link_end_visibility = updatedFormData.primary_link_end_visibility || defaultDates.endDate;
+        }
+      }
+      
+      setFormData(prev => ({ ...prev, ...updatedFormData }));
     } else {
       // For fields inside metadata
       setFormData(prev => ({
@@ -222,23 +279,12 @@ export const BaseResourceForm = ({
   // Handle material type change specifically to clear metadata
   const handleMaterialTypeChange = (e) => {
     const { value } = e.target;
-    const isVideoType = value === '3' || value === 3;
     
     setFormData(prev => ({ 
       ...prev, 
       material_type_id: value,
-      metadata: {}, // Clear existing metadata when type changes
-      // Set visibility dates to term dates if it's a video type
-      ...(isVideoType && {
-        start_visibility: prev.start_visibility || defaultDates.startDate,
-        end_visibility: prev.end_visibility || defaultDates.endDate
-      })
+      metadata: {} // Clear existing metadata when type changes
     }));
-    
-    // Auto-enable visibility dates for video types
-    if (isVideoType) {
-      setUseVisibilityDates(true);
-    }
     
     fetchMaterialTypeFields(value);
   };
@@ -257,14 +303,63 @@ export const BaseResourceForm = ({
       }));
     }
     
-    // If disabling visibility dates (and not a video type), clear the dates
-    if (!checked && formData.material_type_id !== '3' && formData.material_type_id !== 3) {
+    // If disabling visibility dates, clear the dates
+    if (!checked) {
       setFormData(prev => ({
         ...prev,
         start_visibility: '',
         end_visibility: ''
       }));
     }
+  };
+
+  // Handle primary link visibility changes
+  const handlePrimaryLinkVisibilityToggle = (enabled) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      use_primary_link_visibility: enabled,
+      // Clear primary link dates when disabling visibility
+      ...(enabled ? {} : {
+        primary_link_start_visibility: '',
+        primary_link_end_visibility: ''
+      })
+    }));
+  };
+
+  const handlePrimaryLinkDateChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Auto-cascade primary link dates to additional links if they have visibility enabled
+    if (name === 'primary_link_start_visibility' || name === 'primary_link_end_visibility') {
+      const dateField = name === 'primary_link_start_visibility' ? 'start_visibility' : 'end_visibility';
+      
+      setLinks(prevLinks => 
+        prevLinks.map(link => 
+          link.use_link_visibility 
+            ? { ...link, [dateField]: value }
+            : link
+        )
+      );
+    }
+  };
+
+  // Handle link visibility changes
+  const handleLinkVisibilityChange = (index, field, value) => {
+    const newLinks = [...links];
+    newLinks[index][field] = value;
+    setLinks(newLinks);
+  };
+
+  const handleLinkDateChange = (index, field, value) => {
+    const newLinks = [...links];
+    newLinks[index][field] = value;
+    setLinks(newLinks);
+  };
+
+  // Handle cascade toggle
+  const handleCascadeToggle = (enabled) => {
+    setCascadeVisibilityToLinks(enabled);
   };
 
   // Handle form submission
@@ -282,6 +377,14 @@ export const BaseResourceForm = ({
       // Filter out empty links
       const validLinks = links.filter(link => link.url && link.url.trim() !== '');
       
+      // For link visibility mode, ensure all links have use_link_visibility enabled
+      // Also convert boolean values to integers for backend compatibility
+      const processedLinks = validLinks.map(link => ({
+        ...link,
+        use_link_visibility: link.use_link_visibility ? 1 : 0,
+        use_proxy: link.use_proxy ? 1 : 0
+      }));
+      
       // Determine if visibility dates should be included
       const isVideoType = formData.material_type_id === '3' || formData.material_type_id === 3;
       const shouldIncludeVisibilityDates = useVisibilityDates || isVideoType;
@@ -289,7 +392,11 @@ export const BaseResourceForm = ({
       // Prepare final submission data
       const submissionData = {
         ...formData,
-        links: validLinks,
+        // Convert boolean use_proxy to integer for backend compatibility
+        use_proxy: formData.use_proxy ? 1 : 0,
+        // Convert primary link visibility to integer
+        use_primary_link_visibility: formData.use_primary_link_visibility ? 1 : 0,
+        links: processedLinks,
         // Only include visibility dates if they should be active, otherwise clear them
         start_visibility: shouldIncludeVisibilityDates ? formData.start_visibility : '',
         end_visibility: shouldIncludeVisibilityDates ? formData.end_visibility : ''
@@ -322,62 +429,115 @@ export const BaseResourceForm = ({
           )}
           
           <Form onSubmit={handleSubmit}>
-            {/* Basic Resource Fields */}
-            <ResourceBasicFields 
-              formData={formData}
-              handleFieldChange={handleFieldChange}
+            {/* Hitchcock Video Automatic Visibility Alert */}
+            {formData.link && 
+             formData.link.startsWith('https://ereserves.smith.edu/hitchcock/videos/') && 
+             formData.use_primary_link_visibility && (
+              <Alert color="warning" className="mb-4">
+                <FaInfoCircle className="me-2" />
+                <strong>Automatic Link Visibility Applied:</strong> The primary link to this Hitchcock video can only be displayed during the current term. 
+                Link visibility dates have been automatically set to ensure compliance.
+              </Alert>
+            )}
+            
+            {/* Form Navigation */}
+            <FormNavigationAnchor
+              hasMaterialTypeFields={!!formData.material_type_id && materialTypeFields.length > 0}
+              hasAdditionalLinks={links.length > 0}
             />
             
+            {/* Basic Resource Information */}
+            <div id="basic-information">
+              <FormSection title="Basic Information" icon={FaInfoCircle}>
+                <ResourceBasicFields 
+                  formData={formData}
+                  handleFieldChange={handleFieldChange}
+                />
+              </FormSection>
+            </div>
+            
             {/* Material Type and Folder - Side by Side */}
-            <Row>
-              <Col md={6}>
-                <ResourceTypeSelector 
-                  materialTypes={materialTypes}
-                  selectedTypeId={formData.material_type_id}
-                  onTypeChange={handleMaterialTypeChange}
-                />
-              </Col>
-              
-              <Col md={6}>
-                <FolderSelector 
-                  selectedFolder={formData.folder}
-                  handleFolderChange={handleFieldChange}
-                  setFormData={setFormData}
-                />
-              </Col>
-            </Row>
+            <div id="classification-organization">
+              <FormSection title="Classification & Organization" icon={FaFolder}>
+                <Row>
+                  <Col md={6}>
+                    <ResourceTypeSelector 
+                      materialTypes={materialTypes}
+                      selectedTypeId={formData.material_type_id}
+                      onTypeChange={handleMaterialTypeChange}
+                    />
+                  </Col>
+                  
+                  <Col md={6}>
+                    <FolderSelector 
+                      selectedFolder={formData.folder}
+                      handleFolderChange={handleFieldChange}
+                      setFormData={setFormData}
+                    />
+                  </Col>
+                </Row>
+              </FormSection>
+            </div>
             
             {/* Type-Specific Fields */}
             {formData.material_type_id && (
-              <FormSection title="Type-Specific Details" icon={FaInfoCircle}>
-                <TypeSpecificFields
-                  formData={formData}
-                  metadata={formData.metadata}
-                  handleFieldChange={handleFieldChange}
-                  materialTypeFields={materialTypeFields}
-                />
-              </FormSection>
+              <div id="type-specific-details">
+                <FormSection title="Type-Specific Details" icon={FaInfoCircle}>
+                  <TypeSpecificFields
+                    formData={formData}
+                    metadata={formData.metadata}
+                    handleFieldChange={handleFieldChange}
+                    materialTypeFields={materialTypeFields}
+                  />
+                </FormSection>
+              </div>
             )}
             
             {/* Additional Links */}
-            <FormSection title="Additional Links" icon={FaLink}>
-              <ResourceLinks 
-                links={links}
-                setLinks={setLinks}
-              />
-            </FormSection>
+            <div id="additional-links">
+              <FormSection title="Additional Links" icon={FaLink}>
+                <ResourceLinks 
+                  links={links}
+                  setLinks={setLinks}
+                  materialTypeId={formData.material_type_id}
+                  resourceVisibilityDates={{
+                    startDate: formData.start_visibility,
+                    endDate: formData.end_visibility
+                  }}
+                />
+              </FormSection>
+            </div>
             
-            {/* Visibility Settings */}
-            <FormSection title="Visibility Settings" icon={FaFolder}>
-              <VisibilityDates 
-                startDate={formData.start_visibility}
-                endDate={formData.end_visibility}
-                handleChange={handleFieldChange}
+            {/* Unified Visibility Settings */}
+            <div id="visibility-settings">
+              <UnifiedVisibilityControl
+                // Resource-level visibility
+                resourceStartDate={formData.start_visibility}
+                resourceEndDate={formData.end_visibility}
+                useResourceVisibility={useVisibilityDates}
+                onResourceVisibilityToggle={handleVisibilityToggle}
+                onResourceDateChange={handleFieldChange}
+                
+                // Primary link visibility
+                primaryLinkStartDate={formData.primary_link_start_visibility}
+                primaryLinkEndDate={formData.primary_link_end_visibility}
+                usePrimaryLinkVisibility={formData.use_primary_link_visibility}
+                onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
+                onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
+                hasPrimaryLink={!!(formData.link && formData.link.trim())}
+                primaryUrl={formData.link}
+                
+                // Additional links visibility
+                links={links}
+                onLinkVisibilityChange={handleLinkVisibilityChange}
+                onLinkDateChange={handleLinkDateChange}
+                
+                // General settings
                 materialTypeId={formData.material_type_id}
-                useVisibilityDates={useVisibilityDates}
-                onVisibilityToggle={handleVisibilityToggle}
+                cascadeVisibilityToLinks={cascadeVisibilityToLinks}
+                onCascadeToggle={handleCascadeToggle}
               />
-            </FormSection>
+            </div>
             
             {/* Form Actions */}
             <FormActions 

@@ -19,6 +19,7 @@ import useSearchStore from '../../store/searchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import { trackingService } from '../../services/trackingService';
 import { getTermName } from '../../util/termHelpers';
+import { termNameToUrlParam, findTermNameById } from '../../utils/termUrlHelpers';
 import { config } from '../../config';
 import '../../css/Searchbar.css';
 
@@ -135,6 +136,15 @@ function Searchbar() {
     if (sanitizedInput) queryParams.set('query', sanitizedInput);
     if (department && department.trim() !== '') queryParams.set('department', department);
     if (sortOption && sortOption.trim() !== '') queryParams.set('sort', sortOption);
+    
+    // Convert term ID to term name for URL
+    if (termId && termId.trim() !== '') {
+      const termName = findTermNameById(terms, termId);
+      if (termName) {
+        const urlParam = termNameToUrlParam(termName);
+        queryParams.set('term', urlParam);
+      }
+    }
 
     navigate(`/search?${queryParams.toString()}`);
   };
@@ -165,11 +175,22 @@ function Searchbar() {
     setSearchArea('All fields');
     setSearchInput('');
     
-    if (college) {
-      navigate('/search?college=' + college);
-    } else {
-      navigate('/search');
+    // Build URL params including termId to preserve term selection during reset
+    const queryParams = new URLSearchParams();
+    if (college && college !== 'all') {
+      queryParams.set('college', college);
     }
+    // Convert term ID to term name for URL
+    if (termId && termId.trim() !== '') {
+      const termName = findTermNameById(terms, termId);
+      if (termName) {
+        const urlParam = termNameToUrlParam(termName);
+        queryParams.set('term', urlParam);
+      }
+    }
+    
+    const queryString = queryParams.toString();
+    navigate(queryString ? `/search?${queryString}` : '/search');
   };
 
   const handleTermChange = (e) => {
@@ -354,6 +375,14 @@ function Searchbar() {
 
                       const queryParams = new URLSearchParams();
                       queryParams.set('college', newCollegeKey);
+                      // Convert term ID to term name for URL
+                      if (termId && termId.trim() !== '') {
+                        const termName = findTermNameById(terms, termId);
+                        if (termName) {
+                          const urlParam = termNameToUrlParam(termName);
+                          queryParams.set('term', urlParam);
+                        }
+                      }
                       navigate(`/search?${queryParams.toString()}`);
                     }}
                     className="filter-select"
@@ -525,6 +554,14 @@ function Searchbar() {
                       setDepartment('');
                       const queryParams = new URLSearchParams();
                       queryParams.set('college', newCollegeKey);
+                      // Convert term ID to term name for URL
+                      if (termId && termId.trim() !== '') {
+                        const termName = findTermNameById(terms, termId);
+                        if (termName) {
+                          const urlParam = termNameToUrlParam(termName);
+                          queryParams.set('term', urlParam);
+                        }
+                      }
                       navigate(`/search?${queryParams.toString()}`);
                     }}
                     className="filter-select"

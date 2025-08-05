@@ -14,6 +14,9 @@ import {
 import { trackingService } from '../../../services/trackingService';
 // Import Auth Context
 import { useAuth } from '../../../contexts/AuthContext';
+import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
+import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
+import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
 
 /**
  * RecordTable component
@@ -51,6 +54,13 @@ const RecordTable = ({
   
   // Get authentication state from context
   const { isAuthenticated } = useAuth();
+
+  // Get text from the store
+  const recordTableText = useRecordsTextStore(selectRecordTableText);
+  const visibilityText = useRecordsTextStore(selectVisibilityText);
+  const accessibilityText = useRecordsTextStore(selectAccessibilityText);
+  const courseRecordsText = useRecordsTextStore(selectCourseRecordsText);
+  const splitViewText = useRecordsTextStore(selectSplitViewText);
 
   // Calculate total columns for table layout - define before use
   const totalColumns = (hasElectronicReserves ? 1 : 0) + 7 + 2; // Base columns + conditional folder column
@@ -341,9 +351,14 @@ const RecordTable = ({
 
     const discoverUrl = !item.isElectronic ? getDiscoverLink(instanceId) : null;
 
-    const resourceUrl = item.isElectronic && item.resource 
+    // Check primary link visibility for electronic resources
+    const isPrimaryLinkVisibleCheck = item.isElectronic && item.resource 
+      ? isPrimaryLinkVisible(item.resource, isAuthenticated) 
+      : true;
+
+    const resourceUrl = item.isElectronic && item.resource && isPrimaryLinkVisibleCheck
       ? item.resource.item_url 
-      : item.copiedItem?.uri || item.copiedItem?.url || null;
+      : (!item.isElectronic ? (item.copiedItem?.uri || item.copiedItem?.url) : null);
 
     const hasAdditionalLinks = item.isElectronic && 
                               item.resource && 
@@ -352,11 +367,11 @@ const RecordTable = ({
     
     const isExpanded = expandedLinkItems[item.id] || false;
 
-    // For authenticated users, check if the item has visibility dates to display
-    const showVisibilityDates = isAuthenticated && 
-                               item.isElectronic && 
-                               item.resource && 
-                               (item.resource.start_visibility || item.resource.end_visibility);
+    // Get visibility information for electronic resources
+    const visibilityInfo = item.isElectronic && item.resource 
+      ? getVisibilityInfo(item.resource, isAuthenticated) 
+      : { showVisibilityDates: false };
+    const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
     return (
       <React.Fragment key={item.id}>
@@ -394,11 +409,11 @@ const RecordTable = ({
                 <PopoverBody>
                   <h6 className="mb-2">Visibility Window</h6>
                   <div className="small">
-                    {item.resource.start_visibility && (
-                      <div><strong>From:</strong> {new Date(item.resource.start_visibility).toLocaleDateString()}</div>
+                    {visibilityInfo.startDate && (
+                      <div><strong>From:</strong> {new Date(visibilityInfo.startDate).toLocaleDateString()}</div>
                     )}
-                    {item.resource.end_visibility && (
-                      <div><strong>Until:</strong> {new Date(item.resource.end_visibility).toLocaleDateString()}</div>
+                    {visibilityInfo.endDate && (
+                      <div><strong>Until:</strong> {new Date(visibilityInfo.endDate).toLocaleDateString()}</div>
                     )}
                   </div>
                 </PopoverBody>
@@ -483,11 +498,38 @@ const RecordTable = ({
                   }
                   className="btn btn-link p-0"
                   style={{ textDecoration: 'underline', color: customization.buttonPrimaryColor }}
-                  aria-label="Access resource (opens in a new tab)"
+                  aria-label={accessibilityText.accessResourceGeneric}
                 >
-                  Access Resource <FontAwesomeIcon icon={faExternalLinkAlt} />
+                  {recordTableText.accessResource} <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </button>
                 
+                {hasAdditionalLinks && (
+                  <div className="mt-2">
+                    <Button 
+                      color="link" 
+                      size="sm" 
+                      className="p-0"
+                      onClick={() => toggleLinksExpand(item.id)}
+                      aria-expanded={isExpanded}
+                      style={{ color: customization.buttonPrimaryColor }}
+                    >
+                      <span className="badge bg-secondary">
+                        {item.resource.links.length} additional {item.resource.links.length === 1 ? 'link' : 'links'}
+                      </span>
+                      <FontAwesomeIcon 
+                        icon={isExpanded ? faChevronUp : faChevronDown} 
+                        className="ms-1" 
+                      />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : item.isElectronic && item.resource && item.resource.item_url && !isPrimaryLinkVisibleCheck ? (
+              <div>
+                <span className="text-warning small">
+                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
+                  {visibilityText.notCurrentlyAvailable}
+                </span>
                 {hasAdditionalLinks && (
                   <div className="mt-2">
                     <Button 
@@ -536,44 +578,71 @@ const RecordTable = ({
             <td colSpan={totalColumns} className="p-0">
               <Collapse isOpen={isExpanded}>
                 <div className="p-3">
-                  <h6 className="mb-2">Additional Links</h6>
+                  <h6 className="mb-2">{recordTableText.additionalLinks}</h6>
                   <ul className="list-group">
-                    {item.resource.links.map((link, idx) => (
-                      <li key={link.link_id || idx} className="list-group-item">
-                        <div className="d-flex justify-content-between align-items-top">
-                          <div>
-                            <strong>{link.title || `Link ${idx + 1}`}</strong>
+                    {item.resource.links.map((link, idx) => {
+                      const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
+                      
+                      return (
+                        <li key={link.link_id || idx} className="list-group-item">
+                          <div className="d-flex justify-content-between align-items-top">
                             <div>
-                              <a 
-                                href={link.url}
-                                onClick={(e) => handleExternalLinkClick(
-                                  e, 
-                                  'resource_link_click', 
-                                  link.url, 
-                                  item, 
-                                  {
-                                    linkId: link.link_id,
-                                    linkTitle: link.title
-                                  }
+                              <strong>{link.title || `Link ${idx + 1}`}</strong>
+                              {!isCurrentLinkVisible && (
+                                <span className="badge bg-warning text-dark ms-2">{visibilityText.notCurrentlyAvailableBadge}</span>
+                              )}
+                              <div>
+                                {isCurrentLinkVisible ? (
+                                  <a 
+                                    href={link.url}
+                                    onClick={(e) => handleExternalLinkClick(
+                                      e, 
+                                      'resource_link_click', 
+                                      link.url, 
+                                      item, 
+                                      {
+                                        linkId: link.link_id,
+                                        linkTitle: link.title
+                                      }
+                                    )}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    style={{ color: customization.buttonPrimaryColor }}
+                                  >
+                                    {link.url}
+                                    <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
+                                  </a>
+                                ) : (
+                                  <span className="text-muted fst-italic">
+                                    {visibilityText.linkNotAvailable}
+                                  </span>
                                 )}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                style={{ color: customization.buttonPrimaryColor }}
-                              >
-                                {link.url}
-                                <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
-                              </a>
+                              </div>
+                              {link.description && (
+                                <div className="text-muted small mt-1">
+                                  {containsHtml(link.description) ? (
+                                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(link.description) }} />
+                                  ) : (
+                                    link.description
+                                  )}
+                                </div>
+                              )}
+                              {/* Show link visibility dates for authenticated users */}
+                              {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                                <div className="small text-muted mt-1">
+                                  <strong>Link Visibility:</strong>{' '}
+                                  {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
+                                  {link.end_visibility ? `until ${new Date(link.end_visibility).toLocaleDateString()}` : 'No end date'}
+                                </div>
+                              )}
                             </div>
-                            {link.description && (
-                              <div className="text-muted small mt-1">{link.description}</div>
+                            {link.use_proxy === "1" && (
+                              <span className="badge bg-light text-dark">Proxy Enabled</span>
                             )}
                           </div>
-                          {link.use_proxy === "1" && (
-                            <span className="badge bg-light text-dark">Proxy Enabled</span>
-                          )}
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </Collapse>
@@ -598,12 +667,12 @@ const RecordTable = ({
           <div className="column-header mb-3 p-3 bg-light border rounded">
             <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
               <i className="fas fa-book text-muted me-2"></i>
-              Print Materials
+              {splitViewText.printMaterials}
             </h3>
           </div>
           
           {printRecords.length === 0 ? (
-            <p className="text-muted">No print materials available for this course.</p>
+            <p className="text-muted">{splitViewText.noPrintMaterials}</p>
           ) : (
             <Table bordered responsive className="align-middle">
               <thead className="table-light">
@@ -654,12 +723,12 @@ const RecordTable = ({
           <div className="column-header mb-3 p-3 bg-light border rounded">
             <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
               <i className="fas fa-laptop text-muted me-2"></i>
-              Electronic Materials
+              {splitViewText.electronicMaterials}
             </h3>
           </div>
           
           {electronicRecords.length === 0 ? (
-            <p className="text-muted">No electronic materials available for this course.</p>
+            <p className="text-muted">{splitViewText.noElectronicMaterials}</p>
           ) : (
             <Table bordered responsive className="align-middle">
               <thead className="table-light">
@@ -673,7 +742,8 @@ const RecordTable = ({
                 {electronicRecords
                   .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
                   .map(item => {
-                    const resourceUrl = item.resource?.item_url;
+                    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, isAuthenticated);
+                    const resourceUrl = item.resource?.item_url && isPrimaryLinkVisibleCheck ? item.resource.item_url : null;
                     const hasAdditionalLinks = item.resource?.links?.length > 0;
                     const isExpanded = expandedLinkItems[item.id] || false;
                     
@@ -683,7 +753,13 @@ const RecordTable = ({
                           <td>{item.copiedItem.title}</td>
                           <td>
                             {item.resource?.description ? (
-                              <div className="small">{item.resource.description}</div>
+                              <div className="small">
+                                {containsHtml(item.resource.description) ? (
+                                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.resource.description) }} />
+                                ) : (
+                                  item.resource.description
+                                )}
+                              </div>
                             ) : 'N/A'}
                           </td>
                           <td>
@@ -696,11 +772,34 @@ const RecordTable = ({
                                     })
                                   }
                                   className="btn btn-sm btn-outline-secondary"
-                                  aria-label="Access resource (opens in a new tab)"
+                                  aria-label={accessibilityText.accessResourceGeneric}
                                 >
-                                  Access <FontAwesomeIcon icon={faExternalLinkAlt} />
+                                  {recordTableText.access} <FontAwesomeIcon icon={faExternalLinkAlt} />
                                 </button>
                                 
+                                {hasAdditionalLinks && (
+                                  <Button 
+                                    color="link" 
+                                    size="sm" 
+                                    className="ms-2"
+                                    onClick={() => toggleLinksExpand(item.id)}
+                                    aria-expanded={isExpanded}
+                                    style={{ color: customization.buttonPrimaryColor }}
+                                  >
+                                    {item.resource.links.length} more
+                                    <FontAwesomeIcon 
+                                      icon={isExpanded ? faChevronUp : faChevronDown} 
+                                      className="ms-1" 
+                                    />
+                                  </Button>
+                                )}
+                              </div>
+                            ) : item.resource?.item_url && !isPrimaryLinkVisibleCheck ? (
+                              <div>
+                                <span className="text-warning small">
+                                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
+                                  {visibilityText.notCurrentlyAvailable}
+                                </span>
                                 {hasAdditionalLinks && (
                                   <Button 
                                     color="link" 
@@ -769,7 +868,13 @@ const RecordTable = ({
                                             </a>
                                           </div>
                                           {link.description && (
-                                            <div className="text-muted small mt-1">{link.description}</div>
+                                            <div className="text-muted small mt-1">
+                                              {containsHtml(link.description) ? (
+                                                <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(link.description) }} />
+                                              ) : (
+                                                link.description
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       </li>
@@ -797,8 +902,8 @@ const RecordTable = ({
       <Alert color="info" className="d-flex align-items-center">
         <FontAwesomeIcon icon={faInfoCircle} className="me-3 fa-lg" />
         <div>
-          <h4 className="alert-heading">No Course Materials Found</h4>
-          <p className="mb-0">No materials have been added to this course yet.</p>
+          <h4 className="alert-heading">{courseRecordsText.noCourseMaterialsFound}</h4>
+          <p className="mb-0">{courseRecordsText.noMaterialsAdded}</p>
         </div>
       </Alert>
     );
@@ -810,14 +915,13 @@ const RecordTable = ({
       <Alert color="warning" className="d-flex align-items-center">
         <FontAwesomeIcon icon={faExclamationCircle} className="me-3 fa-lg" />
         <div>
-          <h4 className="alert-heading">Course Materials Not Currently Available</h4>
+          <h4 className="alert-heading">{courseRecordsText.materialsNotCurrentlyAvailable}</h4>
           <p>
-            {hiddenCount} {hiddenCount === 1 ? 'resource is' : 'resources are'} scheduled for this course, 
-            but {hiddenCount === 1 ? 'it is' : 'they are'} not currently available.
+            {hiddenCount} {hiddenCount === 1 ? courseRecordsText.resourcesScheduled : courseRecordsText.resourcesScheduledPlural} {courseRecordsText.scheduledButNotAvailable} {hiddenCount === 1 ? courseRecordsText.isNotCurrentlyAvailable : courseRecordsText.areNotCurrentlyAvailable} {courseRecordsText.notCurrentlyAvailable}
           </p>
           {nextAvailableDate && (
             <p className="mb-0">
-              <strong>Next available date:</strong> {nextAvailableDate.toLocaleDateString()}
+              <strong>{courseRecordsText.nextAvailableDate}</strong> {nextAvailableDate.toLocaleDateString()}
             </p>
           )}
         </div>
@@ -833,14 +937,14 @@ const RecordTable = ({
       </caption>
       <thead className="table-light">
         <tr>
-          {hasElectronicReserves && <th scope="col">Folder</th>}
-          <th scope="col">Title</th>
-          <th scope="col">Authors</th>
-          <th scope="col">Type</th>
-          <th scope="col">Publication</th>
-          <th scope="col">Holdings</th>
-          <th scope="col">Discover</th>
-          <th scope="col">Resource</th>
+          {hasElectronicReserves && <th scope="col">{recordTableText.headers.folder}</th>}
+          <th scope="col">{recordTableText.headers.title}</th>
+          <th scope="col">{recordTableText.headers.authors}</th>
+          <th scope="col">{recordTableText.headers.type}</th>
+          <th scope="col">{recordTableText.headers.publication}</th>
+          <th scope="col">{recordTableText.headers.holdings}</th>
+          <th scope="col">{recordTableText.headers.discover}</th>
+          <th scope="col">{recordTableText.headers.resource}</th>
         </tr>
       </thead>
       <tbody>

@@ -27,6 +27,7 @@ import '../../../../css/AdminForms.css';
  * - Responsive card-based layout
  * - Validation for required fields
  * - Empty state with helpful messaging
+ * - Clean, focused interface (visibility controls handled elsewhere)
  * 
  * **Use Cases**:
  * - Related articles or resources
@@ -41,9 +42,7 @@ import '../../../../css/AdminForms.css';
  * - `description` (optional): Brief description
  * - `use_proxy` (boolean): Whether to apply proxy for off-campus access
  * 
- * **Proxy Handling**:
- * Links with use_proxy=true will be automatically wrapped with the 
- * institutional proxy URL during form submission.
+ * **Note**: Visibility settings are now handled by the UnifiedVisibilityControl component
  * 
  * @component
  * @example
@@ -52,10 +51,26 @@ import '../../../../css/AdminForms.css';
  *   setLinks={updateLinks}
  * />
  */
-const ResourceLinks = ({ links, setLinks }) => {
+const ResourceLinks = ({ 
+  links, 
+  setLinks, 
+  resourceVisibilityDates = { startDate: '', endDate: '' }
+}) => {
   // Function to add a new empty link
   const addLink = () => {
-    setLinks([...links, { url: '', title: '', description: '', use_proxy: false }]);
+    // Default to resource visibility dates if they exist
+    const defaultStartDate = resourceVisibilityDates.startDate || '';
+    const defaultEndDate = resourceVisibilityDates.endDate || '';
+    
+    setLinks([...links, { 
+      url: '', 
+      title: '', 
+      description: '', 
+      use_proxy: false,
+      start_visibility: defaultStartDate,
+      end_visibility: defaultEndDate,
+      use_link_visibility: false // Never auto-enable, let user choose
+    }]);
   };
 
   // Function to remove a link at a specific index
@@ -207,10 +222,17 @@ ResourceLinks.propTypes = {
       url: PropTypes.string.isRequired,
       title: PropTypes.string,
       description: PropTypes.string,
-      use_proxy: PropTypes.bool
+      use_proxy: PropTypes.bool,
+      start_visibility: PropTypes.string,
+      end_visibility: PropTypes.string,
+      use_link_visibility: PropTypes.bool
     })
   ).isRequired,
-  setLinks: PropTypes.func.isRequired
+  setLinks: PropTypes.func.isRequired,
+  resourceVisibilityDates: PropTypes.shape({
+    startDate: PropTypes.string,
+    endDate: PropTypes.string
+  })
 };
 
 export default ResourceLinks;

@@ -126,11 +126,11 @@ const AdminPrintResourceTable = ({
       <Table bordered responsive hover>
         <thead>
           <tr>
-            <th>Title</th>
-            <th>Call Number</th>
-            <th>Barcode</th>
-            <th>Copy</th>
-            <th>Actions</th>
+            <th style={{ width: '40%', minWidth: '200px' }}>Title</th>
+            <th style={{ width: '25%', minWidth: '120px' }}>Call Number</th>
+            <th style={{ width: '20%', minWidth: '100px' }}>Barcode</th>
+            <th style={{ width: '10%', minWidth: '60px' }}>Copy</th>
+            <th style={{ width: '5%', minWidth: '60px' }}>Actions</th>
           </tr>
         </thead>
         <tbody>

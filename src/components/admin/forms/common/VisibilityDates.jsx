@@ -2,7 +2,10 @@ import PropTypes from 'prop-types';
 import { Row, Col, FormGroup, Label, Input } from 'reactstrap';
 
 /**
- * VisibilityDates - Component for setting resource visibility dates
+ * VisibilityDates - Simplified Component for setting resource visibility dates
+ * 
+ * This component now handles only basic record-level visibility dates.
+ * Primary link visibility is handled separately in ResourceBasicFields.
  */
 export const VisibilityDates = ({ 
   startDate, 
@@ -10,7 +13,7 @@ export const VisibilityDates = ({
   handleChange, 
   materialTypeId,
   useVisibilityDates,
-  onVisibilityToggle 
+  onVisibilityToggle
 }) => {
   // Check if this is a video material type (ID = 3)
   const isVideoMaterialType = materialTypeId === '3' || materialTypeId === 3;
@@ -20,7 +23,7 @@ export const VisibilityDates = ({
 
   return (
     <div>
-      {/* Visibility Toggle - only show if not video type (video type is always enabled) */}
+      {/* Visibility Toggle - only show if not video type */}
       {!isVideoMaterialType && (
         <Row className="mb-3">
           <Col md={12}>
@@ -33,10 +36,10 @@ export const VisibilityDates = ({
                 onChange={onVisibilityToggle}
               />
               <Label check for="use_visibility_dates">
-                Enable visibility date restrictions
+                Enable visibility date restrictions for this resource
               </Label>
               <small className="text-muted d-block">
-                Check this box to set specific dates when this resource should be visible to students
+                When enabled, this resource will only be visible to students during the specified date range
               </small>
             </FormGroup>
           </Col>
@@ -56,41 +59,52 @@ export const VisibilityDates = ({
         </Row>
       )}
       
-      {/* Date Fields - only show when visibility is enabled */}
+      {/* Resource Visibility Date Fields */}
       {shouldShowDates && (
-        <Row>
-          <Col md={6}>
-            <FormGroup>
-              <Label for="start_visibility">Visibility Start Date</Label>
-              <Input
-                id="start_visibility"
-                name="start_visibility"
-                type="date"
-                value={startDate || ''}
-                onChange={handleChange}
-              />
+        <>
+          <Row className="mb-3">
+            <Col md={12}>
+              <h6 className="text-secondary mb-2">Resource Visibility Dates</h6>
               <small className="text-muted">
-                When the resource becomes visible to students
+                These dates control when the entire resource record is visible to students
               </small>
-            </FormGroup>
-          </Col>
+            </Col>
+          </Row>
           
-          <Col md={6}>
-            <FormGroup>
-              <Label for="end_visibility">Visibility End Date</Label>
-              <Input
-                id="end_visibility"
-                name="end_visibility"
-                type="date"
-                value={endDate || ''}
-                onChange={handleChange}
-              />
-              <small className="text-muted">
-                When the resource stops being visible to students
-              </small>
-            </FormGroup>
-          </Col>
-        </Row>
+          <Row>
+            <Col md={6}>
+              <FormGroup>
+                <Label for="start_visibility">Resource Start Date</Label>
+                <Input
+                  id="start_visibility"
+                  name="start_visibility"
+                  type="date"
+                  value={startDate || ''}
+                  onChange={handleChange}
+                />
+                <small className="text-muted">
+                  When the resource becomes visible to students
+                </small>
+              </FormGroup>
+            </Col>
+            
+            <Col md={6}>
+              <FormGroup>
+                <Label for="end_visibility">Resource End Date</Label>
+                <Input
+                  id="end_visibility"
+                  name="end_visibility"
+                  type="date"
+                  value={endDate || ''}
+                  onChange={handleChange}
+                />
+                <small className="text-muted">
+                  When the resource stops being visible to students
+                </small>
+              </FormGroup>
+            </Col>
+          </Row>
+        </>
       )}
     </div>
   );

@@ -233,7 +233,7 @@ export const AdminResourceTable = ({
   const [sortedResources, setSortedResources] = useState([]);
 
   const handleSelectedResource = useCallback((resource) => {
-    editResourceModal.openEditForm({ resource });
+    editResourceModal.openEditResourceForm(resource);
   }, [editResourceModal]);
 
   // Initialize sorted resources with order (inherits from unified table)
@@ -271,12 +271,12 @@ export const AdminResourceTable = ({
       <Table bordered responsive hover>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Item URL</th>
-            <th>Description</th>
-            <th>Notes</th>
-            <th>Type</th>
-            <th>Actions</th>
+            <th style={{ width: '35%', minWidth: '200px' }}>Name</th>
+            <th style={{ width: '20%', minWidth: '150px' }}>Item URL</th>
+            <th style={{ width: '20%', minWidth: '120px' }}>Description</th>
+            <th style={{ width: '10%', minWidth: '80px' }}>Notes</th>
+            <th style={{ width: '10%', minWidth: '80px' }}>Type</th>
+            <th style={{ width: '5%', minWidth: '60px' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -298,7 +298,7 @@ AdminResourceTable.propTypes = {
   resources: PropTypes.arrayOf(resourceShape),
   unlink: PropTypes.func.isRequired,
   editResourceModal: PropTypes.shape({
-    openEditForm: PropTypes.func.isRequired
+    openEditResourceForm: PropTypes.func.isRequired
   }).isRequired
 };
 

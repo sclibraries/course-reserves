@@ -64,6 +64,7 @@ export const ResourceFormManager = ({
   // Additional state for API data display
   const [copiedField, setCopiedField] = useState(null);
 
+
   /**
    * Reset all state when modal closes or form type changes
    */
@@ -351,7 +352,10 @@ export const ResourceFormManager = ({
         material_type_name: initialData.material_type_name || '',
         course_count: initialData.course_count || 0,
         metadata: transformMetadata(initialData.metadata),
-        links: initialData.links || []
+        links: initialData.links || [],
+        use_primary_link_visibility: normalizeProxyValue(initialData.use_primary_link_visibility),
+        primary_link_start_visibility: initialData.primary_link_start_visibility || null,
+        primary_link_end_visibility: initialData.primary_link_end_visibility || null,
       };
     }
 

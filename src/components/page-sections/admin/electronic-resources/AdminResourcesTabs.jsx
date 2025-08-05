@@ -121,6 +121,7 @@ function AdminResourcesTabs({
                         unlinkResource={unlinkResource}
                         currentSort={unifiedSort}
                         onSortChange={setUnifiedSort}
+                        editResourceModal={editResourceModal}
                       />
                     ) : (
                       <EmptyState 

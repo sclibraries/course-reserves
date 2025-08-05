@@ -7,6 +7,7 @@ import { useBuildQuery } from '../hooks/useBuildQuery';
 import { Container,Alert } from 'reactstrap';
 import { trackingService } from '../services/trackingService';
 import useCustomizationStore from '../store/customizationStore';
+import { termNameToUrlParam, urlParamToTermName, findTermIdByName, findTermNameById } from '../utils/termUrlHelpers';
 import '../css/CourseList.css'; // Import the new CSS
 
 function Search() {
@@ -20,11 +21,13 @@ function Search() {
     department,
     sortOption,
     termId,
+    terms,
     setCollege,
     setType,
     setQuery,
     setDepartment,
     setSortOption,
+    setTermId,
     displayMode,
     setDisplayMode
   } = useSearchStore();
@@ -60,6 +63,11 @@ function Search() {
     const departmentParam = queryParams.get('department') || '';
     const sortParam = queryParams.get('sort') || '';
     const displayModeParam = queryParams.get('displayMode') || 'card';
+    const termUrlParam = queryParams.get('term') || '';
+
+    // Convert URL term parameter back to term name, then find the term ID
+    const termName = urlParamToTermName(termUrlParam);
+    const resolvedTermId = termName ? findTermIdByName(terms, termName) : null;
 
     // Update store if parameters have changed
     if (collegeParam !== college) setCollege(collegeParam);
@@ -68,12 +76,20 @@ function Search() {
     if (departmentParam !== department) setDepartment(departmentParam);
     if (sortParam !== sortOption) setSortOption(sortParam);
     if (displayModeParam !== displayMode) setDisplayMode(displayModeParam); // Update store
+    
+    // Only update termId if we have a valid term from URL or if clearing it
+    if (termUrlParam && resolvedTermId && resolvedTermId !== termId) {
+      setTermId(resolvedTermId);
+    } else if (!termUrlParam && termId) {
+      // Clear termId if no term in URL but one is set in store
+      setTermId(null);
+    }
 
 
     setIsInitialized(true);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+  }, [location.search, terms]); // Added terms to dependencies for term resolution
 
   // Update URL parameters when store changes
   useEffect(() => {
@@ -101,6 +117,15 @@ function Search() {
       queryParams.set('displayMode', displayMode.trim());
     }
 
+    // Convert term ID to term name for URL
+    if (termId && termId.trim() !== '') {
+      const termName = findTermNameById(terms, termId);
+      if (termName) {
+        const urlParam = termNameToUrlParam(termName);
+        queryParams.set('term', urlParam);
+      }
+    }
+
     const newSearch = queryParams.toString();
     const currentSearch = location.search.startsWith('?') ? location.search.substring(1) : location.search;
 
@@ -111,7 +136,7 @@ function Search() {
       }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [college, type, query, department, sortOption, displayMode]);
+  }, [college, type, query, department, sortOption, displayMode, termId]);
 
   // Build the query using the updated buildQuery function that can handle department and sort
   const cqlQuery = useBuildQuery(college, type, query, department, sortOption, termId);

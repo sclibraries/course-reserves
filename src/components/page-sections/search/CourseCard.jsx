@@ -6,7 +6,7 @@ import {
 import { trackingService } from '../../../services/trackingService';
 import useSearchStore from '../../../store/searchStore';
 import { useNavigate } from 'react-router-dom';
-import { FaBook, FaChevronRight } from 'react-icons/fa';
+import { FaChevronRight } from 'react-icons/fa';
 
 function CourseCard({ course, customization, onRecordsClick }) {
   const {
@@ -56,7 +56,7 @@ function CourseCard({ course, customization, onRecordsClick }) {
     }).catch((error) => console.error("Error tracking course access:", error));
   
     // Proceed with navigation
-    onRecordsClick(courseListingId);
+    onRecordsClick(courseListingId, course);
   };
 
   const handleInstructorClick = (instructorName, event) => {
@@ -258,14 +258,14 @@ function CourseCard({ course, customization, onRecordsClick }) {
         </div>
 
         {/* Reserves indicator */}
-        <div className="reserves-indicator d-flex align-items-center mb-2" style={{ fontSize: "0.85rem" }}>
+        {/* <div className="reserves-indicator d-flex align-items-center mb-2" style={{ fontSize: "0.85rem" }}>
           <FaBook style={{ 
             color: cardButtonBgColor || accentColor,
             marginRight: "6px",
             fontSize: "0.9rem"
           }} />
           <span>Has course materials</span>
-        </div>
+        </div> */}
 
         {/* View button with enhanced styling and positioning */}
         <Button

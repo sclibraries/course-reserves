@@ -233,7 +233,7 @@ export const AdminResourceTable = ({
   const [sortedResources, setSortedResources] = useState([]);
 
   const handleSelectedResource = useCallback((resource) => {
-    editResourceModal.openEditForm({ resource });
+    editResourceModal.openEditResourceForm(resource);
   }, [editResourceModal]);
 
   // Initialize sorted resources with order (inherits from unified table)
@@ -298,7 +298,7 @@ AdminResourceTable.propTypes = {
   resources: PropTypes.arrayOf(resourceShape),
   unlink: PropTypes.func.isRequired,
   editResourceModal: PropTypes.shape({
-    openEditForm: PropTypes.func.isRequired
+    openEditResourceForm: PropTypes.func.isRequired
   }).isRequired
 };
 

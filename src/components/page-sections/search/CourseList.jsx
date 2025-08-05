@@ -10,6 +10,7 @@ import CourseCard from './CourseCard';
 import CourseTable from './CourseTable';
 import useSearchStore from '../../../store/searchStore';
 import CourseSkeleton from './CourseSkeleton'; // This would be a new component for loading states
+import { buildFriendlyCourseUrl } from '../../../util/urlHelpers';
 
 function CourseList({ courses, isLoading }) {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ function CourseList({ courses, isLoading }) {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [coursesPerPage, setCoursesPerPage] = useState(12);
+  const [coursesPerPage, setCoursesPerPage] = useState(150);
   const [paginatedCourses, setPaginatedCourses] = useState([]);
 
   // Get customization from the store
@@ -75,17 +76,25 @@ function CourseList({ courses, isLoading }) {
     }
   }, [displayMode, navigate, location]);
 
-  const handleRecords = (courseListingId) => {
+  const handleRecords = (courseListingId, course) => {
     setRecord(courseListingId);
     sessionStorage.setItem('searchScrollPosition', window.scrollY);
 
-    const newQueryParams = new URLSearchParams();
-    newQueryParams.set('courseListingId', courseListingId);
-    if (collegeParam) {
-      newQueryParams.set('college', collegeParam);
+    // Try to build a friendly URL, fall back to traditional URL if needed
+    let targetUrl;
+    if (course) {
+      targetUrl = buildFriendlyCourseUrl(course);
+    } else {
+      // Fallback for when course object isn't available
+      const newQueryParams = new URLSearchParams();
+      newQueryParams.set('courseListingId', courseListingId);
+      if (collegeParam) {
+        newQueryParams.set('college', collegeParam);
+      }
+      targetUrl = `/records?${newQueryParams.toString()}`;
     }
 
-    navigate(`/records?${newQueryParams.toString()}`);
+    navigate(targetUrl);
   };
 
   const scrollToTop = () => {
@@ -260,7 +269,7 @@ function CourseList({ courses, isLoading }) {
                 <CourseCard
                   course={course}
                   customization={customization}
-                  onRecordsClick={handleRecords}
+                  onRecordsClick={(courseListingId) => handleRecords(courseListingId, course)}
                 />
               </Col>
             ))}
@@ -269,7 +278,7 @@ function CourseList({ courses, isLoading }) {
           <CourseTable
             courses={paginatedCourses}
             customization={customization}
-            onRecordsClick={handleRecords}
+            onRecordsClick={(courseListingId, course) => handleRecords(courseListingId, course)}
           />
         )}
         

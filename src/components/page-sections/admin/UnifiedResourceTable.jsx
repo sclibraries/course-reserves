@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Table, Button, Alert, Input } from 'reactstrap';
+import { Table, Button, Alert, Input, Spinner } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useDrag, useDrop } from 'react-dnd';
 import { buildFolioVerificationUrl } from '../../../util/urlHelpers';
@@ -14,7 +14,7 @@ const UNIFIED_ITEM_TYPE = 'unified-resource';
 /**
  * Draggable component for both electronic and print resources
  */
-const DraggableResourceRow = ({ item, index, moveRow, onDrop, isSelected, onSelect }) => {
+const DraggableResourceRow = ({ item, index, moveRow, onDrop, isSelected, onSelect, onEdit }) => {
   const ref = useRef(null);
   
   const [, drop] = useDrop({
@@ -77,13 +77,23 @@ const DraggableResourceRow = ({ item, index, moveRow, onDrop, isSelected, onSele
           )}
         </td>
         <td>
-          <Button 
-            size="sm" 
-            color="danger" 
-            onClick={() => item.onUnlink && item.onUnlink(item.course_resource_id)}
-          >
-            Unlink
-          </Button>
+          <div className="d-flex gap-2">
+            <Button 
+              size="sm" 
+              color="danger" 
+              onClick={() => item.onUnlink && item.onUnlink(item.course_resource_id)}
+            >
+              Unlink
+            </Button>
+            <Button 
+              color="primary" 
+              size="sm"
+              onClick={() => onEdit && onEdit(item)}
+              aria-label={`Edit ${item.name}`}
+            >
+              Edit
+            </Button>
+          </div>
         </td>
       </tr>
     );
@@ -147,13 +157,14 @@ DraggableResourceRow.propTypes = {
   moveRow: PropTypes.func.isRequired,
   onDrop: PropTypes.func.isRequired,
   isSelected: PropTypes.bool.isRequired,
-  onSelect: PropTypes.func.isRequired
+  onSelect: PropTypes.func.isRequired,
+  onEdit: PropTypes.func
 };
 
 /**
  * Static (non-draggable) component for sorted resources
  */
-const StaticResourceRow = ({ item, isSelected, onSelect }) => {
+const StaticResourceRow = ({ item, isSelected, onSelect, onEdit }) => {
   // Render differently based on resource type
   if (item.resourceType === 'electronic') {
     return (
@@ -179,13 +190,23 @@ const StaticResourceRow = ({ item, isSelected, onSelect }) => {
           )}
         </td>
         <td>
-          <Button 
-            size="sm" 
-            color="danger" 
-            onClick={() => item.onUnlink && item.onUnlink(item.course_resource_id)}
-          >
-            Unlink
-          </Button>
+          <div className="d-flex gap-2">
+            <Button 
+              size="sm" 
+              color="danger" 
+              onClick={() => item.onUnlink && item.onUnlink(item.course_resource_id)}
+            >
+              Unlink
+            </Button>
+            <Button 
+              color="primary" 
+              size="sm"
+              onClick={() => onEdit && onEdit(item)}
+              aria-label={`Edit ${item.name}`}
+            >
+              Edit
+            </Button>
+          </div>
         </td>
       </tr>
     );
@@ -239,7 +260,8 @@ StaticResourceRow.propTypes = {
     })
   }).isRequired,
   isSelected: PropTypes.bool.isRequired,
-  onSelect: PropTypes.func.isRequired
+  onSelect: PropTypes.func.isRequired,
+  onEdit: PropTypes.func
 };
 
 /**
@@ -254,12 +276,15 @@ function UnifiedResourceTable({
   currentSort: externalCurrentSort,
   onSortChange: externalOnSortChange,
   isDropdownOpen: externalIsDropdownOpen,
-  setDropdownOpen: externalSetDropdownOpen
+  setDropdownOpen: externalSetDropdownOpen,
+  editResourceModal
 }) {
   const [resources, setResources] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
   const [showBulkOps, setShowBulkOps] = useState(false);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Use external sort state if provided, fallback to internal state
   const [internalCurrentSort, setInternalCurrentSort] = useState('manual');
@@ -299,39 +324,19 @@ function UnifiedResourceTable({
       return;
     }
     
-    // Apply the new sort and update backend if not manual
+    // Apply the new sort locally only
     const sortedResources = applySortOrder(resources, newSortType);
-    setResources(sortedResources);
     
-    // Send the new order to the backend
-    if (onReorder && sortedResources.length > 0) {
-      const electronic = [];
-      const print = [];
-      
-      sortedResources.forEach((resource) => {
-        if (resource.resourceType === 'electronic') {
-          electronic.push({
-            ...resource,
-            resource_id: resource.resource_id,
-            course_resource_id: resource.course_resource_id,
-            order: resource.order
-          });
-        } else {
-          print.push({
-            ...resource,
-            id: resource.id,
-            order: resource.order,
-            copiedItem: resource.copiedItem
-          });
-        }
-      });
-
-      onReorder({
-        electronic,
-        print
-      });
-    }
-  }, [resources, onReorder, onSortChange]);
+    // Update order properties for the sorted resources
+    sortedResources.forEach((resource, index) => {
+      resource.order = index + 1;
+    });
+    
+    setResources(sortedResources);
+    setHasPendingChanges(true); // Mark changes as pending for sort operations too
+    
+    // Note: Backend update moved to manual "Update Order" button
+  }, [resources, onSortChange]);
 
   // Selection handlers
   const handleSelectItem = useCallback((itemId, isSelected) => {
@@ -355,6 +360,13 @@ function UnifiedResourceTable({
   const handleClearSelection = useCallback(() => {
     setSelectedItems([]);
   }, []);
+
+  // Edit handler for electronic resources
+  const handleEditResource = useCallback((resource) => {
+    if (editResourceModal && resource.resourceType === 'electronic') {
+      editResourceModal.openEditResourceForm(resource);
+    }
+  }, [editResourceModal]);
 
   // Bulk operations handler
   const handleBulkMove = useCallback((selectedResources, operation, value) => {
@@ -471,41 +483,15 @@ function UnifiedResourceTable({
     });
 
     setResources(finalResources);
+    setHasPendingChanges(true); // Mark that we have unsaved changes
     
     // Only clear selection for major moves, preserve for incremental arrow moves
     if (operation !== 'moveUp' && operation !== 'moveDown') {
       setSelectedItems([]);
     }
 
-    // Trigger backend update
-    if (onReorder && finalResources.length > 0) {
-      const electronic = [];
-      const print = [];
-      
-      finalResources.forEach((resource) => {
-        if (resource.resourceType === 'electronic') {
-          electronic.push({
-            ...resource,
-            resource_id: resource.resource_id,
-            course_resource_id: resource.course_resource_id,
-            order: resource.order
-          });
-        } else {
-          print.push({
-            ...resource,
-            id: resource.id,
-            order: resource.order,
-            copiedItem: resource.copiedItem
-          });
-        }
-      });
-      
-      onReorder({
-        electronic,
-        print
-      });
-    }
-  }, [resources, selectedItems, onReorder]);
+    // Note: Backend update moved to manual "Update Order" button
+  }, [resources, selectedItems]);
 
   // Combine resources with type information
   useEffect(() => {
@@ -584,6 +570,49 @@ function UnifiedResourceTable({
     setResources(sortedResources);
   }, [electronicResources, printResources, unlinkResource, currentSort]);
 
+  // Manual update function to send changes to backend
+  const handleUpdateOrder = useCallback(async () => {
+    if (!onReorder || !hasPendingChanges || resources.length === 0) return;
+
+    setIsUpdating(true);
+    
+    try {
+      const electronic = [];
+      const print = [];
+      
+      resources.forEach((resource) => {
+        if (resource.resourceType === 'electronic') {
+          electronic.push({
+            ...resource,
+            resource_id: resource.resource_id,
+            course_resource_id: resource.course_resource_id,
+            order: resource.order
+          });
+        } else {
+          print.push({
+            ...resource,
+            id: resource.id,
+            order: resource.order,
+            copiedItem: resource.copiedItem
+          });
+        }
+      });
+      
+      await onReorder({
+        electronic,
+        print
+      });
+      
+      setHasPendingChanges(false); // Clear pending changes flag
+      onSortChange('manual'); // Reset to default order to show backend-provided order
+    } catch (error) {
+      console.error('Error updating order:', error);
+      // You could add error handling/toast here
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [onReorder, hasPendingChanges, resources, onSortChange]);
+
   // Handle row movement (only active in manual mode)
   const moveRow = useCallback((dragIndex, hoverIndex) => {
     if (currentSort !== 'manual') return; // Disable drag in non-manual modes
@@ -602,61 +631,17 @@ function UnifiedResourceTable({
     }));
     
     setResources(updatedItems);
+    setHasPendingChanges(true); // Mark changes as pending for drag operations too
   }, [resources, currentSort]);
 
-  // Handle drag end and update backend (only active in manual mode)
+  // Handle drag end (only active in manual mode)
   const handleDragEnd = useCallback(() => {
-    if (onReorder && resources.length > 0 && isDragging && currentSort === 'manual') {
-      console.log('Drag ended, processing reorder with resources:', resources.length);
-      
-      // Split resources back into their types with proper structure
-      const electronic = [];
-      const print = [];
-      
-      resources.forEach((resource, index) => {
-        const order = index + 1;
-        
-        if (resource.resourceType === 'electronic') {
-          electronic.push({
-            ...resource,
-            resource_id: resource.resource_id,
-            course_resource_id: resource.course_resource_id, // This is critical for backend updates
-            order
-          });
-        } else {
-          // For print resources, we need to preserve the structure
-          print.push({
-            ...resource,
-            id: resource.id,
-            order,
-            copiedItem: resource.copiedItem
-          });
-        }
-      });
-      
-      console.log('Sending reorder data:', {
-        electronic: electronic.map(e => ({ 
-          resource_id: e.resource_id, 
-          course_resource_id: e.course_resource_id,
-          order: e.order 
-        })),
-        print: print.map(p => ({ 
-          id: p.id, 
-          order: p.order, 
-          instanceId: p.copiedItem?.instanceId,
-          title: p.copiedItem?.title 
-        }))
-      });
-      
-      // Send updates to backend
-      onReorder({
-        electronic,
-        print
-      });
-      
+    if (isDragging && currentSort === 'manual') {
+      console.log('Drag ended');
       setIsDragging(false);
+      // Note: Backend update moved to manual "Update Order" button
     }
-  }, [resources, onReorder, isDragging, currentSort]);
+  }, [isDragging, currentSort]);
 
   if (!resources.length) {
     return (
@@ -669,12 +654,36 @@ function UnifiedResourceTable({
 
   return (
     <div className="unified-resource-table mb-4">
-      <ResourceSortDropdown
-        currentSort={currentSort}
-        onSortChange={handleSortChange}
-        isDropdownOpen={isDropdownOpen}
-        setDropdownOpen={setDropdownOpen}
-      />
+      <div className="d-flex justify-content-between align-items-start mb-3">
+        <ResourceSortDropdown
+          currentSort={currentSort}
+          onSortChange={handleSortChange}
+          isDropdownOpen={isDropdownOpen}
+          setDropdownOpen={setDropdownOpen}
+        />
+        
+        {hasPendingChanges && (
+          <Button
+            color="success"
+            size="sm"
+            onClick={handleUpdateOrder}
+            disabled={isUpdating}
+            className="d-flex align-items-center"
+          >
+            {isUpdating ? (
+              <>
+                <Spinner size="sm" className="me-2" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <FontAwesomeIcon icon="fa-solid fa-save" className="me-2" />
+                Update Order
+              </>
+            )}
+          </Button>
+        )}
+      </div>
 
       <BulkOperationsPanel
         selectedItems={selectedItems}
@@ -685,11 +694,13 @@ function UnifiedResourceTable({
       />
       
       <div className="mb-3">
-        <small className="text-muted">
-          <FontAwesomeIcon icon="fa-solid fa-info-circle" className="me-1" />
-          {currentSort === 'manual' 
-            ? 'Using default order (custom order + creation order). Select resources for bulk operations, drag and drop, or use arrow buttons to reorder individually.'
-            : `Resources are sorted by ${currentSort.replace('-', ' ')}. Switch to Default Order to enable drag and drop.`
+        <small className={hasPendingChanges ? "text-warning" : "text-muted"}>
+          <FontAwesomeIcon icon={hasPendingChanges ? "fa-solid fa-exclamation-triangle" : "fa-solid fa-info-circle"} className="me-1" />
+          {hasPendingChanges 
+            ? 'You have unsaved changes. Click "Update Order" to save your sorting/reordering to the server.'
+            : currentSort === 'manual' 
+              ? 'Using default order (custom order + creation order). Select resources for bulk operations, drag and drop, or use arrow buttons to reorder individually.'
+              : `Resources are sorted by ${currentSort.replace('-', ' ')}. All sorting is applied locally - click "Update Order" to save the new order to the server.`
           }
         </small>
       </div>
@@ -697,7 +708,7 @@ function UnifiedResourceTable({
       <Table bordered responsive hover>
         <thead>
           <tr>
-            <th style={{ width: '40px' }}>
+            <th style={{ width: '40px', minWidth: '40px' }}>
               <Input
                 type="checkbox"
                 checked={allSelected}
@@ -708,11 +719,11 @@ function UnifiedResourceTable({
                 title={allSelected ? 'Deselect all' : 'Select all'}
               />
             </th>
-            {currentSort === 'manual' && <th style={{ width: '40px' }}></th>}
-            <th style={{ width: '120px' }}>Type</th>
-            <th>Title</th>
-            <th>Information</th>
-            <th style={{ width: '100px' }}>Actions</th>
+            {currentSort === 'manual' && <th style={{ width: '40px', minWidth: '40px' }}></th>}
+            <th style={{ width: '120px', minWidth: '120px' }}>Type</th>
+            <th style={{ width: '35%', minWidth: '200px' }}>Title</th>
+            <th style={{ width: 'auto', minWidth: '150px' }}>Information</th>
+            <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -728,6 +739,7 @@ function UnifiedResourceTable({
                 onDrop={handleDragEnd}
                 isSelected={isSelected}
                 onSelect={handleSelectItem}
+                onEdit={handleEditResource}
               />
             ) : (
               <StaticResourceRow
@@ -735,6 +747,7 @@ function UnifiedResourceTable({
                 item={item}
                 isSelected={isSelected}
                 onSelect={handleSelectItem}
+                onEdit={handleEditResource}
               />
             );
           })}
@@ -752,7 +765,10 @@ UnifiedResourceTable.propTypes = {
   currentSort: PropTypes.string,
   onSortChange: PropTypes.func,
   isDropdownOpen: PropTypes.bool,
-  setDropdownOpen: PropTypes.func
+  setDropdownOpen: PropTypes.func,
+  editResourceModal: PropTypes.shape({
+    openEditResourceForm: PropTypes.func.isRequired
+  })
 };
 
 export default UnifiedResourceTable;

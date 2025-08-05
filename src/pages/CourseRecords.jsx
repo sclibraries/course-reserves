@@ -22,15 +22,16 @@ import {
 
 import RecordCard from '../components/page-sections/course-record/RecordCard';
 import RecordTable from '../components/page-sections/course-record/RecordTable';
+import CoursePermalink from '../components/common/CoursePermalink';
 
 function CourseRecords() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { uuid, courseCode } = useParams();
+  const { uuid, courseCode, termSlug: _termSlug, courseSlug: _courseSlug, nameSlug: _nameSlug } = useParams();
 
   const searchParams = new URLSearchParams(location.search);
   const collegeParam = searchParams.get('college');
-  const courseListingIdParam = searchParams.get('courseListingId');
+  const courseListingIdParam = searchParams.get('courseListingId') || searchParams.get('id');
 
   const { record, setRecord } = useRecordStore();
   const [records, setRecords] = useState([]);
@@ -221,7 +222,11 @@ function CourseRecords() {
               start_visibility: item.__resource.start_visibility,
               end_visibility: item.__resource.end_visibility,
               use_proxy: item.__resource.use_proxy,
+              use_primary_link_visibility: item.__resource.use_primary_link_visibility,
+              primary_link_start_visibility: item.__resource.primary_link_start_visibility,
+              primary_link_end_visibility: item.__resource.primary_link_end_visibility,
               links: item.__resource.links || [],
+
               metadata: item.__resource.metadata || []
             },
             copiedItem: {
@@ -254,6 +259,9 @@ function CourseRecords() {
               start_visibility:item.start_visibility,
               end_visibility:  item.end_visibility,
               use_proxy:       item.use_proxy,
+              use_primary_link_visibility: item.use_primary_link_visibility,
+              primary_link_start_visibility: item.primary_link_start_visibility,
+              primary_link_end_visibility: item.primary_link_end_visibility,
               links:           item.links || [],
               metadata:        item.metadata || []
             },
@@ -461,19 +469,22 @@ function CourseRecords() {
       if (isAuthenticated) return true;
 
       const now = new Date();
-      const startVisibility = item.resource.start_visibility
-        ? new Date(item.resource.start_visibility)
-        : null;
-      const endVisibility = item.resource.end_visibility
-        ? new Date(item.resource.end_visibility)
-        : null;
+      if(item.start_visibility !== null || item.end_visibility !== null) {
+        // Use resource-level visibility dates
+        const startVisibility = item.resource.start_visibility
+          ? new Date(item.resource.start_visibility + 'T00:00:00')
+          : null;
+        const endVisibility = item.resource.end_visibility
+          ? new Date(item.resource.end_visibility + 'T23:59:59')
+          : null;
 
-      if ((startVisibility && now < startVisibility)) {
-        return false;
-      }
+        if ((startVisibility && now < startVisibility)) {
+          return false;
+        }
 
-      if ((endVisibility && now > endVisibility)) {
-        return false;
+        if ((endVisibility && now > endVisibility)) {
+          return false;
+        }
       }
     }
     return true;
@@ -699,20 +710,48 @@ function CourseRecords() {
         if (isAuthenticated) return { isVisible: true };
 
         const now = new Date();
-        const startVisibility = item.resource.start_visibility
-          ? new Date(item.resource.start_visibility)
-          : null;
-        const endVisibility = item.resource.end_visibility
-          ? new Date(item.resource.end_visibility)
-          : null;
+        
+        // Check if primary link visibility is enabled
+        const usePrimaryLinkVisibility = item.resource.use_primary_link_visibility === "1" || 
+                                       item.resource.use_primary_link_visibility === 1 || 
+                                       item.resource.use_primary_link_visibility === true;
+        
+        if (usePrimaryLinkVisibility) {
+          // Use primary link visibility dates
+          const startVisibility = item.resource.primary_link_start_visibility
+            ? new Date(item.resource.primary_link_start_visibility + 'T00:00:00')
+            : null;
+          const endVisibility = item.resource.primary_link_end_visibility
+            ? new Date(item.resource.primary_link_end_visibility + 'T23:59:59')
+            : null;
+            
+          // If current time is before the start of the primary link visibility window
+          if (startVisibility && now < startVisibility) {
+            upcomingDates.push(startVisibility);
+            return { isVisible: false, startDate: startVisibility };
+          }
+          
+          // If current time is after the end of the primary link visibility window
+          if (endVisibility && now > endVisibility) {
+            return { isVisible: false };
+          }
+        } else {
+          // Use resource-level visibility dates
+          const startVisibility = item.resource.start_visibility
+            ? new Date(item.resource.start_visibility + 'T00:00:00')
+            : null;
+          const endVisibility = item.resource.end_visibility
+            ? new Date(item.resource.end_visibility + 'T23:59:59')
+            : null;
 
-        if ((startVisibility && now < startVisibility)) {
-          upcomingDates.push(startVisibility);
-          return { isVisible: false, startDate: startVisibility };
-        }
+          if ((startVisibility && now < startVisibility)) {
+            upcomingDates.push(startVisibility);
+            return { isVisible: false, startDate: startVisibility };
+          }
 
-        if ((endVisibility && now > endVisibility)) {
-          return { isVisible: false };
+          if ((endVisibility && now > endVisibility)) {
+            return { isVisible: false };
+          }
         }
       }
       return { isVisible: true };
@@ -843,6 +882,7 @@ function CourseRecords() {
     setFilter(newFilter);
   };
 
+
   // Replace the renderFilterButtons function with this enhanced ViewControls component
   const renderViewControls = () => {
     if (!hasElectronicReserves) return null;
@@ -972,7 +1012,10 @@ function CourseRecords() {
                 .join(', ')}
             </h3>
           )}
-          <Badge color="primary">{courseInfo?.courseListingObject?.termObject?.name}</Badge>
+          <div className="d-flex align-items-center gap-3 mt-2">
+            <Badge color="primary">{courseInfo?.courseListingObject?.termObject?.name}</Badge>
+            <CoursePermalink course={courseInfo} compact />
+          </div>
         </div>
       )}
 
@@ -1101,7 +1144,6 @@ function CourseRecords() {
                       return (
                         <div key={`folder-${result.folder}`} className="folder-group mb-5">
                           <header className="folder-header text-white p-3 rounded-top" style={{ backgroundColor: recordsDiscoverLinkBgColor }}>
-                            {/* ...existing code... */}
                           </header>
                           <div className="folder-items border-start border-end border-bottom p-3">
                             <Row className="g-4">
