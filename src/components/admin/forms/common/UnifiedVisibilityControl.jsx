@@ -33,18 +33,22 @@ export const UnifiedVisibilityControl = ({
   usePrimaryLinkVisibility,
   onPrimaryLinkVisibilityToggle,
   onPrimaryLinkDateChange,
-  hasPrimaryLink,
+  hasPrimaryLink = false,
   primaryUrl,
   
   // Additional links visibility
-  links,
+  links = [],
   onLinkVisibilityChange,
   onLinkDateChange,
   
   // General settings
   materialTypeId,
-  cascadeVisibilityToLinks,
-  onCascadeToggle
+  cascadeVisibilityToLinks = false,
+  onCascadeToggle,
+  
+  // Term dates for defaults
+  termStartDate,
+  termEndDate
 }) => {
   // Check if this is a video material type (ID = 3)
   const isVideoMaterialType = materialTypeId === '3' || materialTypeId === 3;
@@ -54,6 +58,52 @@ export const UnifiedVisibilityControl = ({
   
   // Determine if resource visibility should be shown (only when manually enabled)
   const shouldShowResourceVisibility = useResourceVisibility;
+  
+  // Handle resource visibility toggle with term date defaults
+  const handleResourceVisibilityToggle = (enabled) => {
+    onResourceVisibilityToggle(enabled);
+    
+    // If enabling visibility and no dates are set, use term dates as defaults
+    if (enabled && termStartDate && termEndDate) {
+      if (!resourceStartDate || resourceStartDate.trim() === '') {
+        onResourceDateChange({ target: { name: 'start_visibility', value: termStartDate } });
+      }
+      if (!resourceEndDate || resourceEndDate.trim() === '') {
+        onResourceDateChange({ target: { name: 'end_visibility', value: termEndDate } });
+      }
+    }
+  };
+  
+  // Handle primary link visibility toggle with term date defaults
+  const handlePrimaryLinkVisibilityToggle = (enabled) => {
+    onPrimaryLinkVisibilityToggle(enabled);
+    
+    // If enabling visibility and no dates are set, use term dates as defaults
+    if (enabled && termStartDate && termEndDate) {
+      if (!primaryLinkStartDate || primaryLinkStartDate.trim() === '') {
+        onPrimaryLinkDateChange({ target: { name: 'primary_link_start_visibility', value: termStartDate } });
+      }
+      if (!primaryLinkEndDate || primaryLinkEndDate.trim() === '') {
+        onPrimaryLinkDateChange({ target: { name: 'primary_link_end_visibility', value: termEndDate } });
+      }
+    }
+  };
+  
+  // Handle link visibility toggle with term date defaults
+  const handleLinkVisibilityToggle = (index, field, enabled) => {
+    onLinkVisibilityChange(index, field, enabled);
+    
+    // If enabling visibility and no dates are set, use term dates as defaults
+    if (enabled && termStartDate && termEndDate) {
+      const link = links[index];
+      if (!link.start_visibility || link.start_visibility.trim() === '') {
+        onLinkDateChange(index, 'start_visibility', termStartDate);
+      }
+      if (!link.end_visibility || link.end_visibility.trim() === '') {
+        onLinkDateChange(index, 'end_visibility', termEndDate);
+      }
+    }
+  };
   
   // Handle cascade toggle
   const handleCascadeToggle = (enabled) => {
@@ -96,7 +146,6 @@ export const UnifiedVisibilityControl = ({
           primaryLinkEndDate={primaryLinkEndDate}
           hasPrimaryLink={hasPrimaryLink}
           links={links}
-          materialTypeId={materialTypeId}
           cascadeVisibilityToLinks={cascadeVisibilityToLinks}
         />
         
@@ -122,7 +171,7 @@ export const UnifiedVisibilityControl = ({
               id="use_resource_visibility"
               type="checkbox"
               checked={useResourceVisibility}
-              onChange={(e) => onResourceVisibilityToggle(e.target.checked)}
+              onChange={(e) => handleResourceVisibilityToggle(e.target.checked)}
             />
             <Label check for="use_resource_visibility">
               Enable visibility date restrictions for this resource
@@ -205,7 +254,7 @@ export const UnifiedVisibilityControl = ({
                 id="use_primary_link_visibility"
                 type="checkbox"
                 checked={usePrimaryLinkVisibility}
-                onChange={(e) => onPrimaryLinkVisibilityToggle(e.target.checked)}
+                onChange={(e) => handlePrimaryLinkVisibilityToggle(e.target.checked)}
                 disabled={cascadeVisibilityToLinks && shouldShowResourceVisibility}
               />
               <Label check for="use_primary_link_visibility">
@@ -306,7 +355,7 @@ export const UnifiedVisibilityControl = ({
                           id={`link_visibility_${index}`}
                           type="checkbox"
                           checked={link.use_link_visibility || false}
-                          onChange={(e) => onLinkVisibilityChange(index, 'use_link_visibility', e.target.checked)}
+                          onChange={(e) => handleLinkVisibilityToggle(index, 'use_link_visibility', e.target.checked)}
                         />
                         <Label check for={`link_visibility_${index}`}>
                           <small>Set separate visibility dates for this link</small>
@@ -398,13 +447,11 @@ UnifiedVisibilityControl.propTypes = {
     PropTypes.number
   ]),
   cascadeVisibilityToLinks: PropTypes.bool,
-  onCascadeToggle: PropTypes.func.isRequired
-};
-
-UnifiedVisibilityControl.defaultProps = {
-  links: [],
-  hasPrimaryLink: false,
-  cascadeVisibilityToLinks: false
+  onCascadeToggle: PropTypes.func.isRequired,
+  
+  // Term dates for defaults
+  termStartDate: PropTypes.string,
+  termEndDate: PropTypes.string
 };
 
 export default UnifiedVisibilityControl;

@@ -89,22 +89,49 @@ export const BaseResourceForm = ({
   title = 'Resource Form',
   submitButtonText = 'Save Resource',
   onCancel,
-  showCancel = true
+  showCancel = true,
+  course // Add course prop for term dates
 }) => {
   // Get course data from store to access semester dates
-  const { folioCourseData } = useAdminCourseStore();
+  const { folioCourseData, termStart, termEnd } = useAdminCourseStore();
+
   
-  // Get default visibility dates from folio course data
+  // Get default visibility dates from term dates
   const getDefaultVisibilityDates = () => {
-    if (folioCourseData?.courseListingObject?.termObject) {
-      const termObj = folioCourseData.courseListingObject.termObject;
-      return {
+    // First try course prop for term dates
+    if (course?.courseListingObject?.termObject) {
+      const termObj = course.courseListingObject.termObject;
+      const dates = {
         startDate: new Date(termObj.startDate).toISOString().split('T')[0],
         endDate: new Date(termObj.endDate).toISOString().split('T')[0]
       };
+      return dates;
     }
+
+    
+    // Then try termStart/termEnd from the store
+    if (termStart && termEnd) {
+      const dates = {
+        startDate: new Date(termStart).toISOString().split('T')[0],
+        endDate: new Date(termEnd).toISOString().split('T')[0]
+      };
+      return dates;
+    }
+    
+    
+    // Fallback to extracting from folioCourseData if termStart/termEnd aren't available
+    if (folioCourseData?.courseListingObject?.termObject) {
+      const termObj = folioCourseData.courseListingObject.termObject;
+      const dates = {
+        startDate: new Date(termObj.startDate).toISOString().split('T')[0],
+        endDate: new Date(termObj.endDate).toISOString().split('T')[0]
+      };
+      return dates;
+    }
+    
     return { startDate: '', endDate: '' };
   };
+
   
   const defaultDates = getDefaultVisibilityDates();
   
@@ -146,16 +173,6 @@ export const BaseResourceForm = ({
     const primaryUrl = initialData.link || initialData.item_url || '';
     const isHitchcockVideo = primaryUrl.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
     
-    // Debug logging - show all related fields
-    console.log('BaseResourceForm initialData:', initialData);
-    console.log('use_primary_link_visibility raw value:', initialData.use_primary_link_visibility);
-    console.log('use_primary_link_visibility type:', typeof initialData.use_primary_link_visibility);
-    console.log('primary_link_start_visibility:', initialData.primary_link_start_visibility);
-    console.log('primary_link_end_visibility:', initialData.primary_link_end_visibility);
-    console.log('item_url:', initialData.link);
-    console.log('Has primary link control (calculated):', hasPrimaryLinkControl);
-    console.log('Is Hitchcock video URL:', isHitchcockVideo);
-    
     return {
       title: initialData.title || initialData.name || '',
       link: initialData.link || initialData.item_url || '',
@@ -188,9 +205,25 @@ export const BaseResourceForm = ({
   // State for cascade visibility settings
   const [cascadeVisibilityToLinks, setCascadeVisibilityToLinks] = useState(false);
 
-  // Update visibility dates if they're not set and folioCourseData changes
+  // Update visibility dates if they're not set and term dates are available
   useEffect(() => {
-    if (folioCourseData?.courseListingObject?.termObject) {
+    // First try course prop
+    if (course?.courseListingObject?.termObject) {
+      const termObj = course.courseListingObject.termObject;
+      setFormData(prev => ({
+        ...prev,
+        start_visibility: prev.start_visibility || new Date(termObj.startDate).toISOString().split('T')[0],
+        end_visibility: prev.end_visibility || new Date(termObj.endDate).toISOString().split('T')[0]
+      }));
+    } else if (termStart && termEnd) {
+      // Then try termStart/termEnd from store
+      setFormData(prev => ({
+        ...prev,
+        start_visibility: prev.start_visibility || new Date(termStart).toISOString().split('T')[0],
+        end_visibility: prev.end_visibility || new Date(termEnd).toISOString().split('T')[0]
+      }));
+    } else if (folioCourseData?.courseListingObject?.termObject) {
+      // Fallback to folioCourseData
       const termObj = folioCourseData.courseListingObject.termObject;
       setFormData(prev => ({
         ...prev,
@@ -198,7 +231,7 @@ export const BaseResourceForm = ({
         end_visibility: prev.end_visibility || new Date(termObj.endDate).toISOString().split('T')[0]
       }));
     }
-  }, [folioCourseData]);
+  }, [course, termStart, termEnd, folioCourseData]);
 
   // State for links - filter out primary link (order = 0) since it's handled separately
   const [links, setLinks] = useState(() => {
@@ -290,12 +323,11 @@ export const BaseResourceForm = ({
   };
 
   // Handle visibility dates toggle
-  const handleVisibilityToggle = (e) => {
-    const { checked } = e.target;
-    setUseVisibilityDates(checked);
+  const handleVisibilityToggle = (enabled) => {
+    setUseVisibilityDates(enabled);
     
     // If enabling visibility dates and they're empty, set to term dates
-    if (checked && (!formData.start_visibility || !formData.end_visibility)) {
+    if (enabled && (!formData.start_visibility || !formData.end_visibility)) {
       setFormData(prev => ({
         ...prev,
         start_visibility: prev.start_visibility || defaultDates.startDate,
@@ -304,7 +336,7 @@ export const BaseResourceForm = ({
     }
     
     // If disabling visibility dates, clear the dates
-    if (!checked) {
+    if (!enabled) {
       setFormData(prev => ({
         ...prev,
         start_visibility: '',
@@ -414,6 +446,7 @@ export const BaseResourceForm = ({
       setIsLoading(false);
     }
   };
+
 
   return (
     <Container fluid className="py-4">
@@ -536,6 +569,10 @@ export const BaseResourceForm = ({
                 materialTypeId={formData.material_type_id}
                 cascadeVisibilityToLinks={cascadeVisibilityToLinks}
                 onCascadeToggle={handleCascadeToggle}
+                
+                // Term dates for defaults
+                termStartDate={defaultDates.startDate}
+                termEndDate={defaultDates.endDate}
               />
             </div>
             
@@ -554,6 +591,14 @@ export const BaseResourceForm = ({
 };
 
 BaseResourceForm.propTypes = {
+  course: PropTypes.shape({
+    courseListingObject: PropTypes.shape({
+      termObject: PropTypes.shape({
+        startDate: PropTypes.string,
+        endDate: PropTypes.string
+      })
+    })
+  }),
   initialData: PropTypes.object,
   onSubmit: PropTypes.func.isRequired,
   title: PropTypes.string,

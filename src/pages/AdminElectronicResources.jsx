@@ -246,7 +246,15 @@ useEffect(() => {
         permanentCourseUUID: course.permanent_course_uuid,
         courseOfferings: localCourseData
       });
-      setCourse(reactivatedCourse.course);
+      
+      // Properly merge course and offering data to ensure offering_id is available
+      setCourse({
+        ...reactivatedCourse.course,
+        offering_id: reactivatedCourse.offering.offering_id,
+        current_offering_id: reactivatedCourse.offering.offering_id,
+        offerings: reactivatedCourse.offering
+      });
+      
       const resourceData = await adminCourseService.fetchCourseResources(reactivatedCourse.offering.offering_id);
       setResources(resourceData.resources);
       setShowReusePrompt(false);
@@ -266,7 +274,15 @@ useEffect(() => {
       const courseDetails = folioCourseData[0];    
       const localCourseData = transformFolioCourseToLocal(courseDetails);
       const newCourse = await adminCourseService.createLocalCourse(localCourseData);
-      setCourse(newCourse);
+      
+      // Properly merge course and offering data to ensure offering_id is available
+      setCourse({
+        ...newCourse.course,
+        offering_id: newCourse.offering.offering_id,
+        current_offering_id: newCourse.offering.offering_id,
+        offerings: newCourse.offering
+      });
+      
       setResources([]);
       setShowReusePrompt(false);
       toast.success('New course created successfully.');
@@ -490,14 +506,17 @@ useEffect(() => {
     <Container fluid className="admin-resources-container py-4">
       {showReusePrompt && (
         <Alert color="info" className="mb-4 custom-alert">
-          <strong>Note:</strong> A previous version of this course exists.<br />
-          Do you want to reuse existing electronic resources or start fresh?
-
-          <div className="mt-3">
-            <Button color="primary" className="me-2 custom-btn" onClick={handleReuseExistingCourse}>
+          <div className="mb-2">
+            <strong>Note:</strong> A previous version of this course exists.
+          </div>
+          <div className="mb-3">
+            Do you want to reuse existing electronic resources or start fresh?
+          </div>
+          <div>
+            <Button color="primary" size="sm" className="me-2" onClick={handleReuseExistingCourse}>
               Reuse Existing Resources
             </Button>
-            <Button color="secondary" className="custom-btn" onClick={handleCreateNewCourse}>
+            <Button color="secondary" size="sm" onClick={handleCreateNewCourse}>
               Create New Course
             </Button>
           </div>
@@ -516,52 +535,89 @@ useEffect(() => {
         </Col>
       </Row>
 
-      {/* Course Header */}
-      <AdminCourseHeader 
-        folioCourseData={folioCourseData} 
-        linkedCourses={linkedCourses}
-        navigate={navigate}
-        copyToClipboard={copyToClipboard}
-        copyStatus={copyStatus}
-        course={course}
-        coursePermalink={coursePermalink}
-      />
+      {/* Main content - show but disable when reuse prompt is active */}
+      <div style={{ position: 'relative' }}>
+        {/* Overlay when reuse prompt is shown */}
+        {showReusePrompt && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '400px'
+            }}
+          >
+            <div className="text-center p-4">
+              <FontAwesomeIcon 
+                icon="fa-solid fa-lock" 
+                size="3x" 
+                className="text-muted mb-3" 
+              />
+              <h5 className="text-muted">Course Management Locked</h5>
+              <p className="text-muted mb-0">
+                Please make a selection above to access course management features.
+              </p>
+            </div>
+          </div>
+        )}
 
-      {/* Course Permalink */}
-      <AdminCoursePermalink 
-        course={course} 
-        copyToClipboard={copyToClipboard} 
-        coursePermalink={coursePermalink}
-      />
+        {/* Content that gets disabled */}
+        <div style={{ opacity: showReusePrompt ? 0.3 : 1, pointerEvents: showReusePrompt ? 'none' : 'auto' }}>
+          {/* Course Header */}
+          <AdminCourseHeader 
+            folioCourseData={folioCourseData} 
+            linkedCourses={linkedCourses}
+            navigate={navigate}
+            copyToClipboard={copyToClipboard}
+            copyStatus={copyStatus}
+            course={course}
+            coursePermalink={coursePermalink}
+          />
 
-      {/* Main Content Tabs */}
-      <AdminResourcesTabs
-        course={course}
-        resources={resources}
-        printResources={printResources}
-        linkedCourses={linkedCourses}
-        toggleNewResourceModal={resourceFormModal.openNewResourceForm}
-        toggleEDSResourceModal={resourceFormModal.openEDSForm}
-        toggleHitchcockModal={resourceFormModal.openHitchcockForm}
-        toggleReuseModal={() => resourceFormModal.openReuseForm({
-          searchTerm,
-          searchResults,
-          onSearchTermChange: setSearchTerm,
-          onSearch: handleSearchResources,
-          onReuse: handleReuseResource
-        })}
-        toggleCrossLinkModal={resourceFormModal.openCrosslinkForm}
-        unlinkResource={unlinkResource}
-        handleUpdateResources={handleUpdateResources}
-        handleUnifiedReorder={handleUnifiedReorder}
-        buildFolioCourseUrl={() => buildFolioCourseUrl(folioCourseData?.id)}
-        navigate={navigate}
-        editResourceModal={resourceFormModal}
-      />
+          {/* Course Permalink */}
+          <AdminCoursePermalink 
+            course={course} 
+            copyToClipboard={copyToClipboard} 
+            coursePermalink={coursePermalink}
+          />
 
-      {/* Unified Resource Form Modal */}
+          {/* Main Content Tabs */}
+          <AdminResourcesTabs
+            course={course}
+            resources={resources}
+            printResources={printResources}
+            linkedCourses={linkedCourses}
+            toggleNewResourceModal={resourceFormModal.openNewResourceForm}
+            toggleEDSResourceModal={resourceFormModal.openEDSForm}
+            toggleHitchcockModal={resourceFormModal.openHitchcockForm}
+            toggleReuseModal={() => resourceFormModal.openReuseForm({
+              searchTerm,
+              searchResults,
+              onSearchTermChange: setSearchTerm,
+              onSearch: handleSearchResources,
+              onReuse: handleReuseResource
+            })}
+            toggleCrossLinkModal={resourceFormModal.openCrosslinkForm}
+            unlinkResource={unlinkResource}
+            handleUpdateResources={handleUpdateResources}
+            handleUnifiedReorder={handleUnifiedReorder}
+            buildFolioCourseUrl={() => buildFolioCourseUrl(folioCourseData?.id)}
+            navigate={navigate}
+            editResourceModal={resourceFormModal}
+          />
+        </div>
+      </div>
+
+      {/* Unified Resource Form Modal - only functional when not showing reuse prompt */}
       <ResourceFormManager
-        isOpen={resourceFormModal.isOpen}
+        isOpen={resourceFormModal.isOpen && !showReusePrompt}
         onClose={resourceFormModal.closeModal}
         onSubmit={handleUpdateResources}
         formType={resourceFormModal.formType}

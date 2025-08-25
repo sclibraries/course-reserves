@@ -67,9 +67,15 @@ const DraggableResourceRow = ({ item, index, moveRow, onDrop, isSelected, onSele
           <span className="badge bg-info me-2">Electronic</span>
         </td>
         <td className="text-break">{item.name}</td>
-        <td>
+        <td style={{ maxWidth: '200px', overflow: 'hidden' }}>
           {item.item_url ? (
-            <a href={item.item_url} target="_blank" rel="noreferrer">
+            <a 
+              href={item.item_url} 
+              target="_blank" 
+              rel="noreferrer"
+              className="text-truncate d-block"
+              title={item.item_url}
+            >
               {item.item_url}
             </a>
           ) : (
@@ -180,9 +186,15 @@ const StaticResourceRow = ({ item, isSelected, onSelect, onEdit }) => {
           <span className="badge bg-info me-2">Electronic</span>
         </td>
         <td className="text-break">{item.name}</td>
-        <td>
+        <td style={{ maxWidth: '200px', overflow: 'hidden' }}>
           {item.item_url ? (
-            <a href={item.item_url} target="_blank" rel="noreferrer">
+            <a 
+              href={item.item_url} 
+              target="_blank" 
+              rel="noreferrer"
+              className="text-truncate d-block"
+              title={item.item_url}
+            >
               {item.item_url}
             </a>
           ) : (

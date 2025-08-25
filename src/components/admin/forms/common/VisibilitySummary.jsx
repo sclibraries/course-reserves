@@ -15,19 +15,15 @@ export const VisibilitySummary = ({
   usePrimaryLinkVisibility,
   primaryLinkStartDate,
   primaryLinkEndDate,
-  hasPrimaryLink,
-  links,
-  materialTypeId,
-  cascadeVisibilityToLinks
+  hasPrimaryLink = false,
+  links = [],
+  cascadeVisibilityToLinks = false
 }) => {
-  // Check if this is a video material type (ID = 3)
-  const isVideoMaterialType = materialTypeId === '3' || materialTypeId === 3;
-  
   // Count links with individual visibility settings
   const linksWithVisibility = links.filter(link => link.use_link_visibility).length;
   
-  // Determine if resource visibility is active
-  const resourceVisibilityActive = useResourceVisibility || isVideoMaterialType;
+  // Determine if resource visibility is active - respect user's choice even for video types
+  const resourceVisibilityActive = useResourceVisibility;
   
   // Format date for display
   const formatDate = (dateString) => {
@@ -68,9 +64,6 @@ export const VisibilitySummary = ({
                 <strong className="d-block">Resource Visibility</strong>
                 <small className="text-muted">
                   {formatDate(resourceStartDate)} to {formatDate(resourceEndDate)}
-                  {isVideoMaterialType && (
-                    <span className="badge bg-warning ms-2">Auto-enabled (Video)</span>
-                  )}
                 </small>
               </div>
             </div>
@@ -154,17 +147,7 @@ VisibilitySummary.propTypes = {
     start_visibility: PropTypes.string,
     end_visibility: PropTypes.string
   })),
-  materialTypeId: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.number
-  ]),
   cascadeVisibilityToLinks: PropTypes.bool
-};
-
-VisibilitySummary.defaultProps = {
-  links: [],
-  hasPrimaryLink: false,
-  cascadeVisibilityToLinks: false
 };
 
 export default VisibilitySummary;

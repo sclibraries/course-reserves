@@ -397,6 +397,7 @@ export const ResourceFormManager = ({
     if ([ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType) || showEditForm) {
       return (
         <BaseResourceForm
+          course={folioCourseData}
           initialData={getFormInitialData()}
           onSubmit={handleBaseFormSubmit}
           title={getModalConfig().title}

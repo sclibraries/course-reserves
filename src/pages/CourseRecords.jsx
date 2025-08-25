@@ -469,8 +469,9 @@ function CourseRecords() {
       if (isAuthenticated) return true;
 
       const now = new Date();
-      if(item.start_visibility !== null || item.end_visibility !== null) {
-        // Use resource-level visibility dates
+      
+      // Always check resource-level visibility dates if they're set
+      if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
         const startVisibility = item.resource.start_visibility
           ? new Date(item.resource.start_visibility + 'T00:00:00')
           : null;
@@ -509,9 +510,12 @@ function CourseRecords() {
       : filteredBySearch.filter(item =>
           filter === 'electronic' ? item.isElectronic : !item.isElectronic
         );
+
+    // 3) Filter by visibility - hide resources that aren't currently visible
+    const visibilityFiltered = filtered.filter(item => isRecordVisible(item));
   
-        // 3) Determine sorting strategy based on order values
-    const electronicResources = filtered.filter(item => item.isElectronic);
+        // 4) Determine sorting strategy based on order values
+    const electronicResources = visibilityFiltered.filter(item => item.isElectronic);
     const hasElectronic = electronicResources.length > 0;
     
     // Check if all electronic resources have order 999 (auto-assigned)
@@ -519,7 +523,7 @@ function CourseRecords() {
       electronicResources.every(item => item.order === 999 || item.order === "999");
     
     // Check if there are any specific orders (not 999 and not null)
-    const hasSpecificOrders = filtered.some(item => 
+    const hasSpecificOrders = visibilityFiltered.some(item => 
       item.order != null && item.order !== 999 && item.order !== "999"
     );
 
@@ -532,7 +536,7 @@ function CourseRecords() {
       const groupedTemp = {};
       let ungroupedTemp = [];
     
-      filtered.forEach(item => {
+      visibilityFiltered.forEach(item => {
         if (item.folder_id) {
           const key = item.folder_name;
           (groupedTemp[key] ||= []).push(item);
@@ -560,8 +564,8 @@ function CourseRecords() {
         const firstInGroup = groupedArray[j].items[0];
         
         // Get the original indices to maintain server order
-        const ungroupedIndex = filtered.indexOf(firstUngrouped);
-        const groupedIndex = filtered.indexOf(firstInGroup);
+        const ungroupedIndex = visibilityFiltered.indexOf(firstUngrouped);
+        const groupedIndex = visibilityFiltered.indexOf(firstInGroup);
         
         if (ungroupedIndex <= groupedIndex) {
           merged.push(ungroupedTemp[i++]);
@@ -579,7 +583,7 @@ function CourseRecords() {
     // CASE 2: There are specific orders (not 999) - sort by order values
     if (hasSpecificOrders) {
       console.log('Using specific order sorting');
-      const sortedFiltered = filtered
+      const sortedFiltered = visibilityFiltered
         .slice() // copy so we don't mutate state
         .sort((a, b) => {
           const ao = a.order != null ? Number(a.order) : Infinity;
@@ -651,7 +655,7 @@ function CourseRecords() {
     const groupedTemp = {};
     let ungroupedTemp = [];
   
-    filtered.forEach(item => {
+    visibilityFiltered.forEach(item => {
       if (item.folder_id) {
         const key = item.folder_name;
         (groupedTemp[key] ||= []).push(item);
@@ -696,7 +700,7 @@ function CourseRecords() {
     while (j < groupedArray.length)   merged.push(groupedArray[j++]);
   
     return merged;
-  }, [records, filter, searchQuery]);
+  }, [records, filter, searchQuery, isRecordVisible]);
 
   // Process visibility for all records (similar to RecordTable component)
   const processedRecords = useMemo(() => {
@@ -736,21 +740,28 @@ function CourseRecords() {
             return { isVisible: false };
           }
         } else {
-          // Use resource-level visibility dates
-          const startVisibility = item.resource.start_visibility
-            ? new Date(item.resource.start_visibility + 'T00:00:00')
-            : null;
-          const endVisibility = item.resource.end_visibility
-            ? new Date(item.resource.end_visibility + 'T23:59:59')
-            : null;
+          // Check if resource-level visibility is enabled
+          const useResourceVisibility = item.resource.use_resource_visibility === "1" || 
+                                       item.resource.use_resource_visibility === 1 || 
+                                       item.resource.use_resource_visibility === true;
+          
+          if (useResourceVisibility) {
+            // Use resource-level visibility dates
+            const startVisibility = item.resource.start_visibility
+              ? new Date(item.resource.start_visibility + 'T00:00:00')
+              : null;
+            const endVisibility = item.resource.end_visibility
+              ? new Date(item.resource.end_visibility + 'T23:59:59')
+              : null;
 
-          if ((startVisibility && now < startVisibility)) {
-            upcomingDates.push(startVisibility);
-            return { isVisible: false, startDate: startVisibility };
-          }
+            if ((startVisibility && now < startVisibility)) {
+              upcomingDates.push(startVisibility);
+              return { isVisible: false, startDate: startVisibility };
+            }
 
-          if ((endVisibility && now > endVisibility)) {
-            return { isVisible: false };
+            if ((endVisibility && now > endVisibility)) {
+              return { isVisible: false };
+            }
           }
         }
       }

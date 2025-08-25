@@ -42,22 +42,29 @@ export const isPrimaryLinkVisible = (resource, isAuthenticated) => {
       return false;
     }
   } else {
-    // Use resource-level visibility dates
-    const startVisibility = resource.start_visibility
-      ? new Date(resource.start_visibility)
-      : null;
-    const endVisibility = resource.end_visibility
-      ? new Date(resource.end_visibility)
-      : null;
-      
-    // If current time is before the start of the visibility window
-    if (startVisibility && now < startVisibility) {
-      return false;
-    }
+    // Check if resource-level visibility is enabled
+    const useResourceVisibility = resource.use_resource_visibility === "1" || 
+                                 resource.use_resource_visibility === 1 || 
+                                 resource.use_resource_visibility === true;
     
-    // If current time is after the end of the visibility window
-    if (endVisibility && now > endVisibility) {
-      return false;
+    // Only apply resource-level visibility dates if resource visibility is enabled
+    if (useResourceVisibility) {
+      const startVisibility = resource.start_visibility
+        ? new Date(resource.start_visibility)
+        : null;
+      const endVisibility = resource.end_visibility
+        ? new Date(resource.end_visibility)
+        : null;
+        
+      // If current time is before the start of the visibility window
+      if (startVisibility && now < startVisibility) {
+        return false;
+      }
+      
+      // If current time is after the end of the visibility window
+      if (endVisibility && now > endVisibility) {
+        return false;
+      }
     }
   }
   
@@ -107,15 +114,22 @@ export const getVisibilityInfo = (resource, isAuthenticated) => {
     return { showVisibilityDates: false };
   }
 
-  const usePrimaryLinkVisibility = resource.use_primary_link_visibility === "1";
+  const usePrimaryLinkVisibility = resource.use_primary_link_visibility === "1" || 
+                                 resource.use_primary_link_visibility === 1 || 
+                                 resource.use_primary_link_visibility === true;
+  
+  const useResourceVisibility = resource.use_resource_visibility === "1" || 
+                              resource.use_resource_visibility === 1 || 
+                              resource.use_resource_visibility === true;
   
   const showVisibilityDates = usePrimaryLinkVisibility ? 
     (resource.primary_link_start_visibility || resource.primary_link_end_visibility) :
-    (resource.start_visibility || resource.end_visibility);
+    (useResourceVisibility && (resource.start_visibility || resource.end_visibility));
 
   return {
     showVisibilityDates,
     usePrimaryLinkVisibility,
+    useResourceVisibility,
     startDate: usePrimaryLinkVisibility ? resource.primary_link_start_visibility : resource.start_visibility,
     endDate: usePrimaryLinkVisibility ? resource.primary_link_end_visibility : resource.end_visibility
   };

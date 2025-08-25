@@ -33,7 +33,7 @@ export const VisibilityDates = ({
                 name="use_visibility_dates"
                 type="checkbox"
                 checked={useVisibilityDates}
-                onChange={onVisibilityToggle}
+                onChange={(e) => onVisibilityToggle(e.target.checked)}
               />
               <Label check for="use_visibility_dates">
                 Enable visibility date restrictions for this resource

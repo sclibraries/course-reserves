@@ -193,7 +193,10 @@ export const adminCourseService = {
         'Content-Type': 'application/json',
         'Authorization': `${getAuthToken()}`,
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        course: data.course,
+        offering: data.offering
+      })
     });
     if (!response.ok) {
       throw new Error(ADMIN_ERROR_MESSAGES.COURSE_CREATE_FAILED);
