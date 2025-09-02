@@ -160,18 +160,39 @@ function CourseRecords() {
         // else mergedResources stays []
       }
   
-      // 2) if no physical resources in the merged payload, pull the print list from FOLIO
-      const hasAnyPhysical = mergedResources.some(r => r.resource_type === 'physical');
+      // 2) ALWAYS fetch print reserves from FOLIO to ensure we have all physical items
+      // This fixes the issue where new physical items added to FOLIO after backend sync
+      // would be missing if the backend already had references to other physical items
+      const printReserves = await fetchRecords(record);
       
-      let allMerged = mergedResources;
-      if (!hasAnyPhysical) {
-        const printReserves = await fetchRecords(record);
-        const fallbackPhysical = printReserves.map(rec => ({
-          _isFallbackPrint: true,
-          __orig: rec
-        }));
-        allMerged = [...mergedResources, ...fallbackPhysical];
-      }
+      // Convert FOLIO print reserves to our format
+      const folioPhysical = printReserves.map(rec => ({
+        _isFallbackPrint: true,
+        __orig: rec
+      }));
+      
+      // Get physical items that are already in the merged payload (have backend references)
+      const mergedPhysical = mergedResources.filter(r => r.resource_type === 'physical');
+      
+      // Create a Set of instanceIds from merged physical items for deduplication
+      const mergedPhysicalIds = new Set(mergedPhysical.map(item => item.id));
+      
+      // Filter FOLIO physical items to only include those NOT already in merged data
+      const newFolioPhysical = folioPhysical.filter(item => 
+        !mergedPhysicalIds.has(item.__orig.instanceId)
+      );
+      
+      // Combine: electronic resources + existing physical (with backend order) + new physical (FOLIO only)
+      let allMerged = [...mergedResources, ...newFolioPhysical];
+      
+      const hasAnyPhysical = mergedPhysical.length > 0 || newFolioPhysical.length > 0;
+      
+      // Debug logging to help track the merge process
+      console.log(`Physical resources summary:
+        - Merged (with backend order): ${mergedPhysical.length}
+        - New from FOLIO only: ${newFolioPhysical.length}
+        - Total physical: ${hasAnyPhysical ? mergedPhysical.length + newFolioPhysical.length : 0}
+        - Electronic + cross-linked: ${mergedResources.filter(r => r.resource_type === 'electronic').length}`);
 
   
       // 2.5) ADDED: Fetch cross-linked courses and merge them in
@@ -856,7 +877,7 @@ function CourseRecords() {
       course_id: courseInfo?.courseListingId ?? 'N/A',
       term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
       course_name: courseInfo?.name ?? '',
-      course_code: courseInfo?.courseNumber ?? '',
+      course_code: `${courseInfo?.courseNumber ?? ''}${courseInfo?.sectionName ? `-${courseInfo.sectionName}` : ''}`,
       instructor:
         courseInfo?.courseListingObject?.instructorObjects?.map((instr) => ({
           name: instr.name,
@@ -878,7 +899,7 @@ function CourseRecords() {
       course_id: courseInfo?.courseListingId ?? 'N/A',
       term: courseInfo?.courseListingObject?.termObject?.name ?? 'N/A',
       course_name: courseInfo?.name ?? '',
-      course_code: courseInfo?.courseNumber ?? '',
+      course_code: `${courseInfo?.courseNumber ?? ''}${courseInfo?.sectionName ? `-${courseInfo.sectionName}` : ''}`,
       instructor:
         courseInfo?.courseListingObject?.instructorObjects?.map((instr) => ({
           name: instr.name,
@@ -1013,7 +1034,8 @@ function CourseRecords() {
       {courseInfo && (
         <div className="course-info mb-4 container-fluid py-2">
           <h2 className="display-5 fw-bold">
-            {courseInfo.courseNumber}: {courseInfo.name}
+            {courseInfo.courseNumber}
+            {courseInfo.sectionName && `-${courseInfo.sectionName}`}: {courseInfo.name}
           </h2>
           {courseInfo.courseListingObject?.instructorObjects?.length > 0 && (
             <h3 className="col-md-8 fs-4">
@@ -1025,6 +1047,9 @@ function CourseRecords() {
           )}
           <div className="d-flex align-items-center gap-3 mt-2">
             <Badge color="primary">{courseInfo?.courseListingObject?.termObject?.name}</Badge>
+            {courseInfo?.sectionName && (
+              <Badge color="secondary">Section {courseInfo.sectionName}</Badge>
+            )}
             <CoursePermalink course={courseInfo} compact />
           </div>
         </div>
@@ -1155,6 +1180,7 @@ function CourseRecords() {
                       return (
                         <div key={`folder-${result.folder}`} className="folder-group mb-5">
                           <header className="folder-header text-white p-3 rounded-top" style={{ backgroundColor: recordsDiscoverLinkBgColor }}>
+                          {result.folder}
                           </header>
                           <div className="folder-items border-start border-end border-bottom p-3">
                             <Row className="g-4">

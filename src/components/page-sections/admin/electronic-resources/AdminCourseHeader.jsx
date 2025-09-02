@@ -42,8 +42,16 @@ function AdminCourseHeader({
             {/* Course Title */}
             <h2 className="mb-2 course-title">{folioCourseData?.name}</h2>
 
-            {/* Course Number */}
-            <h4 className="text-muted mb-3 course-number">{folioCourseData?.courseNumber}</h4>
+            {/* Course Number and Section */}
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <h4 className="text-muted mb-0 course-number">{folioCourseData?.courseNumber}</h4>
+              {folioCourseData?.sectionName && (
+                <span className="custom-badge section-badge">
+                  <FontAwesomeIcon icon="fa-solid fa-hashtag" className="me-2" />
+                  Section {folioCourseData.sectionName}
+                </span>
+              )}
+            </div>
 
             {/* Instructors */}
             <div className="mb-1">

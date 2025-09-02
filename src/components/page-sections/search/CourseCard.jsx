@@ -22,6 +22,7 @@ function CourseCard({ course, customization, onRecordsClick }) {
   const {
     name,
     courseNumber,
+    sectionName,
     departmentObject,
     courseListingObject,
     courseListingId,
@@ -46,7 +47,7 @@ function CourseCard({ course, customization, onRecordsClick }) {
       course_id: courseListingId,
       term: termName,
       course_name: name,
-      course_code: courseNumber,
+      course_code: `${courseNumber}${sectionName ? `-${sectionName}` : ''}`,
       instructor: instructors.map(i => ({ name: i })),
       metadata: {
         department: departmentName,
@@ -91,7 +92,7 @@ function CourseCard({ course, customization, onRecordsClick }) {
         course_id: courseListingId,
         term: termName,
         course_name: name,
-        course_code: courseNumber,
+        course_code: `${courseNumber}${sectionName ? `-${sectionName}` : ''}`,
         instructor: [{ name: instructorName }],
         metadata: {
           department: departmentName,
@@ -206,6 +207,18 @@ function CourseCard({ course, customization, onRecordsClick }) {
           >
             {courseNumber}
           </Badge>
+          {course.sectionName && (
+            <Badge 
+              color="secondary"
+              style={{ 
+                padding: "0.3em 0.6em",
+                fontSize: "0.75rem",
+                fontWeight: "500"
+              }}
+            >
+              Section {course.sectionName}
+            </Badge>
+          )}
           <span style={{ 
             fontSize: "0.9rem", 
             color: cardTextColor || "#555",

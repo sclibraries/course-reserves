@@ -73,6 +73,7 @@ function CourseTable({ courses, customization, onRecordsClick }) {
             borderBottom: `2px solid ${cardBorderColor || "#dee2e6"}`
           }}>
             <th className="py-3" scope="col">Course</th> {/* Added scope for better accessibility */}
+            <th className="py-3" scope="col">Section</th>
             <th className="py-3" scope="col">Department</th>
             <th className="py-3 d-none d-md-table-cell" scope="col">Instructor(s)</th>
             <th className="py-3 d-none d-md-table-cell" scope="col">Term</th>
@@ -132,13 +133,23 @@ function CourseTable({ courses, customization, onRecordsClick }) {
                       >
                         {courseNumber}
                       </Badge>
-                      {sectionName && (
-                        <small className="ms-2 text-muted" style={{ fontSize: "0.8rem" }}>
-                          Section: {sectionName}
-                        </small>
-                      )}
                     </div>
                   </div>
+                </td>
+                <td>
+                  {sectionName ? (
+                    <Badge 
+                      color="secondary"
+                      style={{ 
+                        fontSize: "0.75rem",
+                        fontWeight: "500"
+                      }}
+                    >
+                      {sectionName}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
                 </td>
                 <td>
                   <span className="department-name">{departmentName}</span>

@@ -17,6 +17,7 @@ function AdminCourseCard({ course, onDetailsClick }) {
   const {
     name: courseName = 'No Title',
     courseNumber = 'Unknown Course #',
+    sectionName,
     departmentObject,
     courseListingObject,
     id: courseId,
@@ -60,7 +61,14 @@ function AdminCourseCard({ course, onDetailsClick }) {
         </div>
 
         <h5 className="course-title mb-1">{courseName}</h5>
-        <div className="course-number text-muted mb-3">{courseNumber}</div>
+        <div className="d-flex align-items-center gap-2 mb-3">
+          <div className="course-number text-muted">{courseNumber}</div>
+          {sectionName && (
+            <Badge color="secondary" pill className="section-badge">
+              Section {sectionName}
+            </Badge>
+          )}
+        </div>
 
         <div className="d-flex align-items-center mb-2">
           <FaBuilding className="text-muted me-2" />
@@ -111,6 +119,7 @@ AdminCourseCard.propTypes = {
     id: PropTypes.string,
     name: PropTypes.string,
     courseNumber: PropTypes.string,
+    sectionName: PropTypes.string,
     departmentObject: PropTypes.shape({
       name: PropTypes.string,
     }),

@@ -20,6 +20,7 @@ export const transformFolioCourseToLocal = (folioCourse) => {
       // Use the courseListingId as the unique identifier from FOLIO.
       course_name: folioCourse.name,
       course_number: folioCourse.courseNumber,
+      section_name: folioCourse.sectionName || '',
       department_id: folioCourse.departmentId,
       // Safely access the department name.
       department_name: folioCourse.departmentObject?.name || '',
@@ -34,10 +35,11 @@ export const transformFolioCourseToLocal = (folioCourse) => {
 
       term_id: folioCourse.courseListingObject?.termId || '',
       term_name: folioCourse.courseListingObject?.termObject?.name || '',
+
       // Use the provided ISO date strings directly or perform any additional formatting if needed.
       start_date: folioCourse.courseListingObject?.termObject?.startDate || null,
       end_date: folioCourse.courseListingObject?.termObject?.endDate || null,
-      
+      section_name: folioCourse.sectionName || '',
       status: isActive ? 'active' : 'inactive',
     }
   };  

@@ -82,6 +82,7 @@ function AdminCourseTable({ courses, onCourseDetails }) {
                 Course Number {renderSortIcon('courseNumber')}
               </span>
             </th>
+            <th>Section</th>
             <th onClick={() => handleSort('department')} style={{ cursor: 'pointer' }}>
               <span className="d-inline-flex align-items-center">
                 Department {renderSortIcon('department')}
@@ -110,6 +111,15 @@ function AdminCourseTable({ courses, onCourseDetails }) {
               <tr key={course.id}>
                 <td className="fw-medium">{course.name || 'Untitled Course'}</td>
                 <td>{course.courseNumber || 'N/A'}</td>
+                <td>
+                  {course.sectionName ? (
+                    <Badge color="secondary" pill>
+                      {course.sectionName}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
                 <td>{course.departmentObject?.name || 'N/A'}</td>
                 <td>{course.courseListingObject?.termObject?.name || 'N/A'}</td>
                 <td>
