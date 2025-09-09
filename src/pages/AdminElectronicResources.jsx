@@ -125,6 +125,9 @@ useEffect(() => {
         department_id: courseDetails?.departmentId,
         folio_course_id: courseDetails?.courseListingId,
         term_id: courseDetails?.courseListingObject?.termId,
+        section_name: courseDetails?.sectionName 
+             || courseDetails?.courseListingObject?.sectionName 
+             || ''
       });
 
       if (checkResponse.exists) {
@@ -220,6 +223,20 @@ useEffect(() => {
       fetchLinkedCourses();
     }
   }, [course]);
+
+  const buildCoursePermalink = (course, currentOffering) => {
+  const origin = window.location.origin;
+  if (!course?.permanent_course_uuid) return '';
+
+  const base = `${origin}/course-reserves/records/${course.permanent_course_uuid}`;
+
+  const sect = currentOffering && currentOffering.section_name
+    ? String(currentOffering.section_name).trim()
+    : '';
+
+  // Add ?section=... only when we actually have one
+  return sect ? `${base}?section=${encodeURIComponent(sect)}` : base;
+};
 
   // Function to refresh linked courses (can be called from modals)
   const refreshLinkedCourses = useCallback(async () => {
@@ -498,9 +515,16 @@ useEffect(() => {
     );
   }
 
-  const coursePermalink = course?.permanent_course_uuid 
-    ? `${window.location.origin}/course-reserves/records/${course.permanent_course_uuid}`
-    : '';
+  let currentOffering = null;
+  if (Array.isArray(course?.offerings)) {
+    currentOffering = course.offerings.find(
+      (o) => String(o.offering_id) === String(course.offering_id)
+    ) || course.offerings[0];
+  } else if (course?.offerings && course?.offerings.offering_id) {
+    currentOffering = course.offerings; // legacy shape
+  }
+
+  const coursePermalink = buildCoursePermalink(course, currentOffering);
 
   return (
     <Container fluid className="admin-resources-container py-4">
@@ -579,13 +603,14 @@ useEffect(() => {
             copyStatus={copyStatus}
             course={course}
             coursePermalink={coursePermalink}
+            sectionLabel={currentOffering?.section_name ? `Section ${currentOffering.section_name}` : ''}
           />
 
           {/* Course Permalink */}
-          <AdminCoursePermalink 
-            course={course} 
-            copyToClipboard={copyToClipboard} 
+          <AdminCoursePermalink
+            copyToClipboard={copyToClipboard}
             coursePermalink={coursePermalink}
+            sectionLabel={currentOffering?.section_name ? `Section ${currentOffering.section_name}` : ''}
           />
 
           {/* Main Content Tabs */}
