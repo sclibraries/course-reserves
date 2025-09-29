@@ -421,6 +421,31 @@ export const adminCourseService = {
     }
   },
 
+  async cleanupPhysicalResourceReferences(offeringId, folioResourceIds) {
+    try {
+      const response = await fetch(`${config.api.urls.courseReserves}/physical-resource/cleanup-references`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': getAuthToken()
+        },
+        body: JSON.stringify({
+          offering_id: offeringId,
+          folio_resource_ids: folioResourceIds
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to cleanup physical resource references');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error cleaning up physical resource references:', error);
+      throw error;
+    }
+  },
+
   // Functions imported at top of file
   getPhysicalResourceByExternalId,
   updatePhysicalResourceOrder,

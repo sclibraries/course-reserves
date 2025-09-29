@@ -39,6 +39,8 @@ function CourseRecords() {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState({});
+  // Map of instanceId -> [barcodes] that are actually on reserve for this course
+  const [reserveBarcodesByInstance, setReserveBarcodesByInstance] = useState({});
   const [openAccordions, setOpenAccordions] = useState({});
   const [hasElectronicReserves, setHasElectronicReserves] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,6 +166,17 @@ function CourseRecords() {
       // This fixes the issue where new physical items added to FOLIO after backend sync
       // would be missing if the backend already had references to other physical items
       const printReserves = await fetchRecords(record);
+
+      // Build a map of instanceId -> array of barcodes that are actually on reserve for this course
+      const barcodeMap = {};
+      for (const rec of printReserves) {
+        const instId = rec?.copiedItem?.instanceId;
+        const barcode = rec?.copiedItem?.barcode;
+        if (!instId || !barcode) continue;
+        if (!barcodeMap[instId]) barcodeMap[instId] = [];
+        if (!barcodeMap[instId].includes(barcode)) barcodeMap[instId].push(barcode);
+      }
+      setReserveBarcodesByInstance(barcodeMap);
       
       // Convert FOLIO print reserves to our format
       const folioPhysical = printReserves.map(rec => ({
@@ -435,17 +448,21 @@ function CourseRecords() {
     }
   }, [record, fetchAllData]);
 
-  // For print reserves only: Fetch item availability data.
+  // For print reserves only: Fetch item availability data, then filter to barcodes that are actually on reserve.
   useEffect(() => {
     (async function loadAvailability() {
       for (const recordItem of records) {
         if (!recordItem.isElectronic && recordItem.copiedItem.instanceId) {
           const { instanceId } = recordItem.copiedItem;
           try {
-            const holding = await fetchItemAvailabilityData(instanceId);
+            const holdings = await fetchItemAvailabilityData(instanceId);
+            const barcodes = new Set(reserveBarcodesByInstance[instanceId] || []);
+            const filtered = Array.isArray(holdings)
+              ? holdings.filter(h => !barcodes.size || (h.barcode && barcodes.has(h.barcode)))
+              : [];
             setAvailability(prev => ({
               ...prev,
-              [instanceId]: { holdings: holding },
+              [instanceId]: { holdings: filtered, allHoldings: holdings },
             }));
           } catch (err) {
             console.error('Error fetching item availability:', err);
@@ -453,7 +470,7 @@ function CourseRecords() {
         }
       }
     })();
-  }, [records]);
+  }, [records, reserveBarcodesByInstance]);
 
   // Initialize open accordions for print reserves
   useEffect(() => {

@@ -220,6 +220,7 @@ const RecordCard = ({
   // Availability data for print items
   const availabilityData = availability[instanceId] || {};
   const holdings = availabilityData.holdings || [];
+  const allHoldings = availabilityData.allHoldings || [];
 
   /**
    * Get material types from reserve holdings
@@ -313,8 +314,12 @@ const RecordCard = ({
   const renderHoldingsSection = () => {
     if (isElectronic || !instanceId) return null;
 
-    const reserves = holdings.filter((h) => h.location.includes('Reserve'));
-    const otherHoldings = holdings.filter((h) => !h.location.includes('Reserve'));
+  // Reserves are the pre-filtered holdings (barcodes that match the course)
+  const reserves = holdings;
+  // Other holdings are all other copies for the instance that are not in reserves
+  const otherHoldings = allHoldings.filter(h =>
+    !(reserves || []).some(r => r.barcode && h.barcode && r.barcode === h.barcode)
+  );
 
     return (
       <div className="mt-3">
@@ -367,6 +372,27 @@ const RecordCard = ({
 
   // Render details inside each holdings accordion
   const renderHoldingItems = (holdings, loanType) => {
+    // Sort holdings by volume (if present), then by itemCopyNumber, then barcode
+    const parseVolumeNumber = (v) => {
+      if (!v) return Number.POSITIVE_INFINITY;
+      const m = String(v).match(/\d+/);
+      return m ? parseInt(m[0], 10) : Number.POSITIVE_INFINITY;
+    };
+    const parseCopyNumber = (c) => {
+      if (c == null) return Number.POSITIVE_INFINITY;
+      const n = parseInt(c, 10);
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+    const sortedHoldings = [...holdings].sort((a, b) => {
+      const va = parseVolumeNumber(a.volume);
+      const vb = parseVolumeNumber(b.volume);
+      if (va !== vb) return va - vb;
+      const ca = parseCopyNumber(a.itemCopyNumber);
+      const cb = parseCopyNumber(b.itemCopyNumber);
+      if (ca !== cb) return ca - cb;
+      return (a.barcode || '').localeCompare(b.barcode || '');
+    });
+
     // Helper to determine the URL for each holding
     const getHoldingUrl = (holding) => {
       if (holding.uri || holding.url) {
@@ -379,15 +405,15 @@ const RecordCard = ({
       return '';
     };
 
-    const showLocation = holdings.some((h) => h.location);
-    const showLibrary = holdings.some((h) => h.library && h.library.name);
-    const showStatus = holdings.some((h) => h.status);
-    const showLoanType = holdings.some((h) => h[`${loanType}LoanType`]);
-    const showCallNumber = holdings.some((h) => h.callNumber);
-    const showBarcode = holdings.some((h) => h.barcode);
-    const showVolume = holdings.some((h) => h.volume);
-    const itemCopyNumber = holdings.some((h) => h.itemCopyNumber);
-    const showAccess = holdings.some((h) => getHoldingUrl(h));
+  const showLocation = sortedHoldings.some((h) => h.location);
+  const showLibrary = sortedHoldings.some((h) => h.library && h.library.name);
+  const showStatus = sortedHoldings.some((h) => h.status);
+  const showLoanType = sortedHoldings.some((h) => h[`${loanType}LoanType`]);
+  const showCallNumber = sortedHoldings.some((h) => h.callNumber);
+  const showBarcode = sortedHoldings.some((h) => h.barcode);
+  const showVolume = sortedHoldings.some((h) => h.volume);
+  const itemCopyNumber = sortedHoldings.some((h) => h.itemCopyNumber);
+  const showAccess = sortedHoldings.some((h) => getHoldingUrl(h));
 
     return (
       <div className="table-responsive">
@@ -407,7 +433,7 @@ const RecordCard = ({
             </tr>
           </thead>
           <tbody>
-            {holdings.map((holding) => {
+            {sortedHoldings.map((holding) => {
               const resourceUrl = getHoldingUrl(holding);
               return (
                 <tr key={holding.id}>

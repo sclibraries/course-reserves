@@ -79,12 +79,26 @@ useEffect(() => {
       // 1) get the raw FOLIO items
       const reserves = await fetchRecords(folioCourseId);
 
-      // 2) get your local order refs
+      // 2) Clean up orphaned references by sending current FOLIO resource IDs to backend
+      const folioResourceIds = reserves.map(item => item.copiedItem?.instanceId).filter(Boolean);
+      if (folioResourceIds.length > 0) {
+        try {
+          await adminCourseService.cleanupPhysicalResourceReferences(
+            course.offering_id, 
+            folioResourceIds
+          );
+        } catch (cleanupErr) {
+          console.warn('Failed to cleanup orphaned physical resource references:', cleanupErr);
+          // Don't fail the entire operation if cleanup fails
+        }
+      }
+
+      // 3) get your local order refs (after cleanup)
       const refs = await adminCourseService.getPhysicalResourceReferences(
         course.offering_id
       );
 
-      // 3) merge .order from refs into each FOLIO item
+      // 4) merge .order from refs into each FOLIO item
       const merged = reserves.map((item, idx) => {
         const match = refs.find(r => r.external_resource_id === item.copiedItem?.instanceId);
         return {
@@ -93,7 +107,7 @@ useEffect(() => {
         };
       });
 
-      // 4) sort by that order
+      // 5) sort by that order
       merged.sort((a, b) => (a.order || 999) - (b.order || 999));
 
       console.log('Print resources loaded and sorted:', merged.map(m => ({ 
@@ -102,7 +116,7 @@ useEffect(() => {
         instanceId: m.copiedItem?.instanceId
       })));
 
-      // 5) store in state
+      // 6) store in state
       setPrintResources(merged);
     } catch (err) {
       console.error('Error loading print resources:', err);

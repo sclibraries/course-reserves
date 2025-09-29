@@ -345,8 +345,9 @@ const RecordTable = ({
     }
     
     const instanceId = item.copiedItem?.instanceId;
-    const holdings = availability[instanceId]?.holdings || [];
-    const reserveCount = holdings.filter(h => h.location?.includes('Reserve')).length;
+  const holdings = availability[instanceId]?.holdings || [];
+  // Holdings are pre-filtered to barcodes on reserve for this course
+  const reserveCount = holdings.length;
     const popoverId = `holdings-${item.id}`;
 
     const discoverUrl = !item.isElectronic ? getDiscoverLink(instanceId) : null;
