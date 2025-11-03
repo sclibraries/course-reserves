@@ -10,12 +10,13 @@
  * @requires ../../store/searchStore
  */
 import { useEffect, useState, useMemo } from 'react';
-import { Navbar, NavbarBrand, Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
+import { Navbar, NavbarBrand, Dropdown, DropdownToggle, DropdownMenu, DropdownItem, Badge } from 'reactstrap';
 import { Link, useLocation } from 'react-router-dom';
-import { FaUser, FaHome, FaChevronDown } from 'react-icons/fa';
+import { FaUser, FaHome, FaChevronDown, FaBell } from 'react-icons/fa';
 import useCustomizationStore from '../../store/customizationStore';
 import useSearchStore from '../../store/searchStore';
 import { useAuth } from '../../contexts/AuthContext';
+import useUnreadMessages from '../../hooks/useUnreadMessages';
 import '../../css/Header.css';
 import LoginButton from '../ui/LoginButton';
 
@@ -73,6 +74,9 @@ function Header() {
   const college = new URLSearchParams(location.search).get('college') || currentCollege || 'default';
 
   const { isAuthenticated, logout, user } = useAuth();
+  
+  // Poll for unread @mentions (only when authenticated)
+  const { unreadCount } = useUnreadMessages(30000, isAuthenticated);
 
   const toggleUserMenu = () => setUserMenuOpen(!userMenuOpen);
 
@@ -191,14 +195,52 @@ function Header() {
             )}
 
             {isAuthenticated && (
-              <Link
-                to="/admin?tab=courses"
-                className={`nav-link me-3 ${isAdminPath ? 'active' : ''}`}
-                aria-label="Go to admin page"
-                style={isAdminPath ? activeNavLinkStyle : navLinkStyle}
-              >
-                Admin
-              </Link>
+              <>
+                <Link
+                  to="/admin?tab=courses"
+                  className={`nav-link me-3 position-relative ${isAdminPath ? 'active' : ''}`}
+                  aria-label="Go to admin page"
+                  style={isAdminPath ? activeNavLinkStyle : navLinkStyle}
+                >
+                  Admin
+                  {unreadCount > 0 && (
+                    <Badge 
+                      color="danger" 
+                      pill 
+                      className="position-absolute top-0 start-100 translate-middle"
+                      style={{ fontSize: '0.7rem', padding: '0.25em 0.5em' }}
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  )}
+                </Link>
+                
+                {/* Notifications Bell */}
+                {unreadCount > 0 && (
+                  <Link
+                    to="/admin?tab=mentions"
+                    className="nav-link me-3 position-relative"
+                    aria-label={`${unreadCount} unread mentions`}
+                    style={navLinkStyle}
+                    title={`You have ${unreadCount} unread mention${unreadCount !== 1 ? 's' : ''}`}
+                  >
+                    <FaBell size={18} />
+                    <Badge 
+                      color="danger" 
+                      pill 
+                      className="position-absolute"
+                      style={{ 
+                        fontSize: '0.65rem', 
+                        padding: '0.2em 0.4em',
+                        top: '-5px',
+                        right: '-8px'
+                      }}
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  </Link>
+                )}
+              </>
             )}
 
             {isAuthenticated ? (

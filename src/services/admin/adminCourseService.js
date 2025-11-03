@@ -392,8 +392,12 @@ export const adminCourseService = {
     return result.data || [];
   },
 
-  async getFolioCourseId(uuid){
-    const response = await fetch(`${COURSE_API}${config.api.endpoints.course.checkUniqueId}?uuid=${uuid}`);
+  async getFolioCourseId(uuid, section = null){
+    let url = `${COURSE_API}${config.api.endpoints.course.checkUniqueId}?uuid=${uuid}`;
+    if (section) {
+      url += `&section=${encodeURIComponent(section)}`;
+    }
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Error checking course existence.');
     }

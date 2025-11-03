@@ -161,6 +161,9 @@
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .tab-button:hover {
@@ -170,6 +173,14 @@
 .tab-button.active {
   color: #4f46e5;
   border-bottom: 2px solid #4f46e5;
+}
+
+/* Badge styling in tabs */
+.tab-button .badge {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  font-weight: 600;
+  vertical-align: middle;
 }
 
 /* Mobile tabs dropdown */
@@ -223,6 +234,42 @@
   to { opacity: 1; }
 }
 
+/* Workflow dropdown styling */
+.workflow-dropdown.dropdown-toggle {
+  background: none !important;
+  border: none !important;
+  padding: 0.75rem 1.25rem !important;
+  position: relative;
+}
+
+.workflow-dropdown.dropdown-toggle::after {
+  margin-left: 0.5rem;
+}
+
+.workflow-dropdown .dropdown-menu {
+  margin-top: 0.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  min-width: 220px;
+}
+
+.workflow-dropdown .dropdown-item {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.workflow-dropdown .dropdown-item:hover {
+  background-color: #f3f4f6;
+}
+
+.workflow-dropdown .dropdown-item.active {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+  font-weight: 500;
+}
+
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .filter-controls-row {
@@ -265,20 +312,4 @@
   .reset-button::after {
     content: " Reset";
   }
-}
-
-/* Remove unused styles */
-.search-control-wrapper,
-.admin-search-input,
-.search-btn,
-.filter-controls,
-.filter-section,
-.filter-header,
-.filter-icon,
-.filter-header span,
-.filter-row,
-.filter-group,
-.reset-btn-wrapper,
-.reset-btn {
-  /* These styles are no longer needed with the new layout */
 }

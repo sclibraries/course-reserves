@@ -17,6 +17,8 @@ import ProtectedRoutePage from '../protected/ProtectedRoutePage';
 import ProtectedRoute from '../protected/ProtectedRoute';
 import Admin from '../../pages/Admin';
 import AdminElectronicResources from '../../pages/AdminElectronicResources';
+import SubmissionDetail from '../page-sections/admin/SubmissionDetail';
+import WorkQueueDetail from '../../pages/WorkQueueDetail';
 import NotFound from '../../pages/NotFound';
 import useAuth from '../../hooks/useAuth';
 import useTermSetup from '../../hooks/useTermSetup';
@@ -91,10 +93,26 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/admin/work-queue/:itemId"
+        element={
+          <ProtectedRoute isAuthorized={isAuthorized}>
+            <WorkQueueDetail isAdmin={isAuthorized} />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/electronic/:folioCourseId"
         element={
           <ProtectedRoute isAuthorized={isAuthorized}>
             <AdminElectronicResources isAdmin={isAuthorized} />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/submissions/:submissionId"
+        element={
+          <ProtectedRoute isAuthorized={isAuthorized}>
+            <SubmissionDetail isAdmin={isAuthorized} />
           </ProtectedRoute>
         }
       />

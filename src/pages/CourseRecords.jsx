@@ -32,6 +32,7 @@ function CourseRecords() {
   const searchParams = new URLSearchParams(location.search);
   const collegeParam = searchParams.get('college');
   const courseListingIdParam = searchParams.get('courseListingId') || searchParams.get('id');
+  const sectionParam = searchParams.get('section');
 
   const { record, setRecord } = useRecordStore();
   const [records, setRecords] = useState([]);
@@ -62,7 +63,7 @@ function CourseRecords() {
     if (uuid) {
       const fetchFOLIOCourseListingId = async () => {
         try {
-          const courseListingId = await adminCourseService.getFolioCourseId(uuid);
+          const courseListingId = await adminCourseService.getFolioCourseId(uuid, sectionParam);
           if (courseListingId) {
             if (courseListingId?.exists == true) {
               setRecord(courseListingId?.folio_course_id);
@@ -74,7 +75,7 @@ function CourseRecords() {
       };
       fetchFOLIOCourseListingId();
     }
-  }, [uuid, setRecord]);
+  }, [uuid, sectionParam, setRecord]);
 
   useEffect(() => {
     if (!courseCode) return;

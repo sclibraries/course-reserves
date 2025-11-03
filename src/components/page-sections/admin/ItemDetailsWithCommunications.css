@@ -1,0 +1,152 @@
+/**
+ * ItemDetailsWithCommunications.css
+ * Tabbed interface for item details and communications
+ */
+
+.item-details-with-comms {
+  padding: 16px;
+}
+
+/* Tab Navigation */
+.details-tabs {
+  border-bottom: 2px solid #dee2e6;
+  margin-bottom: 0;
+}
+
+.details-tabs .nav-link {
+  color: #6c757d;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 12px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.details-tabs .nav-link:hover {
+  color: #495057;
+  border-bottom-color: #dee2e6;
+}
+
+.details-tabs .nav-link.active {
+  color: #0d6efd;
+  border-bottom-color: #0d6efd;
+  background-color: transparent;
+}
+
+.details-tabs .nav-link svg {
+  font-size: 0.9rem;
+}
+
+/* Tab Content */
+.details-tab-content {
+  padding: 20px 0;
+}
+
+.details-tab-content .tab-pane {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Details Grid (from original) */
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.details-column h6 {
+  color: #495057;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.detail-item {
+  margin-bottom: 12px;
+}
+
+.detail-item strong {
+  color: #6c757d;
+  font-size: 0.875rem;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.faculty-notes-box,
+.staff-notes-box {
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-left: 3px solid #0d6efd;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.staff-notes-box {
+  border-left-color: #ffc107;
+  background-color: #fff9e6;
+}
+
+/* Action Bar */
+.details-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Communications Tab */
+.communications-tab-wrapper {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.comms-quick-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .details-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .details-tabs .nav-link {
+    padding: 10px 12px;
+    font-size: 0.875rem;
+  }
+  
+  .comms-quick-actions {
+    flex-direction: column;
+  }
+  
+  .comms-quick-actions .btn-group {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .comms-quick-actions .btn {
+    width: 100%;
+  }
+  
+  .communications-tab-wrapper {
+    max-height: 400px;
+  }
+}

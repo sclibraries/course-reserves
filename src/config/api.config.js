@@ -83,6 +83,63 @@ export const apiConfig = {
     customizations: {
       getCustomizations: '/college-customization',
       updateCustomizations: '/college-customization',
+    },
+    submissionWorkflow: {
+      pendingSubmissions: '/submission-workflow/pending-submissions',
+      submissionDetail: '/submission-workflow/submission/:id',
+      lockSubmission: '/faculty-submission/:uuid/lock',
+      unlockSubmission: '/faculty-submission/:uuid/unlock',
+      updateItem: '/submission-workflow/item/:itemId',
+      claimItem: '/submission-workflow/item/:itemId/claim',
+      unclaimItem: '/submission-workflow/item/:itemId/unclaim',
+      assignItem: '/submission-workflow/item/:itemId/assign',
+      updateItemStatus: '/submission-workflow/item/:itemId/status',
+      addStaffCommunication: '/submission-workflow/item/:itemId/staff-message',
+      getStaffCommunications: '/submission-workflow/item/:itemId/staff-messages',
+      getStaffUsers: '/user/staff',
+      myClaimedItems: '/submission-workflow/my-claimed-items',
+      // Communication endpoints
+      getSubmissionCommunications: '/submission-workflow/submission/:submissionId/communications',
+      createCommunication: '/submission-workflow/submission/:submissionId/communications',
+      updateCommunication: '/submission-workflow/communications/:messageId',
+      markAsRead: '/submission-workflow/communications/:messageId/read',
+      searchStaff: '/submission-workflow/search-staff',
+    },
+    workflow: {
+      // Template Management
+      listTemplates: '/workflow-admin/templates',
+      getTemplate: '/workflow-admin/template/:id',
+      createTemplate: '/workflow-admin/templates',
+      updateTemplate: '/workflow-admin/template/:id',
+      deleteTemplate: '/workflow-admin/template/:id',
+      duplicateTemplate: '/workflow-admin/template/:id/duplicate',
+      
+      // Step Management
+      createStep: '/workflow-admin/template/:templateId/steps',
+      updateStep: '/workflow-admin/step/:id',
+      deleteStep: '/workflow-admin/step/:id',
+      reorderSteps: '/workflow-admin/template/:templateId/steps/reorder',
+      
+      // Condition Management
+      createCondition: '/workflow-admin/step/:stepId/conditions',
+      updateCondition: '/workflow-admin/condition/:id',
+      deleteCondition: '/workflow-admin/condition/:id',
+      
+      // Transition Management
+      createTransition: '/workflow-admin/step/:stepId/transitions',
+      updateTransition: '/workflow-admin/transition/:id',
+      deleteTransition: '/workflow-admin/transition/:id',
+      
+      // Instance Management (Execution)
+      listInstances: '/workflow-admin/instances',
+      getInstance: '/workflow-admin/instance/:id',
+      createInstance: '/workflow-admin/instances',
+      startWorkflow: '/workflow-admin/instance/:id/start',
+      completeStep: '/workflow-admin/instance/:id/complete-step',
+      skipStep: '/workflow-admin/instance/:id/skip-step',
+      cancelWorkflow: '/workflow-admin/instance/:id/cancel',
+      holdWorkflow: '/workflow-admin/instance/:id/hold',
+      resumeWorkflow: '/workflow-admin/instance/:id/resume',
     }
   },
   environment: import.meta.env.MODE || 'development',

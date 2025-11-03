@@ -1,0 +1,383 @@
+/* My Work Queue Streamlined Styles */
+
+.my-work-queue-streamlined {
+  padding: 1rem;
+  overflow: visible !important;
+}
+
+.my-work-queue-streamlined .card {
+  overflow: visible !important;
+}
+
+.my-work-queue-streamlined .card-body {
+  overflow: visible !important;
+}
+
+/* Header */
+.queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.queue-header h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 1.75rem;
+}
+
+.queue-header .text-muted {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Compact Table */
+.work-queue-table {
+  table-layout: fixed;
+  width: 100%;
+  /* Don't set position/z-index on table itself */
+  overflow: visible !important;
+}
+
+.work-queue-table thead th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  padding: 0.75rem;
+  vertical-align: middle;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.work-queue-table tbody td {
+  padding: 0.75rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #e9ecef;
+  overflow: visible !important;
+}
+
+/* Ensure dropdown menus appear above other content */
+.work-queue-table tbody tr {
+  position: relative;
+  z-index: 1;
+}
+
+/* When a dropdown is open or row is hovered, elevate it */
+.work-queue-table tbody tr:hover,
+.work-queue-table tbody tr:focus-within,
+.work-queue-table tbody tr:has(.show) {
+  z-index: 100 !important;
+}
+
+/* Ensure all dropdown menus have high z-index */
+.work-queue-table .dropdown-menu,
+.work-queue-table .dropdown .dropdown-menu,
+.work-queue-table .dropdown-menu-end {
+  z-index: 1050 !important;
+  position: fixed !important;
+}
+
+/* Also ensure the dropdown button groups are elevated */
+.work-queue-table .btn-group,
+.work-queue-table .dropdown {
+  position: relative;
+  z-index: inherit;
+}
+
+/* Specific fix for status dropdown and action dropdown */
+.work-queue-table td .dropdown,
+.work-queue-table td .btn-group {
+  position: static !important;
+}
+
+.work-queue-table td .dropdown-menu {
+  position: fixed !important;
+  z-index: 1060 !important;
+}
+
+/* When any dropdown is open, make sure its parent cell and row are elevated */
+.work-queue-table td:has(.dropdown.show) {
+  position: relative;
+  z-index: 101 !important;
+  overflow: visible !important;
+}
+
+.work-queue-table tr:has(.dropdown.show) {
+  position: relative;
+  z-index: 102 !important;
+}
+
+/* Work Queue Row */
+.work-queue-row {
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.work-queue-row:hover {
+  background-color: #f8f9fa;
+}
+
+.work-queue-row.expanded {
+  background-color: #e7f3ff;
+}
+
+.work-queue-row.highlight-row {
+  animation: highlightPulse 2s ease-in-out;
+}
+
+/* CRITICAL: When row has an open dropdown, it must be elevated */
+.work-queue-row:has(.dropdown.show),
+.work-queue-row:focus-within {
+  position: relative;
+  z-index: 100 !important;
+  background-color: #f8f9fa;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: #fff3cd;
+  }
+}
+
+/* Expand Button */
+.expand-btn {
+  color: #6c757d;
+  font-size: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.expand-btn:hover {
+  color: #495057;
+  text-decoration: none;
+}
+
+.work-queue-row.expanded .expand-btn {
+  transform: rotate(0deg);
+}
+
+/* Item Title Cell */
+.item-title-cell {
+  max-width: 400px;
+}
+
+.item-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 1rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.item-authors {
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Course Cell */
+.course-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.course-code {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.faculty-name {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Details Row */
+.details-row {
+  background-color: #f8f9fa;
+  border-left: 4px solid #0066cc;
+}
+
+.details-row td {
+  padding: 0 !important;
+}
+
+/* Item Details Panel */
+.item-details-panel {
+  padding: 1.5rem;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  margin: 0.5rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.details-column h6 {
+  margin: 0 0 1rem 0;
+  color: #495057;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 0.5rem;
+}
+
+.detail-item {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.detail-item strong {
+  color: #495057;
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.faculty-notes-box,
+.staff-notes-box {
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-left: 3px solid #6c757d;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  font-style: italic;
+  color: #666;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+.faculty-notes-box {
+  border-left-color: #0066cc;
+  background-color: #e7f3ff;
+}
+
+.staff-notes-box {
+  border-left-color: #28a745;
+  background-color: #e7f9ed;
+}
+
+.details-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.details-actions .btn-group {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.empty-state h3 {
+  margin: 1rem 0 0.5rem;
+  color: #666;
+}
+
+.empty-state p {
+  color: #999;
+  margin-bottom: 1.5rem;
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+}
+
+.loading-container p {
+  margin-top: 1rem;
+  color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .details-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .queue-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .work-queue-table {
+    font-size: 0.85rem;
+  }
+  
+  .work-queue-table thead th {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .work-queue-table tbody td {
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .item-title {
+    font-size: 0.9rem;
+  }
+  
+  .course-code,
+  .faculty-name {
+    font-size: 0.75rem;
+  }
+  
+  .item-details-panel {
+    padding: 1rem;
+  }
+  
+  .details-actions .btn-group {
+    flex-direction: column;
+  }
+  
+  .details-actions .btn {
+    width: 100%;
+  }
+}
+
