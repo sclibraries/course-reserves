@@ -1,0 +1,68 @@
+/* ItemSearchResults Component Styles */
+
+.item-search-results {
+  margin: 1rem 0;
+}
+
+.item-search-results .results-header h4 {
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.item-results-table {
+  font-size: 0.9rem;
+  background-color: #fff;
+}
+
+.item-results-table thead th {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.75rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.item-results-table thead th.sortable:hover {
+  background-color: #e9ecef;
+  color: #000;
+}
+
+.item-results-table tbody td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+.item-results-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Course name link styling */
+.item-results-table tbody td a {
+  transition: all 0.2s ease;
+}
+
+.item-results-table tbody td a:focus {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Responsive table adjustments */
+@media (max-width: 768px) {
+  .item-results-table {
+    font-size: 0.85rem;
+  }
+  
+  .item-results-table thead th,
+  .item-results-table tbody td {
+    padding: 0.5rem;
+  }
+}
+
+/* Loading and error states */
+.item-search-results .spinner-border {
+  width: 3rem;
+  height: 3rem;
+}

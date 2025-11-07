@@ -1,4 +1,18 @@
 export function useBuildQuery(college, key, input, department, sortOption, termId = null) {
+  // For item searches, use a different query structure
+  if (key === 'item') {
+    const sanitizedInput = input ? input.trim() : '';
+    const termClause = termId ? ` and courseListing.termId=="${termId}"` : '';
+    const sortClause = ' sortby name';
+    
+    // Build the item search query (without college filter - that's passed as URL param)
+    const itemQuery = sanitizedInput 
+      ? `(copiedItem.title="${sanitizedInput}*"${termClause})${sortClause}`
+      : `(cql.allRecords=1${termClause})${sortClause}`;
+    
+    return itemQuery;
+  }
+
   // Sanitize the input (append wildcard if input is provided)
   const sanitizedInput = input ? input.trim() + '*' : '';
   let collegePrefix = '';

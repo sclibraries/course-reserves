@@ -114,6 +114,9 @@ function CourseRecords() {
   // Update record from URL parameter (if it differs)
   useEffect(() => {
     if (courseListingIdParam && courseListingIdParam !== record) {
+      // Clear previous course data before setting new record
+      setCourse([]);
+      setRecords([]);
       setRecord(courseListingIdParam);
     }
   }, [courseListingIdParam, record, setRecord]);
@@ -441,6 +444,15 @@ function CourseRecords() {
       setIsLoading(false);
     }
   }, [record, fetchInventoryDetails]);
+
+  // Clear data immediately when record changes to prevent showing stale data
+  useEffect(() => {
+    setCourse([]);
+    setRecords([]);
+    setError(null);
+    setAvailability({});
+    setReserveBarcodesByInstance({});
+  }, [record]);
 
   // Fetch data when `record` changes
   useEffect(() => {

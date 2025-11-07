@@ -11,6 +11,7 @@ import {
 import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { workflowService } from '../../../services/admin/workflowService';
+import WorkflowTemplateEditor from './workflow-builder/WorkflowTemplateEditor';
 
 /**
  * WorkflowTemplateManager - Admin interface for managing workflow templates
@@ -27,6 +28,8 @@ function WorkflowTemplateManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedTemplate, setExpandedTemplate] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
 
   useEffect(() => {
     loadTemplates();
@@ -87,6 +90,28 @@ function WorkflowTemplateManager() {
     }
   };
 
+  const handleCreateTemplate = () => {
+    setEditingTemplateId(null);
+    setShowEditor(true);
+  };
+
+  const handleEditTemplate = (templateId) => {
+    setEditingTemplateId(templateId);
+    setShowEditor(true);
+  };
+
+  const handleEditorSave = (savedTemplate) => {
+    toast.success(`Template "${savedTemplate.template_name || savedTemplate.name}" saved successfully`);
+    setShowEditor(false);
+    setEditingTemplateId(null);
+    loadTemplates();
+  };
+
+  const handleEditorCancel = () => {
+    setShowEditor(false);
+    setEditingTemplateId(null);
+  };
+
   const getCategoryBadge = (category) => {
     const colors = {
       'book': 'primary',
@@ -130,14 +155,24 @@ function WorkflowTemplateManager() {
     );
   }
 
+  // Show editor when creating or editing
+  if (showEditor) {
+    return (
+      <WorkflowTemplateEditor
+        templateId={editingTemplateId}
+        onSave={handleEditorSave}
+        onCancel={handleEditorCancel}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h3 mb-0">Workflow Templates</h1>
         <Button 
           color="primary"
-          disabled
-          title="Template creation UI coming in Phase 2">
+          onClick={handleCreateTemplate}>
           <FontAwesomeIcon icon="fa-solid fa-plus" className="me-2" />
           Create Template
         </Button>
@@ -193,6 +228,15 @@ function WorkflowTemplateManager() {
                             className="me-1" 
                           />
                           {expandedTemplate?.id === template.id ? 'Hide' : 'Show'} Details
+                        </Button>
+                        <Button
+                          color="link"
+                          size="sm"
+                          onClick={() => handleEditTemplate(template.id)}
+                          className="p-0 me-3"
+                          title="Edit this template">
+                          <FontAwesomeIcon icon="fa-solid fa-edit" className="me-1" />
+                          Edit
                         </Button>
                         <Button
                           color="link"

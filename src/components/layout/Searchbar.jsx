@@ -52,7 +52,15 @@ function Searchbar() {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const toggleAdvancedFilters = () => setAdvancedFiltersOpen(!advancedFiltersOpen);
 
-  const searchAreas = ['All fields', 'Course Name', 'Course Code', 'Section', 'Instructor'];
+  const searchAreas = [
+    { label: 'All Course Fields', value: 'All fields', group: 'course' },
+    { label: 'Course Name', value: 'Course Name', group: 'course' },
+    { label: 'Course Code', value: 'Course Code', group: 'course' },
+    { label: 'Section', value: 'Section', group: 'course' },
+    { label: 'Instructor', value: 'Instructor', group: 'course' },
+    { label: '───────────────', value: 'divider', disabled: true },
+    { label: 'Item Title', value: 'Item', group: 'item' }
+  ];
   const colleges = ['All', 'Amherst College', 'Hampshire College', 'Mount Holyoke College', 'Smith College', 'UMass Amherst'];
   
   const sortingOptions = [
@@ -225,6 +233,7 @@ function Searchbar() {
       case 'Course Code': return 'code';
       case 'Section': return 'section';
       case 'Instructor': return 'instructor';
+      case 'Item': return 'item';
       default: return 'all';
     }
   };
@@ -236,6 +245,7 @@ function Searchbar() {
       case 'code': return 'Course Code';
       case 'section': return 'Section';
       case 'instructor': return 'Instructor';
+      case 'item': return 'Item';
       default: return 'All fields';
     }
   };
@@ -460,7 +470,18 @@ function Searchbar() {
                     className="filter-select"
                   >
                     {searchAreas.map((area) => (
-                      <option key={area} value={area}>{area}</option>
+                      <option 
+                        key={area.value} 
+                        value={area.value}
+                        disabled={area.disabled}
+                        style={area.disabled ? { 
+                          backgroundColor: '#f0f0f0', 
+                          color: '#999',
+                          cursor: 'default'
+                        } : {}}
+                      >
+                        {area.label}
+                      </option>
                     ))}
                   </Input>
                 </FormGroup>
@@ -607,7 +628,7 @@ function Searchbar() {
                   </Input>
                 </FormGroup>
 
-                {/* Search Area Select */}
+                {/* Search In Filter */}
                 <FormGroup className="mobile-filter-item">
                   <Label for="mobileSearchAreaSelect" className="filter-label">Search In</Label>
                   <Input
@@ -621,7 +642,18 @@ function Searchbar() {
                     className="filter-select"
                   >
                     {searchAreas.map((area) => (
-                      <option key={area} value={area}>{area}</option>
+                      <option 
+                        key={area.value} 
+                        value={area.value}
+                        disabled={area.disabled}
+                        style={area.disabled ? { 
+                          backgroundColor: '#f0f0f0', 
+                          color: '#999',
+                          cursor: 'default'
+                        } : {}}
+                      >
+                        {area.label}
+                      </option>
                     ))}
                   </Input>
                 </FormGroup>
