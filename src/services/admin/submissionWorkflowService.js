@@ -963,5 +963,38 @@ export const submissionWorkflowService = {
       console.error('Error getting mentions:', error);
       throw error;
     }
+  },
+
+  /**
+   * Link a FOLIO course to a workflow instance step (check_course_exists automation)
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - Step ID (instance_step_id)
+   * @param {Object} data - FOLIO identifier { course_id }
+   * @returns {Promise<Object>} Updated workflow instance
+   */
+  async linkFolioCourse(instanceId, stepId, data) {
+    try {
+      const response = await fetch(
+        `${API_BASE}/workflow-admin/instance/${instanceId}/steps/${stepId}/folio/link`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': this.getAuthToken(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to link FOLIO course: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error linking FOLIO course:', error);
+      throw error;
+    }
   }
 };

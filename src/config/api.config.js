@@ -113,6 +113,7 @@ export const apiConfig = {
       createTemplate: '/workflow-admin/templates',
       updateTemplate: '/workflow-admin/template/:id',
       deleteTemplate: '/workflow-admin/template/:id',
+      archiveTemplate: '/workflow-admin/template/:id/archive',
       duplicateTemplate: '/workflow-admin/template/:id/duplicate',
       
       // Step Management
@@ -138,9 +139,15 @@ export const apiConfig = {
       startWorkflow: '/workflow-admin/instance/:id/start',
       completeStep: '/workflow-admin/instance/:id/complete-step',
       skipStep: '/workflow-admin/instance/:id/skip-step',
+      goBack: '/workflow-admin/instance/:id/go-back',
       cancelWorkflow: '/workflow-admin/instance/:id/cancel',
       holdWorkflow: '/workflow-admin/instance/:id/hold',
       resumeWorkflow: '/workflow-admin/instance/:id/resume',
+      transitionStep: '/workflow-admin/instance/:id/transition/:stepId',
+      runAutomation: '/workflow-admin/instance/:id/run-automation/:stepId',
+      runStepAutomation: '/workflow-admin/instance/:id/steps/:stepId/run-automation',
+      completeStepById: '/workflow-admin/instance/:id/steps/:stepId/complete',
+      getInstanceSteps: '/workflow-admin/instance/:id/steps',
     }
   },
   environment: import.meta.env.MODE || 'development',

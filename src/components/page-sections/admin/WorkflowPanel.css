@@ -30,14 +30,62 @@
   padding-top: 1rem;
 }
 
+.workflow-checklist {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.75rem;
+}
+
 .workflow-step {
-  padding: 0.5rem;
+  padding: 0.75rem;
   border-radius: 4px;
-  transition: background-color 0.2s;
+  border-left: 3px solid transparent;
+  background-color: #ffffff;
+  transition: background-color 0.2s, border-color 0.2s;
+  margin-bottom: 0.75rem;
+}
+
+.workflow-step:last-child {
+  margin-bottom: 0;
 }
 
 .workflow-step:hover {
   background-color: #f8f9fa;
+}
+
+.workflow-step.gate-step {
+  border-left-color: #212529;
+}
+
+.workflow-step.status-ready {
+  border-left-color: #0d6efd;
+}
+
+.workflow-step.status-blocked {
+  border-left-color: #ffc107;
+  background-color: #fff8e1;
+}
+
+.workflow-step.status-pending {
+  border-left-color: #6c757d;
+}
+
+.workflow-step.status-in_progress {
+  border-left-color: #0dcaf0;
+}
+
+.workflow-step.status-completed {
+  border-left-color: #198754;
+  background-color: #edf7ed;
+}
+
+.workflow-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.workflow-step-actions .btn {
+  min-width: 140px;
 }
 
 .workflow-step .form-check-input {

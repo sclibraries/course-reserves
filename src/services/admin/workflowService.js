@@ -23,15 +23,28 @@ class WorkflowService {
       }
     };
 
-    if (body && (method === 'POST' || method === 'PUT')) {
+    if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
       options.body = JSON.stringify(body);
     }
 
     const response = await fetch(url, options);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API call failed: ${response.status} - ${errorText}`);
+      let errorPayload;
+      try {
+        errorPayload = await response.json();
+      } catch {
+        const rawText = await response.text();
+        const fallbackError = new Error(rawText || `Request failed with status ${response.status}`);
+        fallbackError.status = response.status;
+        throw fallbackError;
+      }
+
+      const apiError = new Error(errorPayload.message || `Request failed with status ${response.status}`);
+      apiError.status = response.status;
+      apiError.code = errorPayload.code;
+      apiError.details = errorPayload;
+      throw apiError;
     }
 
     // Handle empty responses (DELETE operations)
@@ -96,13 +109,22 @@ class WorkflowService {
   }
 
   /**
-   * Delete a template
+   * Delete/Archive a template (sets is_active to 0)
    * @param {number} id - Template ID
-   * @returns {Promise<Object>} Deletion confirmation
+   * @returns {Promise<Object>} Archived template
    */
   async deleteTemplate(id) {
-    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.deleteTemplate.replace(':id', id)}`;
-    return await this.apiCall(url, 'DELETE');
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.archiveTemplate.replace(':id', id)}`;
+    return await this.apiCall(url, 'POST');
+  }
+
+  /**
+   * Archive a template (alias for deleteTemplate for clarity)
+   * @param {number} id - Template ID
+   * @returns {Promise<Object>} Archived template
+   */
+  async archiveTemplate(id) {
+    return await this.deleteTemplate(id);
   }
 
   /**
@@ -270,7 +292,9 @@ class WorkflowService {
    */
   async getInstance(id) {
     const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.getInstance.replace(':id', id)}`;
-    return await this.apiCall(url, 'GET');
+    const response = await this.apiCall(url, 'GET');
+    // Handle nested response structure
+    return response.instance || response;
   }
 
   /**
@@ -328,6 +352,19 @@ class WorkflowService {
   }
 
   /**
+   * Go back to the previous step
+   * @param {number} id - Instance ID
+   * @param {string} [reason] - Optional reason for going back
+   * @returns {Promise<Object>} Result with previous step info
+   */
+  async goBack(id, reason = '') {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.goBack.replace(':id', id)}`;
+    const payload = { reason };
+    console.log('goBack API call:', { url, payload });
+    return await this.apiCall(url, 'POST', payload);
+  }
+
+  /**
    * Cancel a workflow
    * @param {number} id - Instance ID
    * @param {string} reason - Reason for cancellation
@@ -357,6 +394,85 @@ class WorkflowService {
   async resumeWorkflow(id) {
     const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.resumeWorkflow.replace(':id', id)}`;
     return await this.apiCall(url, 'POST');
+  }
+
+  /**
+   * Retrieve the checklist of steps for a workflow instance
+   * @param {number} id - Instance ID
+   * @returns {Promise<Object>} Checklist data including steps, counts, and progress mode
+   */
+  async getInstanceSteps(id) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.getInstanceSteps.replace(':id', id)}`;
+    return await this.apiCall(url, 'GET');
+  }
+
+  /**
+   * Mark a step as complete or transition it in the checklist
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - Step ID to transition
+   * @param {Object} payload - Optional payload including notes or metadata
+   * @returns {Promise<Object>} Updated instance state
+   */
+  async transitionStep(instanceId, stepId, payload = {}) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.transitionStep
+      .replace(':id', instanceId)
+      .replace(':stepId', stepId)}`;
+    return await this.apiCall(url, 'PATCH', payload);
+  }
+
+  /**
+   * Trigger an automation handler for a specific step
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - Step ID with automation handler
+   * @returns {Promise<Object>} Automation execution response
+   */
+  async runAutomation(instanceId, stepId, payload = {}) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.runAutomation
+      .replace(':id', instanceId)
+      .replace(':stepId', stepId)}`;
+    return await this.apiCall(url, 'POST', payload);
+  }
+
+  /**
+   * Trigger automation for a specific step using the dedicated step endpoint
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - Step ID with automation handler
+   * @param {Object} payload - Optional payload such as notes or metadata
+   * @returns {Promise<Object>} Automation execution response
+   */
+  async runStepAutomation(instanceId, stepId, payload = {}) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.runStepAutomation
+      .replace(':id', instanceId)
+      .replace(':stepId', stepId)}`;
+    return await this.apiCall(url, 'POST', payload);
+  }
+
+  /**
+   * Run the FOLIO course/link automation for a specific gate step
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - FOLIO gate step ID
+   * @param {Object} payload - { course_id, term_id }
+   * @returns {Promise<Object>} Updated instance state
+   */
+  async runFolioLink(instanceId, stepId, payload) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.runFolioLink
+      .replace(':id', instanceId)
+      .replace(':stepId', stepId)}`;
+    return await this.apiCall(url, 'POST', payload);
+  }
+
+  /**
+   * Mark a specific step as complete using the checklist endpoint
+   * @param {number} instanceId - Workflow instance ID
+   * @param {number} stepId - Step ID to mark complete
+   * @param {Object} payload - Optional payload such as notes
+   * @returns {Promise<Object>} Updated instance state
+   */
+  async completeStepById(instanceId, stepId, payload = {}) {
+    const url = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.workflow.completeStepById
+      .replace(':id', instanceId)
+      .replace(':stepId', stepId)}`;
+    return await this.apiCall(url, 'POST', payload);
   }
 
   // ==========================================
@@ -402,7 +518,7 @@ class WorkflowService {
       }
 
       // Create instance
-      const instance = await this.createInstance({
+      const response = await this.createInstance({
         template_id: template.id,
         entity_type: entityType,
         entity_id: resourceId,
@@ -410,6 +526,13 @@ class WorkflowService {
         priority: 'normal',
         due_date: this.calculateDueDate(7) // 7 days default
       });
+
+      // Extract instance from response - handle both direct and nested structures
+      const instance = response.instance || response;
+      
+      if (!instance || !instance.id) {
+        throw new Error('Invalid response from server - missing instance ID');
+      }
 
       // Start workflow
       await this.startWorkflow(instance.id);

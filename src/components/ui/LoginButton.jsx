@@ -4,7 +4,8 @@ import PropTypes from 'prop-types';
 const LoginButton = ({ textColor = "#1A2C57" }) => {
   // Get the appropriate auth URL for the current environment
   const authUrl = apiConfig.getAuthUrl();
-  const isDevelopment = apiConfig.environment !== 'production';
+  const isProduction = apiConfig.environment === 'production';
+  const envLabel = isProduction ? '' : `(${apiConfig.environment.toUpperCase()})`;
 
   console.log(`Using auth URL for environment: ${apiConfig.environment}`, authUrl);
 
@@ -20,10 +21,10 @@ const LoginButton = ({ textColor = "#1A2C57" }) => {
           textDecoration: 'underline',
         }}
       >
-        Admin Login {isDevelopment && '(DEV)'}
+        Admin Login {envLabel}
       </a>
       
-      {isDevelopment && (
+      {!isProduction && (
         <div style={{ 
           fontSize: '10px', 
           color: '#c22', 

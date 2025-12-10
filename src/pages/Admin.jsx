@@ -22,6 +22,7 @@ import { adminResourceService } from '../services/admin/adminResourceService';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentTermId } from '../hooks/useCurrentTermId';
+import { apiConfig } from '../config/api.config';
 import '../css/AdminComponents.css';
 import '../css/Admin.css';
 
@@ -34,8 +35,11 @@ function Admin() {
   const { fetchResults, results: courses, error: courseError, loading: courseLoading } = useCourseStore();
   const { user, isAdmin } = useAuth();
   
-  // Get unread mentions count
-  const { unreadCount: mentionsCount } = useUnreadMessages(30000, true);
+  // Check if we're in development mode
+  const isDevelopment = apiConfig.environment !== 'production';
+  
+  // Get unread mentions count (only in development)
+  const { unreadCount: mentionsCount } = useUnreadMessages(30000, isDevelopment);
   
   // Get submission workflow counts
   const { 
@@ -70,7 +74,7 @@ function Admin() {
   const canViewReports = isAdmin || userPermissions.includes('view_reports');
   const canCustomize = isAdmin || userPermissions.some(perm => perm.startsWith('customize_'));
   const canManageSubmissions = isAdmin || userPermissions.includes('manage_submissions');
-  const canManageWorkflows = isAdmin; // Only admins can manage workflow templates
+  const canManageWorkflows = isDevelopment && isAdmin; // Only admins in development can manage workflow templates
   
   // Build the query for fetching courses.
   const cqlQuery = useBuildQuery(college, type, query, department, null, termId);
@@ -210,8 +214,8 @@ function Admin() {
               </button>
             )}
             
-            {/* Workflow Dropdown */}
-            {canManageSubmissions && (
+            {/* Workflow Dropdown - Only in development */}
+            {isDevelopment && canManageSubmissions && (
               <UncontrolledDropdown nav inNavbar className="d-inline-block">
                 <DropdownToggle 
                   nav 
@@ -365,7 +369,7 @@ function Admin() {
                   </DropdownItem>
                 )}
                 
-                {canManageSubmissions && (
+                {isDevelopment && canManageSubmissions && (
                   <DropdownItem 
                     onClick={() => handleTabChange('submissions')}
                     active={activeTab === 'submissions'}
@@ -379,7 +383,7 @@ function Admin() {
                   </DropdownItem>
                 )}
                 
-                {canManageSubmissions && (
+                {isDevelopment && canManageSubmissions && (
                   <DropdownItem 
                     onClick={() => handleTabChange('my-work')}
                     active={activeTab === 'my-work'}
@@ -393,7 +397,7 @@ function Admin() {
                   </DropdownItem>
                 )}
                 
-                {canManageSubmissions && (
+                {isDevelopment && canManageSubmissions && (
                   <DropdownItem 
                     onClick={() => handleTabChange('mentions')}
                     active={activeTab === 'mentions'}

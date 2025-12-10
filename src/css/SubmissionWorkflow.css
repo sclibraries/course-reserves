@@ -407,3 +407,17 @@
   line-height: 1.4;
   margin-bottom: 0;
 }
+
+/* Utility Classes */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.workflow-status .details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.workflow-status .details summary:hover {
+  text-decoration: underline;
+}

@@ -50,6 +50,7 @@ function Searchbar() {
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
   const [departments, setDepartments] = useState([]);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [searchMode, setSearchMode] = useState('courses'); // 'courses' or 'items'
   const toggleAdvancedFilters = () => setAdvancedFiltersOpen(!advancedFiltersOpen);
 
   const searchAreas = [
@@ -57,9 +58,7 @@ function Searchbar() {
     { label: 'Course Name', value: 'Course Name', group: 'course' },
     { label: 'Course Code', value: 'Course Code', group: 'course' },
     { label: 'Section', value: 'Section', group: 'course' },
-    { label: 'Instructor', value: 'Instructor', group: 'course' },
-    { label: '───────────────', value: 'divider', disabled: true },
-    { label: 'Item Title', value: 'Item', group: 'item' }
+    { label: 'Instructor', value: 'Instructor', group: 'course' }
   ];
   const colleges = ['All', 'Amherst College', 'Hampshire College', 'Mount Holyoke College', 'Smith College', 'UMass Amherst'];
   
@@ -74,9 +73,16 @@ function Searchbar() {
 
   // Sync local state with store
   useEffect(() => {
-    setSearchArea(keyToSearchArea(type));
+    const area = keyToSearchArea(type);
+    setSearchArea(area);
     setSearchInput(query || '');
     setSelectedCollege(keyToCollegeName(college));
+    // Set search mode based on type
+    if (type === 'item') {
+      setSearchMode('items');
+    } else {
+      setSearchMode('courses');
+    }
   }, [type, query, college, department, sortOption]);
 
   // Fetch departments when college changes
@@ -225,6 +231,34 @@ function Searchbar() {
     }
   };
 
+  const handleSearchModeChange = (mode) => {
+    const currentTermName = getTermName(terms, termId);
+    trackingService.trackEvent({
+      event_type: "search_mode_change",
+      college,
+      course_id: "N/A",
+      term: currentTermName || "N/A",
+      course_name: "",
+      course_code: "",
+      instructor: null,
+      metadata: {
+        old_mode: searchMode,
+        new_mode: mode,
+      }
+    }).catch(err => console.error("Error tracking search mode change:", err));
+
+    setSearchMode(mode);
+    setSearchInput(''); // Clear search input when switching modes
+    setQuery(''); // Clear query in store
+    if (mode === 'items') {
+      setSearchArea('Item');
+      setType('item');
+    } else {
+      setSearchArea('All fields');
+      setType('all');
+    }
+  };
+
   // Conversion helper functions
   const searchAreaToKey = (area) => {
     switch (area) {
@@ -303,7 +337,7 @@ function Searchbar() {
                     type="text"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Search courses..."
+                    placeholder={searchMode === 'items' ? 'Search items...' : 'Search courses...'}
                     className="filter-input"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -345,6 +379,28 @@ function Searchbar() {
 
           {/* Advanced Filters Section */}
           <Collapse isOpen={advancedFiltersOpen} className="d-md-block" id="advancedFilters">
+            {/* Search Mode Toggle - Desktop */}
+            <div className="d-none d-md-flex search-mode-toggle-container mb-2">
+              <div className="search-mode-toggle" role="group" aria-label="Search mode selection">
+                <button
+                  type="button"
+                  className={`search-mode-btn ${searchMode === 'courses' ? 'active' : ''}`}
+                  onClick={() => handleSearchModeChange('courses')}
+                  aria-pressed={searchMode === 'courses'}
+                >
+                  Search Courses
+                </button>
+                <button
+                  type="button"
+                  className={`search-mode-btn ${searchMode === 'items' ? 'active' : ''}`}
+                  onClick={() => handleSearchModeChange('items')}
+                  aria-pressed={searchMode === 'items'}
+                >
+                  Search Reserve Items
+                </button>
+              </div>
+            </div>
+
             {/* Desktop Search Bar - Hidden on mobile */}
             <div className="d-none d-md-block mb-3">
               <div className="filter-controls-row">
@@ -456,35 +512,31 @@ function Searchbar() {
                   </Input>
                 </FormGroup>
 
-                {/* Search Area Select */}
-                <FormGroup className="filter-item">
-                  <Label for="searchAreaSelect" className="filter-label">Search In</Label>
-                  <Input
-                    id="searchAreaSelect"
-                    type="select"
-                    value={searchArea}
-                    onChange={(e) => {
-                      setSearchArea(e.target.value);
-                      setType(searchAreaToKey(e.target.value));
-                    }}
-                    className="filter-select"
-                  >
-                    {searchAreas.map((area) => (
-                      <option 
-                        key={area.value} 
-                        value={area.value}
-                        disabled={area.disabled}
-                        style={area.disabled ? { 
-                          backgroundColor: '#f0f0f0', 
-                          color: '#999',
-                          cursor: 'default'
-                        } : {}}
-                      >
-                        {area.label}
-                      </option>
-                    ))}
-                  </Input>
-                </FormGroup>
+                {/* Search Area Select - Only show in course mode */}
+                {searchMode === 'courses' && (
+                  <FormGroup className="filter-item">
+                    <Label for="searchAreaSelect" className="filter-label">Search In</Label>
+                    <Input
+                      id="searchAreaSelect"
+                      type="select"
+                      value={searchArea}
+                      onChange={(e) => {
+                        setSearchArea(e.target.value);
+                        setType(searchAreaToKey(e.target.value));
+                      }}
+                      className="filter-select"
+                    >
+                      {searchAreas.map((area) => (
+                        <option 
+                          key={area.value} 
+                          value={area.value}
+                        >
+                          {area.label}
+                        </option>
+                      ))}
+                    </Input>
+                  </FormGroup>
+                )}
 
                 {/* Sort Filter */}
                 <FormGroup className="filter-item">
@@ -514,7 +566,7 @@ function Searchbar() {
                       type="text"
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
-                      placeholder="Search courses..."
+                      placeholder={searchMode === 'items' ? 'Search reserve item titles...' : 'Search courses...'}
                       className="filter-input"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -556,6 +608,28 @@ function Searchbar() {
 
             {/* Mobile Advanced Filters */}
             <div className="d-md-none mobile-advanced-filters">
+              {/* Search Mode Toggle - Mobile */}
+              <div className="search-mode-toggle-container mb-3">
+                <div className="search-mode-toggle" role="group" aria-label="Search mode selection">
+                  <button
+                    type="button"
+                    className={`search-mode-btn ${searchMode === 'courses' ? 'active' : ''}`}
+                    onClick={() => handleSearchModeChange('courses')}
+                    aria-pressed={searchMode === 'courses'}
+                  >
+                    Courses
+                  </button>
+                  <button
+                    type="button"
+                    className={`search-mode-btn ${searchMode === 'items' ? 'active' : ''}`}
+                    onClick={() => handleSearchModeChange('items')}
+                    aria-pressed={searchMode === 'items'}
+                  >
+                    Reserve Items
+                  </button>
+                </div>
+              </div>
+
               {/* Mobile Filter Items */}
               <div className="mobile-filter-grid">
                 {/* College Filter */}
@@ -628,35 +702,31 @@ function Searchbar() {
                   </Input>
                 </FormGroup>
 
-                {/* Search In Filter */}
-                <FormGroup className="mobile-filter-item">
-                  <Label for="mobileSearchAreaSelect" className="filter-label">Search In</Label>
-                  <Input
-                    id="mobileSearchAreaSelect"
-                    type="select"
-                    value={searchArea}
-                    onChange={(e) => {
-                      setSearchArea(e.target.value);
-                      setType(searchAreaToKey(e.target.value));
-                    }}
-                    className="filter-select"
-                  >
-                    {searchAreas.map((area) => (
-                      <option 
-                        key={area.value} 
-                        value={area.value}
-                        disabled={area.disabled}
-                        style={area.disabled ? { 
-                          backgroundColor: '#f0f0f0', 
-                          color: '#999',
-                          cursor: 'default'
-                        } : {}}
-                      >
-                        {area.label}
-                      </option>
-                    ))}
-                  </Input>
-                </FormGroup>
+                {/* Search In Filter - Only show in course mode */}
+                {searchMode === 'courses' && (
+                  <FormGroup className="mobile-filter-item">
+                    <Label for="mobileSearchAreaSelect" className="filter-label">Search In</Label>
+                    <Input
+                      id="mobileSearchAreaSelect"
+                      type="select"
+                      value={searchArea}
+                      onChange={(e) => {
+                        setSearchArea(e.target.value);
+                        setType(searchAreaToKey(e.target.value));
+                      }}
+                      className="filter-select"
+                    >
+                      {searchAreas.map((area) => (
+                        <option 
+                          key={area.value} 
+                          value={area.value}
+                        >
+                          {area.label}
+                        </option>
+                      ))}
+                    </Input>
+                  </FormGroup>
+                )}
 
                 {/* Sort Filter */}
                 <FormGroup className="mobile-filter-item">

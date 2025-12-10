@@ -16,7 +16,7 @@ const ITEM_TYPE = 'WORKFLOW_STEP';
 /**
  * DraggableStepCard - Individual draggable step card
  */
-function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
+function DraggableStepCard({ step, index, steps, onEdit, onDelete, moveStep }) {
   const ref = useRef(null);
 
   const [{ isDragging }, drag] = useDrag({
@@ -41,6 +41,22 @@ function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
   });
 
   drag(drop(ref));
+
+  const stepNumber = step.sequence_order ?? step.step_order ?? (index + 1);
+  const isGate = step.is_gate === 1 || step.is_gate === true;
+  const isAutomated = step.is_automated === 1 || step.is_automated === true;
+
+  const dependencyLabels = (Array.isArray(step.depends_on) ? step.depends_on : [])
+    .map((dep) => {
+      const target = steps.find((candidate, candidateIndex) => {
+        const candidateId = candidate.id ?? candidate.local_id ?? candidate.sequence_order ?? (candidateIndex + 1);
+        return candidateId === dep;
+      });
+      if (!target) return null;
+      const targetNumber = target.sequence_order ?? target.step_order ?? (steps.indexOf(target) + 1);
+      return `Step ${targetNumber}: ${target.step_name}`;
+    })
+    .filter(Boolean);
 
   const getStepTypeBadge = (type) => {
     const config = {
@@ -81,7 +97,7 @@ function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
               <div
                 className="d-flex align-items-center justify-content-center bg-primary text-white rounded-circle"
                 style={{ width: '32px', height: '32px', fontWeight: 'bold' }}>
-                {step.step_order}
+                {stepNumber}
               </div>
             </div>
 
@@ -93,6 +109,16 @@ function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
                 {step.is_required && (
                   <Badge color="danger" pill className="ms-1">
                     Required
+                  </Badge>
+                )}
+                {isGate && (
+                  <Badge color="dark" pill className="ms-1">
+                    Gate
+                  </Badge>
+                )}
+                {isAutomated && (
+                  <Badge color="info" pill className="ms-1">
+                    Automated
                   </Badge>
                 )}
                 {step.due_date_offset && (
@@ -109,6 +135,18 @@ function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
               </div>
               {step.description && (
                 <p className="text-muted small mb-0">{step.description}</p>
+              )}
+              {dependencyLabels.length > 0 && (
+                <p className="text-muted small mb-0 mt-2">
+                  <FontAwesomeIcon icon="fa-solid fa-link" className="me-1" />
+                  Depends on {dependencyLabels.join(', ')}
+                </p>
+              )}
+              {step.automation_handler && (
+                <p className="text-muted small mb-0 mt-2">
+                  <FontAwesomeIcon icon="fa-solid fa-robot" className="me-1" />
+                  Automation Handler: <code>{step.automation_handler}</code>
+                </p>
               )}
             </div>
 
@@ -141,6 +179,7 @@ function DraggableStepCard({ step, index, onEdit, onDelete, moveStep }) {
 DraggableStepCard.propTypes = {
   step: PropTypes.object.isRequired,
   index: PropTypes.number.isRequired,
+  steps: PropTypes.array.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   moveStep: PropTypes.func.isRequired
@@ -211,7 +250,7 @@ function StepBuilder({ steps, onAddStep, onUpdateStep, onDeleteStep, onReorderSt
             />
             <h5>No Steps Yet</h5>
             <p className="text-muted">
-              Click "Add Step" to create your first workflow step
+              Click &ldquo;Add Step&rdquo; to create your first workflow step
             </p>
             <Button color="primary" onClick={handleAddNew}>
               <FontAwesomeIcon icon="fa-solid fa-plus" className="me-2" />
@@ -226,6 +265,7 @@ function StepBuilder({ steps, onAddStep, onUpdateStep, onDeleteStep, onReorderSt
               key={index}
               step={step}
               index={index}
+              steps={steps}
               onEdit={handleEdit}
               onDelete={handleDelete}
               moveStep={moveStep}
@@ -238,12 +278,14 @@ function StepBuilder({ steps, onAddStep, onUpdateStep, onDeleteStep, onReorderSt
       {modalOpen && editingIndex !== null && steps[editingIndex] && (
         <StepConfigModal
           isOpen={modalOpen}
-          toggle={() => {
+          step={steps[editingIndex]}
+          allSteps={steps}
+          currentIndex={editingIndex}
+          onSave={handleSaveStep}
+          onClose={() => {
             setModalOpen(false);
             setEditingIndex(null);
           }}
-          step={steps[editingIndex]}
-          onSave={handleSaveStep}
         />
       )}
 
@@ -257,7 +299,7 @@ function StepBuilder({ steps, onAddStep, onUpdateStep, onDeleteStep, onReorderSt
           <ul className="small mb-0">
             <li>Steps execute in order from top to bottom</li>
             <li>Use the grip icon to drag and reorder steps</li>
-            <li>Mark critical steps as "Required" to prevent skipping</li>
+            <li>Mark critical steps as &ldquo;Required&rdquo; to prevent skipping</li>
             <li>Set due date offsets to track deadlines</li>
             <li>Use Decision steps to create branching workflows</li>
           </ul>

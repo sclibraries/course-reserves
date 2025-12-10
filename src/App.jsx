@@ -82,8 +82,11 @@ const AppContent = () => {
  * )
  */
 const RootApp = ({ router: RouterComponent = Router }) => {
+  // Use the environment variable for basename, removing trailing slash if present
+  const basename = (import.meta.env.VITE_BASE_PATH || '/course-reserves').replace(/\/$/, '');
+  
   return (
-    <RouterComponent basename="/course-reserves">
+    <RouterComponent basename={basename}>
       <AppContent />
     </RouterComponent>
   );
