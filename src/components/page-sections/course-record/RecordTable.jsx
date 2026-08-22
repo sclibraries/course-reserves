@@ -16,8 +16,7 @@ import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
 import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
 import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const getRecordVisibility = (item, canBypassVisibility) => {
+const getRecordVisibility = (item, canBypassVisibility) => {
   if (item.isElectronic && item.resource) {
     // Users authorized to bypass visibility can see all resources regardless of visibility window
     if (canBypassVisibility) {
@@ -53,8 +52,7 @@ export const getRecordVisibility = (item, canBypassVisibility) => {
   return { isVisible: true };
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const getVisibleSplitLinks = (links, canBypassVisibility) => (
+const getVisibleSplitLinks = (links, canBypassVisibility) => (
   Array.isArray(links)
     ? links.filter(link => isLinkVisible(link, canBypassVisibility))
     : []
