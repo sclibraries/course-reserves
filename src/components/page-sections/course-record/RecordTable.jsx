@@ -16,6 +16,50 @@ import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
 import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
 import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const getRecordVisibility = (item, canBypassVisibility) => {
+  if (item.isElectronic && item.resource) {
+    // Users authorized to bypass visibility can see all resources regardless of visibility window
+    if (canBypassVisibility) {
+      return { isVisible: true };
+    }
+
+    const now = new Date();
+    const startVisibility = item.resource.start_visibility
+      ? new Date(item.resource.start_visibility)
+      : null;
+    const endVisibility = item.resource.end_visibility
+      ? new Date(item.resource.end_visibility)
+      : null;
+
+    // If current time is before the start of the visibility window
+    if (startVisibility && now < startVisibility) {
+      return {
+        isVisible: false,
+        message: `Available from ${startVisibility.toLocaleDateString()}`,
+        startDate: startVisibility
+      };
+    }
+
+    // If current time is after the end of the visibility window
+    if (endVisibility && now > endVisibility) {
+      return {
+        isVisible: false,
+        message: `Available until ${endVisibility.toLocaleDateString()}`,
+        endDate: endVisibility
+      };
+    }
+  }
+  return { isVisible: true };
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getVisibleSplitLinks = (links, canBypassVisibility) => (
+  Array.isArray(links)
+    ? links.filter(link => isLinkVisible(link, canBypassVisibility))
+    : []
+);
+
 /**
  * RecordTable component
  * 
@@ -91,39 +135,7 @@ const RecordTable = ({
    * @returns {Object} Object containing visibility status and message
    */
   const checkVisibility = useCallback((item) => {
-    if (item.isElectronic && item.resource) {
-      // Users authorized to bypass visibility can see all resources regardless of visibility window
-      if (canBypassVisibility) {
-        return { isVisible: true };
-      }
-
-      const now = new Date();
-      const startVisibility = item.resource.start_visibility
-        ? new Date(item.resource.start_visibility)
-        : null;
-      const endVisibility = item.resource.end_visibility
-        ? new Date(item.resource.end_visibility)
-        : null;
-        
-      // If current time is before the start of the visibility window
-      if (startVisibility && now < startVisibility) {
-        return { 
-          isVisible: false,
-          message: `Available from ${startVisibility.toLocaleDateString()}`,
-          startDate: startVisibility
-        };
-      }
-      
-      // If current time is after the end of the visibility window
-      if (endVisibility && now > endVisibility) {
-        return {
-          isVisible: false,
-          message: `Available until ${endVisibility.toLocaleDateString()}`,
-          endDate: endVisibility
-        };
-      }
-    }
-    return { isVisible: true };
+    return getRecordVisibility(item, canBypassVisibility);
   }, [canBypassVisibility]);
 
   // Process visibility for all items
@@ -655,8 +667,9 @@ const RecordTable = ({
    * Render the table in split view mode
    */
   const renderSplitView = () => {
-    const printRecords = records.filter(item => !item.isElectronic);
-    const electronicRecords = records.filter(item => item.isElectronic);
+    const visibleRecords = records.filter(item => checkVisibility(item).isVisible);
+    const printRecords = visibleRecords.filter(item => !item.isElectronic);
+    const electronicRecords = visibleRecords.filter(item => item.isElectronic);
     
     return (
       <Row>
@@ -742,7 +755,8 @@ const RecordTable = ({
                   .map(item => {
                     const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, canBypassVisibility);
                     const resourceUrl = item.resource?.item_url && isPrimaryLinkVisibleCheck ? item.resource.item_url : null;
-                    const hasAdditionalLinks = item.resource?.links?.length > 0;
+                    const visibleAdditionalLinks = getVisibleSplitLinks(item.resource?.links, canBypassVisibility);
+                    const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
                     const isExpanded = expandedLinkItems[item.id] || false;
                     
                     return (
@@ -784,7 +798,7 @@ const RecordTable = ({
                                     aria-expanded={isExpanded}
                                     style={{ color: customization.buttonPrimaryColor }}
                                   >
-                                    {item.resource.links.length} more
+                                    {visibleAdditionalLinks.length} more
                                     <FontAwesomeIcon 
                                       icon={isExpanded ? faChevronUp : faChevronDown} 
                                       className="ms-1" 
@@ -807,7 +821,7 @@ const RecordTable = ({
                                     aria-expanded={isExpanded}
                                     style={{ color: customization.buttonPrimaryColor }}
                                   >
-                                    {item.resource.links.length} more
+                                    {visibleAdditionalLinks.length} more
                                     <FontAwesomeIcon 
                                       icon={isExpanded ? faChevronUp : faChevronDown} 
                                       className="ms-1" 
@@ -823,7 +837,7 @@ const RecordTable = ({
                                 aria-expanded={isExpanded}
                                 style={{ color: customization.buttonPrimaryColor }}
                               >
-                                {item.resource.links.length} links
+                                {visibleAdditionalLinks.length} links
                                 <FontAwesomeIcon 
                                   icon={isExpanded ? faChevronUp : faChevronDown} 
                                   className="ms-1" 
@@ -840,7 +854,7 @@ const RecordTable = ({
                               <Collapse isOpen={isExpanded}>
                                 <div className="p-3 bg-light">
                                   <ul className="list-group list-group-flush">
-                                    {item.resource.links.map((link, idx) => (
+                                    {visibleAdditionalLinks.map((link, idx) => (
                                       <li key={link.link_id || idx} className="list-group-item bg-transparent px-0">
                                         <div>
                                           <strong>{link.title || `Link ${idx + 1}`}</strong>
