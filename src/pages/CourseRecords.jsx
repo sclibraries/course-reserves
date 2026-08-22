@@ -28,6 +28,7 @@ import {
   withStudentPreview,
   canBypassVisibility,
 } from '../util/studentPreview';
+import { parseVisibilityDate } from '../util/resourceVisibility';
 
 function CourseRecords() {
   const location = useLocation();
@@ -541,12 +542,8 @@ function CourseRecords() {
       
       // Always check resource-level visibility dates if they're set
       if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
-        const startVisibility = item.resource.start_visibility
-          ? new Date(item.resource.start_visibility + 'T00:00:00')
-          : null;
-        const endVisibility = item.resource.end_visibility
-          ? new Date(item.resource.end_visibility + 'T23:59:59')
-          : null;
+        const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+        const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
         if ((startVisibility && now < startVisibility)) {
           return false;
@@ -791,12 +788,8 @@ function CourseRecords() {
         
         if (usePrimaryLinkVisibility) {
           // Use primary link visibility dates
-          const startVisibility = item.resource.primary_link_start_visibility
-            ? new Date(item.resource.primary_link_start_visibility + 'T00:00:00')
-            : null;
-          const endVisibility = item.resource.primary_link_end_visibility
-            ? new Date(item.resource.primary_link_end_visibility + 'T23:59:59')
-            : null;
+          const startVisibility = parseVisibilityDate(item.resource.primary_link_start_visibility);
+          const endVisibility = parseVisibilityDate(item.resource.primary_link_end_visibility, 'end');
             
           // If current time is before the start of the primary link visibility window
           if (startVisibility && now < startVisibility) {
@@ -816,12 +809,8 @@ function CourseRecords() {
           
           if (useResourceVisibility) {
             // Use resource-level visibility dates
-            const startVisibility = item.resource.start_visibility
-              ? new Date(item.resource.start_visibility + 'T00:00:00')
-              : null;
-            const endVisibility = item.resource.end_visibility
-              ? new Date(item.resource.end_visibility + 'T23:59:59')
-              : null;
+            const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+            const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
             if ((startVisibility && now < startVisibility)) {
               upcomingDates.push(startVisibility);

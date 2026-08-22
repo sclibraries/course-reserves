@@ -13,8 +13,17 @@ import {
 // Import tracking service
 import { trackingService } from '../../../services/trackingService';
 import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
-import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
-import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
+import {
+  getVisibilityInfo,
+  isLinkVisible,
+  isPrimaryLinkVisible,
+  parseVisibilityDate,
+} from '../../../util/resourceVisibility';
+import { useRecordsTextStore, selectRecordTableText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
+
+const formatVisibilityDate = (value, boundary = 'start') => (
+  parseVisibilityDate(value, boundary)?.toLocaleDateString()
+);
 
 const getRecordVisibility = (item, canBypassVisibility) => {
   if (item.isElectronic && item.resource) {
@@ -24,12 +33,8 @@ const getRecordVisibility = (item, canBypassVisibility) => {
     }
 
     const now = new Date();
-    const startVisibility = item.resource.start_visibility
-      ? new Date(item.resource.start_visibility)
-      : null;
-    const endVisibility = item.resource.end_visibility
-      ? new Date(item.resource.end_visibility)
-      : null;
+    const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+    const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
     // If current time is before the start of the visibility window
     if (startVisibility && now < startVisibility) {
@@ -52,7 +57,7 @@ const getRecordVisibility = (item, canBypassVisibility) => {
   return { isVisible: true };
 };
 
-const getVisibleSplitLinks = (links, canBypassVisibility) => (
+const getVisibleLinks = (links, canBypassVisibility) => (
   Array.isArray(links)
     ? links.filter(link => isLinkVisible(link, canBypassVisibility))
     : []
@@ -96,7 +101,6 @@ const RecordTable = ({
   
   // Get text from the store
   const recordTableText = useRecordsTextStore(selectRecordTableText);
-  const visibilityText = useRecordsTextStore(selectVisibilityText);
   const accessibilityText = useRecordsTextStore(selectAccessibilityText);
   const courseRecordsText = useRecordsTextStore(selectCourseRecordsText);
   const splitViewText = useRecordsTextStore(selectSplitViewText);
@@ -153,13 +157,13 @@ const RecordTable = ({
             if (item.resource?.start_visibility) {
               scheduleInfo.push({
                 title: item.copiedItem?.title,
-                date: new Date(item.resource.start_visibility),
+                date: parseVisibilityDate(item.resource.start_visibility),
                 type: 'upcoming'
               });
             } else if (item.resource?.end_visibility) {
               scheduleInfo.push({
                 title: item.copiedItem?.title,
-                date: new Date(item.resource.end_visibility),
+                date: parseVisibilityDate(item.resource.end_visibility, 'end'),
                 type: 'past'
               });
             }
@@ -188,13 +192,13 @@ const RecordTable = ({
           if (result.resource?.start_visibility) {
             scheduleInfo.push({
               title: result.copiedItem?.title,
-              date: new Date(result.resource.start_visibility),
+              date: parseVisibilityDate(result.resource.start_visibility),
               type: 'upcoming'
             });
           } else if (result.resource?.end_visibility) {
             scheduleInfo.push({
               title: result.copiedItem?.title,
-              date: new Date(result.resource.end_visibility),
+              date: parseVisibilityDate(result.resource.end_visibility, 'end'),
               type: 'past'
             });
           }
@@ -368,10 +372,10 @@ const RecordTable = ({
       ? item.resource.item_url 
       : (!item.isElectronic ? (item.copiedItem?.uri || item.copiedItem?.url) : null);
 
-    const hasAdditionalLinks = item.isElectronic && 
-                              item.resource && 
-                              Array.isArray(item.resource.links) && 
-                              item.resource.links.length > 0;
+    const visibleAdditionalLinks = item.isElectronic
+      ? getVisibleLinks(item.resource?.links, canBypassVisibility)
+      : [];
+    const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
     
     const isExpanded = expandedLinkItems[item.id] || false;
 
@@ -418,10 +422,10 @@ const RecordTable = ({
                   <h6 className="mb-2">Visibility Window</h6>
                   <div className="small">
                     {visibilityInfo.startDate && (
-                      <div><strong>From:</strong> {new Date(visibilityInfo.startDate).toLocaleDateString()}</div>
+                      <div><strong>From:</strong> {formatVisibilityDate(visibilityInfo.startDate)}</div>
                     )}
                     {visibilityInfo.endDate && (
-                      <div><strong>Until:</strong> {new Date(visibilityInfo.endDate).toLocaleDateString()}</div>
+                      <div><strong>Until:</strong> {formatVisibilityDate(visibilityInfo.endDate, 'end')}</div>
                     )}
                   </div>
                 </PopoverBody>
@@ -522,34 +526,7 @@ const RecordTable = ({
                       style={{ color: customization.buttonPrimaryColor }}
                     >
                       <span className="badge bg-secondary">
-                        {item.resource.links.length} additional {item.resource.links.length === 1 ? 'link' : 'links'}
-                      </span>
-                      <FontAwesomeIcon 
-                        icon={isExpanded ? faChevronUp : faChevronDown} 
-                        className="ms-1" 
-                      />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ) : item.isElectronic && item.resource && item.resource.item_url && !isPrimaryLinkVisibleCheck ? (
-              <div>
-                <span className="text-warning small">
-                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
-                  {visibilityText.notCurrentlyAvailable}
-                </span>
-                {hasAdditionalLinks && (
-                  <div className="mt-2">
-                    <Button 
-                      color="link" 
-                      size="sm" 
-                      className="p-0"
-                      onClick={() => toggleLinksExpand(item.id)}
-                      aria-expanded={isExpanded}
-                      style={{ color: customization.buttonPrimaryColor }}
-                    >
-                      <span className="badge bg-secondary">
-                        {item.resource.links.length} additional {item.resource.links.length === 1 ? 'link' : 'links'}
+                        {visibleAdditionalLinks.length} additional {visibleAdditionalLinks.length === 1 ? 'link' : 'links'}
                       </span>
                       <FontAwesomeIcon 
                         icon={isExpanded ? faChevronUp : faChevronDown} 
@@ -569,7 +546,7 @@ const RecordTable = ({
                 style={{ color: customization.buttonPrimaryColor }}
               >
                 <span className="badge bg-secondary">
-                  {item.resource.links.length} {item.resource.links.length === 1 ? 'link' : 'links'} available
+                  {visibleAdditionalLinks.length} {visibleAdditionalLinks.length === 1 ? 'link' : 'links'} available
                 </span>
                 <FontAwesomeIcon 
                   icon={isExpanded ? faChevronUp : faChevronDown} 
@@ -588,43 +565,31 @@ const RecordTable = ({
                 <div className="p-3">
                   <h6 className="mb-2">{recordTableText.additionalLinks}</h6>
                   <ul className="list-group">
-                    {item.resource.links.map((link, idx) => {
-                      const isCurrentLinkVisible = isLinkVisible(link, canBypassVisibility);
-                      
-                      return (
-                        <li key={link.link_id || idx} className="list-group-item">
+                    {visibleAdditionalLinks.map((link, idx) => (
+                      <li key={link.link_id || idx} className="list-group-item">
                           <div className="d-flex justify-content-between align-items-top">
                             <div>
                               <strong>{link.title || `Link ${idx + 1}`}</strong>
-                              {!isCurrentLinkVisible && (
-                                <span className="badge bg-warning text-dark ms-2">{visibilityText.notCurrentlyAvailableBadge}</span>
-                              )}
                               <div>
-                                {isCurrentLinkVisible ? (
-                                  <a 
-                                    href={link.url}
-                                    onClick={(e) => handleExternalLinkClick(
-                                      e, 
-                                      'resource_link_click', 
-                                      link.url, 
-                                      item, 
-                                      {
-                                        linkId: link.link_id,
-                                        linkTitle: link.title
-                                      }
-                                    )}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                    style={{ color: customization.buttonPrimaryColor }}
-                                  >
-                                    {link.url}
-                                    <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
-                                  </a>
-                                ) : (
-                                  <span className="text-muted fst-italic">
-                                    {visibilityText.linkNotAvailable}
-                                  </span>
-                                )}
+                                <a
+                                  href={link.url}
+                                  onClick={(e) => handleExternalLinkClick(
+                                    e,
+                                    'resource_link_click',
+                                    link.url,
+                                    item,
+                                    {
+                                      linkId: link.link_id,
+                                      linkTitle: link.title
+                                    }
+                                  )}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  style={{ color: customization.buttonPrimaryColor }}
+                                >
+                                  {link.url}
+                                  <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
+                                </a>
                               </div>
                               {link.description && (
                                 <div className="text-muted small mt-1">
@@ -639,8 +604,8 @@ const RecordTable = ({
                               {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
                                 <div className="small text-muted mt-1">
                                   <strong>Link Visibility:</strong>{' '}
-                                  {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
-                                  {link.end_visibility ? `until ${new Date(link.end_visibility).toLocaleDateString()}` : 'No end date'}
+                                  {link.start_visibility ? `From ${formatVisibilityDate(link.start_visibility)}` : 'No start date'}{' '}
+                                  {link.end_visibility ? `until ${formatVisibilityDate(link.end_visibility, 'end')}` : 'No end date'}
                                 </div>
                               )}
                             </div>
@@ -648,9 +613,8 @@ const RecordTable = ({
                               <span className="badge bg-light text-dark">Proxy Enabled</span>
                             )}
                           </div>
-                        </li>
-                      );
-                    })}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </Collapse>
@@ -753,7 +717,7 @@ const RecordTable = ({
                   .map(item => {
                     const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, canBypassVisibility);
                     const resourceUrl = item.resource?.item_url && isPrimaryLinkVisibleCheck ? item.resource.item_url : null;
-                    const visibleAdditionalLinks = getVisibleSplitLinks(item.resource?.links, canBypassVisibility);
+                    const visibleAdditionalLinks = getVisibleLinks(item.resource?.links, canBypassVisibility);
                     const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
                     const isExpanded = expandedLinkItems[item.id] || false;
                     
@@ -787,29 +751,6 @@ const RecordTable = ({
                                   {recordTableText.access} <FontAwesomeIcon icon={faExternalLinkAlt} />
                                 </button>
                                 
-                                {hasAdditionalLinks && (
-                                  <Button 
-                                    color="link" 
-                                    size="sm" 
-                                    className="ms-2"
-                                    onClick={() => toggleLinksExpand(item.id)}
-                                    aria-expanded={isExpanded}
-                                    style={{ color: customization.buttonPrimaryColor }}
-                                  >
-                                    {visibleAdditionalLinks.length} more
-                                    <FontAwesomeIcon 
-                                      icon={isExpanded ? faChevronUp : faChevronDown} 
-                                      className="ms-1" 
-                                    />
-                                  </Button>
-                                )}
-                              </div>
-                            ) : item.resource?.item_url && !isPrimaryLinkVisibleCheck ? (
-                              <div>
-                                <span className="text-warning small">
-                                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
-                                  {visibilityText.notCurrentlyAvailable}
-                                </span>
                                 {hasAdditionalLinks && (
                                   <Button 
                                     color="link" 
@@ -884,6 +825,13 @@ const RecordTable = ({
                                               ) : (
                                                 link.description
                                               )}
+                                            </div>
+                                          )}
+                                          {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                                            <div className="small text-muted mt-1">
+                                              <strong>Link Visibility:</strong>{' '}
+                                              {link.start_visibility ? `From ${formatVisibilityDate(link.start_visibility)}` : 'No start date'}{' '}
+                                              {link.end_visibility ? `until ${formatVisibilityDate(link.end_visibility, 'end')}` : 'No end date'}
                                             </div>
                                           )}
                                         </div>
