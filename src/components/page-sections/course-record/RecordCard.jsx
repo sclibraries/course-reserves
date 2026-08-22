@@ -18,7 +18,6 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faBook, faClock, faInfoCircle} from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
-import { useAuth } from '../../../contexts/AuthContext';
 import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
 import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
 
@@ -39,6 +38,7 @@ import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../..
  * @param {Object} props.courseInfo - Information about the associated course
  * @param {string} props.collegeParam - College parameter for tracking
  * @param {boolean} props.showVisibilityMessages - Whether to show visibility messages instead of hiding items
+ * @param {boolean} props.canBypassVisibility - Whether visibility restrictions can be bypassed
  * @returns {JSX.Element|null} The record card or null if visibility conditions aren't met
  */
 const RecordCard = ({
@@ -51,10 +51,8 @@ const RecordCard = ({
   courseInfo,
   collegeParam,
   showVisibilityMessages = true,
+  canBypassVisibility = false,
 }) => {
-  // Get authentication state directly from context
-  const { isAuthenticated } = useAuth();
-
   // State for managing popover visibility
   const [activePopover, setActivePopover] = useState(null);
 
@@ -170,8 +168,8 @@ const RecordCard = ({
    */
   const checkVisibility = () => {
     if (isElectronic && resource) {
-      // Authenticated users can see all resources regardless of visibility window
-      if (isAuthenticated) {
+      // Users authorized to bypass visibility can see all resources regardless of visibility window
+      if (canBypassVisibility) {
         return { isVisible: true };
       }
 
@@ -210,8 +208,8 @@ const RecordCard = ({
   // Check visibility
   const { isVisible, message } = checkVisibility();
 
-  // For non-authenticated users, completely skip rendering resources that aren't visible
-  if (!isVisible && !isAuthenticated && !showVisibilityMessages) {
+  // For users without visibility-bypass authority, skip resources that aren't visible
+  if (!isVisible && !canBypassVisibility && !showVisibilityMessages) {
     return null; // Simply return null for invisible resources, let parent component show the message
   }
 
@@ -247,7 +245,7 @@ const RecordCard = ({
   const reserveMaterialTypes = getReserveMaterialTypes();
 
   // Get visibility information for electronic resources
-  const visibilityInfo = isElectronic && resource ? getVisibilityInfo(resource, isAuthenticated) : { showVisibilityDates: false };
+  const visibilityInfo = isElectronic && resource ? getVisibilityInfo(resource, canBypassVisibility) : { showVisibilityDates: false };
   const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
   /**
@@ -519,7 +517,7 @@ const RecordCard = ({
     const hasAdditionalLinks = resource.links && resource.links.length > 0;
 
     // Check if the primary resource link is visible based on visibility settings
-    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(resource, isAuthenticated);
+    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(resource, canBypassVisibility);
 
     return (
       <div className="mt-3">
@@ -600,7 +598,7 @@ const RecordCard = ({
             <div className="list-group">
               {resource.links.map((link, index) => {
                 // Check if this individual link is visible
-                const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
+                const isCurrentLinkVisible = isLinkVisible(link, canBypassVisibility);
                 
                 // Always render the link item, but conditionally show the actual link
                 return (
@@ -621,8 +619,8 @@ const RecordCard = ({
                       <p className="mb-2">{link.description}</p>
                     )}
 
-                    {/* Show link visibility dates for authenticated users */}
-                    {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                    {/* Show link visibility dates for users authorized to bypass visibility */}
+                    {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
                       <div className="small text-muted mb-2">
                         <strong>Link Visibility:</strong>{' '}
                         {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
@@ -754,8 +752,8 @@ const RecordCard = ({
               {message}
             </div>
           )}
-          {/* Display visibility information for authenticated users */}
-          {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+          {/* Display visibility information for users authorized to bypass visibility */}
+          {canBypassVisibility && isElectronic && resource && showVisibilityDates && (
             <span 
               id={`visibility-${recordItem.id}`}
               className="ms-2 text-muted"
@@ -768,8 +766,8 @@ const RecordCard = ({
           )}
         </CardTitle>
         
-        {/* Popover for visibility dates (authenticated users only) */}
-        {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+        {/* Popover for visibility dates (users authorized to bypass visibility only) */}
+        {canBypassVisibility && isElectronic && resource && showVisibilityDates && (
           <Popover
             placement="auto"
             isOpen={activePopover === `visibility-${recordItem.id}`}
@@ -832,6 +830,10 @@ RecordCard.propTypes = {
    * Whether the record is displayed as part of a group
    */
   isGrouped: PropTypes.bool,
+  /**
+   * Whether visibility restrictions can be bypassed
+   */
+  canBypassVisibility: PropTypes.bool,
   /**
    * Availability information keyed by instance ID
    */
@@ -904,7 +906,8 @@ RecordCard.defaultProps = {
   isGrouped: false,
   courseInfo: {},
   collegeParam: 'Unknown',
-  showVisibilityMessages: true
+  showVisibilityMessages: true,
+  canBypassVisibility: false,
 };
 
 export default RecordCard;

@@ -12,8 +12,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 // Import tracking service
 import { trackingService } from '../../../services/trackingService';
-// Import Auth Context
-import { useAuth } from '../../../contexts/AuthContext';
 import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
 import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
 import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../stores/recordsTextStore';
@@ -35,6 +33,7 @@ import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selec
  * @param {boolean} props.showVisibilityMessages - Whether to show visibility messages
  * @param {string} props.viewMode - View mode for the table ('combined' or 'split')
  * @param {Array} props.records - Array of individual record items
+ * @param {boolean} props.canBypassVisibility - Whether visibility restrictions can be bypassed
  * @returns {JSX.Element} A table of course records with interactive elements
  */
 const RecordTable = ({
@@ -46,15 +45,13 @@ const RecordTable = ({
   collegeParam,
   showVisibilityMessages = true,
   viewMode = 'combined',
-  records = []
+  records = [],
+  canBypassVisibility = false,
 }) => {
   const [activePopover, setActivePopover] = useState(null);
   const [expandedLinkItems, setExpandedLinkItems] = useState({});
   const [showHiddenItems] = useState(false);
   
-  // Get authentication state from context
-  const { isAuthenticated } = useAuth();
-
   // Get text from the store
   const recordTableText = useRecordsTextStore(selectRecordTableText);
   const visibilityText = useRecordsTextStore(selectVisibilityText);
@@ -95,8 +92,8 @@ const RecordTable = ({
    */
   const checkVisibility = useCallback((item) => {
     if (item.isElectronic && item.resource) {
-      // Authenticated users can see all resources regardless of visibility window
-      if (isAuthenticated) {
+      // Users authorized to bypass visibility can see all resources regardless of visibility window
+      if (canBypassVisibility) {
         return { isVisible: true };
       }
 
@@ -127,7 +124,7 @@ const RecordTable = ({
       }
     }
     return { isVisible: true };
-  }, [isAuthenticated]);
+  }, [canBypassVisibility]);
 
   // Process visibility for all items
   const processedResults = useMemo(() => {
@@ -164,7 +161,7 @@ const RecordTable = ({
         
         // Only include visible items in the processed group
         const visibleItems = processedGroupItems.filter(item => 
-          item.visibility.isVisible || isAuthenticated
+          item.visibility.isVisible || canBypassVisibility
         );
         
         return {
@@ -198,14 +195,14 @@ const RecordTable = ({
       }
     });
     
-    // Filter out items that aren't visible (unless user is authenticated)
+    // Filter out items that aren't visible unless visibility can be bypassed
     const filteredItems = processedItems.filter(item => {
       if ('items' in item) {
         // Group items
         return item.items.length > 0; // Only keep groups with visible items
       }
       // Individual items
-      return item.visibility.isVisible || isAuthenticated;
+      return item.visibility.isVisible || canBypassVisibility;
     });
     
     // Sort upcoming items by date
@@ -221,7 +218,7 @@ const RecordTable = ({
       upcomingItems,
       nextAvailableDate: upcomingItems.length > 0 ? upcomingItems[0].date : null
     };
-  }, [combinedResults, isAuthenticated, checkVisibility]);
+  }, [combinedResults, canBypassVisibility, checkVisibility]);
   
   const { 
     items: processedItems, 
@@ -354,7 +351,7 @@ const RecordTable = ({
 
     // Check primary link visibility for electronic resources
     const isPrimaryLinkVisibleCheck = item.isElectronic && item.resource 
-      ? isPrimaryLinkVisible(item.resource, isAuthenticated) 
+      ? isPrimaryLinkVisible(item.resource, canBypassVisibility)
       : true;
 
     const resourceUrl = item.isElectronic && item.resource && isPrimaryLinkVisibleCheck
@@ -370,7 +367,7 @@ const RecordTable = ({
 
     // Get visibility information for electronic resources
     const visibilityInfo = item.isElectronic && item.resource 
-      ? getVisibilityInfo(item.resource, isAuthenticated) 
+      ? getVisibilityInfo(item.resource, canBypassVisibility)
       : { showVisibilityDates: false };
     const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
@@ -582,7 +579,7 @@ const RecordTable = ({
                   <h6 className="mb-2">{recordTableText.additionalLinks}</h6>
                   <ul className="list-group">
                     {item.resource.links.map((link, idx) => {
-                      const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
+                      const isCurrentLinkVisible = isLinkVisible(link, canBypassVisibility);
                       
                       return (
                         <li key={link.link_id || idx} className="list-group-item">
@@ -628,8 +625,8 @@ const RecordTable = ({
                                   )}
                                 </div>
                               )}
-                              {/* Show link visibility dates for authenticated users */}
-                              {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                              {/* Show link visibility dates for users authorized to bypass visibility */}
+                              {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
                                 <div className="small text-muted mt-1">
                                   <strong>Link Visibility:</strong>{' '}
                                   {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
@@ -743,7 +740,7 @@ const RecordTable = ({
                 {electronicRecords
                   .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
                   .map(item => {
-                    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, isAuthenticated);
+                    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, canBypassVisibility);
                     const resourceUrl = item.resource?.item_url && isPrimaryLinkVisibleCheck ? item.resource.item_url : null;
                     const hasAdditionalLinks = item.resource?.links?.length > 0;
                     const isExpanded = expandedLinkItems[item.id] || false;
@@ -1042,6 +1039,10 @@ RecordTable.propTypes = {
    */
   hasElectronicReserves: PropTypes.bool,
   /**
+   * Whether visibility restrictions can be bypassed
+   */
+  canBypassVisibility: PropTypes.bool,
+  /**
    * UI customization settings
    */
   customization: PropTypes.shape({
@@ -1079,7 +1080,8 @@ RecordTable.defaultProps = {
   collegeParam: 'Unknown',
   showVisibilityMessages: true,
   viewMode: 'combined',
-  records: []
+  records: [],
+  canBypassVisibility: false,
 };
 
 export default RecordTable;
