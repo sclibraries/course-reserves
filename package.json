@@ -4,7 +4,7 @@
   "version": "1.1.1",
   "type": "module",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --config vite.config.js",
     "dev": "vite",
     "build": "vite build",
     "build:staging": "vite build --mode staging",
