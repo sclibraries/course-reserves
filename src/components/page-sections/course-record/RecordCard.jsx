@@ -18,9 +18,17 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faBook, faClock, faInfoCircle} from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
-import { useAuth } from '../../../contexts/AuthContext';
 import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
-import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
+import {
+  getVisibilityInfo,
+  isLinkVisible,
+  isPrimaryLinkVisible,
+  parseVisibilityDate,
+} from '../../../util/resourceVisibility';
+
+const formatVisibilityDate = (value, boundary = 'start') => (
+  parseVisibilityDate(value, boundary)?.toLocaleDateString()
+);
 
 /**
  * RecordCard component
@@ -39,6 +47,7 @@ import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../..
  * @param {Object} props.courseInfo - Information about the associated course
  * @param {string} props.collegeParam - College parameter for tracking
  * @param {boolean} props.showVisibilityMessages - Whether to show visibility messages instead of hiding items
+ * @param {boolean} props.canBypassVisibility - Whether visibility restrictions can be bypassed
  * @returns {JSX.Element|null} The record card or null if visibility conditions aren't met
  */
 const RecordCard = ({
@@ -51,10 +60,8 @@ const RecordCard = ({
   courseInfo,
   collegeParam,
   showVisibilityMessages = true,
+  canBypassVisibility = false,
 }) => {
-  // Get authentication state directly from context
-  const { isAuthenticated } = useAuth();
-
   // State for managing popover visibility
   const [activePopover, setActivePopover] = useState(null);
 
@@ -170,8 +177,8 @@ const RecordCard = ({
    */
   const checkVisibility = () => {
     if (isElectronic && resource) {
-      // Authenticated users can see all resources regardless of visibility window
-      if (isAuthenticated) {
+      // Users authorized to bypass visibility can see all resources regardless of visibility window
+      if (canBypassVisibility) {
         return { isVisible: true };
       }
 
@@ -179,12 +186,8 @@ const RecordCard = ({
       
     
         // Use resource-level visibility dates
-        const startVisibility = resource.start_visibility
-          ? new Date(resource.start_visibility)
-          : null;
-        const endVisibility = resource.end_visibility
-          ? new Date(resource.end_visibility)
-          : null;
+        const startVisibility = parseVisibilityDate(resource.start_visibility);
+        const endVisibility = parseVisibilityDate(resource.end_visibility, 'end');
           
         // If current time is before the start of the visibility window
         if (startVisibility && now < startVisibility) {
@@ -210,8 +213,8 @@ const RecordCard = ({
   // Check visibility
   const { isVisible, message } = checkVisibility();
 
-  // For non-authenticated users, completely skip rendering resources that aren't visible
-  if (!isVisible && !isAuthenticated && !showVisibilityMessages) {
+  // For users without visibility-bypass authority, skip resources that aren't visible
+  if (!isVisible && !canBypassVisibility && !showVisibilityMessages) {
     return null; // Simply return null for invisible resources, let parent component show the message
   }
 
@@ -247,7 +250,7 @@ const RecordCard = ({
   const reserveMaterialTypes = getReserveMaterialTypes();
 
   // Get visibility information for electronic resources
-  const visibilityInfo = isElectronic && resource ? getVisibilityInfo(resource, isAuthenticated) : { showVisibilityDates: false };
+  const visibilityInfo = isElectronic && resource ? getVisibilityInfo(resource, canBypassVisibility) : { showVisibilityDates: false };
   const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
   /**
@@ -515,11 +518,13 @@ const RecordCard = ({
       });
     };
 
-    // Check if resource has additional links
-    const hasAdditionalLinks = resource.links && resource.links.length > 0;
+    const visibleAdditionalLinks = Array.isArray(resource.links)
+      ? resource.links.filter(link => isLinkVisible(link, canBypassVisibility))
+      : [];
+    const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
 
     // Check if the primary resource link is visible based on visibility settings
-    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(resource, isAuthenticated);
+    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(resource, canBypassVisibility);
 
     return (
       <div className="mt-3">
@@ -540,25 +545,18 @@ const RecordCard = ({
           </Button>
         )}
 
-        {/* Show message when primary link is not available */}
-        {resource.item_url && !isPrimaryLinkVisibleCheck && (
-          <div className="alert alert-warning small mb-2" role="alert">
-            <strong>Access Resource:</strong> The link to this resource is not currently available due to visibility restrictions.
-          </div>
-        )}
-
         {showVisibilityDates && (
           <div className="alert alert-info small mb-2" role="alert">
             <strong>Visibility Window:</strong>{' '}
             {visibilityInfo.usePrimaryLinkVisibility ? (
               <>
-                {visibilityInfo.startDate ? `From ${new Date(visibilityInfo.startDate).toLocaleDateString()}` : 'No start date'}{' '}
-                {visibilityInfo.endDate ? `until ${new Date(visibilityInfo.endDate).toLocaleDateString()}` : 'No end date'}
+                {visibilityInfo.startDate ? `From ${formatVisibilityDate(visibilityInfo.startDate)}` : 'No start date'}{' '}
+                {visibilityInfo.endDate ? `until ${formatVisibilityDate(visibilityInfo.endDate, 'end')}` : 'No end date'}
               </>
             ) : (
               <>
-                {visibilityInfo.startDate ? `From ${new Date(visibilityInfo.startDate).toLocaleDateString()}` : 'No start date'}{' '}
-                {visibilityInfo.endDate ? `until ${new Date(visibilityInfo.endDate).toLocaleDateString()}` : 'No end date'}
+                {visibilityInfo.startDate ? `From ${formatVisibilityDate(visibilityInfo.startDate)}` : 'No start date'}{' '}
+                {visibilityInfo.endDate ? `until ${formatVisibilityDate(visibilityInfo.endDate, 'end')}` : 'No end date'}
               </>
             )}
           </div>
@@ -598,21 +596,13 @@ const RecordCard = ({
           <div className="additional-links mt-3">
             <h3 className="h6 fw-bold mb-2">Additional Resources</h3>
             <div className="list-group">
-              {resource.links.map((link, index) => {
-                // Check if this individual link is visible
-                const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
-                
-                // Always render the link item, but conditionally show the actual link
-                return (
-                  <div key={link.link_id || index} className="list-group-item list-group-item-action">
+              {visibleAdditionalLinks.map((link, index) => (
+                <div key={link.link_id || index} className="list-group-item list-group-item-action">
                     <div className="d-flex w-100 justify-content-between">
                       <h4 className="h6 mb-1">{link.title || 'Additional Resource'}</h4>
                       <div>
                         {link.use_proxy === "1" && (
                           <Badge color="secondary" className="me-1">Proxy Enabled</Badge>
-                        )}
-                        {!isCurrentLinkVisible && (
-                          <Badge color="warning">Not Currently Available</Badge>
                         )}
                       </div>
                     </div>
@@ -621,41 +611,30 @@ const RecordCard = ({
                       <p className="mb-2">{link.description}</p>
                     )}
 
-                    {/* Show link visibility dates for authenticated users */}
-                    {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                    {/* Show link visibility dates for users authorized to bypass visibility */}
+                    {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
                       <div className="small text-muted mb-2">
                         <strong>Link Visibility:</strong>{' '}
-                        {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
-                        {link.end_visibility ? `until ${new Date(link.end_visibility).toLocaleDateString()}` : 'No end date'}
+                        {link.start_visibility ? `From ${formatVisibilityDate(link.start_visibility)}` : 'No start date'}{' '}
+                        {link.end_visibility ? `until ${formatVisibilityDate(link.end_visibility, 'end')}` : 'No end date'}
                       </div>
                     )}
                     
-                    {/* Only show the actual link if it's visible */}
-                    {isCurrentLinkVisible && (
-                      <a 
-                        href={link.url}
-                        onClick={(e) => handleAdditionalLinkClick(e, link)}
-                        className="text-primary d-block mb-1"
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        aria-label={`Access ${link.title || 'additional resource'} (opens in new tab)`}
-                      >
-                        <span className="text-truncate d-inline-block" style={{ maxWidth: "100%" }}>
-                          {link.url}
-                        </span>
-                        <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
-                      </a>
-                    )}
-                    
-                    {/* Show a message when link is not available */}
-                    {!isCurrentLinkVisible && (
-                      <p className="mb-1 small text-muted fst-italic">
-                        Link not currently available due to visibility restrictions.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                    <a
+                      href={link.url}
+                      onClick={(e) => handleAdditionalLinkClick(e, link)}
+                      className="text-primary d-block mb-1"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      aria-label={`Access ${link.title || 'additional resource'} (opens in new tab)`}
+                    >
+                      <span className="text-truncate d-inline-block" style={{ maxWidth: "100%" }}>
+                        {link.url}
+                      </span>
+                      <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-2" aria-hidden="true" />
+                    </a>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -754,8 +733,8 @@ const RecordCard = ({
               {message}
             </div>
           )}
-          {/* Display visibility information for authenticated users */}
-          {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+          {/* Display visibility information for users authorized to bypass visibility */}
+          {canBypassVisibility && isElectronic && resource && showVisibilityDates && (
             <span 
               id={`visibility-${recordItem.id}`}
               className="ms-2 text-muted"
@@ -768,8 +747,8 @@ const RecordCard = ({
           )}
         </CardTitle>
         
-        {/* Popover for visibility dates (authenticated users only) */}
-        {isAuthenticated && isElectronic && resource && showVisibilityDates && (
+        {/* Popover for visibility dates (users authorized to bypass visibility only) */}
+        {canBypassVisibility && isElectronic && resource && showVisibilityDates && (
           <Popover
             placement="auto"
             isOpen={activePopover === `visibility-${recordItem.id}`}
@@ -781,10 +760,10 @@ const RecordCard = ({
               <h6 className="mb-2">Visibility Window</h6>
               <div className="small">
                 {visibilityInfo.startDate && (
-                  <div><strong>From:</strong> {new Date(visibilityInfo.startDate).toLocaleDateString()}</div>
+                  <div><strong>From:</strong> {formatVisibilityDate(visibilityInfo.startDate)}</div>
                 )}
                 {visibilityInfo.endDate && (
-                  <div><strong>Until:</strong> {new Date(visibilityInfo.endDate).toLocaleDateString()}</div>
+                  <div><strong>Until:</strong> {formatVisibilityDate(visibilityInfo.endDate, 'end')}</div>
                 )}
               </div>
             </PopoverBody>
@@ -832,6 +811,10 @@ RecordCard.propTypes = {
    * Whether the record is displayed as part of a group
    */
   isGrouped: PropTypes.bool,
+  /**
+   * Whether visibility restrictions can be bypassed
+   */
+  canBypassVisibility: PropTypes.bool,
   /**
    * Availability information keyed by instance ID
    */
@@ -904,7 +887,8 @@ RecordCard.defaultProps = {
   isGrouped: false,
   courseInfo: {},
   collegeParam: 'Unknown',
-  showVisibilityMessages: true
+  showVisibilityMessages: true,
+  canBypassVisibility: false,
 };
 
 export default RecordCard;

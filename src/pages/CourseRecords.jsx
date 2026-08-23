@@ -23,6 +23,12 @@ import {
 import RecordCard from '../components/page-sections/course-record/RecordCard';
 import RecordTable from '../components/page-sections/course-record/RecordTable';
 import CoursePermalink from '../components/common/CoursePermalink';
+import {
+  isStudentPreview,
+  withStudentPreview,
+  canBypassVisibility,
+} from '../util/studentPreview';
+import { parseVisibilityDate } from '../util/resourceVisibility';
 
 function CourseRecords() {
   const location = useLocation();
@@ -47,6 +53,19 @@ function CourseRecords() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const { isAuthenticated } = useAuth();
+  const studentPreview = isStudentPreview(location.search);
+  const canBypassResourceVisibility = canBypassVisibility(
+    isAuthenticated,
+    studentPreview
+  );
+
+  const setStudentPreview = useCallback((enabled) => {
+    navigate({
+      pathname: location.pathname,
+      search: withStudentPreview(location.search, enabled),
+      hash: location.hash,
+    }, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   // Display mode: "card" (detailed) vs. "table" (compact)
   const [displayMode, setDisplayMode] = useState('card');
@@ -517,18 +536,14 @@ function CourseRecords() {
   // Helper function to check if a record should be visible
   const isRecordVisible = useCallback((item) => {
     if (item.isElectronic && item.resource) {
-      if (isAuthenticated) return true;
+      if (canBypassResourceVisibility) return true;
 
       const now = new Date();
       
       // Always check resource-level visibility dates if they're set
       if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
-        const startVisibility = item.resource.start_visibility
-          ? new Date(item.resource.start_visibility + 'T00:00:00')
-          : null;
-        const endVisibility = item.resource.end_visibility
-          ? new Date(item.resource.end_visibility + 'T23:59:59')
-          : null;
+        const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+        const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
         if ((startVisibility && now < startVisibility)) {
           return false;
@@ -540,7 +555,7 @@ function CourseRecords() {
       }
     }
     return true;
-  }, [isAuthenticated]);
+  }, [canBypassResourceVisibility]);
 
   // NEW: Combine grouped and ungrouped items with improved ordering logic
   // Handle different sorting scenarios based on order values
@@ -762,7 +777,7 @@ function CourseRecords() {
     // Check record visibility
     const checkRecordVisibility = (item) => {
       if (item.isElectronic && item.resource) {
-        if (isAuthenticated) return { isVisible: true };
+        if (canBypassResourceVisibility) return { isVisible: true };
 
         const now = new Date();
         
@@ -773,12 +788,8 @@ function CourseRecords() {
         
         if (usePrimaryLinkVisibility) {
           // Use primary link visibility dates
-          const startVisibility = item.resource.primary_link_start_visibility
-            ? new Date(item.resource.primary_link_start_visibility + 'T00:00:00')
-            : null;
-          const endVisibility = item.resource.primary_link_end_visibility
-            ? new Date(item.resource.primary_link_end_visibility + 'T23:59:59')
-            : null;
+          const startVisibility = parseVisibilityDate(item.resource.primary_link_start_visibility);
+          const endVisibility = parseVisibilityDate(item.resource.primary_link_end_visibility, 'end');
             
           // If current time is before the start of the primary link visibility window
           if (startVisibility && now < startVisibility) {
@@ -798,12 +809,8 @@ function CourseRecords() {
           
           if (useResourceVisibility) {
             // Use resource-level visibility dates
-            const startVisibility = item.resource.start_visibility
-              ? new Date(item.resource.start_visibility + 'T00:00:00')
-              : null;
-            const endVisibility = item.resource.end_visibility
-              ? new Date(item.resource.end_visibility + 'T23:59:59')
-              : null;
+            const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+            const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
             if ((startVisibility && now < startVisibility)) {
               upcomingDates.push(startVisibility);
@@ -840,7 +847,7 @@ function CourseRecords() {
       totalCount: hiddenCount + visibleCount,
       nextAvailableDate
     };
-  }, [records, isAuthenticated]);
+  }, [records, canBypassResourceVisibility]);
 
   const { hiddenCount, visibleCount, nextAvailableDate } = processedRecords;
 
@@ -1085,6 +1092,26 @@ function CourseRecords() {
         </div>
       )}
 
+      {isAuthenticated && !studentPreview && (
+        <div className="mb-3 d-flex justify-content-end">
+          <Button color="warning" outline onClick={() => setStudentPreview(true)}>
+            Preview as student
+          </Button>
+        </div>
+      )}
+
+      {studentPreview && (
+        <Alert color="warning" className="d-flex justify-content-between align-items-center">
+          <span>
+            <strong>Student preview is active.</strong>{' '}
+            Resources and links outside their visibility dates are hidden as they are for students.
+          </span>
+          <Button color="warning" outline onClick={() => setStudentPreview(false)}>
+            Exit student preview
+          </Button>
+        </Alert>
+      )}
+
       <div className="mb-3 d-flex justify-content-end">
         <Button color="link" className="p-0 icon-button" onClick={handleToggleDisplay}>
           {displayMode === 'card' ? (
@@ -1175,8 +1202,8 @@ function CourseRecords() {
         <Alert color="danger">{error}</Alert>
       ) : records && records.length > 0 ? (
         <>
-          {/* Show unavailable message if all items are hidden and user is not authenticated */}
-          {!isAuthenticated && visibleCount === 0 && hiddenCount > 0 ? (
+          {/* Show unavailable message if all items are hidden by visibility rules */}
+          {!canBypassResourceVisibility && visibleCount === 0 && hiddenCount > 0 ? (
             <Alert color="warning" className="d-flex align-items-center">
               <FontAwesomeIcon icon={faExclamationCircle} className="me-3 fa-lg" />
               <div>
@@ -1224,7 +1251,7 @@ function CourseRecords() {
                                     customization={customizationProps}
                                     courseInfo={courseInfo}
                                     collegeParam={collegeParam}
-                                    isAuthenticated={isAuthenticated}
+                                    canBypassVisibility={canBypassResourceVisibility}
                                     isGrouped
                                   />
                                 </Col>
@@ -1251,7 +1278,7 @@ function CourseRecords() {
                               customization={customizationProps}
                               courseInfo={courseInfo}
                               collegeParam={collegeParam}
-                              isAuthenticated={isAuthenticated}
+                              canBypassVisibility={canBypassResourceVisibility}
                             />
                           </Col>
                         </Row>
@@ -1285,7 +1312,7 @@ function CourseRecords() {
                               customization={customizationProps}
                               courseInfo={courseInfo}
                               collegeParam={collegeParam}
-                              isAuthenticated={isAuthenticated}
+                              canBypassVisibility={canBypassResourceVisibility}
                             />
                           ))
                       )}
@@ -1315,7 +1342,7 @@ function CourseRecords() {
                               customization={customizationProps}
                               courseInfo={courseInfo}
                               collegeParam={collegeParam}
-                              isAuthenticated={isAuthenticated}
+                              canBypassVisibility={canBypassResourceVisibility}
                             />
                           ))
                       )}
@@ -1334,6 +1361,7 @@ function CourseRecords() {
                 collegeParam={collegeParam}
                 viewMode={viewMode}
                 records={records} // Pass all records for split view
+                canBypassVisibility={canBypassResourceVisibility}
               />
             )
           )}
