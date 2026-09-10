@@ -1,0 +1,129 @@
+services:
+  # ─────────────────────────────────────────────
+  # MariaDB 10.3  (matches production)
+  # ─────────────────────────────────────────────
+  db:
+    image: mariadb:10.3
+    container_name: course_reserves_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: reserves
+      MYSQL_USER: folio-reserves
+      MYSQL_PASSWORD: folio-reserves
+    volumes:
+      # Persistent data across restarts
+      - db_data:/var/lib/mysql
+      # Auto-import SQL dump on first run (files run in alpha order: 01 → 02)
+      - ./packages/database/schema.sql:/docker-entrypoint-initdb.d/01-dump.sql:ro
+      - ./docker/mysql/init/02-seed-dev-user.sql:/docker-entrypoint-initdb.d/02-seed-dev-user.sql:ro
+    ports:
+      # Expose to host for direct DB access (TablePlus, DBeaver, etc.)
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "folio-reserves", "-pfolio-reserves"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - app_network
+
+  # ─────────────────────────────────────────────
+  # PHP 7.4 + Apache  (Yii2 backend)
+  # ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: course_reserves_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: reserves
+      DB_USER: folio-reserves
+      DB_PASS: folio-reserves
+      YII_DEBUG: "true"
+      YII_ENV: dev
+    env_file:
+      - ./apps/api/.env
+    volumes:
+      # Mount Yii2 app root into /app (monorepo: apps/api)
+      - ./apps/api:/app:cached
+      # Share Composer cache from host (speeds up rebuilds)
+      - ~/.composer-docker/cache:/root/.composer/cache:delegated
+    # NOT exposed directly to host — nginx routes to it
+    networks:
+      - app_network
+
+  # ─────────────────────────────────────────────
+  # Vite 5 + React  (frontend dev server)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./docker/frontend
+      dockerfile: Dockerfile
+    container_name: course_reserves_frontend
+    restart: unless-stopped
+    volumes:
+      # Mount only the admin-web app (not the entire monorepo root)
+      - ./apps/admin-web:/app:cached
+      # Prevent host node_modules from overriding container's
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    ports:
+      # Expose directly to host so HMR WebSocket works without nginx
+      - "5173:5173"
+    networks:
+      - app_network
+
+  # ─────────────────────────────────────────────
+  # Faculty form dev server  (port 5174)
+  # ─────────────────────────────────────────────
+  faculty-form:
+    build:
+      context: ./docker/frontend
+      dockerfile: Dockerfile
+    container_name: course_reserves_faculty_form
+    restart: unless-stopped
+    # Override CMD to run on port 5174 (8080 is taken by the nginx proxy)
+    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5174 --mode docker"
+    volumes:
+      - ./apps/faculty-form:/app:cached
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "5174:5174"
+    networks:
+      - app_network
+
+  # ─────────────────────────────────────────────
+  # nginx  (reverse proxy — unifies all services)
+  # ─────────────────────────────────────────────
+  proxy:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: course_reserves_proxy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+      - faculty-form
+    ports:
+      # Single entry point matching production path structure
+      - "8080:80"
+    networks:
+      - app_network
+
+volumes:
+  db_data:
+
+networks:
+  app_network:
+    driver: bridge

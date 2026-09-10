@@ -1,0 +1,117 @@
+/**
+ * StaffMessagingModal.css
+ * Styling for staff messaging modal with @mention autocomplete
+ */
+
+.staff-messaging-modal .modal-content {
+  border-radius: 8px;
+}
+
+.staff-messaging-modal .modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.staff-messaging-modal .modal-header svg {
+  color: #0d6efd;
+}
+
+/* @Mention Autocomplete Dropdown */
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1060;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
+.mention-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mention-option:hover {
+  background-color: #f8f9fa;
+}
+
+.mention-option:last-child {
+  border-bottom: none;
+}
+
+.mention-loading,
+.mention-empty {
+  padding: 12px;
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+.mention-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Task Options */
+.task-options {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Item Context */
+.item-context {
+  background-color: #f8f9fa;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+/* Form Styling */
+.staff-messaging-modal .form-label {
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 6px;
+}
+
+.staff-messaging-modal textarea.form-control {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.staff-messaging-modal code {
+  background-color: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.875em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .staff-messaging-modal .modal-lg {
+    max-width: 95%;
+  }
+  
+  .mention-dropdown {
+    max-height: 150px;
+  }
+}

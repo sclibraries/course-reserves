@@ -1,0 +1,175 @@
+/* CourseList and course component styles */
+
+/* Course card enhancements */
+.course-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.course-title-text {
+  display: inline;
+  background-image: linear-gradient(transparent calc(100% - 2px), currentColor 2px);
+  background-size: 0% 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s;
+}
+
+.course-card:hover .course-title-text {
+  background-size: 100% 100%;
+}
+
+/* Course table enhancements */
+.course-table-container {
+  border: 1px solid #dee2e6;
+}
+
+.course-table {
+  margin-bottom: 0;
+}
+
+.course-table-row {
+  transition: background-color 0.15s ease;
+}
+
+.course-table-row:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.course-title-link {
+  transition: color 0.15s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.course-title-link:hover {
+  color: #0a58ca;
+}
+
+.instructor-badge:hover {
+  background-color: #e9ecef !important;
+  color: #0a58ca !important;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.skeleton-title,
+.skeleton-subtitle,
+.skeleton-text,
+.skeleton-badge,
+.skeleton-button,
+.skeleton-line {
+  background-color: #e9ecef;
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Pagination styling */
+.pagination .page-link {
+  color: #495057;
+  border-color: #dee2e6;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+.pagination .page-link:focus {
+  box-shadow: none;
+  z-index: 3;
+}
+
+.pagination .active .page-link {
+  color: white;
+}
+
+/* Scroll to top button */
+.scroll-to-top-btn {
+  transition: opacity 0.3s, transform 0.3s;
+  opacity: 0.8;
+}
+
+.scroll-to-top-btn:hover {
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+  .pagination .page-link {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Accessibility helper class */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Improve focus visibility for interactive elements */
+button:focus-visible,
+a:focus-visible,
+.page-link:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Ensure badge text has proper contrast */
+.term-badge,
+.location-badge {
+  border: 1px solid rgba(0,0,0,0.1);
+  font-weight: 600 !important; /* Ensure font weight for better readability */
+}
+
+/* Prevent text overflow in cards */
+.course-card .card-title {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Improve button hover states */
+.action-button:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Ensure reset button has visible text in smaller viewports */
+@media (max-width: 576px) {
+  .reset-button .visually-hidden {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0 0 0 0.5rem;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}

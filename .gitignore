@@ -1,0 +1,31 @@
+# Private configuration and generated files
+.env
+.env.*
+!.env.example
+!.env.development
+!.env.docker
+*.local
+node_modules/
+vendor/
+dist/
+runtime/
+__pycache__/
+*.log
+.DS_Store
+.worktrees/
+apps/api/tests/_output/*
+!apps/api/tests/_output/.gitignore
+apps/api/tests/_support/_generated/
+apps/api/web/assets/*
+!apps/api/web/assets/.gitignore
+# Never add local server copies or data exports
+/backend/
+/production/
+/legacy-source/
+/packages/database/*.sql
+!/packages/database/schema.sql
+
+# Internal review records are maintained outside the public candidate.
+/docs/project-management/
+/docs/superpowers/
+/docker/test/review-probes.php

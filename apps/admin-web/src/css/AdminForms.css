@@ -1,0 +1,248 @@
+/* Admin Forms Styling */
+
+/* Form Container */
+.admin-resource-form-container {
+  margin-bottom: 2rem;
+}
+
+/* Section styling */
+.form-section {
+  padding-bottom: 1.5rem;
+}
+
+.section-header {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Form controls */
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4b5563;
+  margin-bottom: 0.375rem;
+}
+
+.form-control, .form-select {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.95rem;
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
+}
+
+/* Form labels */
+label.required::after {
+  content: " *";
+  color: #dc2626;
+}
+
+/* Form groups */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+/* Required field indicator */
+.required-field::after {
+  content: '*';
+  color: #dc2626;
+  margin-left: 0.25rem;
+}
+
+/* Card styling for forms */
+.resource-form-tabs .nav-tabs {
+  border-bottom: none;
+}
+
+.resource-form-tabs .nav-link {
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  color: #6b7280;
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  margin-right: 0.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.resource-form-tabs .nav-link.active {
+  background-color: #fff;
+  color: #4f46e5;
+  border-bottom-color: #fff;
+  font-weight: 600;
+}
+
+.resource-form-tabs .nav-link.disabled {
+  color: #9ca3af;
+  pointer-events: none;
+  cursor: default;
+}
+
+.resource-form-tabs .nav-link:not(.active):hover {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+/* Link items */
+.link-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #ffffff;
+  transition: all 0.15s ease;
+  overflow: hidden;
+}
+
+.link-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Type specific fields */
+.type-fields-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.type-fields-card .card-header {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+}
+
+/* Add link button */
+.add-link-button {
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.add-more-button {
+  border: 1px dashed #e5e7eb;
+  border-radius: 6px;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.add-more-button:hover {
+  border-color: #4f46e5;
+  background-color: #f5f5ff;
+}
+
+/* Form switch */
+.form-check-input {
+  width: 2.5em;
+  height: 1.25em;
+  margin-top: 0;
+}
+
+.form-check-input:checked {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.form-switch .form-check-input:focus {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%234f46e5'/%3e%3c/svg%3e");
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.btn-primary:hover {
+  background-color: #4338ca;
+  border-color: #4338ca;
+}
+
+.btn-primary:focus, .btn-primary:active {
+  background-color: #4338ca;
+  border-color: #4338ca;
+  box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+}
+
+/* Form actions */
+.form-actions {
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+/* Tab content */
+.tab-content {
+  background: #fff;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Card styling */
+.card {
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 1rem 1.25rem;
+}
+
+/* Input group styling */
+.input-group-text {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.input-group-text .btn {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Textarea sizing */
+textarea.form-control {
+  min-height: 100px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .form-section {
+    padding-bottom: 1rem;
+  }
+  
+  .resource-form-tabs .nav-link {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .resource-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    padding-bottom: 10px;
+  }
+
+  .resource-tabs .nav-item {
+    flex: 0 0 auto;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}

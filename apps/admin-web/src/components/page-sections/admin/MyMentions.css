@@ -1,0 +1,103 @@
+/**
+ * MyMentions Component Styles
+ */
+
+.my-mentions-card {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.mentions-section {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.mentions-section:last-child {
+  border-bottom: none;
+}
+
+.section-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.mention-item {
+  padding: 1rem 1.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.mention-item:hover {
+  background-color: #f8f9fa;
+}
+
+.mention-item.unread {
+  background-color: #fff8f0;
+  border-left: 3px solid #ffc107;
+}
+
+.mention-item.unread:hover {
+  background-color: #fff4e5;
+}
+
+.mention-item.read {
+  opacity: 0.7;
+}
+
+.mention-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mention-subject {
+  font-size: 1rem;
+  color: #212529;
+}
+
+.mention-item.read .mention-subject {
+  color: #6c757d;
+  font-weight: normal;
+}
+
+.mention-message {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #495057;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mention-item.read .mention-message {
+  color: #868e96;
+}
+
+.mention-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .mention-item {
+    padding: 0.75rem 1rem;
+  }
+
+  .mention-header {
+    font-size: 0.9rem;
+  }
+
+  .mention-message {
+    font-size: 0.875rem;
+  }
+
+  .mention-actions {
+    width: 100%;
+  }
+
+  .mention-actions .btn {
+    flex: 1;
+  }
+}

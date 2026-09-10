@@ -1,0 +1,24 @@
+/* Drag and drop styling */
+.drag-handle {
+  cursor: grab;
+  text-align: center;
+  color: #6c757d;
+  width: 40px;
+}
+
+tr.dragging {
+  background-color: #f8f9fa;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+
+/* Animation for drag-and-drop operation */
+.draggable-transition {
+  transition: transform 0.2s;
+}
+
+/* Style for the placeholder during dragging */
+.placeholder {
+  background-color: #e9ecef;
+  border: 2px dashed #adb5bd;
+}

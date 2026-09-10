@@ -1,0 +1,14 @@
+{
+  "name": "course-reserves-monorepo",
+  "private": true,
+  "workspaces": ["apps/admin-web", "apps/faculty-form"],
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "node apps/faculty-form/node_modules/typescript/bin/tsc --noEmit -p apps/faculty-form/tsconfig.app.json",
+    "test:isolation": "python3 -m unittest discover -s docker/tests -v",
+    "install:locked:admin": "npm --prefix apps/admin-web ci --workspaces=false",
+    "install:locked:faculty": "npm --prefix apps/faculty-form ci --workspaces=false"
+  }
+}

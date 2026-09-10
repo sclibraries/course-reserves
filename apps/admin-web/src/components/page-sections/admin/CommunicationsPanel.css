@@ -1,0 +1,183 @@
+/**
+ * CommunicationsPanel.css
+ * Styling for communications/messages display
+ */
+
+.communications-panel .card-header {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 500;
+}
+
+.communications-list {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.communication-item {
+  padding: 16px;
+  border-bottom: 1px solid #e9ecef;
+  transition: background-color 0.2s;
+}
+
+.clickable-message {
+  cursor: pointer;
+}
+
+.clickable-message:focus {
+  outline: 2px solid #0d6efd;
+  outline-offset: -2px;
+  background-color: #f8f9fa;
+}
+
+.thread-hint {
+  display: flex;
+  align-items: center;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.communication-item:hover {
+  background-color: #f8f9fa;
+}
+
+.communication-item:last-child {
+  border-bottom: none;
+}
+
+.communication-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.communication-header svg {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.communication-meta {
+  flex: 1;
+}
+
+.author-line {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.badge-line {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.communication-subject {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 8px;
+  color: #212529;
+}
+
+.communication-message {
+  color: #495057;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 8px;
+}
+
+.task-details {
+  padding: 8px;
+  background-color: #e7f5e7;
+  border-left: 3px solid #28a745;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+/* Replies */
+.replies-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e9ecef;
+}
+
+.replies-list {
+  margin-top: 12px;
+  padding-left: 24px;
+  border-left: 2px solid #dee2e6;
+}
+
+.reply-item {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.reply-item:last-child {
+  margin-bottom: 0;
+}
+
+.reply-header {
+  font-size: 0.875rem;
+  margin-bottom: 6px;
+}
+
+.reply-message {
+  color: #495057;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .communications-list {
+    max-height: 400px;
+  }
+  
+  .communication-item {
+    padding: 12px;
+  }
+  
+  .badge-line .badge {
+    font-size: 0.7rem;
+  }
+}
+
+/* Message Sections */
+.messages-section {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.messages-section:last-child {
+  border-bottom: none;
+}
+
+.messages-section .section-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.faculty-section .section-header {
+  background-color: #0066cc !important;
+}
+
+.staff-section .section-header {
+  background-color: #6c757d !important;
+}
+
+.section-content {
+  background-color: #fff;
+}
+
+.section-content .communication-item:first-child {
+  border-top: none;
+}

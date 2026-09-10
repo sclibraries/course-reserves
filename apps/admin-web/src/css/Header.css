@@ -1,0 +1,290 @@
+/* Header.css - Updated for better integration with new Searchbar */
+header .navbar {
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1030;
+}
+
+header .navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+header .navbar-brand img {
+  height: 40px;
+  transition: all 0.2s ease;
+}
+
+header .navbar-text {
+  width: 100%;
+}
+
+header .navbar-collapse {
+  flex-grow: 1;
+}
+
+.secondary-text {
+  font-weight: 500;
+  margin-left: 1rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+/* Navigation styling */
+header .nav-link {
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+header .nav-link:hover {
+  transform: translateY(-1px);
+}
+
+header .nav-link.active {
+  font-weight: 700;
+}
+
+/* Navigation links - updated to fix double underline */
+.nav-link {
+  color: #4b5563;
+  text-decoration: none !important; /* Force no text-decoration */
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.nav-link:hover {
+  color: #4f46e5;
+  text-decoration: none !important;
+}
+
+.nav-link.active {
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+/* Single underline for active links */
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: currentColor;
+}
+
+.nav-link:focus {
+  outline: 2px solid #4d90fe;
+  outline-offset: 2px;
+}
+
+/* User menu styling */
+.user-menu-toggle {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+  color: #4b5563 !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.user-menu-toggle:hover, 
+.user-menu-toggle:focus {
+  background-color: #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.user-menu-toggle::after {
+  display: none; /* Remove default caret */
+}
+
+.user-menu-toggle .user-name {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-toggle.btn-dark {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.user-menu-toggle.btn-light {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.user-menu {
+  min-width: 200px;
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  color: #4b5563;
+}
+
+.dropdown-item:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-item.active {
+  background-color: #f3f4f6;
+  color: #4f46e5;
+}
+
+.dropdown-header {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Login/logout button styling */
+header .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+header .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.college-logo {
+  height: auto; /* Use auto height instead of fixed */
+  max-height: 50px; /* Maximum height on desktop */
+  width: auto;
+  min-height: 30px; /* Add minimum height to prevent too small logos */
+  min-width: 30px; /* Ensure minimum width as well */
+  max-width: 240px; /* More generous max width for desktop */
+  transition: all 0.2s ease;
+  object-fit: contain; /* Ensures the logo maintains aspect ratio */
+}
+
+/* Make the content area start below the header */
+.container-fluid.mt-4 {
+  margin-top: 5rem !important; /* Adjust this value based on your header height */
+}
+
+/* College theme classes */
+.smith-theme .navbar {
+  background-color: var(--smith-primary, #ffffff);
+}
+
+.mtholyoke-theme .navbar {
+  background-color: var(--mtholyoke-primary, #01295c);
+}
+
+.hampshire-theme .navbar {
+  background-color: var(--hampshire-primary, #e2e31b);
+}
+
+.amherst-theme .navbar {
+  background-color: var(--amherst-primary, #3c1053);
+}
+
+.umass-theme .navbar {
+  background-color: var(--umass-primary, #971b2f);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  header .navbar-text {
+    margin-top: 10px;
+  }
+  
+  header .navbar {
+    padding: 0.5rem 1rem;
+  }
+  
+  header .navbar-brand {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .secondary-text {
+    margin-left: 0;
+    font-size: 0.9rem;
+  }
+  
+  .college-logo {
+    max-height: 40px; /* Increase from 35px */
+    min-height: 30px;
+    max-width: 180px; /* Increase from 160px */
+  }
+
+  .user-menu-toggle .user-name {
+    max-width: 80px;
+  }
+  
+  .nav-link {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-menu-toggle .user-name {
+    display: none;
+  }
+  
+  .nav-link {
+    padding: 0.5rem;
+  }
+  
+  .college-logo {
+    max-height: 35px; /* Increase from 30px */
+    min-height: 28px;
+    max-width: 160px; /* Increase from 120px */
+  }
+  
+  .secondary-text {
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 375px) {
+  .college-logo {
+    max-height: 30px; /* Increase from 24px */
+    min-height: 25px;
+    max-width: 130px; /* Increase from 100px */
+  }
+  
+  .secondary-text {
+    font-size: 0.75rem;
+    margin-left: 0.3rem;
+  }
+  
+  header .navbar {
+    padding: 0.4rem 0.75rem;
+  }
+}

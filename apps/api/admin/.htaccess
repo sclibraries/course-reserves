@@ -1,0 +1,16 @@
+Header set Access-Control-Allow-Origin "*"
+
+# Force HTTPS in production — skip on localhost/Docker where HTTPS is unavailable
+RewriteEngine On
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1) [NC]
+RewriteCond %{HTTPS} Off
+RewriteRule .* https://%{HTTP_HOST}%{REQUEST_URI} [R,L]
+
+# Shibboleth authentication — only available in production (requires mod_shib)
+# In local Docker development, mod_shib is not installed; the -local.php scripts
+# bypass Shibboleth entirely and are protected by YII_ENV checks instead.
+<IfModule mod_shib.c>
+  AuthType shibboleth
+  ShibRequestSetting requireSession 1
+  require valid-user
+</IfModule>
