@@ -25,11 +25,17 @@ return [
             'showScriptName' => true,
         ],
         'user' => [
-            'identityClass' => 'app\models\User',
+            // Mirror config/web.php: bearer tokens resolve to JwtIdentity without a DB lookup.
+            'identityClass' => 'app\models\JwtIdentity',
+            'enableAutoLogin' => false,
         ],
         'request' => [
             'cookieValidationKey' => 'test',
             'enableCsrfValidation' => false,
+            // Mirror config/web.php so JSON request bodies populate body params.
+            'parsers' => [
+                'application/json' => 'yii\web\JsonParser',
+            ],
             // but if you absolutely need it set cookie domain to localhost
             /*
             'csrfCookie' => [
