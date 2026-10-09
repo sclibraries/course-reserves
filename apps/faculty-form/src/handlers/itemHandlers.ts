@@ -1,0 +1,103 @@
+import { toast } from "sonner";
+import type { ItemData } from "@/components/ItemModal";
+import { transformItemForEditing, transformItemForSaving } from "@/utils/itemTransformers";
+import type { CourseItem, CourseReserve } from "../store/courseReservesStore";
+
+/**
+ * Handlers for item-related operations
+ */
+export const createItemHandlers = (
+  reserveId: string,
+  addItem: (id: string, item: Partial<CourseItem>) => boolean,
+  updateItem: (id: string, itemId: string, updates: Partial<CourseItem>) => void,
+  deleteItem: (id: string, itemId: string) => void,
+  moveItemToPosition: (id: string, itemId: string, position: number) => void,
+  updateReserve: (id: string, updates: Partial<CourseReserve>) => void,
+  items: CourseItem[],
+  hasActiveFiltersOrSort: boolean,
+  setEditingItem: (item: (ItemData & { id: string }) | undefined) => void,
+  setModalOpen: (open: boolean) => void
+) => {
+  const handleAddItem = () => {
+    setEditingItem(undefined);
+    setModalOpen(true);
+  };
+
+  const handleEditItem = (courseItem: CourseItem & { id: string }) => {
+    const itemData = transformItemForEditing(courseItem);
+    setEditingItem(itemData);
+    setModalOpen(true);
+  };
+
+  const handleSaveItem = (itemData: ItemData, editingItem?: ItemData & { id: string }) => {
+    const courseItemData = transformItemForSaving(itemData);
+
+    if (editingItem) {
+      updateItem(reserveId, editingItem.id, courseItemData);
+    } else if (!addItem(reserveId, courseItemData)) {
+      toast.error('This item is already in your reserve list.');
+      return;
+    }
+    setModalOpen(false);
+    setEditingItem(undefined);
+  };
+
+  const handleMoveUp = (itemId: string) => {
+    if (hasActiveFiltersOrSort) {
+      toast.error("Manual reordering is disabled when filters or sorting are applied. Clear filters to reorder items.");
+      return;
+    }
+
+    const currentIndex = items.findIndex(item => item.id === itemId);
+    if (currentIndex > 0) {
+      moveItemToPosition(reserveId, itemId, currentIndex - 1);
+      toast.success("Item moved up");
+    }
+  };
+
+  const handleMoveDown = (itemId: string) => {
+    if (hasActiveFiltersOrSort) {
+      toast.error("Manual reordering is disabled when filters or sorting are applied. Clear filters to reorder items.");
+      return;
+    }
+
+    const currentIndex = items.findIndex(item => item.id === itemId);
+    if (currentIndex < items.length - 1) {
+      moveItemToPosition(reserveId, itemId, currentIndex + 1);
+      toast.success("Item moved down");
+    }
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    deleteItem(reserveId, itemId);
+    toast.success("Item removed from list");
+  };
+
+  const handleClearAll = (itemsCount: number, foldersCount: number) => {
+    if (itemsCount === 0 && foldersCount === 0) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to remove all ${itemsCount} item${itemsCount !== 1 ? 's' : ''}${foldersCount > 0 ? ` and ${foldersCount} folder${foldersCount !== 1 ? 's' : ''}` : ''}? This action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      // One atomic update: clear both items and folders
+      updateReserve(reserveId, { items: [], folders: [] });
+      toast.success(
+        foldersCount > 0 
+          ? `Cleared ${itemsCount} item${itemsCount !== 1 ? 's' : ''} and ${foldersCount} folder${foldersCount !== 1 ? 's' : ''}`
+          : `Removed all ${itemsCount} item${itemsCount !== 1 ? 's' : ''}`
+      );
+    }
+  };
+
+  return {
+    handleAddItem,
+    handleEditItem,
+    handleSaveItem,
+    handleMoveUp,
+    handleMoveDown,
+    handleDeleteItem,
+    handleClearAll,
+  };
+};

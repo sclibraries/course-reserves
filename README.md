@@ -1,29 +1,46 @@
-<h1 align="center">Welcome to course-reserves 👋</h1>
-<p>
-  <img alt="Version" src="https://img.shields.io/badge/version-1.1.0-blue.svg?cacheSeconds=2592000" />
-</p>
+# Course Reserves
 
-> Course reserves management for the Five Colleges. Connects FOLIO APIs to frontend VITE.JS application to search and view course reserves. Contains optional backend system for linking electronic reserves to physical reserves.
+Smith College Course Reserves supports faculty requests for course materials, library staff
+processing, and student discovery of available reserves.
 
-### 🏠 [Homepage](https://libtools2.smith.edu/course-reserves)
+## Applications
 
-### ✨ [Demo](https://libtools2.smith.edu/course-reserves)
+- **`apps/api`** — Yii2 REST API for submissions, staff processing, course records, and external
+  discovery services.
+- **`apps/admin-web`** — React application for library staff and public student reserve pages.
+- **`apps/faculty-form`** — React and TypeScript application for faculty course-material requests.
 
-## Install
+## Local development
+
+Requirements: Docker with Compose, Node.js and npm for frontend checks, and Git.
+
+Prepare the API environment file, then start the stack:
 
 ```sh
-npm install
+cp apps/api/.env.example apps/api/.env
+# Set the JWT keys and any service credentials needed for your local work.
+docker/start.sh --build
 ```
 
-## Author
+The first database boot loads `packages/database/schema.sql` and the synthetic development-user
+seed. The schema is used by default. To initialize a new local database from another file, set
+`DEV_DB_INIT_SQL` to its path before starting the stack. Existing database volumes are not
+re-imported on restart.
 
-👤 **Rob O'Connell**
+The nginx entry point is `http://localhost:8080/course-reserves/`. The admin-web and faculty-form
+development servers use ports `5173` and `5174`; the API is available under
+`/course-reserves/backend/web/` through nginx.
 
-* Github: [@sclibraries](https://github.com/sclibraries)
+Run frontend checks from each app directory:
 
-## Show your support
+```sh
+npm ci --workspaces=false
+npm run test
+npm run build
+```
 
-Give a ⭐️ if this project helped you!
+For admin-web, also run `npm run lint`. Its dependency install requires the Font Awesome npm token
+configured in the environment.
 
-***
-_This README was generated with ❤️ by [readme-md-generator](https://github.com/kefranabg/readme-md-generator)_
+The isolated API test stack and its commands are documented in
+[`docs/testing/docker-test-stack.md`](docs/testing/docker-test-stack.md).

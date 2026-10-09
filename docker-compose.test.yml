@@ -1,0 +1,59 @@
+# Standalone test stack reconstructed from the phase0 ticket records.
+# No dependency on the missing /private/tmp override or developer Compose volumes.
+name: course-reserves-test
+services:
+  db:
+    image: mariadb:10.3.39
+    environment:
+      MYSQL_ROOT_PASSWORD: test-only-root
+      MYSQL_DATABASE: reserves_test
+      MYSQL_USER: reserves_test
+      MYSQL_PASSWORD: test-only-password
+    volumes:
+      - test_db:/var/lib/mysql
+      - ./packages/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ureserves_test", "-ptest-only-password"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    networks: [test]
+
+  backend:
+    image: course-reserves-test-backend:local
+    build:
+      context: ./docker/php
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: reserves_test
+      DB_USER: reserves_test
+      DB_PASS: test-only-password
+      JWT_SECRET_KEY: isolated-test-signing-key-not-for-production
+      JWT_REFRESH_SECRET_KEY: isolated-test-refresh-key-not-for-production
+    env_file:
+      - ./docker/test/app.env
+    volumes:
+      - ${COURSE_RESERVES_TEST_SOURCE:-.}/apps/api:/app:ro
+      # Reuse installed dependencies read-only, including when reviewing a worktree.
+      - ./apps/api/vendor:/app/vendor:ro
+      - ./docker/test/app.env:/app/.env:ro
+      - ./docker/test/db.php:/app/config/db.php:ro
+      - ./docker/test/db.php:/app/config/test_db.php:ro
+      - ./docker/test/bootstrap.php:/app/tests/_bootstrap.php:ro
+      - test_runtime:/app/runtime
+      - test_output:/app/tests/_output
+      - test_assets:/app/web/assets
+    networks: [test]
+
+volumes:
+  test_db:
+  test_runtime:
+  test_output:
+  test_assets:
+
+networks:
+  test:
+    internal: true

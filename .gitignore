@@ -24,4 +24,27 @@ dist-ssr
 *.sw?
 .qodo
 
+# Isolated development worktrees
+.worktrees/
+
 *storybook.log
+
+# Environment files with real credentials — never commit these
+apps/api/.env
+apps/admin-web/.env.local
+apps/faculty-form/.env.local
+
+# Local comparison copies contain credentials; never stage these files.
+/production/
+/backend/
+/production/backend/.env
+/backend/.env
+/backend/config/db.php
+/docker/tests/__pycache__/
+
+# Yii runtime output can include debug dumps, request headers, SQL, and tokens.
+apps/api/runtime/
+
+# Production SQL snapshots and local-only database copies
+packages/database/*_20*.sql
+packages/database/local/
