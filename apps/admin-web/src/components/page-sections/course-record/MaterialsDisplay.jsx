@@ -1,6 +1,6 @@
 import { Row, Col, Spinner, Alert } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons';
+import { faBook, faExclamationCircle, faLaptop } from '@fortawesome/free-solid-svg-icons';
 import RecordCard from './RecordCard';
 import RecordTable from './RecordTable';
 import { useCourseView } from '../../../contexts/CourseViewContext';
@@ -81,7 +81,7 @@ export default function MaterialsDisplay({
       <Row>
         <Col md={6} className="print-resources">
           <div className="column-header mb-3">
-            <h3 className="h4"><i className="fas fa-book text-success me-2"></i>Physical Materials</h3>
+            <h3 className="h4"><FontAwesomeIcon icon={faBook} className="text-success me-2" />Physical Materials</h3>
           </div>
           {materials.filter(item => !item.isElectronic && isItemVisible(item, isAuthenticated)).length === 0 ? (
             <p className="text-muted">No physical materials available for this course.</p>
@@ -106,7 +106,7 @@ export default function MaterialsDisplay({
         </Col>
         <Col md={6} className="electronic-resources">
           <div className="column-header mb-3">
-            <h3 className="h4"><i className="fas fa-laptop text-info me-2"></i>Electronic Materials</h3>
+            <h3 className="h4"><FontAwesomeIcon icon={faLaptop} className="text-info me-2" />Electronic Materials</h3>
           </div>
           {materials.filter(item => item.isElectronic && isItemVisible(item, isAuthenticated)).length === 0 ? (
             <p className="text-muted">No electronic materials available for this course.</p>

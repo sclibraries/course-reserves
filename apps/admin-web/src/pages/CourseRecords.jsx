@@ -2,6 +2,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { config } from '../config';
 import useRecordStore from '../store/recordStore';
 import useCustomizationStore from '../store/customizationStore';
@@ -178,7 +180,7 @@ function CourseRecords() {
         <div className="mb-3 search-container">
           <div className="input-group">
             <span className="input-group-text bg-white border-end-0">
-              <i className="fas fa-search text-muted"></i>
+              <FontAwesomeIcon icon={faMagnifyingGlass} className="text-muted" />
             </span>
             <input
               type="text"
@@ -190,7 +192,7 @@ function CourseRecords() {
             />
             {searchQuery && (
               <button className="btn btn-outline-secondary border-start-0" type="button" onClick={() => setSearchQuery('')} aria-label="Clear search">
-                <i className="fas fa-times"></i>
+                <FontAwesomeIcon icon={faXmark} />
               </button>
             )}
           </div>

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCircleCheck } from '@fortawesome/free-solid-svg-icons';
 
 /**
  * Registration confirmation page shown after successful account request
@@ -15,7 +17,7 @@ const RegistrationConfirmation = () => {
           <Card className="shadow">
             <div className="card-body text-center p-5">
               <div className="mb-4">
-                <i className="fas fa-check-circle text-success" style={{ fontSize: '4rem' }}></i>
+                <FontAwesomeIcon icon={faCircleCheck} className="text-success" style={{ fontSize: '4rem' }} />
               </div>
               
               <h1 className="card-title mb-4">Registration Submitted</h1>

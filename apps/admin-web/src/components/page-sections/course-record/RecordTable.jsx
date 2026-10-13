@@ -4,11 +4,13 @@ import { Table, Popover, PopoverBody, Button, Collapse, Alert, Row, Col } from '
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faExternalLinkAlt, 
+  faBook,
   faChevronDown, 
   faChevronUp, 
   faInfoCircle,
   faClock,
-  faExclamationCircle
+  faExclamationCircle,
+  faLaptop
 } from '@fortawesome/free-solid-svg-icons';
 // Import tracking service
 import { trackingService } from '../../../services/trackingService';
@@ -636,7 +638,7 @@ const RecordTable = ({
         <Col md={6}>
           <div className="column-header mb-3 p-3 bg-light border rounded">
             <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
-              <i className="fas fa-book text-muted me-2"></i>
+              <FontAwesomeIcon icon={faBook} className="text-muted me-2" />
               {splitViewText.printMaterials}
             </h3>
           </div>
@@ -692,7 +694,7 @@ const RecordTable = ({
         <Col md={6}>
           <div className="column-header mb-3 p-3 bg-light border rounded">
             <h3 className="h4 mb-0" style={{ color: customization.cardTextColor }}>
-              <i className="fas fa-laptop text-muted me-2"></i>
+              <FontAwesomeIcon icon={faLaptop} className="text-muted me-2" />
               {splitViewText.electronicMaterials}
             </h3>
           </div>

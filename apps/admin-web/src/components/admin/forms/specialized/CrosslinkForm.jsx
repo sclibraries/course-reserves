@@ -1,6 +1,8 @@
 // src/components/admin/forms/CrossLinkForm.jsx
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLinkSlash, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import {
   FormGroup,
   Label,
@@ -410,7 +412,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
               onClick={handleReset}
               aria-label="Reset search filters"
             >
-              <i className="fas fa-undo" role="button"></i>
+              <FontAwesomeIcon icon={faRotateLeft} />
               <span className="d-inline ml-1">Reset</span>
             </Button>
           </ButtonGroup>
@@ -451,7 +453,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
                       onClick={() => handleUnlinkCourse(linkedCourse.offering_link_id)}
                       title="Unlink this course"
                     >
-                      <i className="fas fa-unlink"></i> Unlink
+                      <FontAwesomeIcon icon={faLinkSlash} /> Unlink
                     </Button>
                   </td>
                 </tr>

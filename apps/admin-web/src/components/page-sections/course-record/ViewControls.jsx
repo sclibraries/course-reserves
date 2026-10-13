@@ -1,4 +1,6 @@
 import { Button, Row, Col } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBook, faLaptop, faLayerGroup, faTableColumns, faTableList } from '@fortawesome/free-solid-svg-icons';
 import { trackingService } from '../../../services/trackingService';
 import { useCourseView } from '../../../contexts/CourseViewContext';
 
@@ -25,27 +27,27 @@ export default function ViewControls({ viewMode, setViewMode, filter, onFilterCh
               onClick={() => { trackViewMode('combined'); setViewMode('combined'); }}
               className="px-3"
             >
-              <i className="fas fa-th-list me-2"></i>Combined View
+              <FontAwesomeIcon icon={faTableList} className="me-2" />Combined View
             </Button>
             <Button
               color={viewMode === 'split' ? 'primary' : 'outline-primary'}
               onClick={() => { trackViewMode('split'); setViewMode('split'); }}
               className="px-3"
             >
-              <i className="fas fa-columns me-2"></i>Split View
+              <FontAwesomeIcon icon={faTableColumns} className="me-2" />Split View
             </Button>
           </div>
         </div>
         {viewMode === 'combined' && (
           <div className="filters d-flex gap-2">
             <Button color={filter === 'all' ? 'primary' : 'outline-secondary'} size="sm" className="rounded-pill" onClick={() => onFilterChange('all')}>
-              <i className="fas fa-layer-group me-1"></i> All Materials
+              <FontAwesomeIcon icon={faLayerGroup} className="me-1" /> All Materials
             </Button>
             <Button color={filter === 'print' ? 'success' : 'outline-success'} size="sm" className="rounded-pill" onClick={() => onFilterChange('print')}>
-              <i className="fas fa-book me-1"></i> Physical Only
+              <FontAwesomeIcon icon={faBook} className="me-1" /> Physical Only
             </Button>
             <Button color={filter === 'electronic' ? 'info' : 'outline-info'} size="sm" className="rounded-pill" onClick={() => onFilterChange('electronic')}>
-              <i className="fas fa-laptop me-1"></i> Electronic Only
+              <FontAwesomeIcon icon={faLaptop} className="me-1" /> Electronic Only
             </Button>
           </div>
         )}
