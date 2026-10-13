@@ -2,6 +2,8 @@
  * Utility functions for sorting and selecting academic terms
  */
 
+import { parseDateBoundary } from '../util/dateBoundaries';
+
 /**
  * Sorts terms by year (latest first) and season within each year
  * Accounts for academic year cycles where Winter of year Y is part of (Y-1)/Y academic year
@@ -76,10 +78,10 @@ export const getCurrentTerm = (terms, mode = 'public') => {
   const activeTerms = sortedTerms.filter(term => {
     if (!term.startDate || !term.endDate) return false;
     
-    const startDate = new Date(term.startDate);
-    const endDate = new Date(term.endDate);
+    const startDate = parseDateBoundary(term.startDate, 'start');
+    const endDate = parseDateBoundary(term.endDate, 'end');
     
-    return now >= startDate && now <= endDate;
+    return startDate && endDate && now >= startDate && now <= endDate;
   });
   
   // If we have active terms, selection depends on mode
@@ -88,16 +90,16 @@ export const getCurrentTerm = (terms, mode = 'public') => {
       // Admin: prefer the term that extends furthest into the future (latest end date)
       // This allows admins to work on upcoming terms as soon as they start
       return activeTerms.sort((a, b) => {
-        const endA = new Date(a.endDate);
-        const endB = new Date(b.endDate);
+        const endA = parseDateBoundary(a.endDate, 'end');
+        const endB = parseDateBoundary(b.endDate, 'end');
         return endB - endA; // Latest end date first
       })[0];
     } else {
       // Public: prefer the term ending soonest (earliest end date)
       // Users want to see their current term until it actually ends
       return activeTerms.sort((a, b) => {
-        const endA = new Date(a.endDate);
-        const endB = new Date(b.endDate);
+        const endA = parseDateBoundary(a.endDate, 'end');
+        const endB = parseDateBoundary(b.endDate, 'end');
         return endA - endB; // Earliest end date first
       })[0];
     }
@@ -106,15 +108,15 @@ export const getCurrentTerm = (terms, mode = 'public') => {
   // No currently active terms - find the next upcoming term
   const upcomingTerms = sortedTerms.filter(term => {
     if (!term.startDate) return false;
-    const startDate = new Date(term.startDate);
-    return startDate > now;
+    const startDate = parseDateBoundary(term.startDate, 'start');
+    return startDate && startDate > now;
   });
   
   if (upcomingTerms.length > 0) {
     // Sort by startDate (earliest start date = next term)
     return upcomingTerms.sort((a, b) => {
-      const startA = new Date(a.startDate);
-      const startB = new Date(b.startDate);
+      const startA = parseDateBoundary(a.startDate, 'start');
+      const startB = parseDateBoundary(b.startDate, 'start');
       return startA - startB; // Earliest start date first
     })[0];
   }

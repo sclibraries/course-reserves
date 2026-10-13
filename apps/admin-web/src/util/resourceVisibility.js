@@ -2,7 +2,7 @@
  * Utility functions for handling resource visibility logic
  */
 
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+import { parseDateBoundary } from './dateBoundaries';
 
 /**
  * Parse a visibility boundary without converting date-only values to UTC.
@@ -13,17 +13,7 @@ const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * @returns {Date|null} Parsed boundary, or null when absent/invalid
  */
 export const parseVisibilityDate = (value, boundary = 'start') => {
-  if (!value) return null;
-
-  const date = value instanceof Date
-    ? new Date(value.getTime())
-    : new Date(
-      DATE_ONLY_PATTERN.test(value)
-        ? `${value}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`
-        : value
-    );
-
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseDateBoundary(value, boundary);
 };
 
 /**
