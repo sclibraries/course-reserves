@@ -1,7 +1,7 @@
 // src/pages/CourseRecords.jsx
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from 'reactstrap';
+import { Alert, Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { config } from '../config';
@@ -10,6 +10,8 @@ import useCustomizationStore from '../store/customizationStore';
 import { trackingService } from '../services/trackingService';
 import { adminCourseService } from '../services/admin/adminCourseService';
 import { useAuth } from '../contexts/AuthContext';
+import { useRecordsTextStore, selectCourseRecordsText } from '../store/recordsTextStore';
+import { canBypassVisibility, isStudentPreview, withStudentPreview } from '../util/studentPreview';
 
 import { useCourseMaterials } from '../hooks/useCourseMaterials';
 import CourseViewContext from '../contexts/CourseViewContext';
@@ -29,6 +31,17 @@ function CourseRecords() {
 
   const { record, setRecord } = useRecordStore();
   const { isAuthenticated } = useAuth();
+  const studentPreview = isStudentPreview(location.search);
+  const canBypassResourceVisibility = canBypassVisibility(isAuthenticated, studentPreview);
+  const courseRecordsText = useRecordsTextStore(selectCourseRecordsText);
+
+  const setStudentPreview = useCallback((enabled) => {
+    navigate({
+      pathname: location.pathname,
+      search: withStudentPreview(location.search, enabled),
+      hash: location.hash,
+    }, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   const [displayMode, setDisplayMode] = useState('card');
   const [filter, setFilter] = useState('all');
@@ -76,7 +89,7 @@ function CourseRecords() {
   const {
     materials, course, isLoading, error, availability, hasElectronicReserves,
     openAccordions, toggleAccordion, combinedResults, hiddenCount, visibleCount, nextAvailableDate,
-  } = useCourseMaterials(record, { filter, searchQuery, isAuthenticated });
+  } = useCourseMaterials(record, { filter, searchQuery, canBypassVisibility: canBypassResourceVisibility });
 
   const courseInfo = useMemo(() => (course.length > 0 ? course[0] : null), [course]);
 
@@ -143,12 +156,32 @@ function CourseRecords() {
     setFilter(newFilter);
   };
 
-  const courseViewValue = { courseInfo, customizationProps, collegeParam, isAuthenticated };
+  const courseViewValue = { courseInfo, customizationProps, collegeParam };
 
   return (
     <CourseViewContext.Provider value={courseViewValue}>
       <div className="container mt-4">
         <CourseHeader onBack={() => navigate(-1)} />
+
+        {isAuthenticated && !studentPreview && (
+          <div className="mb-3 d-flex justify-content-end">
+            <Button color="warning" outline onClick={() => setStudentPreview(true)}>
+              {courseRecordsText.previewAsStudent}
+            </Button>
+          </div>
+        )}
+
+        {studentPreview && (
+          <Alert color="warning" className="d-flex justify-content-between align-items-center">
+            <span>
+              <strong>{courseRecordsText.studentPreviewActive}</strong>{' '}
+              {courseRecordsText.studentPreviewDescription}
+            </span>
+            <Button color="warning" outline onClick={() => setStudentPreview(false)}>
+              {courseRecordsText.exitStudentPreview}
+            </Button>
+          </Alert>
+        )}
 
         <div className="mb-3 d-flex justify-content-end">
           <Button color="link" className="p-0 icon-button" onClick={handleToggleDisplay}>
@@ -219,6 +252,7 @@ function CourseRecords() {
           hiddenCount={hiddenCount}
           visibleCount={visibleCount}
           nextAvailableDate={nextAvailableDate}
+          canBypassVisibility={canBypassResourceVisibility}
         />
       </div>
     </CourseViewContext.Provider>

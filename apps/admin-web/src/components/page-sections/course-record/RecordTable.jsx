@@ -14,11 +14,24 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 // Import tracking service
 import { trackingService } from '../../../services/trackingService';
-// Import Auth Context
-import { useAuth } from '../../../contexts/AuthContext';
 import { sanitizeHtml, containsHtml } from '../../../util/htmlUtils';
-import { isPrimaryLinkVisible, isLinkVisible, getVisibilityInfo } from '../../../util/resourceVisibility';
-import { useRecordsTextStore, selectRecordTableText, selectVisibilityText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../store/recordsTextStore';
+import {
+  getVisibilityInfo,
+  isLinkVisible,
+  isPrimaryLinkVisible,
+  parseVisibilityDate,
+} from '../../../util/resourceVisibility';
+import { useRecordsTextStore, selectRecordTableText, selectAccessibilityText, selectCourseRecordsText, selectSplitViewText } from '../../../store/recordsTextStore';
+
+const formatVisibilityDate = (value, boundary = 'start') => (
+  parseVisibilityDate(value, boundary)?.toLocaleDateString()
+);
+
+const getVisibleLinks = (links, canBypassVisibility) => (
+  Array.isArray(links)
+    ? links.filter(link => isLinkVisible(link, canBypassVisibility))
+    : []
+);
 
 /**
  * RecordTable component
@@ -48,18 +61,15 @@ const RecordTable = ({
   collegeParam,
   showVisibilityMessages = true,
   viewMode = 'combined',
-  records = []
+  records = [],
+  canBypassVisibility = false,
 }) => {
   const [activePopover, setActivePopover] = useState(null);
   const [expandedLinkItems, setExpandedLinkItems] = useState({});
   const showHiddenItems = false;
   
-  // Get authentication state from context
-  const { isAuthenticated } = useAuth();
-
   // Get text from the store
   const recordTableText = useRecordsTextStore(selectRecordTableText);
-  const visibilityText = useRecordsTextStore(selectVisibilityText);
   const accessibilityText = useRecordsTextStore(selectAccessibilityText);
   const courseRecordsText = useRecordsTextStore(selectCourseRecordsText);
   const splitViewText = useRecordsTextStore(selectSplitViewText);
@@ -97,18 +107,14 @@ const RecordTable = ({
    */
   const checkVisibility = useCallback((item) => {
     if (item.isElectronic && item.resource) {
-      // Authenticated users can see all resources regardless of visibility window
-      if (isAuthenticated) {
+      // Users authorized to bypass visibility can see all resources regardless of visibility window
+      if (canBypassVisibility) {
         return { isVisible: true };
       }
 
       const now = new Date();
-      const startVisibility = item.resource.start_visibility
-        ? new Date(item.resource.start_visibility)
-        : null;
-      const endVisibility = item.resource.end_visibility
-        ? new Date(item.resource.end_visibility)
-        : null;
+      const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+      const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
         
       // If current time is before the start of the visibility window
       if (startVisibility && now < startVisibility) {
@@ -129,7 +135,7 @@ const RecordTable = ({
       }
     }
     return { isVisible: true };
-  }, [isAuthenticated]);
+  }, [canBypassVisibility]);
 
   // Process visibility for all items
   const processedResults = useMemo(() => {
@@ -138,10 +144,12 @@ const RecordTable = ({
     let scheduleInfo = [];
     
     const collectScheduleInfo = (item) => {
-      if (item.resource?.start_visibility) {
-        scheduleInfo.push({ title: item.copiedItem?.title, date: new Date(item.resource.start_visibility), type: 'upcoming' });
-      } else if (item.resource?.end_visibility) {
-        scheduleInfo.push({ title: item.copiedItem?.title, date: new Date(item.resource.end_visibility), type: 'past' });
+      const startDate = parseVisibilityDate(item.resource?.start_visibility);
+      const endDate = parseVisibilityDate(item.resource?.end_visibility, 'end');
+      if (startDate) {
+        scheduleInfo.push({ title: item.copiedItem?.title, date: startDate, type: 'upcoming' });
+      } else if (endDate) {
+        scheduleInfo.push({ title: item.copiedItem?.title, date: endDate, type: 'past' });
       }
     };
 
@@ -161,7 +169,7 @@ const RecordTable = ({
         
         // Only include visible items in the processed group
         const visibleItems = processedGroupItems.filter(item => 
-          item.visibility.isVisible || isAuthenticated
+          item.visibility.isVisible || canBypassVisibility
         );
         
         return {
@@ -189,7 +197,7 @@ const RecordTable = ({
         return item.items.length > 0; // Only keep groups with visible items
       }
       // Individual items
-      return item.visibility.isVisible || isAuthenticated;
+      return item.visibility.isVisible || canBypassVisibility;
     });
     
     // Sort upcoming items by date
@@ -205,7 +213,7 @@ const RecordTable = ({
       upcomingItems,
       nextAvailableDate: upcomingItems.length > 0 ? upcomingItems[0].date : null
     };
-  }, [combinedResults, isAuthenticated, checkVisibility]);
+  }, [combinedResults, canBypassVisibility, checkVisibility]);
   
   const { 
     items: processedItems, 
@@ -352,23 +360,23 @@ const RecordTable = ({
 
     // Check primary link visibility for electronic resources
     const isPrimaryLinkVisibleCheck = item.isElectronic && item.resource 
-      ? isPrimaryLinkVisible(item.resource, isAuthenticated) 
+      ? isPrimaryLinkVisible(item.resource, canBypassVisibility)
       : true;
 
     const resourceUrl = item.isElectronic && item.resource && isPrimaryLinkVisibleCheck
       ? item.resource.item_url 
       : (!item.isElectronic ? (item.copiedItem?.uri || item.copiedItem?.url) : null);
 
-    const hasAdditionalLinks = item.isElectronic && 
-                              item.resource && 
-                              Array.isArray(item.resource.links) && 
-                              item.resource.links.length > 0;
+    const visibleAdditionalLinks = item.isElectronic
+      ? getVisibleLinks(item.resource?.links, canBypassVisibility)
+      : [];
+    const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
     
     const isExpanded = expandedLinkItems[item.id] || false;
 
     // Get visibility information for electronic resources
     const visibilityInfo = item.isElectronic && item.resource 
-      ? getVisibilityInfo(item.resource, isAuthenticated) 
+      ? getVisibilityInfo(item.resource, canBypassVisibility)
       : { showVisibilityDates: false };
     const showVisibilityDates = visibilityInfo.showVisibilityDates;
 
@@ -506,28 +514,10 @@ const RecordTable = ({
                   <div className="mt-2">
                     <LinksExpandButton
                       itemId={item.id}
-                      links={item.resource.links}
+                      links={visibleAdditionalLinks}
                       isExpanded={isExpanded}
                       color={customization.buttonPrimaryColor}
-                      label={`${item.resource.links.length} additional ${item.resource.links.length === 1 ? 'link' : 'links'}`}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : item.isElectronic && item.resource && item.resource.item_url && !isPrimaryLinkVisibleCheck ? (
-              <div>
-                <span className="text-warning small">
-                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
-                  {visibilityText.notCurrentlyAvailable}
-                </span>
-                {hasAdditionalLinks && (
-                  <div className="mt-2">
-                    <LinksExpandButton
-                      itemId={item.id}
-                      links={item.resource.links}
-                      isExpanded={isExpanded}
-                      color={customization.buttonPrimaryColor}
-                      label={`${item.resource.links.length} additional ${item.resource.links.length === 1 ? 'link' : 'links'}`}
+                      label={`${visibleAdditionalLinks.length} additional ${visibleAdditionalLinks.length === 1 ? 'link' : 'links'}`}
                     />
                   </div>
                 )}
@@ -535,10 +525,10 @@ const RecordTable = ({
             ) : hasAdditionalLinks ? (
               <LinksExpandButton
                 itemId={item.id}
-                links={item.resource.links}
+                links={visibleAdditionalLinks}
                 isExpanded={isExpanded}
                 color={customization.buttonPrimaryColor}
-                label={`${item.resource.links.length} ${item.resource.links.length === 1 ? 'link' : 'links'} available`}
+                label={`${visibleAdditionalLinks.length} ${visibleAdditionalLinks.length === 1 ? 'link' : 'links'} available`}
               />
             ) : 'N/A'}
           </td>
@@ -552,20 +542,13 @@ const RecordTable = ({
                 <div className="p-3">
                   <h6 className="mb-2">{recordTableText.additionalLinks}</h6>
                   <ul className="list-group">
-                    {item.resource.links.map((link, idx) => {
-                      const isCurrentLinkVisible = isLinkVisible(link, isAuthenticated);
-                      
-                      return (
+                    {visibleAdditionalLinks.map((link, idx) => (
                         <li key={link.link_id || idx} className="list-group-item">
                           <div className="d-flex justify-content-between align-items-top">
                             <div>
                               <strong>{link.title || `Link ${idx + 1}`}</strong>
-                              {!isCurrentLinkVisible && (
-                                <span className="badge bg-warning text-dark ms-2">{visibilityText.notCurrentlyAvailableBadge}</span>
-                              )}
                               <div>
-                                {isCurrentLinkVisible ? (
-                                  <a 
+                                  <a
                                     href={link.url}
                                     onClick={(e) => handleExternalLinkClick(
                                       e, 
@@ -584,11 +567,6 @@ const RecordTable = ({
                                     {link.url}
                                     <FontAwesomeIcon icon={faExternalLinkAlt} className="ms-1" />
                                   </a>
-                                ) : (
-                                  <span className="text-muted fst-italic">
-                                    {visibilityText.linkNotAvailable}
-                                  </span>
-                                )}
                               </div>
                               {link.description && (
                                 <div className="text-muted small mt-1">
@@ -599,12 +577,12 @@ const RecordTable = ({
                                   )}
                                 </div>
                               )}
-                              {/* Show link visibility dates for authenticated users */}
-                              {isAuthenticated && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                              {/* Show link visibility dates for users authorized to bypass visibility */}
+                              {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
                                 <div className="small text-muted mt-1">
                                   <strong>Link Visibility:</strong>{' '}
-                                  {link.start_visibility ? `From ${new Date(link.start_visibility).toLocaleDateString()}` : 'No start date'}{' '}
-                                  {link.end_visibility ? `until ${new Date(link.end_visibility).toLocaleDateString()}` : 'No end date'}
+                                  {link.start_visibility ? `From ${formatVisibilityDate(link.start_visibility)}` : 'No start date'}{' '}
+                                  {link.end_visibility ? `until ${formatVisibilityDate(link.end_visibility, 'end')}` : 'No end date'}
                                 </div>
                               )}
                             </div>
@@ -613,8 +591,7 @@ const RecordTable = ({
                             )}
                           </div>
                         </li>
-                      );
-                    })}
+                    ))}
                   </ul>
                 </div>
               </Collapse>
@@ -629,8 +606,9 @@ const RecordTable = ({
    * Render the table in split view mode
    */
   const renderSplitView = () => {
-    const printRecords = records.filter(item => !item.isElectronic);
-    const electronicRecords = records.filter(item => item.isElectronic);
+    const visibleRecords = records.filter(item => checkVisibility(item).isVisible);
+    const printRecords = visibleRecords.filter(item => !item.isElectronic);
+    const electronicRecords = visibleRecords.filter(item => item.isElectronic);
     
     return (
       <Row>
@@ -714,9 +692,10 @@ const RecordTable = ({
                 {electronicRecords
                   .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
                   .map(item => {
-                    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, isAuthenticated);
+                    const isPrimaryLinkVisibleCheck = isPrimaryLinkVisible(item.resource, canBypassVisibility);
                     const resourceUrl = item.resource?.item_url && isPrimaryLinkVisibleCheck ? item.resource.item_url : null;
-                    const hasAdditionalLinks = item.resource?.links?.length > 0;
+                    const visibleAdditionalLinks = getVisibleLinks(item.resource?.links, canBypassVisibility);
+                    const hasAdditionalLinks = visibleAdditionalLinks.length > 0;
                     const isExpanded = expandedLinkItems[item.id] || false;
                     
                     return (
@@ -752,36 +731,20 @@ const RecordTable = ({
                                 {hasAdditionalLinks && (
                                   <LinksExpandButton
                                     itemId={item.id}
-                                    links={item.resource.links}
+                                    links={visibleAdditionalLinks}
                                     isExpanded={isExpanded}
                                     color={customization.buttonPrimaryColor}
-                                    label={`${item.resource.links.length} more`}
-                                  />
-                                )}
-                              </div>
-                            ) : item.resource?.item_url && !isPrimaryLinkVisibleCheck ? (
-                              <div>
-                                <span className="text-warning small">
-                                  <FontAwesomeIcon icon={faExclamationCircle} className="me-1" />
-                                  {visibilityText.notCurrentlyAvailable}
-                                </span>
-                                {hasAdditionalLinks && (
-                                  <LinksExpandButton
-                                    itemId={item.id}
-                                    links={item.resource.links}
-                                    isExpanded={isExpanded}
-                                    color={customization.buttonPrimaryColor}
-                                    label={`${item.resource.links.length} more`}
+                                    label={`${visibleAdditionalLinks.length} more`}
                                   />
                                 )}
                               </div>
                             ) : hasAdditionalLinks ? (
                               <LinksExpandButton
                                 itemId={item.id}
-                                links={item.resource.links}
+                                links={visibleAdditionalLinks}
                                 isExpanded={isExpanded}
                                 color={customization.buttonPrimaryColor}
-                                label={`${item.resource.links.length} links`}
+                                label={`${visibleAdditionalLinks.length} links`}
                               />
                             ) : 'N/A'}
                           </td>
@@ -794,7 +757,7 @@ const RecordTable = ({
                               <Collapse isOpen={isExpanded}>
                                 <div className="p-3 bg-light">
                                   <ul className="list-group list-group-flush">
-                                    {item.resource.links.map((link, idx) => (
+                                    {visibleAdditionalLinks.map((link, idx) => (
                                       <li key={link.link_id || idx} className="list-group-item bg-transparent px-0">
                                         <div>
                                           <strong>{link.title || `Link ${idx + 1}`}</strong>
@@ -826,6 +789,13 @@ const RecordTable = ({
                                               ) : (
                                                 link.description
                                               )}
+                                            </div>
+                                          )}
+                                          {canBypassVisibility && link.use_link_visibility && (link.start_visibility || link.end_visibility) && (
+                                            <div className="small text-muted mt-1">
+                                              <strong>Link Visibility:</strong>{' '}
+                                              {link.start_visibility ? `From ${formatVisibilityDate(link.start_visibility)}` : 'No start date'}{' '}
+                                              {link.end_visibility ? `until ${formatVisibilityDate(link.end_visibility, 'end')}` : 'No end date'}
                                             </div>
                                           )}
                                         </div>
@@ -993,6 +963,10 @@ RecordTable.propTypes = {
    */
   hasElectronicReserves: PropTypes.bool,
   /**
+   * Whether visibility restrictions can be bypassed
+   */
+  canBypassVisibility: PropTypes.bool,
+  /**
    * UI customization settings
    */
   customization: PropTypes.shape({
@@ -1030,7 +1004,8 @@ RecordTable.defaultProps = {
   collegeParam: 'Unknown',
   showVisibilityMessages: true,
   viewMode: 'combined',
-  records: []
+  records: [],
+  canBypassVisibility: false,
 };
 
 export default RecordTable;

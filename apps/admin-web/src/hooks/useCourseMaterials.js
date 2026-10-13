@@ -6,8 +6,9 @@ import {
   fetchCrossLinkedCourses,
   fetchMergedResources,
 } from '../components/page-sections/course-record/api';
+import { parseVisibilityDate } from '../util/resourceVisibility';
 
-export function useCourseMaterials(record, { filter = 'all', searchQuery = '', isAuthenticated = false } = {}) {
+export function useCourseMaterials(record, { filter = 'all', searchQuery = '', canBypassVisibility = false } = {}) {
   const [records, setRecords] = useState([]);
   const [course, setCourse] = useState([]);
   const [error, setError] = useState(null);
@@ -371,29 +372,22 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', i
 
   const isRecordVisible = useCallback((item) => {
     if (item.isElectronic && item.resource) {
-      if (isAuthenticated) return true;
+      if (canBypassVisibility) return true;
 
       const now = new Date();
-      
-      if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
-        const startVisibility = item.resource.start_visibility
-          ? new Date(item.resource.start_visibility + 'T00:00:00')
-          : null;
-        const endVisibility = item.resource.end_visibility
-          ? new Date(item.resource.end_visibility + 'T23:59:59')
-          : null;
+      const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+      const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
-        if ((startVisibility && now < startVisibility)) {
-          return false;
-        }
+      if (startVisibility && now < startVisibility) {
+        return false;
+      }
 
-        if ((endVisibility && now > endVisibility)) {
-          return false;
-        }
+      if (endVisibility && now > endVisibility) {
+        return false;
       }
     }
     return true;
-  }, [isAuthenticated]);
+  }, [canBypassVisibility]);
 
   const combinedResults = useMemo(() => {
     const filteredBySearch = searchQuery.trim() !== ''
@@ -583,7 +577,7 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', i
 
     const checkRecordVisibility = (item) => {
       if (item.isElectronic && item.resource) {
-        if (isAuthenticated) return { isVisible: true };
+        if (canBypassVisibility) return { isVisible: true };
 
         const now = new Date();
         
@@ -592,12 +586,8 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', i
                                        item.resource.use_primary_link_visibility === true;
         
         if (usePrimaryLinkVisibility) {
-          const startVisibility = item.resource.primary_link_start_visibility
-            ? new Date(item.resource.primary_link_start_visibility + 'T00:00:00')
-            : null;
-          const endVisibility = item.resource.primary_link_end_visibility
-            ? new Date(item.resource.primary_link_end_visibility + 'T23:59:59')
-            : null;
+          const startVisibility = parseVisibilityDate(item.resource.primary_link_start_visibility);
+          const endVisibility = parseVisibilityDate(item.resource.primary_link_end_visibility, 'end');
             
           if (startVisibility && now < startVisibility) {
             upcomingDates.push(startVisibility);
@@ -613,12 +603,8 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', i
                                        item.resource.use_resource_visibility === true;
           
           if (useResourceVisibility) {
-            const startVisibility = item.resource.start_visibility
-              ? new Date(item.resource.start_visibility + 'T00:00:00')
-              : null;
-            const endVisibility = item.resource.end_visibility
-              ? new Date(item.resource.end_visibility + 'T23:59:59')
-              : null;
+            const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+            const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
 
             if ((startVisibility && now < startVisibility)) {
               upcomingDates.push(startVisibility);
@@ -653,7 +639,7 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', i
       totalCount: hiddenCount + visibleCount,
       nextAvailableDate
     };
-  }, [records, isAuthenticated]);
+  }, [records, canBypassVisibility]);
 
   const { hiddenCount, visibleCount, nextAvailableDate } = processedRecords;
 

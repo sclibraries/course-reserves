@@ -120,6 +120,10 @@ const DEFAULT_TEXT = {
     areNotCurrentlyAvailable: 'they are',
     notCurrentlyAvailable: 'not currently available.',
     nextAvailableDate: 'Next available date:',
+    previewAsStudent: 'Preview as student',
+    studentPreviewActive: 'Student preview is active.',
+    studentPreviewDescription: 'Resources and links outside their visibility dates are hidden as they are for students.',
+    exitStudentPreview: 'Exit student preview',
   },
 
   // Loading states

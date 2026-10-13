@@ -1,17 +1,19 @@
+import PropTypes from 'prop-types';
 import { Row, Col, Spinner, Alert } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBook, faExclamationCircle, faLaptop } from '@fortawesome/free-solid-svg-icons';
 import RecordCard from './RecordCard';
 import RecordTable from './RecordTable';
 import { useCourseView } from '../../../contexts/CourseViewContext';
+import { parseVisibilityDate } from '../../../util/resourceVisibility';
 
-function isItemVisible(item, isAuthenticated) {
+function isItemVisible(item, canBypassVisibility) {
   if (item.isElectronic && item.resource) {
-    if (isAuthenticated) return true;
+    if (canBypassVisibility) return true;
     const now = new Date();
     if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
-      const start = item.resource.start_visibility ? new Date(item.resource.start_visibility + 'T00:00:00') : null;
-      const end = item.resource.end_visibility ? new Date(item.resource.end_visibility + 'T23:59:59') : null;
+      const start = parseVisibilityDate(item.resource.start_visibility);
+      const end = parseVisibilityDate(item.resource.end_visibility, 'end');
       if (start && now < start) return false;
       if (end && now > end) return false;
     }
@@ -22,9 +24,9 @@ function isItemVisible(item, isAuthenticated) {
 export default function MaterialsDisplay({
   isLoading, error, materials, combinedResults, availability,
   openAccordions, toggleAccordion, displayMode, viewMode,
-  hiddenCount, visibleCount, nextAvailableDate,
+  hiddenCount, visibleCount, nextAvailableDate, canBypassVisibility = false,
 }) {
-  const { customizationProps, courseInfo, collegeParam, isAuthenticated } = useCourseView();
+  const { customizationProps, courseInfo, collegeParam } = useCourseView();
   const { recordsDiscoverLinkBgColor } = customizationProps;
 
   if (isLoading) {
@@ -40,7 +42,7 @@ export default function MaterialsDisplay({
 
   if (!materials || materials.length === 0) return <p>No records found.</p>;
 
-  if (!isAuthenticated && visibleCount === 0 && hiddenCount > 0) {
+  if (!canBypassVisibility && visibleCount === 0 && hiddenCount > 0) {
     return (
       <Alert color="warning" fade={false} className="d-flex align-items-center">
         <FontAwesomeIcon icon={faExclamationCircle} className="me-3 fa-lg" />
@@ -71,6 +73,7 @@ export default function MaterialsDisplay({
         collegeParam={collegeParam}
         viewMode={viewMode}
         records={materials}
+        canBypassVisibility={canBypassVisibility}
       />
     );
   }
@@ -83,11 +86,11 @@ export default function MaterialsDisplay({
           <div className="column-header mb-3">
             <h3 className="h4"><FontAwesomeIcon icon={faBook} className="text-success me-2" />Physical Materials</h3>
           </div>
-          {materials.filter(item => !item.isElectronic && isItemVisible(item, isAuthenticated)).length === 0 ? (
+          {materials.filter(item => !item.isElectronic && isItemVisible(item, canBypassVisibility)).length === 0 ? (
             <p className="text-muted">No physical materials available for this course.</p>
           ) : (
             materials
-              .filter(item => !item.isElectronic && isItemVisible(item, isAuthenticated))
+              .filter(item => !item.isElectronic && isItemVisible(item, canBypassVisibility))
               .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
               .map(item => (
                 <RecordCard
@@ -99,7 +102,7 @@ export default function MaterialsDisplay({
                   customization={customizationProps}
                   courseInfo={courseInfo}
                   collegeParam={collegeParam}
-                  isAuthenticated={isAuthenticated}
+                  canBypassVisibility={canBypassVisibility}
                 />
               ))
           )}
@@ -108,11 +111,11 @@ export default function MaterialsDisplay({
           <div className="column-header mb-3">
             <h3 className="h4"><FontAwesomeIcon icon={faLaptop} className="text-info me-2" />Electronic Materials</h3>
           </div>
-          {materials.filter(item => item.isElectronic && isItemVisible(item, isAuthenticated)).length === 0 ? (
+          {materials.filter(item => item.isElectronic && isItemVisible(item, canBypassVisibility)).length === 0 ? (
             <p className="text-muted">No electronic materials available for this course.</p>
           ) : (
             materials
-              .filter(item => item.isElectronic && isItemVisible(item, isAuthenticated))
+              .filter(item => item.isElectronic && isItemVisible(item, canBypassVisibility))
               .sort((a, b) => a.copiedItem.title.localeCompare(b.copiedItem.title))
               .map(item => (
                 <RecordCard
@@ -124,7 +127,7 @@ export default function MaterialsDisplay({
                   customization={customizationProps}
                   courseInfo={courseInfo}
                   collegeParam={collegeParam}
-                  isAuthenticated={isAuthenticated}
+                  canBypassVisibility={canBypassVisibility}
                 />
               ))
           )}
@@ -138,7 +141,7 @@ export default function MaterialsDisplay({
     <>
       {combinedResults.map((result) => {
         if (result.folder) {
-          const visibleItems = result.items.filter(item => isItemVisible(item, isAuthenticated));
+          const visibleItems = result.items.filter(item => isItemVisible(item, canBypassVisibility));
           if (visibleItems.length === 0) return null;
           return (
             <div key={`folder-${result.folder}`} className="folder-group mb-5">
@@ -157,7 +160,7 @@ export default function MaterialsDisplay({
                         customization={customizationProps}
                         courseInfo={courseInfo}
                         collegeParam={collegeParam}
-                        isAuthenticated={isAuthenticated}
+                        canBypassVisibility={canBypassVisibility}
                         isGrouped
                       />
                     </Col>
@@ -167,7 +170,7 @@ export default function MaterialsDisplay({
             </div>
           );
         }
-        if (!isItemVisible(result, isAuthenticated)) return null;
+        if (!isItemVisible(result, canBypassVisibility)) return null;
         return (
           <Row className="g-4 mb-4" key={result.id}>
             <Col xs="12">
@@ -179,7 +182,7 @@ export default function MaterialsDisplay({
                 customization={customizationProps}
                 courseInfo={courseInfo}
                 collegeParam={collegeParam}
-                isAuthenticated={isAuthenticated}
+                canBypassVisibility={canBypassVisibility}
               />
             </Col>
           </Row>
@@ -188,3 +191,7 @@ export default function MaterialsDisplay({
     </>
   );
 }
+
+MaterialsDisplay.propTypes = {
+  canBypassVisibility: PropTypes.bool,
+};
