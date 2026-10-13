@@ -12,8 +12,9 @@ services:
     volumes:
       - test_db:/var/lib/mysql
       - ./packages/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docker/test/seed-test-users.sql:/docker-entrypoint-initdb.d/02-test-users.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ureserves_test", "-ptest-only-password"]
+      test: ["CMD", "mysqladmin", "ping", "--protocol=tcp", "-h", "127.0.0.1", "-ureserves_test", "-ptest-only-password"]
       interval: 3s
       timeout: 3s
       retries: 60

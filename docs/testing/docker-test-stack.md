@@ -1,15 +1,19 @@
 # Isolated API test stack
 
-This Compose stack uses MariaDB 10.3, an internal-only network, no host ports, synthetic
-credentials, and project-scoped volumes. The API source and installed Composer dependencies are
-mounted read-only. Its database starts from `packages/database/schema.sql`; Yii migrations and the
-synthetic faculty workflow seed are explicit steps. `docker/test/app.env` is loaded into the
-backend process before Yii reads its configuration and is also mounted at `/app/.env`.
+This standalone Compose stack uses MariaDB 10.3, an internal-only network, no host ports,
+synthetic credentials and project-scoped volumes. The test database starts from
+`packages/database/schema.sql` plus `docker/test/seed-test-users.sql`; the runner then applies Yii
+migrations and the synthetic faculty workflow seed. The backend loads only the synthetic
+configuration in `docker/test/app.env`.
 
-Run the commands from the repository root. The official PHP 7.2 image needs Composer and ZIP
-support installed for a clean dependency install. Debian Buster uses the archive mirrors. This
-container command skips Yii's post-install script so it cannot write a generated cookie key into
-`config/web.php`:
+Run setup and tests from the repository root. Tests must never run against the development stack.
+Do not use `docker/start.sh` or `docker-compose.yml` for API tests.
+
+## Prerequisites
+
+Install Composer dependencies with the PHP 7.2 image. The image needs Composer and ZIP support;
+Debian Buster uses the archive mirrors. The install skips Yii's post-install script so it cannot
+write a generated cookie key into `config/web.php`:
 
 ```sh
 docker run --rm \
@@ -30,12 +34,7 @@ docker run --rm \
   '
 ```
 
-The disabled cURL multi functions make Composer use PHP's HTTPS stream transport. In this
-PHP 7.2 container, the cURL downloader can terminate with an illegal-instruction signal while
-requesting the locked Bootstrap archive from the npm registry.
-
-After installing dependencies, prepare the read-only source mount points and generated
-Codeception actor traits:
+Prepare the read-only source mount points and generated Codeception actor traits:
 
 ```sh
 test -e apps/api/.env || touch apps/api/.env
@@ -46,29 +45,27 @@ docker run --rm --network none \
   --entrypoint php php:7.2 vendor/bin/codecept build
 ```
 
-Build and start the isolated project, then migrate and seed it:
+## Run the API suites
 
 ```sh
-docker compose -f docker-compose.test.yml -p cr-test up -d --build
-docker compose -f docker-compose.test.yml -p cr-test exec -T backend php yii migrate/up --interactive=0
-docker compose -f docker-compose.test.yml -p cr-test exec -T backend php yii test-data/seed-faculty-workflow
+docker/test/run-api-tests.sh [project-name]
 ```
 
-Run the API suites:
+The runner builds and starts the isolated stack, applies migrations, verifies that a second
+migration run is a no-op, seeds the synthetic faculty workflow fixture, runs both API suites and
+removes its containers and volumes on exit. Set `KEEP_STACK=1` to keep the stack for debugging;
+remove it manually when finished.
+
+## Manual steps for debugging
+
+Use a project name reserved for this test run, such as `cx002-debug`, and include the test Compose
+file on every command:
 
 ```sh
-docker compose -f docker-compose.test.yml -p cr-test exec -T backend \
-  php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors
-docker compose -f docker-compose.test.yml -p cr-test exec -T backend \
-  php -d register_argc_argv=On vendor/bin/codecept run functional --no-colors
+docker compose -f docker-compose.test.yml -p cx002-debug up -d --build --wait
+docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php yii migrate/up --interactive=0
+docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php yii test-data/seed-faculty-workflow
+docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors
+docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run functional --no-colors
+docker compose -f docker-compose.test.yml -p cx002-debug down -v --remove-orphans
 ```
-
-Remove this project's containers and volumes after the run:
-
-```sh
-docker compose -f docker-compose.test.yml -p cr-test down -v --remove-orphans
-```
-
-For a separate worktree, set `COURSE_RESERVES_TEST_SOURCE` to its path for every Compose command.
-The default source is the current repository directory. This test project does not use the
-development Compose file or its database volume.
