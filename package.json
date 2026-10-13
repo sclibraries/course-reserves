@@ -1,5 +1,6 @@
 {
   "name": "course-reserves-monorepo",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "workspaces": ["apps/admin-web", "apps/faculty-form"],
   "scripts": {

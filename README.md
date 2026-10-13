@@ -44,3 +44,9 @@ configured in the environment.
 
 The isolated API test stack and its commands are documented in
 [`docs/testing/docker-test-stack.md`](docs/testing/docker-test-stack.md).
+
+## Licence
+
+Course Reserves is available under the [PolyForm Noncommercial License 1.0.0](LICENSE), which
+allows use, changes and sharing for noncommercial purposes as that licence defines them.
+Third-party code keeps its own licence; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
