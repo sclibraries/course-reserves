@@ -46,6 +46,15 @@ describe('MockLoginForm', () => {
     act(() => root!.render(<MockLoginForm />));
   };
 
+  const enterValue = (input: HTMLInputElement, value: string) => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!;
+    valueSetter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
   it('requires Shibboleth identity fields without real-looking examples or generated account preview', () => {
     render();
 
@@ -54,5 +63,38 @@ describe('MockLoginForm', () => {
     expect(container!.textContent).not.toContain('Karla');
     expect(container!.textContent).not.toContain('999999999');
     expect(container!.textContent).not.toContain('Will create:');
+  });
+
+  it('fetches courses without identity arguments after mock JWT creation resolves', async () => {
+    let resolveLogin!: () => void;
+    const loginPromise = new Promise<void>((resolve) => {
+      resolveLogin = resolve;
+    });
+    setMockUser.mockReturnValue(loginPromise);
+    fetchCourseAssignments.mockResolvedValue(undefined);
+    render();
+
+    const nameInput = container!.querySelector<HTMLInputElement>('#custom-name')!;
+    const idInput = container!.querySelector<HTMLInputElement>('#internal-id')!;
+    await act(async () => {
+      enterValue(nameInput, 'Faculty Member');
+      enterValue(idInput, 'faculty-id');
+    });
+
+    const button = container!.querySelector<HTMLButtonElement>('button')!;
+    act(() => {
+      button.click();
+    });
+
+    expect(setMockUser).toHaveBeenCalledWith('Faculty Member', 'faculty-id');
+    expect(fetchCourseAssignments).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveLogin();
+      await loginPromise;
+    });
+
+    expect(fetchCourseAssignments).toHaveBeenCalledOnce();
+    expect(fetchCourseAssignments).toHaveBeenCalledWith();
   });
 });

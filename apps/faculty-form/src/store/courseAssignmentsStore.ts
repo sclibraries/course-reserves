@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { API_ENDPOINTS } from '@/config/endpoints';
+import apiClient from '@/services/apiClient';
 
 // Types for course assignments from the backend
 export interface CourseAssignment {
@@ -47,7 +48,7 @@ interface CourseAssignmentsState {
   error: string | null;
   
   // Actions
-  fetchCourseAssignments: (fullName: string, internalId: string) => Promise<void>;
+  fetchCourseAssignments: () => Promise<void>;
   clearAssignments: () => void;
 }
 
@@ -61,25 +62,15 @@ export const useCourseAssignmentsStore = create<CourseAssignmentsState>()(
         error: null,
 
         // Fetch course assignments from backend
-        fetchCourseAssignments: async (fullName: string, internalId: string) => {
-        console.log('🔍 Fetching course assignments for:', fullName, 'ID:', internalId);
+        fetchCourseAssignments: async () => {
+        console.log('🔍 Fetching authenticated course assignments');
         set({ loading: true, error: null });
         
         try {
-          const url = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.COURSE_ASSIGNMENTS}?full_name=${encodeURIComponent(fullName)}&internal_id=${encodeURIComponent(internalId)}`;
-          
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
+          const response = await apiClient.get(
+            `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.COURSE_ASSIGNMENTS}`,
+          );
+          const data = response.data;
           
           if (data.success && data.courses) {
             console.log('✅ Course assignments loaded:', data.courses.length, 'courses');

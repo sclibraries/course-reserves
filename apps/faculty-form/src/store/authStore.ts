@@ -184,6 +184,7 @@ export const useAuthStore = create<AuthState>()(
                 credentials: 'include', // accepts HttpOnly refreshToken cookie from server
                 body: JSON.stringify({
                   full_name: fullName,
+                  internal_id: internalId,
                   institution: institution,
                   role: role,
                 }),

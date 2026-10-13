@@ -88,6 +88,34 @@ describe('authStore — auth token lifecycle', () => {
     expect(state.user?.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
+  it('includes internal_id in the mock-login request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'synthetic-mock-token',
+        user: {
+          username: 'faculty',
+          role: 'faculty',
+          full_name: 'Faculty Member',
+          email: 'faculty@example.test',
+          institution: 'SM',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { useAuthStore } = await import('./authStore');
+
+    await useAuthStore.getState().setMockUser('Faculty Member', 'faculty-123');
+
+    const [, requestOptions] = fetchMock.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(JSON.parse(String(requestOptions.body))).toEqual({
+      full_name: 'Faculty Member',
+      institution: 'SM',
+      role: 'faculty',
+      internal_id: 'faculty-123',
+    });
+  });
+
   it('logout() clears auth state and redirects to the faculty form auth route', async () => {
     const { FACULTY_FORM_AUTH_PATH, useAuthStore } = await import('./authStore');
 

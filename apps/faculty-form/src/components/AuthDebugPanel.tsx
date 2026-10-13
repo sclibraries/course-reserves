@@ -92,7 +92,7 @@ export const AuthDebugPanel = () => {
         
         // Auto-fetch course assignments after successful login
         try {
-          await fetchCourseAssignments(customName.trim(), internalId.trim());
+          await fetchCourseAssignments();
           console.log('✅ Course assignments auto-fetched after login');
         } catch (assignmentError) {
           console.warn('⚠️ Could not fetch course assignments:', assignmentError);
