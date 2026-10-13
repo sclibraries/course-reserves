@@ -34,6 +34,10 @@ docker run --rm \
   '
 ```
 
+The disabled cURL multi functions make Composer use PHP's HTTPS stream transport. In this
+PHP 7.2 container, the cURL downloader can terminate with an illegal-instruction signal while
+requesting the locked Bootstrap archive from the npm registry.
+
 Prepare the read-only source mount points and generated Codeception actor traits:
 
 ```sh
@@ -56,16 +60,19 @@ migration run is a no-op, seeds the synthetic faculty workflow fixture, runs bot
 removes its containers and volumes on exit. Set `KEEP_STACK=1` to keep the stack for debugging;
 remove it manually when finished.
 
+To test a separate worktree, set `COURSE_RESERVES_TEST_SOURCE` to its path for the runner
+and every Compose command. The default source is the current repository directory.
+
 ## Manual steps for debugging
 
-Use a project name reserved for this test run, such as `cx002-debug`, and include the test Compose
+Use a project name reserved for this test run, such as `cr-test-debug`, and include the test Compose
 file on every command:
 
 ```sh
-docker compose -f docker-compose.test.yml -p cx002-debug up -d --build --wait
-docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php yii migrate/up --interactive=0
-docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php yii test-data/seed-faculty-workflow
-docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors
-docker compose -f docker-compose.test.yml -p cx002-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run functional --no-colors
-docker compose -f docker-compose.test.yml -p cx002-debug down -v --remove-orphans
+docker compose -f docker-compose.test.yml -p cr-test-debug up -d --build --wait
+docker compose -f docker-compose.test.yml -p cr-test-debug exec -T backend php yii migrate/up --interactive=0
+docker compose -f docker-compose.test.yml -p cr-test-debug exec -T backend php yii test-data/seed-faculty-workflow
+docker compose -f docker-compose.test.yml -p cr-test-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors
+docker compose -f docker-compose.test.yml -p cr-test-debug exec -T backend php -d register_argc_argv=On vendor/bin/codecept run functional --no-colors
+docker compose -f docker-compose.test.yml -p cr-test-debug down -v --remove-orphans
 ```
