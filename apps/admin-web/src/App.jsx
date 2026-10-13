@@ -15,7 +15,7 @@ import Layout from './components/layout/Layout';
 import CampusDetection from './components/CampusDetection';
 import { ToastContainer } from 'react-toastify';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { all } from '@awesome.me/kit-48b7df1f35/icons';
+import { fas } from '@fortawesome/free-solid-svg-icons';
 import useCustomizationStore from './store/customizationStore'; // <-- Import the store
 import { AuthProvider } from './contexts/AuthContext';
 import './css/variables.css'; // Import the new variables CSS file
@@ -23,8 +23,8 @@ import './css/App.css';
 import 'react-toastify/dist/ReactToastify.css';
 import 'react-loading-skeleton/dist/skeleton.css';
 
-// Add all FontAwesome icons to the library
-library.add(...all);
+// Register free solid icons for string-based FontAwesomeIcon props.
+library.add(fas);
 
 // Inner component that uses Router context
 const AppContent = () => {

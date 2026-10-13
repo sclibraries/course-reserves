@@ -69,8 +69,8 @@ npm run build      # admin-web prebuild runs check-case
 npx vitest run src/path/to/file.test.jsx      # one file
 ```
 
-admin-web installs FontAwesome Pro packages and needs `FONTAWESOME_NPM_AUTH_TOKEN` in the
-environment. Never write the token into `.npmrc`.
+Icons use the free `@fortawesome/free-solid-svg-icons` set
+and `react-icons`. No private registry or token is needed.
 
 api (in `apps/api`, or the backend container):
 
