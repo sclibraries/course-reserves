@@ -3,6 +3,7 @@
 session_start();
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
+use app\services\FacultyTokenClaims;
 
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
@@ -78,32 +79,28 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
         $fullName = trim(($firstname ?? '') . ' ' . ($lastname ?? ''));
         $role = (strpos($affLower, 'faculty') !== false) ? 'faculty' : 'staff';
 
-        // Access token payload
-        $accessPayload = [
-            'iat' => $issuedAt,
-            'exp' => $accessExpiration,
+        $identityClaims = [
             'username' => $username,
             'role' => $role,
             'id' => $username, // No DB id; use username as stable identifier
             'full_name' => $fullName,
             'email' => $email,
             'institution' => $locationCode,
-            'interal_id' => $fcIdNumber
         ];
+        $accessPayload = FacultyTokenClaims::forAuthorization(
+            $identityClaims,
+            $fcIdNumber,
+            $issuedAt,
+            $accessExpiration
+        );
         $accessToken = JWT::encode($accessPayload, $secretKey, 'HS256');
 
-        // Refresh token payload
-        $refreshPayload = [
-            'iat' => $issuedAt,
-            'exp' => $refreshExpiration,
-            'username' => $username,
-            'role' => $role,
-            'id' => $username,
-            'full_name' => $fullName,
-            'email' => $email,
-            'institution' => $locationCode,
-            'interal_id' => $fcIdNumber
-        ];
+        $refreshPayload = FacultyTokenClaims::forAuthorization(
+            $identityClaims,
+            $fcIdNumber,
+            $issuedAt,
+            $refreshExpiration
+        );
         $refreshToken = JWT::encode($refreshPayload, $refreshSecretKey, 'HS256');
 
         // Determine cookie parameters based on current host/scheme for dev/prod compatibility

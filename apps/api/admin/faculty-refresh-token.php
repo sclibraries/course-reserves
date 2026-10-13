@@ -3,6 +3,7 @@
 
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
+use app\services\FacultyTokenClaims;
 
 // Include Yii and Composer
 require_once dirname(__DIR__) . '/vendor/autoload.php';
@@ -47,29 +48,20 @@ try {
     $issuedAt = time();
     $accessExpiration = $issuedAt + 3600;   // 1 hour
     $refreshExpiration = $issuedAt + 86400; // 1 day
+    $decodedClaims = (array) $decoded;
 
-    // Preserve known claims if present
-    $claims = [
-        'username' => $decoded->username,
-        'role' => $decoded->role ?? 'faculty',
-        'id' => $decoded->id ?? $decoded->username,
-        'full_name' => $decoded->full_name ?? null,
-        'email' => $decoded->email ?? null,
-        'institution' => $decoded->institution ?? null,
-    ];
-
-    // New access token
-    $accessPayload = array_merge($claims, [
-        'iat' => $issuedAt,
-        'exp' => $accessExpiration,
-    ]);
+    $accessPayload = FacultyTokenClaims::forRefresh(
+        $decodedClaims,
+        $issuedAt,
+        $accessExpiration
+    );
     $newAccessToken = JWT::encode($accessPayload, $accessSecretKey, 'HS256');
 
-    // New refresh token
-    $refreshPayload = array_merge($claims, [
-        'iat' => $issuedAt,
-        'exp' => $refreshExpiration,
-    ]);
+    $refreshPayload = FacultyTokenClaims::forRefresh(
+        $decodedClaims,
+        $issuedAt,
+        $refreshExpiration
+    );
     $newRefreshToken = JWT::encode($refreshPayload, $refreshSecretKey, 'HS256');
 
     // Rotate refresh token cookie — HttpOnly prevents XSS access

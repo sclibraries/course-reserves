@@ -17,6 +17,7 @@ use app\models\MaterialTypes;
 use app\models\Course;
 use app\models\CourseOffering;
 use app\models\SubmissionCommunication;
+use app\services\FacultyTokenClaims;
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use yii\helpers\ArrayHelper;
@@ -68,7 +69,7 @@ class FacultySubmissionController extends BaseRestController
      * Creates a JWT token for a mock user based on full_name
      * 
      * POST /faculty-submission/mock-login
-     * Body: { "full_name": "Jane Smith" }
+     * Body: { "full_name": "Synthetic Faculty", "internal_id": "999000001" }
      * 
      * Returns: {
      *   "token": "eyJ...",
@@ -88,6 +89,7 @@ class FacultySubmissionController extends BaseRestController
 
         $request = Yii::$app->request;
         $fullName = $request->post('full_name');
+        $internalId = $request->post('internal_id');
 
         if (!$fullName) {
             throw new BadRequestHttpException('full_name is required');
@@ -113,9 +115,7 @@ class FacultySubmissionController extends BaseRestController
         $issuedAt = time();
         $expire = $issuedAt + 3600; // 1 hour
 
-        $accessPayload = [
-            'iat' => $issuedAt,
-            'exp' => $expire,
+        $identityClaims = [
             'username' => $username,
             'role' => $role,
             'id' => $username,
@@ -123,21 +123,23 @@ class FacultySubmissionController extends BaseRestController
             'email' => $email,
             'institution' => $institution,
         ];
+        $accessPayload = FacultyTokenClaims::forAuthorization(
+            $identityClaims,
+            $internalId,
+            $issuedAt,
+            $expire
+        );
 
         $accessToken = JWT::encode($accessPayload, $secretKey, 'HS256');
 
         // Create refresh token (24 hours)
         $refreshExpire = $issuedAt + 86400; // 24 hours
-        $refreshPayload = [
-            'iat' => $issuedAt,
-            'exp' => $refreshExpire,
-            'username' => $username,
-            'role' => $role,
-            'id' => $username,
-            'full_name' => $fullName,
-            'email' => $email,
-            'institution' => $institution,
-        ];
+        $refreshPayload = FacultyTokenClaims::forAuthorization(
+            $identityClaims,
+            $internalId,
+            $issuedAt,
+            $refreshExpire
+        );
 
         $refreshToken = JWT::encode($refreshPayload, $secretKey, 'HS256');
 

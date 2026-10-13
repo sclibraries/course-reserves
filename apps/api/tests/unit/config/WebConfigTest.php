@@ -4,6 +4,22 @@ namespace tests\unit\config;
 
 class WebConfigTest extends \Codeception\Test\Unit
 {
+    /**
+     * Both faculty token issuers delegate to the shared claims helper.
+     *
+     * @return void
+     */
+    public function testFacultyTokenEntryPointsStructurallyDelegatePayloadConstructionToHelper()
+    {
+        $authorizationSource = file_get_contents(codecept_root_dir('admin/faculty-authorize.php'));
+        $refreshSource = file_get_contents(codecept_root_dir('admin/faculty-refresh-token.php'));
+
+        $this->assertStringContainsString('use app\services\FacultyTokenClaims;', $authorizationSource);
+        $this->assertSame(2, substr_count($authorizationSource, 'FacultyTokenClaims::forAuthorization('));
+        $this->assertStringContainsString('use app\services\FacultyTokenClaims;', $refreshSource);
+        $this->assertSame(2, substr_count($refreshSource, 'FacultyTokenClaims::forRefresh('));
+    }
+
     public function testFacultySubmissionUuidCommunicationsRoutesAreDeclaredOnce()
     {
         $source = file_get_contents(codecept_root_dir('config/web.php'));

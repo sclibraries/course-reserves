@@ -25,6 +25,8 @@ class JwtIdentity implements IdentityInterface
     /** @var string */
     public $fullName;
     /** @var string */
+    public $internalId;
+    /** @var string */
     public $email;
     /** @var string */
     public $institution;
@@ -35,6 +37,7 @@ class JwtIdentity implements IdentityInterface
         $this->username    = $claims['username']  ?? null;
         $this->role        = $claims['role']       ?? null;
         $this->fullName    = $claims['full_name']  ?? null;
+        $this->internalId  = $claims['internal_id'] ?? $claims['interal_id'] ?? null;
         $this->email       = $claims['email']      ?? null;
         $this->institution = $claims['institution'] ?? null;
     }

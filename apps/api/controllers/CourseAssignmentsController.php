@@ -6,6 +6,7 @@ use Yii;
 use yii\rest\ActiveController;
 use yii\filters\Cors;
 use yii\web\ServerErrorHttpException;
+use yii\web\ForbiddenHttpException;
 use app\models\CourseAssignments;
 use yii\httpclient\Client;
 
@@ -26,10 +27,10 @@ class CourseAssignmentsController extends ActiveController
     {
         $behaviors = parent::behaviors();
 
-        // Configure JWT authentication for specific endpoints
+        // Require a Bearer token for every endpoint except CORS preflight.
         $behaviors['authenticator'] = [
             'class' => \yii\filters\auth\HttpBearerAuth::class,
-            'only' => ['instructor-courses'], // Only require auth for production endpoint
+            'except' => ['options'],
         ];
 
         // CORS
@@ -52,6 +53,38 @@ class CourseAssignmentsController extends ActiveController
         ];
 
         return $behaviors;
+    }
+
+    /**
+     * Enforce the role policy for roster and instructor course actions.
+     *
+     * @param \yii\base\Action $action Action being executed.
+     * @return bool Whether the action should continue.
+     */
+    public function beforeAction($action)
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        if ($action->id === 'options' || Yii::$app->request->method === 'OPTIONS') {
+            return true;
+        }
+
+        $identity = Yii::$app->user->identity;
+        $staffOnlyActions = ['index', 'by-period', 'by-smith-id', 'check-enrollment'];
+        $isStaffOnlyAction = in_array($action->id, $staffOnlyActions, true);
+        $hasStaffRole = in_array($identity->role ?? null, ['staff', 'admin'], true);
+
+        if ($isStaffOnlyAction && !$hasStaffRole) {
+            throw new ForbiddenHttpException('Roster access requires a staff or admin role.');
+        }
+
+        if ($action->id === 'instructor-courses' && ($identity->role ?? null) !== 'faculty') {
+            throw new ForbiddenHttpException('Instructor course lookup requires a faculty role.');
+        }
+
+        return true;
     }
 
     public function actions()
@@ -259,6 +292,8 @@ class CourseAssignmentsController extends ActiveController
      */
     public function actionTestInstructorCourses()
     {
+        $this->assertTestEndpointEnabled();
+
         $fullName = Yii::$app->request->get('full_name');
         $internalId = Yii::$app->request->get('internal_id');
 
@@ -273,6 +308,28 @@ class CourseAssignmentsController extends ActiveController
     }
 
     /**
+     * Hide the query-identity test endpoint outside development.
+     *
+     * @return void
+     */
+    protected function assertTestEndpointEnabled()
+    {
+        if (!$this->isDevelopmentEnvironment()) {
+            throw new \yii\web\NotFoundHttpException('Page not found.');
+        }
+    }
+
+    /**
+     * Check whether Yii is running in development mode.
+     *
+     * @return bool
+     */
+    protected function isDevelopmentEnvironment()
+    {
+        return defined('YII_ENV_DEV') && YII_ENV_DEV;
+    }
+
+    /**
      * Production endpoint to get authenticated instructor's courses
      * GET /course-assignments/instructor-courses
      * 
@@ -283,21 +340,31 @@ class CourseAssignmentsController extends ActiveController
      */
     public function actionInstructorCourses()
     {
-        $identity = Yii::$app->user->identity;
+        $identity = $this->getAuthenticatedIdentity();
         
         if (!$identity) {
             throw new \yii\web\UnauthorizedHttpException('Authentication required');
         }
 
         // Extract user info from JWT token
-        $fullName = $identity->full_name ?? null;
-        $internalId = $identity->interal_id ?? null; // Note: typo in original "interal_id"
+        $fullName = $identity->fullName;
+        $internalId = $identity->internalId;
 
         if (!$fullName || !$internalId) {
             throw new \yii\web\BadRequestHttpException('Missing required user information in token');
         }
 
         return $this->getInstructorCourses($fullName, $internalId, false);
+    }
+
+    /**
+     * Return the identity resolved by the bearer authenticator.
+     *
+     * @return \app\models\JwtIdentity|null
+     */
+    protected function getAuthenticatedIdentity()
+    {
+        return Yii::$app->user->identity;
     }
 
     /**
@@ -308,7 +375,7 @@ class CourseAssignmentsController extends ActiveController
      * @param bool $debug Whether to include debug information
      * @return array
      */
-    private function getInstructorCourses($fullName, $internalId, $debug = false)
+    protected function getInstructorCourses($fullName, $internalId, $debug = false)
     {
         // Fetch all course assignments for this instructor
         $assignments = CourseAssignments::find()
