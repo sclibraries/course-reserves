@@ -39,11 +39,11 @@ npm run test
 npm run build
 ```
 
-For admin-web, also run `npm run lint`. Its dependency install requires the Font Awesome npm token
-configured in the environment.
+For admin-web, also run `npm run lint`.
 
-The isolated API test stack and its commands are documented in
-[`docs/testing/docker-test-stack.md`](docs/testing/docker-test-stack.md).
+API tests run in an isolated Docker stack (`docker-compose.test.yml`) with a synthetic database.
+After installing `apps/api` Composer dependencies, run `docker/test/run-api-tests.sh [project-name]`
+from the repository root.
 
 ## Licence
 
