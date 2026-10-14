@@ -2,6 +2,9 @@
 
 namespace app\controllers;
 
+use app\components\Roles;
+use app\filters\RoleAccessFilter;
+use Yii;
 use yii\rest\ActiveController;
 use yii\filters\auth\HttpBearerAuth;
 use yii\filters\Cors;
@@ -33,6 +36,15 @@ class FolderController extends ActiveController
                 'Access-Control-Max-Age' => 3600,
                 'Access-Control-Allow-Headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
                 'Access-Control-Expose-Headers' => [],
+            ],
+        ];
+
+        $behaviors['roleAccess'] = [
+            'class' => RoleAccessFilter::class,
+            'rules' => [
+                'create' => Roles::STAFF,
+                'update' => Roles::STAFF,
+                'delete' => Roles::STAFF,
             ],
         ];
 

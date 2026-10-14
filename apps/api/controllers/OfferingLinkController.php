@@ -11,7 +11,8 @@ use app\models\Courses;
 use app\models\CourseResources;
 use yii\filters\Cors;
 use yii\filters\auth\HttpBearerAuth;
-use yii\filters\AccessControl;
+use app\components\Roles;
+use app\filters\RoleAccessFilter;
 
 class OfferingLinkController extends ActiveController
 {
@@ -24,7 +25,7 @@ class OfferingLinkController extends ActiveController
         // Re-add the authenticator and exclude OPTIONS requests from authentication
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'except' => ['options', 'find-links', 'find-linked-offerings', 'find-linked-resources', 'get-linked-resources', 'link-existing-resources'],
+            'except' => ['options', 'find-links', 'find-linked-offerings', 'find-linked-resources', 'get-linked-resources'],
         ];
         // Add the CORS filter first so that it handles OPTIONS requests properly
         $behaviors['corsFilter'] = [
@@ -41,19 +42,14 @@ class OfferingLinkController extends ActiveController
         ];
 
 
-        // Optionally, add access control if needed
-        $behaviors['access'] = [
-            'class' => AccessControl::class,
-            'only' => ['create', 'update', 'delete'],
+        $behaviors['roleAccess'] = [
+            'class' => RoleAccessFilter::class,
             'rules' => [
-                [
-                    'allow' => true,
-                    'actions' => ['create', 'update', 'delete'],
-                    'roles' => ['@'],
-                ],
-                [
-                    'allow' => false,
-                ],
+                'create' => Roles::STAFF,
+                'update' => Roles::STAFF,
+                'delete' => Roles::STAFF,
+                'link-existing-resources' => Roles::STAFF,
+                'update-resource-order' => Roles::STAFF,
             ],
         ];
 

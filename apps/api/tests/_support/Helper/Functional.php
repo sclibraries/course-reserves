@@ -33,6 +33,31 @@ class Functional extends \Codeception\Module
     }
 
     /**
+     * Send a JSON request using an explicit HTTP method and URI.
+     *
+     * @param string $method HTTP method.
+     * @param string $route  Yii route, such as "course/create".
+     * @param array  $payload Decoded JSON document to send as the request body.
+     * @param array  $routeParams Parameters passed to the Yii route.
+     * @return int HTTP response status code.
+     */
+    public function sendJsonRequest($method, $route, array $payload = [], array $routeParams = [])
+    {
+        $module = $this->getModule('Yii2');
+        $url = \Yii::$app->urlManager->createUrl(array_merge([$route], $routeParams));
+        $module->_request(
+            strtoupper($method),
+            $url,
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode($payload)
+        );
+
+        return $module->_getResponseStatusCode();
+    }
+
+    /**
      * Decode the last response body as JSON.
      *
      * @return array|null

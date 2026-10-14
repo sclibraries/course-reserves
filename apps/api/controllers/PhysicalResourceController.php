@@ -8,6 +8,8 @@ use yii\filters\Cors;
 use yii\filters\auth\HttpBearerAuth;
 use app\models\PhysicalResourceReferences;
 use app\models\CourseOfferings;
+use app\components\Roles;
+use app\filters\RoleAccessFilter;
 use yii\web\NotFoundHttpException;
 use yii\web\BadRequestHttpException;
 use yii\web\Response;
@@ -21,7 +23,7 @@ class PhysicalResourceController extends Controller
 
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'except' => ['options', 'get-references', 'create-or-update-reference', 'cleanup-references'],
+            'except' => ['options', 'get-references'],
         ];
 
         $behaviors['corsFilter'] = [
@@ -34,6 +36,15 @@ class PhysicalResourceController extends Controller
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Max-Age' => 3600,
                 'Access-Control-Allow-Headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
+            ],
+        ];
+
+        $behaviors['roleAccess'] = [
+            'class' => RoleAccessFilter::class,
+            'rules' => [
+                'create-or-update-reference' => Roles::STAFF,
+                'update-resource-order' => Roles::STAFF,
+                'cleanup-references' => Roles::STAFF,
             ],
         ];
 

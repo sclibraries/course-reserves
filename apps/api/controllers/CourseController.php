@@ -17,6 +17,8 @@ use app\models\ResourceMetadata;
 use app\models\CourseOfferings;
 use app\models\ResourceLinks;
 use app\services\SubmissionCourseScaffoldService;
+use app\components\Roles;
+use app\filters\RoleAccessFilter;
 
 class CourseController extends ActiveController
 {
@@ -57,45 +59,22 @@ class CourseController extends ActiveController
             ],
         ];
 
-        // Access control if you want to limit creation/updating
-        $behaviors['access'] = [
-            'class' => \yii\filters\AccessControl::class,
-            'only' => [
-                'create', 
-                'update', 
-                'delete', 
-                'file-upload', 
-                'link-resource' ,
-                'reuse-resource', 
-                'create-from-folio', 
-                'create-resource', 
-                'unlink-resource', 
-                'check-course-exists', 
-                'reactivate-course',
-                'link-course-offering'
-            ],
+        $behaviors['roleAccess'] = [
+            'class' => RoleAccessFilter::class,
             'rules' => [
-                [
-                    'allow' => true,
-                    'actions' => [
-                        'create', 
-                        'update', 
-                        'delete', 
-                        'file-upload', 
-                        'link-resource',
-                        'reuse-resource',
-                        'create-from-folio', 
-                        'create-resource',
-                        'unlink-resource',
-                        'check-course-exists',
-                        'reactivate-course',
-                        'link-course-offering'
-                    ],
-                    'roles' => ['@'],
-                ],
-                [
-                    'allow' => false,
-                ]
+                'create' => Roles::STAFF,
+                'update' => Roles::STAFF,
+                'delete' => Roles::STAFF,
+                'file-upload' => Roles::STAFF,
+                'link-resource' => Roles::STAFF,
+                'reuse-resource' => Roles::STAFF,
+                'create-from-folio' => Roles::STAFF,
+                'create-resource' => Roles::STAFF,
+                'unlink-resource' => Roles::STAFF,
+                'check-course-exists' => Roles::STAFF,
+                'reactivate-course' => Roles::STAFF,
+                'link-course-offering' => Roles::STAFF,
+                'update-resource-order' => Roles::STAFF,
             ],
         ];
 
