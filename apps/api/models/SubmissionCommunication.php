@@ -132,7 +132,7 @@ class SubmissionCommunication extends ActiveRecord
             [['department'], 'string', 'max' => 64],
             
             // Defaults
-            [['visibility'], 'default', 'value' => self::VISIBILITY_ALL_STAFF],
+            [['visibility'], 'default', 'value' => self::VISIBILITY_STAFF_ONLY],
             [['priority'], 'default', 'value' => self::PRIORITY_NORMAL],
             [['status'], 'default', 'value' => self::STATUS_ACTIVE],
             [['is_read', 'is_flagged', 'is_task'], 'default', 'value' => 0],
@@ -222,10 +222,8 @@ class SubmissionCommunication extends ActiveRecord
     
     public function isVisibleToFaculty()
     {
-        return in_array($this->visibility, [
-            self::VISIBILITY_FACULTY,
-            self::VISIBILITY_ALL_STAFF  // Faculty can see messages marked for all staff
-        ]);
+        return (new \app\services\SubmissionCommunicationVisibilityPolicy())
+            ->isFacultyVisible($this->visibility);
     }
 
     public function isVisibleToStaff($staffId = null)

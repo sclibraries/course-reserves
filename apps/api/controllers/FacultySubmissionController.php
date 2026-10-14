@@ -16,7 +16,6 @@ use app\models\SubmissionMetadata;
 use app\models\MaterialTypes;
 use app\models\Course;
 use app\models\CourseOffering;
-use app\models\SubmissionCommunication;
 use app\services\FacultyTokenClaims;
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
@@ -1583,232 +1582,59 @@ class FacultySubmissionController extends BaseRestController
     }
 
     /**
-     * Get all communications for a submission
-     * GET /faculty-submission/{uuid}/communications
-     * 
-     * Returns all faculty-visible messages with threaded replies
+     * Get faculty-visible communications for a submission.
      */
     public function actionCommunications($id)
     {
         $facultyUser = $this->getFacultyUser();
-        
-        // Find submission by UUID
-        $submission = FacultySubmission::find()
-            ->where(['submission_uuid' => $id])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Verify access
+        $service = $this->communicationService();
+        $submission = $service->findFacultySubmission($id);
         if (!$this->canAccessSubmission($submission, $facultyUser['user_id'])) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-
-        // Get all root messages (messages without a parent) that are faculty-visible
-        $messages = SubmissionCommunication::find()
-            ->where([
-                'submission_id' => $submission->submission_id,
-                'parent_message_id' => null,
-            ])
-            ->andWhere([
-                'OR',
-                ['visibility' => SubmissionCommunication::VISIBILITY_FACULTY],
-                ['visibility' => SubmissionCommunication::VISIBILITY_ALL_STAFF],
-            ])
-            ->orderBy(['created_at' => SORT_DESC])
-            ->all();
-
-        // Format messages with replies
-        $formattedMessages = [];
-        foreach ($messages as $message) {
-            $formattedMessages[] = $this->formatCommunication($message);
-        }
-
-        return [
-            'messages' => $formattedMessages,
-        ];
+        return ['messages' => $service->threads($submission->submission_id, true)];
     }
 
-    /**
-     * Create a new communication (message or reply)
-     * POST /faculty-submission/{uuid}/communications
-     * 
-     * Body: {
-     *   "message": "Message text",
-     *   "subject": "Optional subject",
-     *   "category": "question|issue|update|note",
-     *   "priority": "low|normal|high|urgent",
-     *   "resource_id": 123,  // optional - link to specific item
-     *   "parent_message_id": 456  // optional - for replies
-     * }
-     */
     public function actionCreateCommunication($id)
     {
         $facultyUser = $this->getFacultyUser();
-
-        // Find submission by UUID
-        $submission = FacultySubmission::find()
-            ->where(['submission_uuid' => $id])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Verify access
+        $service = $this->communicationService();
+        $submission = $service->findFacultySubmission($id);
         if (!$this->canAccessSubmission($submission, $facultyUser['user_id'])) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-
-        // Get request body
-        $request = Yii::$app->request;
-        $message = $request->post('message');
-        $subject = $request->post('subject');
-        $category = $request->post('category', 'question');
-        $priority = $request->post('priority', 'normal');
-        $resourceId = $request->post('resource_id');
-        $parentMessageId = $request->post('parent_message_id');
-
-        // Validate required fields
-        if (!$message) {
-            throw new BadRequestHttpException('Message is required');
+        $result = $service->create($submission, Yii::$app->request->post(), [
+            'id' => $facultyUser['user_id'],
+            'name' => $facultyUser['display_name'],
+            'email' => $facultyUser['email'],
+        ], true);
+        if (!$result['saved']) {
+            return ['success' => false, 'errors' => $result['communication']->getErrors()];
         }
-
-        // Create communication record
-        $communication = new SubmissionCommunication();
-        $communication->submission_id = $submission->submission_id;
-        $communication->parent_message_id = $parentMessageId;
-        $communication->resource_id = $resourceId;
-        $communication->communication_type = SubmissionCommunication::TYPE_FACULTY_TO_STAFF;
-        $communication->visibility = SubmissionCommunication::VISIBILITY_FACULTY;
-        $communication->category = $category;
-        $communication->subject = $subject;
-        $communication->message = $message;
-        $communication->sender_type = 'faculty';
-        $communication->sender_id = $facultyUser['user_id'];
-        $communication->sender_name = $facultyUser['display_name'];
-        $communication->sender_email = $facultyUser['email'];
-        $communication->recipient_type = 'staff';
-        $communication->priority = $priority;
-        $communication->status = SubmissionCommunication::STATUS_ACTIVE;
-
-        if (!$communication->save()) {
-            return [
-                'success' => false,
-                'errors' => $communication->getErrors(),
-            ];
-        }
-
-        // Log activity
-        $communication->logActivity(
-            $facultyUser['user_id'],
-            'faculty',
-            'created',
-            [
-                'category' => $category,
-                'priority' => $priority,
-                'has_subject' => !empty($subject),
-                'is_reply' => !empty($parentMessageId),
-            ]
-        );
-
         return [
             'success' => true,
-            'message_id' => $communication->id,
+            'message_id' => $result['communication']->id,
             'message' => 'Message sent successfully',
         ];
     }
 
-    /**
-     * Update a communication message
-     * PUT /faculty-submission/{uuid}/communications/{messageId}
-     * 
-     * Body: {
-     *   "message": "Updated message text",
-     *   "subject": "Updated subject",
-     *   "priority": "high",
-     *   "status": "resolved"
-     * }
-     */
     public function actionUpdateCommunication($id, $messageId)
     {
         $facultyUser = $this->getFacultyUser();
-
-        // Find submission by UUID
-        $submission = FacultySubmission::find()
-            ->where(['submission_uuid' => $id])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Verify access
+        $service = $this->communicationService();
+        $submission = $service->findFacultySubmission($id);
         if (!$this->canAccessSubmission($submission, $facultyUser['user_id'])) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-
-        // Find the communication
-        $communication = SubmissionCommunication::find()
-            ->where([
-                'id' => $messageId,
-                'submission_id' => $submission->submission_id,
-            ])
-            ->one();
-
-        if (!$communication) {
-            throw new NotFoundHttpException('Message not found');
-        }
-
-        // Only allow faculty to edit their own messages
+        $communication = $service->findMessage($messageId, $submission->submission_id, true);
         if ($communication->sender_id !== $facultyUser['user_id']) {
             throw new ForbiddenHttpException('You can only edit your own messages');
         }
-
-        // Get request body
-        $request = Yii::$app->request;
-        $oldMessage = $communication->message;
-        
-        // Update allowed fields
-        if ($request->post('message') !== null) {
-            $communication->message = $request->post('message');
+        if (!$service->update($communication, Yii::$app->request->post(), [
+            'id' => $facultyUser['user_id'],
+        ], true)) {
+            return ['success' => false, 'errors' => $communication->getErrors()];
         }
-        if ($request->post('subject') !== null) {
-            $communication->subject = $request->post('subject');
-        }
-        if ($request->post('priority') !== null) {
-            $communication->priority = $request->post('priority');
-        }
-        if ($request->post('status') !== null) {
-            $communication->status = $request->post('status');
-            
-            // Set resolved_at if status changed to resolved
-            if ($request->post('status') === SubmissionCommunication::STATUS_RESOLVED && !$communication->resolved_at) {
-                $communication->resolved_at = date('Y-m-d H:i:s');
-            }
-        }
-
-        if (!$communication->save()) {
-            return [
-                'success' => false,
-                'errors' => $communication->getErrors(),
-            ];
-        }
-
-        // Log activity
-        $communication->logActivity(
-            $facultyUser['user_id'],
-            'faculty',
-            'updated',
-            [
-                'changed_message' => $oldMessage !== $communication->message,
-                'changed_priority' => $request->post('priority') !== null,
-                'changed_status' => $request->post('status') !== null,
-            ]
-        );
-
         return [
             'success' => true,
             'message_id' => $communication->id,
@@ -1816,157 +1642,40 @@ class FacultySubmissionController extends BaseRestController
         ];
     }
 
-    /**
-     * Delete a communication message
-     * DELETE /faculty-submission/{uuid}/communications/{messageId}
-     */
     public function actionDeleteCommunication($id, $messageId)
     {
         $facultyUser = $this->getFacultyUser();
-
-        // Find submission by UUID
-        $submission = FacultySubmission::find()
-            ->where(['submission_uuid' => $id])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Verify access
+        $service = $this->communicationService();
+        $submission = $service->findFacultySubmission($id);
         if (!$this->canAccessSubmission($submission, $facultyUser['user_id'])) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-
-        // Find the communication
-        $communication = SubmissionCommunication::find()
-            ->where([
-                'id' => $messageId,
-                'submission_id' => $submission->submission_id,
-            ])
-            ->one();
-
-        if (!$communication) {
-            throw new NotFoundHttpException('Message not found');
-        }
-
-        // Only allow faculty to delete their own messages
+        $communication = $service->findMessage($messageId, $submission->submission_id, true);
         if ($communication->sender_id !== $facultyUser['user_id']) {
             throw new ForbiddenHttpException('You can only delete your own messages');
         }
-
-        // Check if message has replies - might want to prevent deletion if it does
-        if (count($communication->replies) > 0) {
-            return [
-                'success' => false,
-                'message' => 'Cannot delete message with replies',
-            ];
+        if (!$service->archiveFacultyMessage($communication, ['id' => $facultyUser['user_id']])) {
+            return ['success' => false, 'message' => 'Cannot delete message with replies'];
         }
-
-        // Log activity before deleting
-        $communication->logActivity(
-            $facultyUser['user_id'],
-            'faculty',
-            'deleted',
-            [
-                'message_id' => $communication->id,
-                'had_subject' => !empty($communication->subject),
-                'category' => $communication->category,
-            ]
-        );
-
-        // Soft delete by archiving instead of hard delete
-        $communication->status = SubmissionCommunication::STATUS_ARCHIVED;
-        $communication->save(false);
-
-        // Or use hard delete:
-        // $communication->delete();
-
-        return [
-            'success' => true,
-            'message' => 'Message deleted successfully',
-        ];
+        return ['success' => true, 'message' => 'Message deleted successfully'];
     }
 
-    /**
-     * Mark a communication as read
-     * POST /faculty-submission/{uuid}/communications/{messageId}/read
-     */
     public function actionMarkCommunicationRead($id, $messageId)
     {
         $facultyUser = $this->getFacultyUser();
-
-        // Find submission by UUID
-        $submission = FacultySubmission::find()
-            ->where(['submission_uuid' => $id])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Verify access
+        $service = $this->communicationService();
+        $submission = $service->findFacultySubmission($id);
         if (!$this->canAccessSubmission($submission, $facultyUser['user_id'])) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-
-        // Find the communication
-        $communication = SubmissionCommunication::find()
-            ->where([
-                'id' => $messageId,
-                'submission_id' => $submission->submission_id,
-            ])
-            ->andWhere([
-                'OR',
-                ['visibility' => SubmissionCommunication::VISIBILITY_FACULTY],
-                ['visibility' => SubmissionCommunication::VISIBILITY_ALL_STAFF],
-            ])
-            ->one();
-
-        if (!$communication) {
-            throw new NotFoundHttpException('Message not found');
-        }
-
-        // Mark as read
-        $communication->markAsRead($facultyUser['user_id'], 'faculty');
-
-        return [
-            'success' => true,
-            'message' => 'Message marked as read',
-        ];
+        $communication = $service->findMessage($messageId, $submission->submission_id, true);
+        $service->markAsRead($communication, $facultyUser['user_id'], 'faculty');
+        return ['success' => true, 'message' => 'Message marked as read'];
     }
 
-    /**
-     * Format a communication message with replies
-     */
-    protected function formatCommunication($communication)
+    protected function communicationService()
     {
-        $replies = [];
-        foreach ($communication->replies as $reply) {
-            $replies[] = [
-                'id' => $reply->id,
-                'message' => $reply->message,
-                'sender_name' => $reply->sender_name,
-                'sender_type' => $reply->sender_type,
-                'created_at' => $reply->created_at,
-            ];
-        }
-
-        return [
-            'id' => $communication->id,
-            'resource_id' => $communication->resource_id,
-            'subject' => $communication->subject,
-            'message' => $communication->message,
-            'category' => $communication->category,
-            'priority' => $communication->priority,
-            'status' => $communication->status,
-            'sender_name' => $communication->sender_name,
-            'sender_type' => $communication->sender_type,
-            'created_at' => $communication->created_at,
-            'is_read' => (bool)$communication->is_read,
-            'reply_count' => count($replies),
-            'replies' => $replies,
-        ];
+        return new \app\services\SubmissionCommunicationService();
     }
 
     /**

@@ -151,7 +151,10 @@ class FacultySubmission extends ActiveRecord
         $fields['reuseResources'] = 'reuseResources';
         $fields['newResources'] = 'newResources';
         $fields['workflowAssignment'] = 'workflowAssignment';
-        $fields['communications'] = 'communications';
+        $fields['communications'] = function ($model) {
+            return (new \app\services\SubmissionCommunicationService())
+                ->submissionMessages($model->submission_id);
+        };
         $fields['courseOffering'] = 'courseOffering';
         
         return $fields;

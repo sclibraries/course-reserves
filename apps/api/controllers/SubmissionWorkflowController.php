@@ -453,209 +453,78 @@ class SubmissionWorkflowController extends Controller
         }, $items);
     }
 
-    /**
-     * Get all communications for a submission (staff view)
-     * GET /submission-workflow/submission/{id}/communications
-     */
+    /** Get all communications for a submission (staff view). */
     public function actionCommunications($id)
     {
-        $currentUser = Yii::$app->user->identity;
-        
-        $submission = FacultySubmission::findOne($id);
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        // Get all messages (staff can see all)
-        $messages = \app\models\SubmissionCommunication::find()
-            ->where(['submission_id' => $submission->submission_id, 'parent_message_id' => null])
-            ->orderBy(['created_at' => SORT_DESC])
-            ->all();
-
-        // Format messages with replies
-        $formattedMessages = [];
-        foreach ($messages as $message) {
-            $formattedMessages[] = $this->formatCommunication($message);
-        }
-
+        $service = $this->communicationService();
+        $submission = $service->findStaffSubmission($id);
         return [
-            'messages' => $formattedMessages,
+            'messages' => $service->threads($submission->submission_id, false),
             'submission' => [
                 'submission_id' => $submission->submission_id,
                 'course_code' => $submission->course_code,
                 'course_title' => $submission->course_title,
                 'status' => $submission->status,
-            ]
+            ],
         ];
     }
 
-    /**
-     * Create a new communication (staff message)
-     * POST /submission-workflow/submission/{id}/communications
-     * 
-     * Body: {
-     *   "message": "Message text with @username mentions",
-     *   "subject": "Optional subject",
-     *   "category": "question|issue|update|note|acquisitions|cataloging|etc",
-     *   "priority": "low|normal|high|urgent",
-     *   "visibility": "faculty_visible|staff_only|all_staff|assigned_only",
-     *   "resource_id": 123,  // optional - link to specific item
-     *   "parent_message_id": 456,  // optional - for replies
-     *   "is_task": true,  // optional - create as task
-     *   "task_assignee": "username",  // optional - assign task
-     *   "task_due_date": "2025-12-01"  // optional
-     * }
-     */
     public function actionCreateCommunication($id)
     {
         $currentUser = Yii::$app->user->identity;
-        $request = Yii::$app->request;
-        
-        $submission = FacultySubmission::findOne($id);
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        $message = $request->post('message');
-        if (empty($message)) {
-            throw new BadRequestHttpException('Message is required');
-        }
-
-        // Extract @mentions from message
-        $mentions = $this->extractMentions($message);
-        
-        // Create communication
-        $communication = new \app\models\SubmissionCommunication();
-        $communication->submission_id = $submission->submission_id;
-        $communication->communication_type = \app\models\SubmissionCommunication::TYPE_STAFF_TO_STAFF;
-        $communication->message = $message;
-        $communication->sender_type = \app\models\SubmissionCommunication::ACTOR_STAFF;
-        $communication->sender_id = (string)$currentUser->id;  // Cast to string
-        $communication->sender_name = $currentUser->full_name ?? $currentUser->username;
-        $communication->sender_email = $currentUser->email;
-        
-        // Optional fields
-        $communication->subject = $request->post('subject');
-        $communication->category = $request->post('category', \app\models\SubmissionCommunication::CATEGORY_NOTE);
-        $communication->priority = $request->post('priority', \app\models\SubmissionCommunication::PRIORITY_NORMAL);
-        $communication->visibility = $request->post('visibility', \app\models\SubmissionCommunication::VISIBILITY_ALL_STAFF);
-        $communication->resource_id = $request->post('resource_id');
-        $communication->parent_message_id = $request->post('parent_message_id');
-        $communication->department = $request->post('department', \app\models\SubmissionCommunication::DEPT_RESERVES);
-        
-        // Store mentions in metadata
-        if (!empty($mentions)) {
-            $communication->metadata = json_encode(['mentions' => $mentions]);
-        }
-
-        // Handle tasks
-        if ($request->post('is_task')) {
-            $communication->is_task = 1;
-            $communication->task_status = \app\models\SubmissionCommunication::TASK_STATUS_PENDING;
-            $assignee = $request->post('task_assignee');
-            if ($assignee) {
-                $communication->task_assignee = $assignee;
-            }
-            $dueDate = $request->post('task_due_date');
-            if ($dueDate) {
-                $communication->task_due_date = $dueDate;
-            }
-        }
-
-        // Determine recipient if it's a faculty-visible message
-        if ($communication->visibility === \app\models\SubmissionCommunication::VISIBILITY_FACULTY) {
-            $communication->recipient_type = \app\models\SubmissionCommunication::ACTOR_FACULTY;
-            $communication->recipient_id = $submission->shibboleth_user_id;
-            $communication->recipient_name = $submission->faculty_display_name;
-        }
-
-        if ($communication->save()) {
-            // Create participant records for @mentions
-            if (!empty($mentions)) {
-                $this->createMentionParticipants($communication->id, $mentions);
-            }
-
-            // Log activity
-            $communication->logActivity((string)$currentUser->id, \app\models\SubmissionCommunication::ACTOR_STAFF, 'created');
-
-            return [
-                'success' => true,
-                'communication' => $this->formatCommunication($communication),
-                'message' => 'Communication created successfully'
-            ];
-        } else {
+        $service = $this->communicationService();
+        $submission = $service->findStaffSubmission($id);
+        $result = $service->create($submission, Yii::$app->request->post(), [
+            'id' => $currentUser->id,
+            'name' => $currentUser->full_name ?? $currentUser->username,
+            'email' => $currentUser->email,
+        ], false);
+        if (!$result['saved']) {
             Yii::$app->response->statusCode = 422;
-            return ['errors' => $communication->errors];
+            return ['errors' => $result['communication']->errors];
         }
+        return [
+            'success' => true,
+            'communication' => $service->formatCommunication($result['communication'], false),
+            'message' => 'Communication created successfully',
+        ];
     }
 
-    /**
-     * Update a communication
-     * PUT /submission-workflow/communications/{messageId}
-     */
     public function actionUpdateCommunication($messageId)
     {
         $currentUser = Yii::$app->user->identity;
-        $request = Yii::$app->request;
-        
-        $communication = \app\models\SubmissionCommunication::findOne($messageId);
-        if (!$communication) {
-            throw new NotFoundHttpException('Communication not found');
-        }
-
-        // Only sender or admin can edit
+        $service = $this->communicationService();
+        $communication = $service->findMessage($messageId);
         if ($communication->sender_id != (string)$currentUser->id && $currentUser->role !== 'admin') {
             throw new ForbiddenHttpException('You can only edit your own messages');
         }
-
-        $message = $request->post('message');
-        if ($message !== null) {
-            $communication->message = $message;
-            
-            // Re-extract mentions
-            $mentions = $this->extractMentions($message);
-            if (!empty($mentions)) {
-                $metadata = $communication->getMetadataArray();
-                $metadata['mentions'] = $mentions;
-                $communication->metadata = json_encode($metadata);
-                
-                // Update participants
-                $this->createMentionParticipants($communication->id, $mentions);
-            }
-        }
-
-        if ($communication->save()) {
-            $communication->logActivity((string)$currentUser->id, \app\models\SubmissionCommunication::ACTOR_STAFF, 'updated');
-            
-            return [
-                'success' => true,
-                'communication' => $this->formatCommunication($communication)
-            ];
-        } else {
+        if (!$service->update($communication, Yii::$app->request->post(), [
+            'id' => $currentUser->id,
+        ], false)) {
             Yii::$app->response->statusCode = 422;
             return ['errors' => $communication->errors];
         }
+        return [
+            'success' => true,
+            'communication' => $service->formatCommunication($communication, false),
+        ];
     }
 
-    /**
-     * Mark communication as read
-     * POST /submission-workflow/communications/{messageId}/read
-     */
     public function actionMarkCommunicationRead($messageId)
     {
         $currentUser = Yii::$app->user->identity;
-        
-        $communication = \app\models\SubmissionCommunication::findOne($messageId);
-        if (!$communication) {
-            throw new NotFoundHttpException('Communication not found');
-        }
+        $communication = $this->communicationService()->findMessage($messageId);
+        $this->communicationService()->markAsRead(
+            $communication,
+            $currentUser->id,
+            \app\models\SubmissionCommunication::ACTOR_STAFF
+        );
+        return ['success' => true, 'message' => 'Marked as read'];
+    }
 
-        $communication->markAsRead((string)$currentUser->id, \app\models\SubmissionCommunication::ACTOR_STAFF);
-
-        return [
-            'success' => true,
-            'message' => 'Marked as read'
-        ];
+    protected function communicationService()
+    {
+        return new \app\services\SubmissionCommunicationService();
     }
 
     /**
@@ -779,89 +648,6 @@ class SubmissionWorkflowController extends Controller
             'mentions' => $result,
             'total' => count($result)
         ];
-    }
-
-    /**
-     * Extract @mentions from message text
-     * Returns array of usernames mentioned
-     */
-    protected function extractMentions($message)
-    {
-        $mentions = [];
-        if (preg_match_all('/@(\w+)/', $message, $matches)) {
-            $mentions = array_unique($matches[1]);
-        }
-        return $mentions;
-    }
-
-    /**
-     * Create participant records for mentioned users
-     */
-    protected function createMentionParticipants($communicationId, $mentions)
-    {
-        foreach ($mentions as $username) {
-            $user = User::findOne(['username' => $username]);
-            if ($user) {
-                // Check if participant already exists
-                $existing = \app\models\SubmissionCommunicationParticipant::findOne([
-                    'communication_id' => $communicationId,
-                    'participant_id' => $user->id
-                ]);
-
-                if (!$existing) {
-                    $participant = new \app\models\SubmissionCommunicationParticipant();
-                    $participant->communication_id = $communicationId;
-                    $participant->participant_type = 'staff';
-                    $participant->participant_id = (string)$user->id;  // Cast to string
-                    $participant->participant_name = $user->full_name ?? $user->username;
-                    $participant->participant_email = $user->email;
-                    $participant->role = \app\models\SubmissionCommunicationParticipant::ROLE_RECIPIENT;
-                    $participant->save();
-                }
-            }
-        }
-    }
-
-    /**
-     * Format communication for API response
-     */
-    protected function formatCommunication($communication)
-    {
-        $data = [
-            'id' => $communication->id,
-            'submission_id' => $communication->submission_id,
-            'parent_message_id' => $communication->parent_message_id,
-            'resource_id' => $communication->resource_id,
-            'communication_type' => $communication->communication_type,
-            'visibility' => $communication->visibility,
-            'category' => $communication->category,
-            'subject' => $communication->subject,
-            'message' => $communication->message,
-            'sender_type' => $communication->sender_type,
-            'sender_id' => $communication->sender_id,
-            'sender_name' => $communication->sender_name,
-            'sender_email' => $communication->sender_email,
-            'priority' => $communication->priority,
-            'status' => $communication->status,
-            'is_read' => $communication->is_read,
-            'is_flagged' => $communication->is_flagged,
-            'is_task' => $communication->is_task,
-            'task_status' => $communication->task_status,
-            'task_assignee' => $communication->task_assignee,
-            'task_due_date' => $communication->task_due_date,
-            'created_at' => $communication->created_at,
-            'updated_at' => $communication->updated_at,
-            'metadata' => $communication->getMetadataArray(),
-            'replies' => [],
-        ];
-
-        // Add replies
-        $replies = $communication->getReplies()->all();
-        foreach ($replies as $reply) {
-            $data['replies'][] = $this->formatCommunication($reply);
-        }
-
-        return $data;
     }
 
     /**
