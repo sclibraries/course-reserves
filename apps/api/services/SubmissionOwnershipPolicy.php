@@ -2,6 +2,7 @@
 
 namespace app\services;
 
+use app\components\Roles;
 use app\models\FacultyProxyPermission;
 use app\models\FacultySubmission;
 use yii\web\BadRequestHttpException;
@@ -9,18 +10,52 @@ use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 
 /**
- * Resolves submission ownership and applies the shared faculty proxy rule.
+ * Resolves submission ownership and applies faculty roster and proxy access rules.
  */
 class SubmissionOwnershipPolicy
 {
+    private $rosterService;
+
+    public function __construct($rosterService = null)
+    {
+        $this->rosterService = $rosterService ?: new CourseRosterService();
+    }
+
     /**
-     * Resolve the owner from the token actor and an optional authorized target.
+     * Resolve the owner from the actor, course roster, and optional proxy target.
      *
      * @return array owner_id, is_proxy and permission
      */
-    public function resolveOwner($actorId, $actingForFacultyId, $folioCourseListingId)
+    public function resolveOwner(array $actor, $actingForFacultyId, $folioCourseListingId, array $course)
     {
-        if ($actingForFacultyId === null || $actingForFacultyId === '' || $actingForFacultyId === $actorId) {
+        $actorId = $actor['user_id'];
+        $isStaff = Roles::isStaff($actor['role'] ?? null);
+        $isActingForOther = $actingForFacultyId !== null && $actingForFacultyId !== '' &&
+            $actingForFacultyId !== $actorId;
+
+        if ($isStaff) {
+            return [
+                'owner_id' => $isActingForOther ? $actingForFacultyId : $actorId,
+                'is_proxy' => $isActingForOther,
+                'permission' => null,
+            ];
+        }
+
+        if (!$isActingForOther) {
+            $termCode = $course['term'] ?? $course['term_code'] ?? null;
+            $courseCode = $course['courseCode'] ?? $course['course_code'] ?? null;
+            $section = $course['section'] ?? null;
+            if (!$this->rosterService->isInstructorRostered(
+                $actor['internal_id'] ?? null,
+                $termCode,
+                $courseCode,
+                $section
+            )) {
+                throw new ForbiddenHttpException(
+                    'course not found on your teaching roster; contact library staff'
+                );
+            }
+
             return [
                 'owner_id' => $actorId,
                 'is_proxy' => false,
@@ -28,14 +63,7 @@ class SubmissionOwnershipPolicy
             ];
         }
 
-        $permission = FacultyProxyPermission::find()
-            ->where([
-                'faculty_shibboleth_id' => $actingForFacultyId,
-                'proxy_shibboleth_id' => $actorId,
-                'status' => FacultyProxyPermission::STATUS_ACTIVE,
-            ])
-            ->one();
-
+        $permission = $this->findPermission($actingForFacultyId, $actorId);
         if (!$permission || !$permission->isActive(false)) {
             throw new ForbiddenHttpException('No active proxy permission for this faculty member');
         }
@@ -56,49 +84,78 @@ class SubmissionOwnershipPolicy
     }
 
     /**
-     * Check whether an actor can read or edit a submission as owner or proxy.
+     * A co-instructor listed for a course may open and edit another instructor's submission.
      */
-    public function canAccess($submission, $actorId, $requireEdit = false)
+    public function isRosteredCoInstructor($submission, array $actor)
     {
-        if ($submission->shibboleth_user_id === $actorId) {
-            return true;
-        }
-
-        $permission = FacultyProxyPermission::find()
-            ->where([
-                'faculty_shibboleth_id' => $submission->shibboleth_user_id,
-                'proxy_shibboleth_id' => $actorId,
-                'status' => FacultyProxyPermission::STATUS_ACTIVE,
-            ])
-            ->one();
-
-        if (!$permission || !$permission->isActive()) {
+        if ($submission->shibboleth_user_id === $actor['user_id']) {
             return false;
         }
 
-        if (!$permission->canAccessCourse($submission->folio_course_listing_id)) {
-            return false;
-        }
-
-        return !$requireEdit || $permission->canEdit();
+        return $this->rosterService->isInstructorRostered(
+            $actor['internal_id'] ?? null,
+            $submission->term_code,
+            $submission->course_code,
+            $submission->section
+        );
     }
 
     /**
-     * Find a submission and enforce the shared owner/proxy access rule.
+     * Check whether an actor can read or edit a submission as owner, staff, proxy, or co-instructor.
      */
-    public function findSubmissionWithProxyAccess($id, $actorId, $requireEdit = false)
+    public function canAccess($submission, array $actor, $requireEdit = false)
     {
-        $submission = FacultySubmission::findOne($id);
+        if ($submission->shibboleth_user_id === $actor['user_id']) {
+            return true;
+        }
 
+        if (Roles::isStaff($actor['role'] ?? null)) {
+            return true;
+        }
+
+        $permission = $this->findPermission($submission->shibboleth_user_id, $actor['user_id']);
+        if ($permission && $permission->isActive(false) &&
+            $permission->canAccessCourse($submission->folio_course_listing_id, false) &&
+            (!$requireEdit || $permission->canEdit(false))) {
+            return true;
+        }
+
+        return $this->isRosteredCoInstructor($submission, $actor);
+    }
+
+    /**
+     * Find a submission and enforce the shared access rule.
+     */
+    public function findSubmissionWithAccess($id, array $actor, $requireEdit = false, array $with = [])
+    {
+        $query = FacultySubmission::find();
+        if (preg_match('/^[0-9a-f-]{36}$/i', (string)$id)) {
+            $query->where(['submission_uuid' => $id]);
+        } else {
+            $query->where(['submission_id' => $id]);
+        }
+
+        $submission = $query->with($with)->one();
         if (!$submission) {
             throw new NotFoundHttpException('Submission not found');
         }
 
-        if (!$this->canAccess($submission, $actorId, $requireEdit)) {
+        if (!$this->canAccess($submission, $actor, $requireEdit)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
 
         return $submission;
+    }
+
+    private function findPermission($ownerId, $actorId)
+    {
+        return FacultyProxyPermission::find()
+            ->where([
+                'faculty_shibboleth_id' => $ownerId,
+                'proxy_shibboleth_id' => $actorId,
+                'status' => FacultyProxyPermission::STATUS_ACTIVE,
+            ])
+            ->one();
     }
 
     /**

@@ -371,7 +371,9 @@ class FacultySubmissionController extends BaseRestController
             throw new ForbiddenHttpException('Faculty user not authenticated');
         }
         
-        return Yii::$app->params['facultyUser'];
+        $facultyUser = Yii::$app->params['facultyUser'];
+        $facultyUser['internal_id'] = Yii::$app->user->identity->internalId ?? null;
+        return $facultyUser;
     }
 
     /**
@@ -419,15 +421,7 @@ class FacultySubmissionController extends BaseRestController
     {
         $facultyUser = $this->getFacultyUser();
         
-        // Build query - check if ID is UUID or numeric
-        $query = FacultySubmission::find();
-        if (preg_match('/^[0-9a-f-]{36}$/i', $id)) {
-            $query->where(['submission_uuid' => $id, 'shibboleth_user_id' => $facultyUser['user_id']]);
-        } else {
-            $query->where(['submission_id' => $id, 'shibboleth_user_id' => $facultyUser['user_id']]);
-        }
-        
-        $submission = $query->with([
+        $submission = (new SubmissionOwnershipPolicy())->findSubmissionWithAccess($id, $facultyUser, false, [
                 'reuseResources' => function($query) {
                     $query->orderBy(['display_order' => SORT_ASC, 'position_in_folder' => SORT_ASC]);
                 },
@@ -438,12 +432,7 @@ class FacultySubmissionController extends BaseRestController
                     $query->orderBy(['display_order' => SORT_ASC]);
                 },
                 'metadata'
-            ])
-            ->one();
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
+            ]);
 
         // Build structured response with folders and items
         $response = $submission->toArray();
@@ -548,26 +537,19 @@ class FacultySubmissionController extends BaseRestController
     {
         $facultyUser = $this->getFacultyUser();
         
-        $submission = FacultySubmission::findOne([
-            'submission_id' => $id,
-            'shibboleth_user_id' => $facultyUser['user_id']
-        ]);
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
+        $submission = $this->findSubmission($id, $facultyUser);
 
         // Count items by status
         $reuseStatuses = \app\models\SubmissionReuseResource::find()
             ->select(['item_status', 'COUNT(*) as count'])
-            ->where(['submission_id' => $id])
+            ->where(['submission_id' => $submission->submission_id])
             ->groupBy(['item_status'])
             ->asArray()
             ->all();
         
         $newStatuses = \app\models\SubmissionNewResource::find()
             ->select(['item_status', 'COUNT(*) as count'])
-            ->where(['submission_id' => $id])
+            ->where(['submission_id' => $submission->submission_id])
             ->groupBy(['item_status'])
             ->asArray()
             ->all();
@@ -624,9 +606,10 @@ class FacultySubmissionController extends BaseRestController
         }
 
         $ownership = (new SubmissionOwnershipPolicy())->resolveOwner(
-            $facultyUser['user_id'],
+            $facultyUser,
             $data['acting_for_faculty_id'] ?? null,
-            $data['folio_course_listing_id'] ?? null
+            $data['folio_course_listing_id'] ?? null,
+            $data
         );
         $facultyId = $ownership['owner_id'];
         $isProxySubmission = $ownership['is_proxy'];
@@ -648,8 +631,8 @@ class FacultySubmissionController extends BaseRestController
 
         $submission = new FacultySubmission();
         $submission->shibboleth_user_id = $facultyId;
-        $submission->faculty_display_name = $data['faculty_display_name'] ?? 
-            ($isProxySubmission ? $permission->faculty_display_name : $facultyUser['display_name']);
+        $submission->faculty_display_name = $data['faculty_display_name'] ??
+            ($permission ? $permission->faculty_display_name : $facultyUser['display_name']);
         $submission->term_code = $data['term_code'];
         $submission->course_code = $data['course_code'];
         $submission->section = $data['section'] ?? '';
@@ -670,7 +653,7 @@ class FacultySubmissionController extends BaseRestController
 
         if ($submission->save()) {
             // Log proxy activity if applicable
-            if ($isProxySubmission) {
+            if ($isProxySubmission && $permission) {
                 $permission->logActivity('submission_created', $submission->submission_id, [
                     'course_title' => $submission->course_title,
                     'term_code' => $submission->term_code,
@@ -714,9 +697,10 @@ class FacultySubmissionController extends BaseRestController
 
         $folioCourseListingId = $data['folio_course_listing_id'] ?? null;
         $ownership = (new SubmissionOwnershipPolicy())->resolveOwner(
-            $facultyUser['user_id'],
+            $facultyUser,
             $data['acting_for_faculty_id'] ?? null,
-            $folioCourseListingId
+            $folioCourseListingId,
+            $courseInfo
         );
         $facultyId = $ownership['owner_id'];
         $isProxySubmission = $ownership['is_proxy'];
@@ -1082,7 +1066,7 @@ class FacultySubmissionController extends BaseRestController
     public function actionUpdate($id)
     {
         $facultyUser = $this->getFacultyUser();
-        $submission = $this->findSubmission($id, $facultyUser['user_id']);
+        $submission = $this->findSubmission($id, $facultyUser, true);
 
         // Check if submission is locked
         if ($submission->isLocked()) {
@@ -1437,7 +1421,7 @@ class FacultySubmissionController extends BaseRestController
     public function actionSubmit($id)
     {
         $facultyUser = $this->getFacultyUser();
-        $submission = $this->findSubmission($id, $facultyUser['user_id']);
+        $submission = $this->findSubmission($id, $facultyUser, true);
 
         if (!$submission->isEditable()) {
             throw new BadRequestHttpException('Submission cannot be modified in current status');
@@ -1467,7 +1451,7 @@ class FacultySubmissionController extends BaseRestController
     public function actionAddReuseResource($id)
     {
         $facultyUser = $this->getFacultyUser();
-        $submission = $this->findSubmission($id, $facultyUser['user_id']);
+        $submission = $this->findSubmission($id, $facultyUser, true);
 
         if (!$submission->isEditable()) {
             throw new BadRequestHttpException('Submission cannot be modified');
@@ -1500,7 +1484,7 @@ class FacultySubmissionController extends BaseRestController
     public function actionAddNewResource($id)
     {
         $facultyUser = $this->getFacultyUser();
-        $submission = $this->findSubmission($id, $facultyUser['user_id']);
+        $submission = $this->findSubmission($id, $facultyUser, true);
 
         if (!$submission->isEditable()) {
             throw new BadRequestHttpException('Submission cannot be modified');
@@ -1575,7 +1559,7 @@ class FacultySubmissionController extends BaseRestController
         $facultyUser = $this->getFacultyUser();
         $service = $this->communicationService();
         $submission = $service->findFacultySubmission($id);
-        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser['user_id'])) {
+        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
         return ['messages' => $service->threads($submission->submission_id, true)];
@@ -1586,7 +1570,7 @@ class FacultySubmissionController extends BaseRestController
         $facultyUser = $this->getFacultyUser();
         $service = $this->communicationService();
         $submission = $service->findFacultySubmission($id);
-        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser['user_id'])) {
+        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser, true)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
         $result = $service->create($submission, Yii::$app->request->post(), [
@@ -1609,7 +1593,7 @@ class FacultySubmissionController extends BaseRestController
         $facultyUser = $this->getFacultyUser();
         $service = $this->communicationService();
         $submission = $service->findFacultySubmission($id);
-        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser['user_id'])) {
+        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser, true)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
         $communication = $service->findMessage($messageId, $submission->submission_id, true);
@@ -1633,7 +1617,7 @@ class FacultySubmissionController extends BaseRestController
         $facultyUser = $this->getFacultyUser();
         $service = $this->communicationService();
         $submission = $service->findFacultySubmission($id);
-        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser['user_id'])) {
+        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser, true)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
         $communication = $service->findMessage($messageId, $submission->submission_id, true);
@@ -1651,7 +1635,7 @@ class FacultySubmissionController extends BaseRestController
         $facultyUser = $this->getFacultyUser();
         $service = $this->communicationService();
         $submission = $service->findFacultySubmission($id);
-        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser['user_id'])) {
+        if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser, true)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
         $communication = $service->findMessage($messageId, $submission->submission_id, true);
@@ -1776,26 +1760,9 @@ class FacultySubmissionController extends BaseRestController
      * Helper method to find submission with ownership check
      * Supports both numeric ID and UUID
      */
-    protected function findSubmission($id, $facultyUserId)
+    protected function findSubmission($id, array $facultyUser, $requireEdit = false)
     {
-        // Check if ID is a UUID (contains hyphens) or numeric
-        if (preg_match('/^[0-9a-f-]{36}$/i', $id)) {
-            // UUID lookup
-            $submission = FacultySubmission::find()
-                ->where(['submission_uuid' => $id, 'shibboleth_user_id' => $facultyUserId])
-                ->one();
-        } else {
-            // Numeric ID lookup
-            $submission = FacultySubmission::find()
-                ->where(['submission_id' => $id, 'shibboleth_user_id' => $facultyUserId])
-                ->one();
-        }
-
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
-
-        return $submission;
+        return (new SubmissionOwnershipPolicy())->findSubmissionWithAccess($id, $facultyUser, $requireEdit);
     }
 
 }

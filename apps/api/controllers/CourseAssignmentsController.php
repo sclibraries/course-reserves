@@ -9,12 +9,13 @@ use yii\web\ServerErrorHttpException;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 use app\models\CourseAssignments;
+use app\services\CourseRosterService;
 use app\services\FolioService;
 
 class CourseAssignmentsController extends ActiveController
 {
     public $modelClass = 'app\models\CourseAssignments';
-    private $folioTerms;
+    private $courseRosterService;
     private $folioService;
 
     public function init()
@@ -113,12 +114,12 @@ class CourseAssignmentsController extends ActiveController
         $assignments = $query->asArray()->all();
 
         // Fetch FOLIO terms
-        $terms = $this->getFolioTerms();
+        $terms = $this->getCourseRosterService()->getFolioTerms();
 
         // Map academic periods to FOLIO terms and parse course codes
         foreach ($assignments as &$assignment) {
-            $assignment['folio_term'] = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
-            $assignment['parsed_course'] = $this->parseCourseId($assignment['course_id']);
+            $assignment['folio_term'] = $this->getCourseRosterService()->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
+            $assignment['parsed_course'] = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
         }
 
         return [
@@ -135,7 +136,7 @@ class CourseAssignmentsController extends ActiveController
     public function actionByPeriod()
     {
         $assignments = CourseAssignments::find()->asArray()->all();
-        $terms = $this->getFolioTerms();
+        $terms = $this->getCourseRosterService()->getFolioTerms();
 
         $grouped = [];
         foreach ($assignments as $assignment) {
@@ -143,11 +144,11 @@ class CourseAssignmentsController extends ActiveController
             if (!isset($grouped[$period])) {
                 $grouped[$period] = [
                     'academic_period' => $period,
-                    'folio_term' => $this->mapAcademicPeriodToTerm($period, $terms),
+                    'folio_term' => $this->getCourseRosterService()->mapAcademicPeriodToTerm($period, $terms),
                     'assignments' => []
                 ];
             }
-            $assignment['parsed_course'] = $this->parseCourseId($assignment['course_id']);
+            $assignment['parsed_course'] = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
             $grouped[$period]['assignments'][] = $assignment;
         }
 
@@ -175,11 +176,11 @@ class CourseAssignmentsController extends ActiveController
             ->asArray()
             ->all();
 
-        $terms = $this->getFolioTerms();
+        $terms = $this->getCourseRosterService()->getFolioTerms();
 
         foreach ($assignments as &$assignment) {
-            $assignment['folio_term'] = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
-            $assignment['parsed_course'] = $this->parseCourseId($assignment['course_id']);
+            $assignment['folio_term'] = $this->getCourseRosterService()->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
+            $assignment['parsed_course'] = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
         }
 
         return [
@@ -235,15 +236,15 @@ class CourseAssignmentsController extends ActiveController
 
         // Check each assignment to see if the parsed course matches
         foreach ($assignments as $assignment) {
-            $parsedCourse = $this->parseCourseId($assignment['course_id']);
+            $parsedCourse = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
             
             // Match course number and section name
             if ($parsedCourse['courseNumber'] === $courseNumber && 
                 $parsedCourse['sectionName'] === $sectionName) {
                 
                 // Found a match - fetch term info and return
-                $terms = $this->getFolioTerms();
-                $assignment['folio_term'] = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
+                $terms = $this->getCourseRosterService()->getFolioTerms();
+                $assignment['folio_term'] = $this->getCourseRosterService()->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
                 $assignment['parsed_course'] = $parsedCourse;
                 
                 return [
@@ -331,7 +332,7 @@ class CourseAssignmentsController extends ActiveController
         }
 
         // Fetch FOLIO terms once
-        $terms = $this->getFolioTerms();
+        $terms = $this->getCourseRosterService()->getFolioTerms();
 
         $enrichedCourses = [];
         $debugInfo = [];
@@ -339,9 +340,9 @@ class CourseAssignmentsController extends ActiveController
         foreach ($assignments as $assignment) {
             // Parse course information
 
-            $parsedCourse = $this->parseCourseId($assignment['course_id']);
+            $parsedCourse = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
 
-            $folioTerm = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
+            $folioTerm = $this->getCourseRosterService()->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
 
             $courseData = [
                 'assignment' => $assignment,
@@ -412,90 +413,12 @@ class CourseAssignmentsController extends ActiveController
         return $this->folioService;
     }
 
-    private function getFolioTerms()
+    private function getCourseRosterService()
     {
-        if ($this->folioTerms === null) {
-            $this->folioTerms = $this->getFolioService()->searchTerms();
+        if ($this->courseRosterService === null) {
+            $this->courseRosterService = new CourseRosterService($this->getFolioService());
         }
 
-        return $this->folioTerms;
-    }
-
-    /**
-     * Map academic period (e.g., AP_202601) to FOLIO term
-     * 
-     * @param string $academicPeriod Format: AP_YYYYMM
-     * @param array $terms FOLIO terms array
-     * @return array|null Matched term or null
-     */
-    private function mapAcademicPeriodToTerm($academicPeriod, $terms)
-    {
-        if (empty($terms) || empty($academicPeriod)) {
-            return null;
-        }
-
-        // Parse academic period: AP_202603 -> year: 2026, month: 03
-        if (preg_match('/^AP_(\d{4})(\d{2})$/', $academicPeriod, $matches)) {
-            $year = (int)$matches[1];
-            $month = (int)$matches[2];
-            
-            // Create a DateTime object for the academic period (first day of that month)
-            $academicDate = new \DateTime(sprintf('%04d-%02d-01', $year, $month));
-
-            // Find term where the academic period falls within the term's date range
-            foreach ($terms as $term) {
-                if (isset($term['startDate']) && isset($term['endDate'])) {
-                    $startDate = new \DateTime($term['startDate']);
-                    $endDate = new \DateTime($term['endDate']);
-
-                    // Check if academic period falls within this term's date range
-                    if ($academicDate >= $startDate && $academicDate <= $endDate) {
-                        return $term;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Parse course_id into FOLIO-compatible format
-     * 
-     * @param string $courseId Format: AMS-120-01-202601
-     * @return array Parsed course information
-     */
-    private function parseCourseId($courseId)
-    {
-        if (empty($courseId)) {
-            return [
-                'courseNumber' => null,
-                'sectionName' => null,
-                'raw' => $courseId
-            ];
-        }
-
-        // Split by hyphen: AMS-120-01-202601
-        $parts = explode('-', $courseId);
-
-        if (count($parts) >= 3) {
-            $departmentCode = $parts[0]; // AMS
-            $courseNum = $parts[1];      // 120
-            $section = $parts[2];        // 01
-            // parts[3] would be the date (202601) which we ignore
-
-            return [
-                'courseNumber' => $departmentCode . ' ' . $courseNum, // "AMS 120"
-                'sectionName' => $section,                            // "01"
-                'raw' => $courseId
-            ];
-        }
-
-        // If format doesn't match, return raw value
-        return [
-            'courseNumber' => null,
-            'sectionName' => null,
-            'raw' => $courseId
-        ];
+        return $this->courseRosterService;
     }
 }

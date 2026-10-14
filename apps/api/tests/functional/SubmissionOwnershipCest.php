@@ -7,6 +7,8 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
 {
     private $actorId = 'test-ownership-owner-alpha';
     private $targetId = 'test-ownership-owner-bravo';
+    private $actorSmithId = '999000101';
+    private $coInstructorSmithId = '999000103';
     private $actorToken;
 
     public function _before(FunctionalTester $I)
@@ -14,13 +16,21 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         parent::_before($I);
         $this->cleanupSubmissions();
         $this->cleanupPermissions();
-        $this->actorToken = $this->mockLogin('ownership-owner-alpha');
+        $this->cleanupAssignments();
+        \Yii::$container->set(
+            \app\services\FolioService::class,
+            new TestSubmissionOwnershipFolioStub()
+        );
+        $this->insertRosterAssignment($this->actorSmithId, 'TST-155-01-209909', 'AP_209909');
+        $this->actorToken = $this->mockLogin('ownership-owner-alpha', $this->actorSmithId);
     }
 
     public function _after(FunctionalTester $I)
     {
         $this->cleanupSubmissions();
         $this->cleanupPermissions();
+        $this->cleanupAssignments();
+        \Yii::$container->clear(\app\services\FolioService::class);
     }
 
     public function submitCompleteIgnoresForgedSubmittedByAndRecordsTokenActor(FunctionalTester $I)
@@ -36,7 +46,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertSame($this->actorId, $metadata['submitted_by_user_id']);
         \PHPUnit\Framework\Assert::assertSame($this->actorId, $metadata['submitted_by_username']);
         \PHPUnit\Framework\Assert::assertSame('T est-ownership-owner-alpha', $metadata['submitted_by_full_name']);
-        \PHPUnit\Framework\Assert::assertSame('test-ownership-owner-alpha@smith.edu', $metadata['submitted_by_email']);
+        \PHPUnit\Framework\Assert::assertSame($this->actorId . '@example.test', $metadata['submitted_by_email']);
         \PHPUnit\Framework\Assert::assertSame('SM', $metadata['submitted_by_institution']);
 
         $rawPayload = json_decode($metadata['raw_payload'], true);
@@ -154,6 +164,109 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertNull($submission['proxy_shibboleth_user_id']);
     }
 
+    public function submitCompleteRejectsUnrosteredFacultyBeforeAnyWrite(FunctionalTester $I)
+    {
+        $token = $this->mockLoginAs('T est-unrostered-api056', 'test-unrostered-api056', '999000102');
+
+        $this->postComplete($I, $token, 'unrostered-complete', 'test-unrostered-api056');
+        $I->seeResponseCodeIs(403);
+        \PHPUnit\Framework\Assert::assertStringContainsString(
+            'course not found on your teaching roster; contact library staff',
+            $I->grabPageSource()
+        );
+        $this->assertNoSubmissionRows($I, 'unrostered-complete');
+
+        $this->postCreate($I, $token, 'unrostered-create', null);
+        $I->seeResponseCodeIs(403);
+        \PHPUnit\Framework\Assert::assertStringContainsString(
+            'course not found on your teaching roster; contact library staff',
+            $I->grabPageSource()
+        );
+        $this->assertNoSubmissionRows($I, 'unrostered-create');
+    }
+
+    public function rosteredCoInstructorCanOpenAndEditSharedSubmission(FunctionalTester $I)
+    {
+        $this->postComplete($I, $this->actorToken, 'co-instructor-seed', $this->actorId);
+        $I->seeResponseCodeIs(200);
+        $submission = $this->findSubmission('co-instructor-seed');
+        $uuid = $submission['submission_uuid'];
+
+        $this->insertRosterAssignment($this->coInstructorSmithId, 'TST-155-01-209909', 'AP_209909');
+        $coInstructorToken = $this->mockLoginAs(
+            'T est-co-instructor-api056',
+            'test-co-instructor-api056',
+            $this->coInstructorSmithId
+        );
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $coInstructorToken);
+        $I->amOnRoute('faculty-submission/view', ['id' => $uuid]);
+        $I->seeResponseCodeIs(200);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', [
+            'submission_notes' => 'test-co-instructor-edit',
+        ], ['id' => $uuid]);
+        $I->seeResponseCodeIs(200);
+        $this->assertSubmissionNotes($submission['submission_id'], 'test-co-instructor-edit');
+
+        $unrosteredToken = $this->mockLoginAs(
+            'T est-not-rostered-api056',
+            'test-not-rostered-api056',
+            '999000104'
+        );
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $unrosteredToken);
+        $I->amOnRoute('faculty-submission/view', ['id' => $uuid]);
+        $I->seeResponseCodeIs(403);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', [
+            'submission_notes' => 'test-forbidden-edit',
+        ], ['id' => $uuid]);
+        $I->seeResponseCodeIs(403);
+        $this->assertSubmissionNotes($submission['submission_id'], 'test-co-instructor-edit');
+    }
+
+    public function crossListedPartnerCourseDoesNotMatchTheRosteredCode(FunctionalTester $I)
+    {
+        $this->insertRosterAssignment('999000105', 'AFR-155-01-209909', 'AP_209909');
+        $token = $this->mockLoginAs(
+            'T est-crosslisted-api056',
+            'test-crosslisted-api056',
+            '999000105'
+        );
+
+        $this->postComplete($I, $token, 'crosslisted-partner', 'test-crosslisted-api056');
+        $I->seeResponseCodeIs(403);
+        \PHPUnit\Framework\Assert::assertStringContainsString(
+            'course not found on your teaching roster; contact library staff',
+            $I->grabPageSource()
+        );
+        $this->assertNoSubmissionRows($I, 'crosslisted-partner');
+    }
+
+    public function staffCanActForAnyFacultyAndOpenAndEditAnySubmission(FunctionalTester $I)
+    {
+        $staffId = 'test-ownership-staff-api056';
+        $staffToken = $this->mockLoginAs('T est-ownership-staff-api056', $staffId, null, 'staff');
+        $this->postComplete($I, $staffToken, 'staff-create', $this->targetId, $this->targetId);
+        $I->seeResponseCodeIs(200);
+
+        $submission = $this->findSubmission('staff-create');
+        \PHPUnit\Framework\Assert::assertSame($this->targetId, $submission['shibboleth_user_id']);
+        \PHPUnit\Framework\Assert::assertSame($staffId, $submission['proxy_shibboleth_user_id']);
+
+        $this->postComplete($I, $this->actorToken, 'staff-open-seed', $this->actorId);
+        $I->seeResponseCodeIs(200);
+        $ownedSubmission = $this->findSubmission('staff-open-seed');
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $staffToken);
+        $I->amOnRoute('faculty-submission/view', ['id' => $ownedSubmission['submission_uuid']]);
+        $I->seeResponseCodeIs(200);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', [
+            'submission_notes' => 'test-staff-edited-any-submission',
+        ], ['id' => $ownedSubmission['submission_uuid']]);
+        $I->seeResponseCodeIs(200);
+        $this->assertSubmissionNotes(
+            $ownedSubmission['submission_id'],
+            'test-staff-edited-any-submission'
+        );
+    }
+
     public function updateRejectsOwnerAndCourseIdentityChanges(FunctionalTester $I)
     {
         $uuid = '11111111-1111-4111-8111-111111111111';
@@ -261,10 +374,10 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     ) {
         $payload = [
             'courseInfo' => [
-                'courseCode' => 'test-course-ownership-' . $suffix,
-                'courseTitle' => 'Synthetic ownership ' . $suffix,
-                'section' => 'test-1',
-                'term' => 'test-term-ownership',
+                'courseCode' => 'TST 155',
+                'courseTitle' => 'test-ownership-' . $suffix,
+                'section' => '01',
+                'term' => 'Fall 2099',
                 'instructors' => 'Test Faculty',
             ],
             'resources' => [],
@@ -294,16 +407,18 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         );
     }
 
-    private function postCreate(FunctionalTester $I, $token, $suffix, $actingFor, $listingId = null)
+    private function postCreate(FunctionalTester $I, $token, $suffix, $actingFor = null, $listingId = null)
     {
         $payload = [
-            'acting_for_faculty_id' => $actingFor,
-            'term_code' => 'test-term-ownership',
-            'course_code' => 'test-course-ownership-' . $suffix,
-            'section' => 'test-1',
-            'course_title' => 'Synthetic ownership ' . $suffix,
+            'term_code' => 'Fall 2099',
+            'course_code' => 'TST 155',
+            'section' => '01',
+            'course_title' => 'test-ownership-' . $suffix,
             'faculty_display_name' => 'Test Owner Bravo',
         ];
+        if ($actingFor !== null) {
+            $payload['acting_for_faculty_id'] = $actingFor;
+        }
         if ($listingId !== null) {
             $payload['folio_course_listing_id'] = $listingId;
         }
@@ -316,18 +431,25 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         );
     }
 
-    private function mockLogin($suffix)
+    private function mockLogin($suffix, $internalId = null, $role = 'faculty')
     {
-        return $this->mockLoginAs('T est-' . $suffix, 'test-' . $suffix);
+        return $this->mockLoginAs('T est-' . $suffix, 'test-' . $suffix, $internalId, $role);
     }
 
-    private function mockLoginAs($fullName, $expectedId)
+    private function mockLoginAs($fullName, $expectedId, $internalId = null, $role = 'faculty')
     {
+        $loginData = ['full_name' => $fullName];
+        if ($internalId !== null) {
+            $loginData['internal_id'] = $internalId;
+        }
+        if ($role !== 'faculty') {
+            $loginData['role'] = $role;
+        }
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
                 'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-                'content' => http_build_query(['full_name' => $fullName]),
+                'content' => http_build_query($loginData),
                 'ignore_errors' => true,
             ],
         ]);
@@ -343,8 +465,13 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
             new \Firebase\JWT\Key(getenv('JWT_SECRET_KEY'), 'HS256')
         );
         \PHPUnit\Framework\Assert::assertSame($expectedId, $claims['username']);
+        if ($internalId !== null) {
+            \PHPUnit\Framework\Assert::assertSame($internalId, $claims['internal_id']);
+        }
+        \PHPUnit\Framework\Assert::assertSame($role, $claims['role']);
+        $claims['email'] = $expectedId . '@example.test';
 
-        return $response['token'];
+        return \Firebase\JWT\JWT::encode($claims, getenv('JWT_SECRET_KEY'), 'HS256');
     }
 
     private function insertPermission($ownerId, $proxyId, $permissionType, $expiresAt = null, $allowedCourse = null)
@@ -372,12 +499,24 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     private function findSubmission($suffix)
     {
         return \Yii::$app->db->createCommand(
-            'SELECT * FROM faculty_submissions WHERE course_code = :course_code AND term_code = :term_code',
+            'SELECT * FROM faculty_submissions WHERE course_title = :course_title '
+            . 'AND course_code = :course_code AND term_code = :term_code AND section = :section',
             [
-                ':course_code' => 'test-course-ownership-' . $suffix,
-                ':term_code' => 'test-term-ownership',
+                ':course_title' => 'test-ownership-' . $suffix,
+                ':course_code' => 'TST 155',
+                ':term_code' => 'Fall 2099',
+                ':section' => '01',
             ]
         )->queryOne();
+    }
+
+    private function assertSubmissionNotes($submissionId, $expectedNotes)
+    {
+        $notes = \Yii::$app->db->createCommand(
+            'SELECT submission_notes FROM faculty_submissions WHERE submission_id = :submission_id',
+            [':submission_id' => $submissionId]
+        )->queryScalar();
+        \PHPUnit\Framework\Assert::assertSame($expectedNotes, $notes);
     }
 
     private function findMetadata($submissionId)
@@ -391,12 +530,14 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     private function assertNoSubmissionRows(FunctionalTester $I, $suffix)
     {
         $params = [
-            ':course_code' => 'test-course-ownership-' . $suffix,
-            ':term_code' => 'test-term-ownership',
-            ':section' => 'test-1',
+            ':course_title' => 'test-ownership-' . $suffix,
+            ':course_code' => 'TST 155',
+            ':term_code' => 'Fall 2099',
+            ':section' => '01',
         ];
         $submissionCount = (int) \Yii::$app->db->createCommand(
-            'SELECT COUNT(*) FROM faculty_submissions WHERE course_code = :course_code AND term_code = :term_code AND section = :section',
+            'SELECT COUNT(*) FROM faculty_submissions WHERE course_title = :course_title '
+            . 'AND course_code = :course_code AND term_code = :term_code AND section = :section',
             $params
         )->queryScalar();
         \PHPUnit\Framework\Assert::assertSame(0, $submissionCount, 'Rejected request wrote a faculty submission.');
@@ -410,7 +551,8 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
             $count = (int) \Yii::$app->db->createCommand(
                 'SELECT COUNT(*) FROM ' . $table . ' child '
                 . 'INNER JOIN faculty_submissions parent ON parent.submission_id = child.submission_id '
-                . 'WHERE parent.course_code = :course_code AND parent.term_code = :term_code AND parent.section = :section',
+                . 'WHERE parent.course_title = :course_title AND parent.course_code = :course_code '
+                . 'AND parent.term_code = :term_code AND parent.section = :section',
                 $params
             )->queryScalar();
             \PHPUnit\Framework\Assert::assertSame(0, $count, 'Rejected request wrote rows to ' . $table . '.');
@@ -420,7 +562,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     private function cleanupSubmissions()
     {
         $submissionIds = \Yii::$app->db->createCommand(
-            "SELECT submission_id FROM faculty_submissions WHERE course_code LIKE 'test-course-ownership-%'"
+            "SELECT submission_id FROM faculty_submissions WHERE course_title LIKE 'test-ownership-%'"
         )->queryColumn();
         if (!$submissionIds) {
             return;
@@ -435,6 +577,29 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
             \Yii::$app->db->createCommand()->delete($table, ['submission_id' => $submissionIds])->execute();
         }
         \Yii::$app->db->createCommand()->delete('faculty_submissions', ['submission_id' => $submissionIds])->execute();
+    }
+
+    private function insertRosterAssignment($smithId, $courseId, $academicPeriod)
+    {
+        \Yii::$app->db->createCommand()->insert('course_assignments', [
+            'academic_period' => $academicPeriod,
+            'course_id' => $courseId,
+            'course_title' => 'Synthetic API-056 roster course',
+            'smith_id' => $smithId,
+            'role' => 'Instructor',
+        ])->execute();
+    }
+
+    private function cleanupAssignments()
+    {
+        \Yii::$app->db->createCommand()->delete('course_assignments', [
+            'smith_id' => [
+                $this->actorSmithId,
+                $this->coInstructorSmithId,
+                '999000104',
+                '999000105',
+            ],
+        ])->execute();
     }
 
     private function cleanupPermissions()
@@ -461,5 +626,31 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
             ['permission_id' => $permissionIds]
         )->execute();
         \Yii::$app->db->createCommand()->delete('faculty_proxy_permissions', ['permission_id' => $permissionIds])->execute();
+    }
+}
+
+class TestSubmissionOwnershipFolioStub
+{
+    public function searchTerms()
+    {
+        return [
+            [
+                'id' => 'test-folio-term-2099',
+                'name' => 'Fall 2099',
+                'startDate' => '2099-08-01',
+                'endDate' => '2099-12-31',
+            ],
+            [
+                'id' => 'test-sandbox-term-2026',
+                'name' => 'Sandbox Term 2026',
+                'startDate' => '2026-01-01',
+                'endDate' => '2026-12-31',
+            ],
+        ];
+    }
+
+    public function searchCourses($query)
+    {
+        return null;
     }
 }

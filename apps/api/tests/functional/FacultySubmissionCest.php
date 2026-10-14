@@ -28,6 +28,7 @@ class FacultySubmissionCest extends BaseFunctionalCest
     private $staffToken;
     private $submissionId;
     private $otherSubmissionUuid = '33333333-3333-4333-8333-333333333333';
+    private $rosterSmithId = '999000131';
 
     /**
      * Delegate DB/URL setup to the base class, then mint a faculty JWT
@@ -36,6 +37,20 @@ class FacultySubmissionCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        \Yii::$container->set(
+            \app\services\FolioService::class,
+            new TestFacultySubmissionFolioStub()
+        );
+        \Yii::$app->db->createCommand()->delete('course_assignments', [
+            'smith_id' => $this->rosterSmithId,
+        ])->execute();
+        \Yii::$app->db->createCommand()->insert('course_assignments', [
+            'academic_period' => 'AP_209902',
+            'course_id' => 'TST-API030-99-209902',
+            'course_title' => 'Synthetic API-030 roster course',
+            'smith_id' => $this->rosterSmithId,
+            'role' => 'Instructor',
+        ])->execute();
         $this->submissionId = \Yii::$app->db->createCommand(
             'SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid',
             [':uuid' => $this->uuid]
@@ -50,8 +65,9 @@ class FacultySubmissionCest extends BaseFunctionalCest
             'role'        => 'faculty',
             'id'          => 0,
             'full_name'   => 'Test Faculty',
-            'email'       => $this->shibbolethId . '@test.local',
+            'email'       => $this->shibbolethId,
             'institution' => 'SM',
+            'internal_id' => $this->rosterSmithId,
         ];
         $this->token = \Firebase\JWT\JWT::encode($payload, $secretKey, 'HS256');
         $staffPayload = [
@@ -68,6 +84,10 @@ class FacultySubmissionCest extends BaseFunctionalCest
 
     public function _after(FunctionalTester $I)
     {
+        \Yii::$app->db->createCommand()->delete('course_assignments', [
+            'smith_id' => $this->rosterSmithId,
+        ])->execute();
+        \Yii::$container->clear(\app\services\FolioService::class);
         \Yii::$app->db->createCommand()->delete(
             'submission_communications',
             'message LIKE :prefix',
@@ -78,7 +98,7 @@ class FacultySubmissionCest extends BaseFunctionalCest
         ])->execute();
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
             'course_code' => 'TST API030',
-            'term_code' => '209902',
+            'term_code' => 'Spring 2099',
             'section' => '99',
         ])->execute();
     }
@@ -137,7 +157,7 @@ class FacultySubmissionCest extends BaseFunctionalCest
             'courseInfo' => [
                 'courseCode' => 'TST API030',
                 'courseTitle' => 'Synthetic API-030 serialization',
-                'term' => '209902',
+                'term' => 'Spring 2099',
                 'section' => '99',
                 'instructors' => 'Test Faculty',
             ],
@@ -257,5 +277,25 @@ class FacultySubmissionCest extends BaseFunctionalCest
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
         $I->sendAjaxRequest('POST', $url, $payload);
         $I->seeResponseCodeIs($expectedStatus);
+    }
+}
+
+class TestFacultySubmissionFolioStub
+{
+    public function searchTerms()
+    {
+        return [
+            [
+                'id' => 'test-api030-spring-2099',
+                'name' => 'Spring 2099',
+                'startDate' => '2099-01-01',
+                'endDate' => '2099-05-31',
+            ],
+        ];
+    }
+
+    public function searchCourses($query)
+    {
+        return null;
     }
 }
