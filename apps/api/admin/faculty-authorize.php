@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config/environment.php';
 session_start();
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
+use app\services\FacultyRoleResolver;
 use app\services\FacultyTokenClaims;
 
 // Allow CORS dynamically for known origins; redirects aren't impacted by CORS,
@@ -75,7 +76,7 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
         $refreshExpiration = $issuedAt + 86400;  // 1 day
 
         $fullName = trim(($firstname ?? '') . ' ' . ($lastname ?? ''));
-        $role = (strpos($affLower, 'faculty') !== false) ? 'faculty' : 'staff';
+        $role = (new FacultyRoleResolver())->forFacultyAuthorization($username, $aff);
 
         $identityClaims = [
             'username' => $username,

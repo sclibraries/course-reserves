@@ -16,6 +16,7 @@ if (!\app\components\Environment::isDev()) {
 
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
+use app\services\FacultyRoleResolver;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';
@@ -67,7 +68,10 @@ $accessPayload = [
     'iat'         => $issuedAt,
     'exp'         => $accessExpiration,
     'username'    => $decoded->username,
-    'role'        => $decoded->role,
+    'role'        => (new FacultyRoleResolver())->forRefresh(
+        $decoded->username,
+        $decoded->role ?? null
+    ),
     'id'          => $decoded->id,
     'full_name'   => $decoded->full_name,
     'email'       => $decoded->email,

@@ -26,4 +26,10 @@ class RolesTest extends \Codeception\Test\Unit
             $this->assertSame($case[1], Roles::isStaff($case[0]));
         }
     }
+
+    public function testEmployeeIsSignedInButNotStaff()
+    {
+        $this->assertContains('employee', Roles::SIGNED_IN);
+        $this->assertFalse(Roles::isStaff('employee'));
+    }
 }

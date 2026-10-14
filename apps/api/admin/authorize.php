@@ -11,6 +11,7 @@ header('Access-Control-Allow-Credentials: true');
 // Include Yii framework and the autoloader
 require_once(__DIR__ . '/../vendor/autoload.php'); // Composer autoloader
 require_once(__DIR__ . '/../vendor/yiisoft/yii2/Yii.php'); // Yii framework
+use app\services\ApprovedUserLookup;
 
 // Load the configuration for the Yii application
 $config = require(__DIR__ . '/../config/web.php');
@@ -52,7 +53,7 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
     // Check if the user is a staff member
     if (strpos($aff, 'staff') !== false || strpos($aff, 'employee') !== false || strpos($aff, 'Employee') !== false) {
         // Check if the user exists in the database
-        $userInfo = getUserFromDatabase($username);
+        $userInfo = (new ApprovedUserLookup())->find($username);
         
         if ($userInfo && $userInfo['approved'] == 1) {
             // Generate JWT tokens with user information
@@ -107,41 +108,6 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
     // If Shibboleth session isn't properly set up, fail gracefully
     header('HTTP/1.1 400 Bad Request');
     echo json_encode(['error' => 'Invalid session or missing attributes.']);
-}
-
-/**
- * Function to check if a user exists in the database.
- */
-function isUserInDatabase($username) {
-    try {
-        $user = Yii::$app->db->createCommand("
-            SELECT COUNT(*)
-            FROM users
-            WHERE username = :username AND approved = 1
-        ")->bindValue(':username', $username)
-          ->queryScalar();
-        
-        return (bool)$user;
-    } catch (Exception $e) {
-        Yii::error('Database query failed: ' . $e->getMessage());
-        return false;
-    }
-}
-
-function getUserFromDatabase($username) {
-    try {
-        $user = Yii::$app->db->createCommand("
-            SELECT id, username, full_name, email, role, department, institution, approved 
-            FROM users
-            WHERE username = :username AND approved = 1
-        ")->bindValue(':username', $username)
-          ->queryOne();
-        
-        return $user;
-    } catch (Exception $e) {
-        Yii::error('Database query failed: ' . $e->getMessage());
-        return false;
-    }
 }
 
 

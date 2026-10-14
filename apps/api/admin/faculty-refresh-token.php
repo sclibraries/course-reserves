@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config/environment.php';
 
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
+use app\services\FacultyRoleResolver;
 use app\services\FacultyTokenClaims;
 
 // Include Yii and Composer
@@ -50,18 +51,24 @@ try {
     $accessExpiration = $issuedAt + 3600;   // 1 hour
     $refreshExpiration = $issuedAt + 86400; // 1 day
     $decodedClaims = (array) $decoded;
+    $role = (new FacultyRoleResolver())->forRefresh(
+        $decodedClaims['username'],
+        $decodedClaims['role'] ?? null
+    );
 
     $accessPayload = FacultyTokenClaims::forRefresh(
         $decodedClaims,
         $issuedAt,
-        $accessExpiration
+        $accessExpiration,
+        $role
     );
     $newAccessToken = JWT::encode($accessPayload, $accessSecretKey, 'HS256');
 
     $refreshPayload = FacultyTokenClaims::forRefresh(
         $decodedClaims,
         $issuedAt,
-        $refreshExpiration
+        $refreshExpiration,
+        $role
     );
     $newRefreshToken = JWT::encode($refreshPayload, $refreshSecretKey, 'HS256');
 

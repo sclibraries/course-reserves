@@ -108,6 +108,29 @@ class FacultyTokenClaimsTest extends \Codeception\Test\Unit
         );
     }
 
+    public function testRefreshDoesNotPreserveUnverifiedLibraryRoles()
+    {
+        foreach (['staff', 'admin'] as $role) {
+            $claims = FacultyTokenClaims::forRefresh(
+                [
+                    'username' => 'test-api069-employee',
+                    'role' => $role,
+                ],
+                time(),
+                time() + 3600
+            );
+
+            $this->assertSame('employee', $claims['role']);
+        }
+
+        $claims = FacultyTokenClaims::forRefresh(
+            ['username' => 'test-api069-employee'],
+            time(),
+            time() + 3600
+        );
+        $this->assertSame('employee', $claims['role']);
+    }
+
     /**
      * Encode and decode a token with its matching key.
      *

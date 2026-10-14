@@ -364,6 +364,23 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertSame($coveredProxyId, $submission['proxy_shibboleth_user_id']);
     }
 
+    public function employeeWithActivePermissionCanActForFaculty(FunctionalTester $I)
+    {
+        $proxyId = 'test-ownership-employee-proxy';
+        $this->insertPermission(
+            $this->targetId,
+            $proxyId,
+            \app\models\FacultyProxyPermission::PERMISSION_FULL_ACCESS
+        );
+
+        $this->postCreate($I, $this->signedToken($proxyId, 'employee'), 'employee-proxy', $this->targetId);
+        $I->seeResponseCodeIs(200);
+
+        $submission = $this->findSubmission('employee-proxy');
+        \PHPUnit\Framework\Assert::assertSame($this->targetId, $submission['shibboleth_user_id']);
+        \PHPUnit\Framework\Assert::assertSame($proxyId, $submission['proxy_shibboleth_user_id']);
+    }
+
     private function postComplete(
         FunctionalTester $I,
         $token,
@@ -472,6 +489,21 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         $claims['email'] = $expectedId . '@example.test';
 
         return \Firebase\JWT\JWT::encode($claims, getenv('JWT_SECRET_KEY'), 'HS256');
+    }
+
+    private function signedToken($username, $role)
+    {
+        return \Firebase\JWT\JWT::encode([
+            'iat' => time() - 1,
+            'exp' => time() + 3600,
+            'username' => $username,
+            'role' => $role,
+            'id' => $username,
+            'full_name' => 'Synthetic Employee Proxy',
+            'email' => $username . '@example.test',
+            'institution' => 'SM',
+            'internal_id' => '999006901',
+        ], getenv('JWT_SECRET_KEY'), 'HS256');
     }
 
     private function insertPermission($ownerId, $proxyId, $permissionType, $expiresAt = null, $allowedCourse = null)

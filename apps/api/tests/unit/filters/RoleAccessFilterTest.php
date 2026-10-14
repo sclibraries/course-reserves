@@ -4,6 +4,10 @@ namespace tests\unit\filters;
 
 use app\filters\RoleAccessFilter;
 use app\models\JwtIdentity;
+use app\components\Roles;
+use app\services\ApprovedUserLookup;
+use app\services\FacultyRoleResolver;
+use app\services\FacultyTokenClaims;
 use Firebase\JWT\JWT;
 use Yii;
 use yii\base\Action;
@@ -76,6 +80,31 @@ class RoleAccessFilterTest extends \Codeception\Test\Unit
         $filter->beforeAction($this->_action('lookup'));
     }
 
+    public function testFacultyEmployeeTokenIsForbiddenOnStaffRoute()
+    {
+        $resolver = new FacultyRoleResolver(new ApprovedUserLookup(function () {
+            return false;
+        }));
+        $roleDecision = $resolver->forFacultyAuthorization('test-api069-employee', 'employee');
+        $this->_setFacultyPathRole('test-api069-employee', $roleDecision);
+        $filter = $this->_filter(['lookup' => Roles::STAFF]);
+
+        $this->expectException(ForbiddenHttpException::class);
+        $filter->beforeAction($this->_action('lookup'));
+    }
+
+    public function testApprovedLibraryStaffFromFacultyPathPassesStaffRoute()
+    {
+        $resolver = new FacultyRoleResolver(new ApprovedUserLookup(function () {
+            return ['approved' => 1, 'role' => 'staff'];
+        }));
+        $roleDecision = $resolver->forFacultyAuthorization('test-api069-staff', 'employee');
+        $this->_setFacultyPathRole('test-api069-staff', $roleDecision);
+        $filter = $this->_filter(['lookup' => Roles::STAFF]);
+
+        $this->assertTrue($filter->beforeAction($this->_action('lookup')));
+    }
+
     /**
      * OPTIONS bypasses role checks so preflight can continue.
      *
@@ -130,6 +159,22 @@ class RoleAccessFilterTest extends \Codeception\Test\Unit
             self::TEST_SECRET,
             'HS256'
         );
+        Yii::$app->user->setIdentity(JwtIdentity::findIdentityByAccessToken($token));
+    }
+
+    private function _setFacultyPathRole($username, $role)
+    {
+        $payload = FacultyTokenClaims::forAuthorization(
+            [
+                'username' => $username,
+                'role' => $role,
+                'id' => $username,
+            ],
+            '999006900',
+            time() - 1,
+            time() + 60
+        );
+        $token = JWT::encode($payload, self::TEST_SECRET, 'HS256');
         Yii::$app->user->setIdentity(JwtIdentity::findIdentityByAccessToken($token));
     }
 

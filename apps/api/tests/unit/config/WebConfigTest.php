@@ -20,6 +20,17 @@ class WebConfigTest extends \Codeception\Test\Unit
         $this->assertSame(2, substr_count($refreshSource, 'FacultyTokenClaims::forRefresh('));
     }
 
+    public function testLocalRolePreservingRefreshRevalidatesRoles()
+    {
+        $refreshSource = file_get_contents(codecept_root_dir('admin/refresh-token-local.php'));
+        $shibbolethDevRefreshSource = file_get_contents(codecept_root_dir('admin/refresh-token-dev.php'));
+
+        $this->assertStringContainsString('use app\\services\\FacultyRoleResolver;', $refreshSource);
+        $this->assertStringContainsString('FacultyRoleResolver())->forRefresh(', $refreshSource);
+        $this->assertStringNotContainsString("'role' => " . '$decoded->role', $refreshSource);
+        $this->assertStringNotContainsString("'role'", $shibbolethDevRefreshSource);
+    }
+
     public function testFacultySubmissionUuidCommunicationsRoutesAreDeclaredOnce()
     {
         $source = file_get_contents(codecept_root_dir('config/web.php'));

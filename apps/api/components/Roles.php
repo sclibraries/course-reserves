@@ -8,7 +8,7 @@ namespace app\components;
 class Roles
 {
     const STAFF = ['staff', 'admin'];
-    const SIGNED_IN = ['faculty', 'staff', 'admin'];
+    const SIGNED_IN = ['faculty', 'staff', 'admin', 'employee'];
 
     /**
      * Check whether a role is staff or admin.
