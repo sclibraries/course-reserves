@@ -10,6 +10,7 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
     private $_facultyAToken;
     private $_facultyBToken;
     private $_staffToken;
+    private $_staffInstructorToken;
 
     /**
      * Create synthetic assignments and get tokens from the application issuers.
@@ -43,6 +44,15 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
             [
                 'full_name' => 'Synthetic Faculty B',
                 'internal_id' => $this->_facultyBInternalId,
+            ],
+            'token'
+        );
+        $this->_staffInstructorToken = $this->_requestToken(
+            'http://localhost/faculty-submission/mock-login',
+            [
+                'full_name' => 'Synthetic Staff Instructor',
+                'internal_id' => $this->_facultyAInternalId,
+                'role' => 'staff',
             ],
             'token'
         );
@@ -128,6 +138,17 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
             $this->_facultyBToken,
             $this->_facultyBInternalId,
             $this->_facultyAInternalId
+        );
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->_staffInstructorToken);
+        $I->amOnRoute('course-assignments/instructor-courses');
+        $I->seeResponseCodeIs(200);
+
+        $response = json_decode($I->grabPageSource(), true);
+        \PHPUnit\Framework\Assert::assertSame(1, $response['count']);
+        \PHPUnit\Framework\Assert::assertSame(
+            $this->_facultyAInternalId,
+            $response['courses'][0]['assignment']['smith_id']
         );
     }
 

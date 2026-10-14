@@ -6,8 +6,11 @@
 namespace tests\unit\controllers;
 
 use app\controllers\CourseAssignmentsController;
+use app\components\Roles;
+use app\filters\RoleAccessFilter;
 use Yii;
 use yii\filters\auth\HttpBearerAuth;
+use yii\web\IdentityInterface;
 use yii\web\BadRequestHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\UnauthorizedHttpException;
@@ -27,6 +30,7 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
     protected function _after()
     {
         Yii::$app->request->setQueryParams([]);
+        Yii::$app->user->setIdentity(null);
     }
 
     /**
@@ -42,6 +46,11 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
         $this->assertSame(HttpBearerAuth::class, $authenticator['class']);
         $this->assertSame(['options'], $authenticator['except']);
         $this->assertArrayNotHasKey('only', $authenticator);
+
+        $roleFilter = $controller->behaviors()['roleAccessFilter'];
+        $this->assertSame(RoleAccessFilter::class, $roleFilter['class']);
+        $this->assertSame(Roles::STAFF, $roleFilter['rules']['index']);
+        $this->assertSame(Roles::SIGNED_IN, $roleFilter['rules']['instructor-courses']);
     }
 
     /**
@@ -52,18 +61,19 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
     public function testProductionSemanticsDisableQueryIdentityEndpoint()
     {
         $controller = new TestCourseAssignmentsController('course-assignments', Yii::$app);
-        $controller->developmentEnvironment = false;
+        $filter = Yii::createObject($controller->behaviors()['roleAccessFilter']);
+        $action = new \yii\base\Action('test-instructor-courses', $controller);
 
         $this->expectException(NotFoundHttpException::class);
-        $controller->assertTestEndpointEnabledForTest();
+        $filter->beforeAction($action);
     }
 
     /**
-     * The development query-identity action preserves its sandbox response.
+     * The query-identity action preserves its sandbox response.
      *
      * @return void
      */
-    public function testDevelopmentQueryIdentityEndpointPreservesSandboxLookup()
+    public function testQueryIdentityActionPreservesSandboxLookup()
     {
         Yii::$app->request->setQueryParams(
             [
@@ -72,7 +82,6 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
             ]
         );
         $controller = new TestCourseAssignmentsController('course-assignments', Yii::$app);
-        $controller->developmentEnvironment = true;
 
         $result = $controller->actionTestInstructorCourses();
 
@@ -98,10 +107,7 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
     public function testAuthenticatedLookupUsesNormalizedIdentityAndPreservesResponseShape()
     {
         $controller = new TestCourseAssignmentsController('course-assignments', Yii::$app);
-        $controller->identity = (object) [
-            'fullName' => 'Synthetic Faculty',
-            'internalId' => '999000004',
-        ];
+        Yii::$app->user->setIdentity(new TestCourseAssignmentsIdentity('Synthetic Faculty', '999000004'));
 
         $result = $controller->actionInstructorCourses();
 
@@ -140,10 +146,7 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
     public function testLookupRejectsMissingNormalizedClaims()
     {
         $controller = new TestCourseAssignmentsController('course-assignments', Yii::$app);
-        $controller->identity = (object) [
-            'fullName' => 'Synthetic Faculty',
-            'internalId' => null,
-        ];
+        Yii::$app->user->setIdentity(new TestCourseAssignmentsIdentity('Synthetic Faculty', null));
 
         $this->expectException(BadRequestHttpException::class);
         $controller->actionInstructorCourses();
@@ -156,53 +159,11 @@ class CourseAssignmentsControllerTest extends \Codeception\Test\Unit
 class TestCourseAssignmentsController extends CourseAssignmentsController
 {
     /**
-     * Whether to enable the query-identity test action.
-     *
-     * @var bool
-     */
-    public $developmentEnvironment = false;
-    /**
-     * Identity returned by the authentication seam.
-     *
-     * @var object|null
-     */
-    public $identity;
-    /**
      * Arguments captured by the lookup seam.
      *
      * @var array|null
      */
     public $lookupArguments;
-
-    /**
-     * Expose the development guard to tests.
-     *
-     * @return void
-     */
-    public function assertTestEndpointEnabledForTest()
-    {
-        $this->assertTestEndpointEnabled();
-    }
-
-    /**
-     * Override the environment check for isolated tests.
-     *
-     * @return bool
-     */
-    protected function isDevelopmentEnvironment()
-    {
-        return $this->developmentEnvironment;
-    }
-
-    /**
-     * Override the authenticated identity for isolated tests.
-     *
-     * @return object|null
-     */
-    protected function getAuthenticatedIdentity()
-    {
-        return $this->identity;
-    }
 
     /**
      * Capture the instructor lookup arguments without reading the database.
@@ -225,5 +186,45 @@ class TestCourseAssignmentsController extends CourseAssignmentsController
             'courses' => [],
             'count' => 0,
         ];
+    }
+}
+
+/**
+ * Test identity with normalized instructor claims.
+ */
+class TestCourseAssignmentsIdentity implements IdentityInterface
+{
+    public $fullName;
+    public $internalId;
+
+    public function __construct($fullName, $internalId)
+    {
+        $this->fullName = $fullName;
+        $this->internalId = $internalId;
+    }
+
+    public static function findIdentity($id)
+    {
+        return null;
+    }
+
+    public static function findIdentityByAccessToken($token, $type = null)
+    {
+        return null;
+    }
+
+    public function getId()
+    {
+        return null;
+    }
+
+    public function getAuthKey()
+    {
+        return null;
+    }
+
+    public function validateAuthKey($authKey)
+    {
+        return false;
     }
 }
