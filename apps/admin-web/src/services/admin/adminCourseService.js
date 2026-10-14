@@ -324,7 +324,7 @@ export const adminCourseService = {
 
   async linkExistingResources(offeringId, resourceId){
     const response = await fetch(
-      `${COURSE_API}${config.api.endpoints.offeringLink.linkExisting}?offering_id=${offeringId}&resource_id=${resourceId}`
+      `${COURSE_API}${config.api.endpoints.offeringLink.linkExisting}?offering_id=${offeringId}&resource_id=${resourceId}`, { headers: { 'Authorization': getAuthToken() } }
     );
     if (!response.ok) throw new Error('Failed to link resources');
     return response.json();
