@@ -3,6 +3,7 @@
 namespace app\models;
 
 use Yii;
+use app\services\SubmissionConfirmationState;
 use yii\db\ActiveRecord;
 use yii\behaviors\TimestampBehavior;
 
@@ -35,6 +36,14 @@ use yii\behaviors\TimestampBehavior;
  * @property string $created_at
  * @property string $updated_at
  * @property string $submitted_at
+ * @property string $email_confirmation_status
+ * @property string $email_confirmation_requested_at
+ * @property string $email_confirmation_queued_at
+ * @property string $email_confirmation_sent_at
+ * @property string $email_confirmation_failed_at
+ * @property string $email_confirmation_error_at
+ * @property string $email_confirmation_error
+ * @property int $email_confirmation_legacy_sent
  */
 class FacultySubmission extends ActiveRecord
 {
@@ -81,6 +90,9 @@ class FacultySubmission extends ActiveRecord
             [['needed_by_date', 'locked_at'], 'date'],
             [['created_at', 'updated_at', 'submitted_at'], 'safe'],
             [['email_confirmation_sent', 'is_duplicate_previous', 'is_locked', 'offering_id'], 'integer'],
+            [['email_confirmation_status'], 'string', 'max' => 32],
+            [['email_confirmation_status'], 'in', 'range' => SubmissionConfirmationState::allowedStatuses()],
+            [['email_confirmation_status'], 'default', 'value' => SubmissionConfirmationState::NOT_REQUESTED],
             [['submission_uuid'], 'string', 'max' => 36],
             [['shibboleth_user_id', 'proxy_shibboleth_user_id', 'folio_course_listing_id', 'faculty_display_name', 'proxy_display_name', 'assignee_staff_user_id', 'locked_by_staff_id'], 'string', 'max' => 255],
             [['term_code'], 'string', 'max' => 32],
@@ -133,7 +145,8 @@ class FacultySubmission extends ActiveRecord
     public function fields()
     {
         $fields = parent::fields();
-        
+        unset($fields['email_confirmation_legacy_sent']);
+
         // Add related data fields
         $fields['reuseResources'] = 'reuseResources';
         $fields['newResources'] = 'newResources';
@@ -201,11 +214,29 @@ class FacultySubmission extends ActiveRecord
         return $this->hasOne(SubmissionMetadata::class, ['submission_id' => 'submission_id']);
     }
 
+    public function beforeValidate()
+    {
+        if (!parent::beforeValidate()) {
+            return false;
+        }
+
+        SubmissionConfirmationState::synchronizeCompatibilityBoolean($this);
+
+        return true;
+    }
+
+    public function requestEmailConfirmation($requested)
+    {
+        SubmissionConfirmationState::request($this, $requested);
+    }
+
     /**
      * Generate UUID before saving
      */
     public function beforeSave($insert)
     {
+        SubmissionConfirmationState::synchronizeCompatibilityBoolean($this);
+
         if ($insert && empty($this->submission_uuid)) {
             $this->submission_uuid = $this->generateUuid();
         }

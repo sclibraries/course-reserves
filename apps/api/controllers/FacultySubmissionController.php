@@ -772,7 +772,7 @@ class FacultySubmissionController extends BaseRestController
                 $submission->duplicate_note = $metadata['duplicateNote'] ?? null;
             }
             
-            $submission->email_confirmation_sent = !empty($metadata['emailConfirmation']) ? 1 : 0;
+            \app\services\SubmissionConfirmationState::request($submission, !empty($metadata['emailConfirmation']));
 
             // Handle proxy submission
             if ($isProxySubmission) {
@@ -812,7 +812,7 @@ class FacultySubmissionController extends BaseRestController
             return [
                 'success' => true,
                 'message' => 'Submission completed successfully',
-                'submission' => $submission->toArray(),
+                'submission' => \app\services\SubmissionConfirmationState::projectResponse($submission),
                 'stats' => [
                     'resources_processed' => $processedResources,
                     'folders_created' => count($folders),
