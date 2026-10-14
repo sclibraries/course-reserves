@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { Alert, Row, Col } from 'reactstrap';
 import { FaEye, FaCalendarAlt, FaLink, FaInfoCircle } from 'react-icons/fa';
+import { formatLocalDate } from '../../../../util/dateBoundaries';
 
 /**
  * VisibilitySummary - Shows a summary of current visibility settings
@@ -26,13 +27,10 @@ export const VisibilitySummary = ({
   const resourceVisibilityActive = useResourceVisibility;
   
   // Format date for display
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, boundary) => {
     if (!dateString) return 'Not set';
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return 'Invalid date';
-    }
+
+    return formatLocalDate(dateString, boundary) || 'Invalid date';
   };
 
   // If no visibility settings are active, show simplified message
@@ -63,7 +61,7 @@ export const VisibilitySummary = ({
               <div>
                 <strong className="d-block">Resource Visibility</strong>
                 <small className="text-muted">
-                  {formatDate(resourceStartDate)} to {formatDate(resourceEndDate)}
+                  {formatDate(resourceStartDate, 'start')} to {formatDate(resourceEndDate, 'end')}
                 </small>
               </div>
             </div>
@@ -80,7 +78,7 @@ export const VisibilitySummary = ({
                 <small className="text-muted">
                   {usePrimaryLinkVisibility ? (
                     <>
-                      {formatDate(primaryLinkStartDate)} to {formatDate(primaryLinkEndDate)}
+                      {formatDate(primaryLinkStartDate, 'start')} to {formatDate(primaryLinkEndDate, 'end')}
                       <span className="badge bg-primary ms-2">Custom dates</span>
                     </>
                   ) : cascadeVisibilityToLinks && resourceVisibilityActive ? (

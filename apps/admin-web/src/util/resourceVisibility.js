@@ -2,7 +2,7 @@
  * Utility functions for handling resource visibility logic
  */
 
-import { parseDateBoundary } from './dateBoundaries';
+import { formatLocalDate, parseDateBoundary } from './dateBoundaries';
 
 /**
  * Parse a visibility boundary without converting date-only values to UTC.
@@ -24,7 +24,7 @@ export const parseVisibilityDate = (value, boundary = 'start') => {
  * @returns {string|undefined} Formatted date, or undefined when absent/invalid
  */
 export const formatVisibilityDate = (value, boundary = 'start') => (
-  parseVisibilityDate(value, boundary)?.toLocaleDateString()
+  formatLocalDate(value, boundary) ?? undefined
 );
 
 /**

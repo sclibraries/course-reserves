@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { formatTimeSeriesData } from '../utils/chartUtils';
+import { formatLocalDate, parseDateBoundary } from '../../../util/dateBoundaries';
 
 /**
  * Time series chart showing events over time
@@ -38,7 +39,7 @@ const EventsTimeSeriesChart = ({ timeSeriesData, title }) => {
                 dataKey="date" 
                 tickFormatter={(date) => {
                   try {
-                    const d = new Date(date);
+                    const d = parseDateBoundary(date);
                     return isNaN(d.getTime()) ? 'Invalid' : `${d.getMonth()+1}/${d.getDate()}`;
                   } catch (e) {
                     console.debug(e);
@@ -53,7 +54,8 @@ const EventsTimeSeriesChart = ({ timeSeriesData, title }) => {
               <Tooltip 
                 labelFormatter={(date) => {
                   try {
-                    return `Date: ${new Date(date).toLocaleDateString()}`;
+                    const formattedDate = formatLocalDate(date);
+                    return formattedDate ? `Date: ${formattedDate}` : 'Invalid date';
                   } catch (e) {
                     console.debug(e);
                     return 'Invalid date';

@@ -21,3 +21,14 @@ export const parseDateBoundary = (value, boundary = 'start') => {
 
   return Number.isNaN(date.getTime()) ? null : date;
 };
+
+/**
+ * Format a date boundary using the viewer's local date settings.
+ *
+ * @param {string|Date|null} value - Date boundary value
+ * @param {'start'|'end'} boundary - Boundary side to parse
+ * @returns {string|null} Formatted date, or null when absent/invalid
+ */
+export const formatLocalDate = (value, boundary = 'start') => (
+  parseDateBoundary(value, boundary)?.toLocaleDateString() ?? null
+);

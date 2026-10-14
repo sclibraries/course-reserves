@@ -27,6 +27,8 @@ import {
   FaUsers
 } from 'react-icons/fa';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
+import { formatLocalDate } from '../../../util/dateBoundaries';
+import { getVisibilityBadge } from './communicationVisibilityBadge';
 import ReplyModal from './ReplyModal';
 import './CommunicationsPanel.css';
 
@@ -110,16 +112,6 @@ const CommunicationsPanel = forwardRef(({ submissionId, resourceId }, ref) => {
       case 'normal': return 'info';
       case 'low': return 'secondary';
       default: return 'secondary';
-    }
-  };
-
-  const getVisibilityBadge = (visibility) => {
-    switch (visibility) {
-      case 'faculty_visible': return <Badge color="primary">Faculty Visible</Badge>;
-      case 'staff_only': return <Badge color="secondary">Staff Only</Badge>;
-      case 'all_staff': return <Badge color="info">All Staff</Badge>;
-      case 'assigned_only': return <Badge color="warning">Assigned Only</Badge>;
-      default: return null;
     }
   };
 
@@ -311,7 +303,7 @@ const CommunicationsPanel = forwardRef(({ submissionId, resourceId }, ref) => {
           <div className="task-details">
             <small className="text-muted">
               Assigned to: <strong>{message.task_assignee}</strong>
-              {message.task_due_date && ` • Due: ${new Date(message.task_due_date).toLocaleDateString()}`}
+              {message.task_due_date && ` • Due: ${formatLocalDate(message.task_due_date, 'end') || 'Invalid Date'}`}
             </small>
           </div>
         )}

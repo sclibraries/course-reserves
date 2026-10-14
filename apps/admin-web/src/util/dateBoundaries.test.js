@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as dateBoundaries from './dateBoundaries';
 import { parseDateBoundary } from './dateBoundaries';
 
 describe('parseDateBoundary', () => {
@@ -25,5 +26,21 @@ describe('parseDateBoundary', () => {
     expect(parseDateBoundary('not-a-date')).toBeNull();
     expect(parseDateBoundary('')).toBeNull();
     expect(parseDateBoundary(null)).toBeNull();
+  });
+});
+
+describe('formatLocalDate', () => {
+  it('formats date-only start and end boundaries on their local calendar day', () => {
+    expect(dateBoundaries.formatLocalDate?.('2026-12-18', 'start')).toBe('12/18/2026');
+    expect(dateBoundaries.formatLocalDate?.('2026-12-18', 'end')).toBe('12/18/2026');
+  });
+
+  it('formats timestamp values using their local date', () => {
+    expect(dateBoundaries.formatLocalDate?.('2026-12-18T23:59:59.000Z')).toBe('12/18/2026');
+  });
+
+  it('returns null for empty or invalid values', () => {
+    expect(dateBoundaries.formatLocalDate?.('')).toBeNull();
+    expect(dateBoundaries.formatLocalDate?.('not-a-date')).toBeNull();
   });
 });
