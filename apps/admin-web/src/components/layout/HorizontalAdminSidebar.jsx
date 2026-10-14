@@ -12,6 +12,7 @@ import useAdminSearchStore from '../../store/adminSearchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import useCollegeManagement from '../../hooks/useCollegeManagement';
 import '../../css/Admin.css';
+import { folioSearchService } from '../../services/folioSearchService';
 
 function HorizontalAdminSidebar() {
   const {
@@ -90,12 +91,7 @@ function HorizontalAdminSidebar() {
   useEffect(() => {
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
-    let url = 'https://libtools2.smith.edu/folio/web/search/search-departments';
-
-    if (queryParam) {
-      url += `?query=${encodeURIComponent(queryParam)}`;
-    }
-    fetch(url)
+    folioSearchService.getDepartments(queryParam)
       .then((res) => res.json())
       .then((data) => {
         if (data && data.data && Array.isArray(data.data.departments)) {

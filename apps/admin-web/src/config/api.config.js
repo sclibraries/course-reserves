@@ -82,7 +82,15 @@ export const apiConfig = {
     folioSearch: {
       courses: '/search/search-courses',
       departments: '/search/search-departments',
+      inventory: '/search/search-inventory',
       reservesWithCourses: '/search/search-reserves-with-courses',
+    },
+    courseReserves: {
+      hitchcockSearch: '/hitchcock/search-resources',
+      materialTypes: {
+        all: '/material-type/all',
+        fields: '/material-type/fields',
+      },
     },
     customizations: {
       getCustomizations: '/college-customization',

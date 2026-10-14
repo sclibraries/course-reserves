@@ -18,9 +18,9 @@ import { FaSearch, FaRedo, FaFilter, FaAngleDown, FaAngleUp } from 'react-icons/
 import useSearchStore from '../../store/searchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import { trackingService } from '../../services/trackingService';
+import { folioSearchService } from '../../services/folioSearchService';
 import { getTermName } from '../../util/termHelpers';
 import { termNameToUrlParam, findTermNameById } from '../../utils/termUrlHelpers';
-import { config } from '../../config';
 import '../../css/Searchbar.css';
 
 function Searchbar() {
@@ -94,12 +94,7 @@ function Searchbar() {
     const queryParam = getCollegeQuery(collegeKey);
     if (!queryParam) return;
     
-    let url = `${config.api.urls.folio}${config.api.endpoints.folioSearch.departments}`;
-    if (queryParam) {
-      url += `?query=${encodeURIComponent(queryParam)}%20sortBy%20name/sort.ascending`;
-    }
-
-    fetch(url)
+    folioSearchService.getDepartments(queryParam, '%20sortBy%20name/sort.ascending')
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();

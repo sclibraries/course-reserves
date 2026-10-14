@@ -12,6 +12,7 @@ import useAdminSearchStore from '../../store/adminSearchStore';
 import useCustomizationStore from '../../store/customizationStore';
 import '../../css/Searchbar.css';
 import useSearchStore from '../../store/searchStore';
+import { folioSearchService } from '../../services/folioSearchService';
 
 function AdminSidebar() {
   const [isOpen, setIsOpen] = useState(true); 
@@ -83,13 +84,7 @@ function AdminSidebar() {
   useEffect(() => {
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
-    let url =
-      'https://libtools2.smith.edu/folio/web/search/search-departments';
-
-    if (queryParam) {
-      url += `?query=${encodeURIComponent(queryParam)}`;
-    }
-    fetch(url)
+    folioSearchService.getDepartments(queryParam)
       .then((res) => res.json())
       .then((data) => {
         // Adjust parsing based on your actual API response structure.

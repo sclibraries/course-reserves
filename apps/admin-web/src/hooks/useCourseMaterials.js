@@ -7,6 +7,7 @@ import {
   fetchMergedResources,
 } from '../components/page-sections/course-record/api';
 import { isItemVisible, parseVisibilityDate } from '../util/resourceVisibility';
+import { folioSearchService } from '../services/folioSearchService';
 
 export function useCourseMaterials(record, { filter = 'all', searchQuery = '', canBypassVisibility = false } = {}) {
   const [records, setRecords] = useState([]);
@@ -20,10 +21,8 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', c
 
   const fetchInventoryDetails = useCallback(async (instanceId) => {
     if (!instanceId) return null;
-    
     try {
-      const response = await fetch(`https://libtools2.smith.edu/folio/web/search/search-inventory?query=id==${instanceId}`);
-      
+      const response = await folioSearchService.getInventory(instanceId);
       if (!response.ok) {
         throw new Error(`Failed to fetch inventory details: ${response.status}`);
       }

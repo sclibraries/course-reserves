@@ -8,3 +8,16 @@ describe('apiConfig submission workflow endpoints', () => {
     );
   });
 });
+
+describe('apiConfig search endpoints', () => {
+  it('provides configured paths for FOLIO inventory and course-reserves searches', () => {
+    expect(apiConfig.endpoints.folioSearch.inventory).toBe('/search/search-inventory');
+    expect(apiConfig.endpoints.courseReserves.hitchcockSearch).toBe(
+      '/hitchcock/search-resources'
+    );
+    expect(apiConfig.endpoints.courseReserves.materialTypes).toEqual({
+      all: '/material-type/all',
+      fields: '/material-type/fields',
+    });
+  });
+});

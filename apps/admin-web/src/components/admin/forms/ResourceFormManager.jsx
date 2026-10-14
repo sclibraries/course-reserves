@@ -14,6 +14,7 @@ import { ResourceFormType } from './constants/formTypes';
 // Services
 import { adminCourseService } from '../../../services/admin/adminCourseService';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
+import { hitchcockService } from '../../../services/admin/hitchcockService';
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
 import { adjustProxy } from '../../../util/proxyUtil';
 import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
@@ -251,11 +252,7 @@ export const ResourceFormManager = ({
           setSearchResults(prev => [...prev, ...results]);
         }
       } else if (formType === ResourceFormType.HITCHCOCK) {
-        // TODO: Replace with proper Hitchcock service call
-        const searchUrl = `https://libtools2.smith.edu/course-reserves/backend/web/hitchcock/search-resources?title=${encodeURIComponent(searchQuery)}`;
-        const response = await fetch(searchUrl, {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await hitchcockService.searchResources(searchQuery);
 
         if (!response.ok) {
           throw new Error(`Search failed with status ${response.status}`);
