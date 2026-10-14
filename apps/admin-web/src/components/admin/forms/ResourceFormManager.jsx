@@ -16,7 +16,7 @@ import { adminCourseService } from '../../../services/admin/adminCourseService';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { hitchcockService } from '../../../services/admin/hitchcockService';
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
-import { adjustProxy } from '../../../util/proxyUtil';
+import { adjustProxy, LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
 import { config } from '../../../config';
 
@@ -174,7 +174,7 @@ export const ResourceFormManager = ({
           if (link.use_proxy) {
             return { 
               ...link, 
-              url: link.url.includes('proxy') ? link.url : `https://libproxy.smith.edu/login?url=${link.url}` 
+              url: link.url.includes('proxy') ? link.url : `${LIBPROXY_PREFIX}${link.url}`
             };
           }
           return link;

@@ -1,5 +1,6 @@
-// Define the constant proxy prefix URL.
-const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
+import { LIBPROXY_PREFIX } from './externalLinks';
+
+export { LIBPROXY_PREFIX };
 
 /**
  * Adjusts the URL in the provided data object based on the proxy flag.
@@ -21,14 +22,14 @@ export function adjustProxy(data) {
 
   // If the use_proxy flag is set to 1, ensure the proxy prefix is added.
   if (data.use_proxy === 1) {
-    if (!data.link.startsWith(PROXY_PREFIX)) {
-      data.link = PROXY_PREFIX + data.link;
+    if (!data.link.startsWith(LIBPROXY_PREFIX)) {
+      data.link = LIBPROXY_PREFIX + data.link;
     }
   } 
   // If the use_proxy flag is set to 0, remove the proxy prefix if present.
   else if (data.use_proxy === 0) {
-    if (data.link.startsWith(PROXY_PREFIX)) {
-      data.link = data.link.substring(PROXY_PREFIX.length);
+    if (data.link.startsWith(LIBPROXY_PREFIX)) {
+      data.link = data.link.substring(LIBPROXY_PREFIX.length);
     }
   }
   // Return the modified data object.

@@ -11,7 +11,6 @@ import {
   Alert
 } from 'reactstrap';
 import { FaInfoCircle, FaLink, FaFolder } from 'react-icons/fa';
-
 // Import shared components
 import ResourceBasicFields from './ResourceBasicFields';
 import ResourceTypeSelector from './ResourceTypeSelector';
@@ -27,6 +26,7 @@ import ResourceLinks from '../fields/ResourceLinks';
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
 import { useAdminCourseStore } from '../../../../store/adminCourseStore';
 import { toast } from 'react-toastify';
+import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import '../../../../css/AdminForms.css';
 
 /**
@@ -171,7 +171,7 @@ export const BaseResourceForm = ({
     
     // Check if URL matches Hitchcock video pattern
     const primaryUrl = initialData.link || initialData.item_url || '';
-    const isHitchcockVideo = primaryUrl.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
+    const isHitchcockVideo = isHitchcockVideoUrl(primaryUrl);
     
     return {
       title: initialData.title || initialData.name || '',
@@ -290,7 +290,7 @@ export const BaseResourceForm = ({
       
       // Check if the link field changed and it's a Hitchcock video URL
       if (name === 'link') {
-        const isHitchcockVideo = value.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
+        const isHitchcockVideo = isHitchcockVideoUrl(value);
         if (isHitchcockVideo && !updatedFormData.use_primary_link_visibility) {
           // Only auto-enable if not already configured
           updatedFormData.use_primary_link_visibility = true;
@@ -464,7 +464,7 @@ export const BaseResourceForm = ({
           <Form onSubmit={handleSubmit}>
             {/* Hitchcock Video Automatic Visibility Alert */}
             {formData.link && 
-             formData.link.startsWith('https://ereserves.smith.edu/hitchcock/videos/') && 
+             isHitchcockVideoUrl(formData.link) &&
              formData.use_primary_link_visibility && (
               <Alert color="warning" className="mb-4">
                 <FaInfoCircle className="me-2" />

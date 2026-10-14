@@ -2,8 +2,8 @@ import PropTypes from 'prop-types';
 import { Row, Col, FormGroup, Label, Input, Card, CardBody, Alert } from 'reactstrap';
 import { FaEye, FaEyeSlash, FaClock, FaLink, FaInfoCircle } from 'react-icons/fa';
 import VisibilitySummary from './VisibilitySummary';
+import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import '../../../../css/UnifiedVisibilityControl.css';
-
 /**
  * UnifiedVisibilityControl - Centralized visibility management component
  * 
@@ -54,7 +54,7 @@ export const UnifiedVisibilityControl = ({
   const isVideoMaterialType = materialTypeId === '3' || materialTypeId === 3;
   
   // Check if this is a Hitchcock video URL that requires automatic visibility
-  const isHitchcockVideo = primaryUrl && primaryUrl.startsWith('https://ereserves.smith.edu/hitchcock/videos/');
+  const isHitchcockVideo = primaryUrl && isHitchcockVideoUrl(primaryUrl);
   
   // Determine if resource visibility should be shown (only when manually enabled)
   const shouldShowResourceVisibility = useResourceVisibility;

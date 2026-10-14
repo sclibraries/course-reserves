@@ -23,12 +23,7 @@ import { ResourceFormType } from '../../admin/forms/constants/formTypes';
 import { useResourceFormModal } from '../../../hooks/admin/useResourceFormModal';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { toast } from 'react-toastify';
-
-/**
- * Smith College proxy URL prefix
- * @constant {string}
- */
-const PROXY_PREFIX = "https://libproxy.smith.edu/login?url=";
+import { LIBPROXY_PREFIX } from '../../../util/externalLinks';
 
 /**
  * Adjusts the proxy settings in a resource URL
@@ -40,13 +35,14 @@ function adjustProxy(data) {
     throw new Error("Invalid data or missing link property");
   }
   
+  // Keep this component's loose flags and undefined return distinct from proxyUtil.
   if (data.use_proxy == 1) {
-    if (!data.link.startsWith(PROXY_PREFIX)) {
-      data.link = PROXY_PREFIX + data.link;
+    if (!data.link.startsWith(LIBPROXY_PREFIX)) {
+      data.link = LIBPROXY_PREFIX + data.link;
     }
   } else if (data.use_proxy == 0) {
-    if (data.link.startsWith(PROXY_PREFIX)) {
-      data.link = data.link.replace(PROXY_PREFIX, "");
+    if (data.link.startsWith(LIBPROXY_PREFIX)) {
+      data.link = data.link.replace(LIBPROXY_PREFIX, "");
     }
   }
 }
