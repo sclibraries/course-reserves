@@ -20,6 +20,7 @@ import {
   FaCheckCircle
 } from 'react-icons/fa';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
+import { matchesCommunicationChannel } from '../../../util/messageChannels';
 import './CommunicationsPanel.css';
 
 const ChannelMessagesPanel = forwardRef(({ submissionId, resourceId, channel, onThreadClick }, ref) => {
@@ -44,28 +45,7 @@ const ChannelMessagesPanel = forwardRef(({ submissionId, resourceId, channel, on
         : allMessages;
       
       // Filter by channel
-      const channelMessages = filtered.filter(msg => {
-        if (channel === 'faculty') {
-          return msg.sender_type === 'faculty' || 
-                 msg.communication_type === 'faculty_to_staff' ||
-                 msg.visibility === 'faculty_visible';
-        } else if (channel === 'notes') {
-          return msg.category === 'note' ||
-                 msg.communication_type === 'note' ||
-                 msg.communication_type === 'internal_note';
-        } else { // staff channel
-          // Exclude notes from staff channel
-          const isNote = msg.category === 'note' || 
-                        msg.communication_type === 'note' ||
-                        msg.communication_type === 'internal_note';
-          
-          return !isNote && (
-            msg.sender_type === 'staff' || 
-            msg.communication_type === 'staff_to_staff' ||
-            (msg.visibility && msg.visibility !== 'faculty_visible')
-          );
-        }
-      });
+      const channelMessages = filtered.filter(msg => matchesCommunicationChannel(msg, channel));
       
       // Sort by date (newest first)
       const sorted = channelMessages.sort((a, b) => 
