@@ -4,6 +4,7 @@ import { Popover, PopoverBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faClock, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import {
+  formatVisibilityDate,
   getVisibleLinks,
   getVisibilityInfo,
   isPrimaryLinkVisible,
@@ -116,10 +117,10 @@ const RecordTableRow = ({ item, context }) => {
                 <h6 className="mb-2">Visibility Window</h6>
                 <div className="small">
                   {visibilityInfo.startDate && (
-                    <div><strong>From:</strong> {new Date(visibilityInfo.startDate).toLocaleDateString()}</div>
+                    <div><strong>From:</strong> {formatVisibilityDate(visibilityInfo.startDate, 'start')}</div>
                   )}
                   {visibilityInfo.endDate && (
-                    <div><strong>Until:</strong> {new Date(visibilityInfo.endDate).toLocaleDateString()}</div>
+                    <div><strong>Until:</strong> {formatVisibilityDate(visibilityInfo.endDate, 'end')}</div>
                   )}
                 </div>
               </PopoverBody>

@@ -1,4 +1,5 @@
-import { createElement } from 'react';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import RecordTable from './RecordTable';
@@ -184,5 +185,61 @@ describe('RecordTable student visibility', () => {
 
     expect(renderCombinedView(records)).toContain('Visible through today');
     expect(renderSplitView(records)).toContain('Visible through today');
+  });
+
+  it('shows date-only visibility boundaries on their local dates when staff open the popover', async () => {
+    const record = {
+      id: 'test-date-popover',
+      isElectronic: true,
+      copiedItem: { title: 'test visibility dates' },
+      resource: {
+        use_resource_visibility: '1',
+        start_visibility: '2026-12-01',
+        end_visibility: '2026-12-18',
+      },
+    };
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    document.body.appendChild(container);
+
+    try {
+      await act(async () => {
+        root.render(createElement(RecordTable, {
+          combinedResults: [record],
+          availability: {},
+          customization: {},
+          hasElectronicReserves: true,
+          courseInfo: {},
+          collegeParam: 'test-college',
+          viewMode: 'combined',
+          records: [record],
+          canBypassVisibility: true,
+        }));
+      });
+
+      const visibilityIcon = container.querySelector('#visibility-test-date-popover');
+      expect(visibilityIcon).not.toBeNull();
+
+      await act(async () => {
+        visibilityIcon.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 1));
+      });
+
+      const popoverText = document.body.textContent;
+      const expectedStartDate = new Date(2026, 11, 1).toLocaleDateString();
+      const expectedEndDate = new Date(2026, 11, 18).toLocaleDateString();
+      expect(popoverText).toContain(`From: ${expectedStartDate}`);
+      expect(popoverText).toContain(`Until: ${expectedEndDate}`);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      if (previousActEnvironment === undefined) {
+        delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+      } else {
+        globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+      }
+    }
   });
 });
