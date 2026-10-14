@@ -1863,6 +1863,34 @@ class CourseController extends ActiveController
                 throw new NotFoundHttpException('Course not found.');
             }
 
+            // Use the exact offering selected in the React form. Looking up an
+            // offering by course and term is ambiguous when a course has
+            // multiple sections in the same term.
+            $offeringId = filter_var(
+                $body['offering_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]
+            );
+            if ($offeringId === false) {
+                throw new BadRequestHttpException('A valid "offering_id" is required.');
+            }
+
+            $courseOffering = CourseOfferings::findOne($offeringId);
+            if (!$courseOffering) {
+                throw new NotFoundHttpException('Course offering not found.');
+            }
+            if ((int)$courseOffering->course_id !== (int)$courseId) {
+                throw new BadRequestHttpException('The selected offering does not belong to this course.');
+            }
+
+            $folioCourseId = $folioData['courseListingId'] ?? null;
+            if (!$folioCourseId) {
+                throw new BadRequestHttpException('A FOLIO course listing is required.');
+            }
+            if ((string)$courseOffering->folio_course_id !== (string)$folioCourseId) {
+                throw new BadRequestHttpException('The selected offering does not match the FOLIO course listing.');
+            }
+
             // Ensure the required "title" field is present
             $title = $body['title'] ?? null;
             if (!$title) {
@@ -1950,14 +1978,9 @@ class CourseController extends ActiveController
                     }
                 }
 
-                $courseOfferingId = CourseOfferings::findOne([
-                    'course_id' => $courseId,
-                    'term_id' => $folioData["courseListingObject"]['termId']
-                ]);
-
                 // Link the resource to the course with visibility settings
                 $courseResource = new CourseResources();
-                $courseResource->offering_id = $courseOfferingId->offering_id;
+                $courseResource->offering_id = $courseOffering->offering_id;
                 $courseResource->resource_id = $resource->resource_id;
                 
                 // Set visibility fields on the course_resources relationship
@@ -1977,7 +2000,7 @@ class CourseController extends ActiveController
 
                 return [
                     'resource' => $resource,
-                    'course_offering' => $courseOfferingId->offering_id,
+                    'course_offering' => $courseOffering->offering_id,
                     'links' => ResourceLinks::findAll(['resource_id' => $resource->resource_id]),
                     'metadata' => ResourceMetadata::findAll(['resource_id' => $resource->resource_id]),
                     'success'  => true,
