@@ -95,31 +95,26 @@ class UserController extends ActiveController
 
     public function actionCurrent()
     {
-        $user = Yii::$app->user->identity;
-        if (!$user) {
-            throw new UnauthorizedHttpException('Not authenticated');
-        }
-        
-        return [
-            'id' => $user->id,
-            'username' => $user->username,
-            'full_name' => $user->full_name,
-            'email' => $user->email,
-            'department' => $user->department,
-            'institution' => $user->institution,
-            'role' => $user->role,
-            'is_admin' => $user->role === 'admin',
-            'permissions' => $user->getPermissions(),
-        ];
+        return $this->currentUserResponse();
     }
 
     public function actionMe()
     {
-        $user = Yii::$app->user->identity;
-        if (!$user) {
+        return $this->currentUserResponse();
+    }
+
+    private function currentUserResponse()
+    {
+        $identity = Yii::$app->user->identity;
+        if (!$identity) {
             throw new UnauthorizedHttpException('Not authenticated');
         }
-        
+
+        $user = User::findByUsername($identity->username);
+        if (!$user) {
+            throw new ForbiddenHttpException('No user account for this login.');
+        }
+
         return [
             'id' => $user->id,
             'username' => $user->username,
