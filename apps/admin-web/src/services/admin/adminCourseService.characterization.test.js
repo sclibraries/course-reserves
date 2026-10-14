@@ -105,9 +105,9 @@ const requestCases = () => {
       name: 'fetchCourseResources',
       invoke: () => adminCourseService.fetchCourseResources(29),
       url: `${courseApi}/course/29/resources`,
-      init: { method: 'GET' },
+      init: { method: 'GET', headers: { Authorization: 'Bearer test-token' } },
       expectedResult: result,
-      sendsToken: false,
+      sendsToken: true,
     },
     {
       name: 'searchEDS',
@@ -169,9 +169,9 @@ const requestCases = () => {
       name: 'getResourcesByCourse',
       invoke: () => adminCourseService.getResourcesByCourse(29),
       url: `${courseApi}/course/get-resources?courseListingId=29`,
-      init: { headers: { 'Content-Type': 'application/json' } },
+      init: { headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' } },
       expectedResult: result,
-      sendsToken: false,
+      sendsToken: true,
     },
     {
       name: 'deleteResourceLink',

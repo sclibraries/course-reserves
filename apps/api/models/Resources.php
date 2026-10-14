@@ -55,7 +55,7 @@ class Resources extends \yii\db\ActiveRecord
         $fields['links'] = function ($model) {
             return $model->links;
         };
-        return $fields;
+        return \app\services\PublicResourceFields::filterFieldDefinitions($fields, Yii::$app->user->identity);
     }
 
     /**

@@ -40,7 +40,8 @@ class CourseController extends ActiveController
         // JWT auth
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::className(),
-            'except' => ['options', 'exists','search-resources', 'resources', 'get-resources', 'check-unique-id', 'get-merged-resources'],
+            'except' => ['options', 'exists', 'check-unique-id'],
+            'optional' => ['search-resources', 'resources', 'get-resources', 'get-merged-resources'],
         ];
 
         // CORS
@@ -1504,8 +1505,6 @@ class CourseController extends ActiveController
             $metadata = Yii::$app->db->createCommand($metadataSql, [
                 ':resource_id' => $resource['resource_id']
             ])->queryAll();
-            $resource['metadata'] = $metadata;
-
             // Get links for this resource
             $linksSql = "
                 SELECT * FROM resource_links
@@ -1515,7 +1514,7 @@ class CourseController extends ActiveController
             $links = Yii::$app->db->createCommand($linksSql, [
                 ':resource_id' => $resource['resource_id']
             ])->queryAll();
-            $resource['links'] = $links;
+            $resource = \app\services\PublicResourceFields::serialize(array_merge($resource, ['metadata' => $metadata, 'links' => $links]), Yii::$app->user->identity);
         }
         
         return [
@@ -1632,7 +1631,7 @@ class CourseController extends ActiveController
         }
         
         // Re-index the array to return a list rather than an associative array keyed by resource_id.
-        $resources = array_values($resources);
+        $resources = \app\services\PublicResourceFields::serializeMany(array_values($resources), Yii::$app->user->identity);
 
         return [
             'course' => $course,
@@ -1795,7 +1794,7 @@ class CourseController extends ActiveController
         unset($resource); // Break the reference
         
         // Merge the two arrays
-        $mergedResources = array_merge($electronicResources, $physicalResources);
+        $mergedResources = \app\services\PublicResourceFields::serializeMany(array_merge($electronicResources, $physicalResources), Yii::$app->user->identity);
         
         // Sort by order with special handling for electronic resources with order = 999
         usort($mergedResources, function($a, $b) {
@@ -2071,7 +2070,7 @@ class CourseController extends ActiveController
     {
         $searchTerm = Yii::$app->request->get('search');
         if (!$searchTerm) {
-            $all = Resources::find()->limit(100)->all();
+            $all = \app\services\PublicResourceFields::serializeMany(Resources::find()->limit(100)->all(), Yii::$app->user->identity);
             return ['resources' => $all];
         }
 
@@ -2080,14 +2079,7 @@ class CourseController extends ActiveController
             ->where(['like', 'LOWER(name)', strtolower($searchTerm)])
             ->limit(100); // limit to avoid huge results
 
-        $resources = $query->all();
-
-        // Optionally join material type info
-        // For quick demonstration, let's do raw SQL:
-        // If you want to keep it purely AR, you'd map each resource to its MaterialTypes relation.
-
-        // We'll do a simpler approach: just return them as is
-        // (If needed, you can do a custom join query here.)
+        $resources = \app\services\PublicResourceFields::serializeMany($query->all(), Yii::$app->user->identity);
         return ['resources' => $resources];
     }
 }

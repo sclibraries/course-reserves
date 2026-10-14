@@ -16,7 +16,7 @@ export const resourceApi = {
 
   async fetchCourseResources(courseId) {
     const url = config.api.endpoints.admin.courseResources.replace(':id', courseId);
-    const response = await fetch(`${COURSE_API}${url}`, {
+    const response = await authFetch(`${COURSE_API}${url}`, {
       method: 'GET',
     });
     if (!response.ok) {
@@ -52,7 +52,7 @@ export const resourceApi = {
   },
 
   async getResourcesByCourse(courseId) {
-    const response = await fetch(
+    const response = await authFetch(
       `${COURSE_API}${config.api.endpoints.admin.getResourcesByCourse}?courseListingId=${courseId}`,
       {
         headers: {

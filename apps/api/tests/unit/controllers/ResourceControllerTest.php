@@ -14,9 +14,10 @@ class ResourceControllerTest extends \Codeception\Test\Unit
 
         $this->assertArrayHasKey('authenticator', $behaviors);
         $this->assertSame(
-            ['create', 'update', 'delete', 'add-link', 'delete-link'],
+            ['index', 'view', 'search', 'create', 'update', 'delete', 'add-link', 'delete-link'],
             $behaviors['authenticator']['only']
         );
+        $this->assertSame(['index', 'view', 'search'], $behaviors['authenticator']['optional']);
     }
 
     public function testResourceWriteAccessRejectsFacultyIdentity()

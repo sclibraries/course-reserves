@@ -11,6 +11,7 @@ use Yii;
 use yii\rest\ActiveController;
 use app\models\ResourceLinks;
 use app\components\Roles;
+use app\services\PublicResourceFields;
 use yii\filters\auth\HttpBearerAuth;
 use yii\web\ForbiddenHttpException;
 
@@ -323,12 +324,7 @@ class ResourceController extends ActiveController
     }
 
 
-    /**
-     * Search for resources by name with optional term filtering
-     * Returns resources with their course offering information
-     * 
-     * @return array
-     */
+    /** Search for resources by name with their course offering information. */
     public function actionSearch()
     {
         try {
@@ -351,7 +347,6 @@ class ResourceController extends ActiveController
             $rawSql = $query->createCommand()->getRawSql();
             Yii::error("Search SQL for name='$name', term_id='$termId': " . $rawSql, __METHOD__);
             
-            // Also return SQL in response for debugging (remove in production)
             $debugSql = $rawSql;
                 
             $resources = $query->all();
@@ -359,6 +354,7 @@ class ResourceController extends ActiveController
             $reserves = [];
             
             foreach ($resources as $resource) {
+                $resourceFields = PublicResourceFields::serialize($resource, Yii::$app->user->identity);
                 foreach ($resource->courseResources as $courseResource) {
                     $offering = $courseResource->courseOffering;
                     if (!$offering) continue;
@@ -403,7 +399,7 @@ class ResourceController extends ActiveController
                             'barcode' => null,
                             'temporaryLocationId' => null,
                             'permanentLocationId' => $course->location_id ?? null,
-                            'title' => $resource->name ?? null,
+                            'title' => $resourceFields['name'] ?? null,
                             'contributors' => [], // No equivalent in our system
                             'publication' => [], // No equivalent
                             'callNumber' => null, // Could be in metadata
@@ -476,6 +472,9 @@ class ResourceController extends ActiveController
                         ]
                     ];
                     
+                    if (array_key_exists('internal_note', $resourceFields)) {
+                        $reserve['internal_note'] = $resourceFields['internal_note'];
+                    }
                     $reserves[] = $reserve;
                 }
             }
@@ -515,7 +514,8 @@ class ResourceController extends ActiveController
 
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'only' => self::RESOURCE_WRITE_ACTIONS,
+            'only' => array_merge(['index', 'view', 'search'], self::RESOURCE_WRITE_ACTIONS),
+            'optional' => ['index', 'view', 'search'],
         ];
 
         // CORS configuration for cross-domain requests
