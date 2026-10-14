@@ -1,6 +1,7 @@
 <?php
 namespace app\services;
 
+use Yii;
 use yii\httpclient\Client;
 
 /**
@@ -10,10 +11,17 @@ class FolioService
 {
     /** @var string */
     private $baseUrl;
+    /** @var string */
+    private $searchBaseUrl;
+    /** @var int */
+    private $timeoutSeconds;
 
     public function __construct($baseUrl = null)
     {
-        $this->baseUrl = $baseUrl ?: 'https://libtools2.smith.edu/folio/web/search/search-courses';
+        $folioParams = Yii::$app->params['folio'];
+        $this->searchBaseUrl = rtrim($folioParams['searchBaseUrl'], '/');
+        $this->baseUrl = rtrim($baseUrl ?: $this->searchBaseUrl . '/search-courses', '/');
+        $this->timeoutSeconds = (int)$folioParams['timeoutSeconds'];
     }
 
     /**
@@ -35,12 +43,9 @@ class FolioService
             return (new SandboxFacultyWorkflowFixture())->getFolioCourse();
         }
 
-        $client = new Client(['transport' => 'yii\\httpclient\\CurlTransport']);
         $url    = $this->baseUrl . '?query=(id==' . rawurlencode($courseId) . ')';
 
-        $response = $client->get($url)
-            ->addHeaders(['Accept' => 'application/json'])
-            ->send();
+        $response = $this->sendGet($url);
 
         if (!$response->isOk) {
             throw new \RuntimeException('FOLIO_HTTP_' . $response->statusCode);
@@ -76,6 +81,85 @@ class FolioService
         }
 
         return $course;
+    }
+
+    /**
+     * Retrieve the available FOLIO terms.
+     *
+     * @return array
+     */
+    public function searchTerms()
+    {
+        try {
+            $response = $this->sendGet($this->searchBaseUrl . '/search-terms');
+            if ($response->isOk && isset($response->data['data']['terms'])) {
+                return $response->data['data']['terms'];
+            }
+
+            Yii::warning('Failed to fetch FOLIO terms: ' . $response->content);
+            return [];
+        } catch (\Exception $e) {
+            Yii::error('Error fetching FOLIO terms: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Search FOLIO courses with the supplied query.
+     *
+     * @param string $query FOLIO search expression.
+     * @return array|null
+     */
+    public function searchCourses($query)
+    {
+        try {
+            $response = $this->sendGet($this->baseUrl, ['query' => $query]);
+            if ($response->isOk && isset($response->data['data']['courses'])) {
+                $courses = $response->data['data']['courses'];
+                if (empty($courses)) {
+                    return null;
+                }
+                return count($courses) === 1 ? $courses[0] : $courses;
+            }
+
+            Yii::warning('Failed to fetch FOLIO course: ' . $response->content);
+            return null;
+        } catch (\Exception $e) {
+            Yii::error('Error fetching FOLIO course: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Create the HTTP client used for FOLIO requests.
+     *
+     * @return Client
+     */
+    protected function createClient()
+    {
+        return new Client(['transport' => 'yii\\httpclient\\CurlTransport']);
+    }
+
+    /**
+     * Send a timed JSON GET request to FOLIO.
+     *
+     * @param string $url Request URL.
+     * @param array|null $data GET query parameters.
+     * @return \yii\httpclient\Response
+     */
+    private function sendGet($url, $data = null)
+    {
+        $request = $this->createClient()->createRequest()
+            ->setMethod('GET')
+            ->setUrl($url)
+            ->setOptions(['timeout' => $this->timeoutSeconds])
+            ->addHeaders(['Accept' => 'application/json']);
+
+        if ($data !== null) {
+            $request->setData($data);
+        }
+
+        return $request->send();
     }
 
     /**

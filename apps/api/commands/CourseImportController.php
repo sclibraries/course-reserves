@@ -14,11 +14,6 @@ use yii\helpers\Console;
  */
 class CourseImportController extends Controller
 {
-    /**
-     * FOLIO API base URL
-     */
-    private $folioApiUrl = 'https://libtools2.smith.edu/folio/web/search';
-
 /**
  * Import courses from CSV file
  * 
@@ -252,7 +247,7 @@ private function queryFolioApi($courseNumber, $instructor = null)
     
     $query = implode(' and ', $queryParts);
     $encodedQuery = urlencode("({$query}) sortby name");
-    $url = "{$this->folioApiUrl}/search-courses?query={$encodedQuery}";
+    $url = rtrim(Yii::$app->params['folio']['searchBaseUrl'], '/') . "/search-courses?query={$encodedQuery}";
     
     $this->stdout("  Querying FOLIO API: " . $url . "\n", Console::FG_BLUE);
     

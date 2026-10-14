@@ -21,6 +21,10 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        \Yii::$container->set(
+            \app\services\FolioService::class,
+            new TestCourseAssignmentsFolioStub()
+        );
 
         $this->_removeAssignments();
         $this->_insertAssignment($this->_facultyAInternalId, 'TST-101-01-209901');
@@ -67,6 +71,7 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
     public function _after(FunctionalTester $I)
     {
         $this->_removeAssignments();
+        \Yii::$container->clear(\app\services\FolioService::class);
     }
 
     /**
@@ -218,7 +223,7 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
             'course_assignments', [
             'academic_period' => 'AP_209901',
             'course_id' => $courseId,
-            'course_title' => 'Synthetic API-031 Course',
+            'course_title' => 'Synthetic test course',
             'smith_id' => $internalId,
             'role' => 'instructor',
             ]
@@ -269,5 +274,25 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
         }
 
         return $data[$tokenKey];
+    }
+}
+
+class TestCourseAssignmentsFolioStub
+{
+    public function searchTerms()
+    {
+        return [
+            [
+                'id' => 'test-term-2099',
+                'name' => 'Fall 2099',
+                'startDate' => '2099-01-01',
+                'endDate' => '2099-12-31',
+            ],
+        ];
+    }
+
+    public function searchCourses($query)
+    {
+        return null;
     }
 }

@@ -6,6 +6,10 @@ $listFromEnvironment = static function ($name) {
 
 return [
     'corsOrigins' => $listFromEnvironment('CORS_ALLOWED_ORIGINS'),
+    'folio' => [
+        'searchBaseUrl' => getenv('FOLIO_SEARCH_BASE_URL') ?: 'https://libtools2.smith.edu/folio/web/search',
+        'timeoutSeconds' => (int)(getenv('FOLIO_TIMEOUT_SECONDS') ?: 5),
+    ],
     'ebsco' => [
         'endPoint' => 'https://eds-api.ebscohost.com/edsapi/rest',
         'authEndPoint' => 'https://eds-api.ebscohost.com/Authservice/rest',

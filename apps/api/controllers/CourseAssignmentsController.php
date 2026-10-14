@@ -9,11 +9,13 @@ use yii\web\ServerErrorHttpException;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 use app\models\CourseAssignments;
-use yii\httpclient\Client;
+use app\services\FolioService;
 
 class CourseAssignmentsController extends ActiveController
 {
     public $modelClass = 'app\models\CourseAssignments';
+    private $folioTerms;
+    private $folioService;
 
     public function init()
     {
@@ -111,7 +113,7 @@ class CourseAssignmentsController extends ActiveController
         $assignments = $query->asArray()->all();
 
         // Fetch FOLIO terms
-        $terms = $this->fetchFolioTerms();
+        $terms = $this->getFolioTerms();
 
         // Map academic periods to FOLIO terms and parse course codes
         foreach ($assignments as &$assignment) {
@@ -133,7 +135,7 @@ class CourseAssignmentsController extends ActiveController
     public function actionByPeriod()
     {
         $assignments = CourseAssignments::find()->asArray()->all();
-        $terms = $this->fetchFolioTerms();
+        $terms = $this->getFolioTerms();
 
         $grouped = [];
         foreach ($assignments as $assignment) {
@@ -173,7 +175,7 @@ class CourseAssignmentsController extends ActiveController
             ->asArray()
             ->all();
 
-        $terms = $this->fetchFolioTerms();
+        $terms = $this->getFolioTerms();
 
         foreach ($assignments as &$assignment) {
             $assignment['folio_term'] = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
@@ -240,7 +242,7 @@ class CourseAssignmentsController extends ActiveController
                 $parsedCourse['sectionName'] === $sectionName) {
                 
                 // Found a match - fetch term info and return
-                $terms = $this->fetchFolioTerms();
+                $terms = $this->getFolioTerms();
                 $assignment['folio_term'] = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
                 $assignment['parsed_course'] = $parsedCourse;
                 
@@ -329,7 +331,7 @@ class CourseAssignmentsController extends ActiveController
         }
 
         // Fetch FOLIO terms once
-        $terms = $this->fetchFolioTerms();
+        $terms = $this->getFolioTerms();
 
         $enrichedCourses = [];
         $debugInfo = [];
@@ -354,14 +356,15 @@ class CourseAssignmentsController extends ActiveController
                 $courseNumber = $parsedCourse['courseNumber'];
                 
                 // Search FOLIO courses
-                $folioSearchResult = $this->searchFolioCourse($courseNumber, $termId);
+                $query = '(department.name=="SC*" and courseNumber=="' . $courseNumber . '" and courseListing.termId=="' . $termId . '") sortby name';
+                $folioSearchResult = $this->getFolioService()->searchCourses($query);
                 
                 if ($debug) {
                     $debugInfo[] = [
                         'course_id' => $assignment['course_id'],
                         'courseNumber' => $courseNumber,
                         'termId' => $termId,
-                        'folioSearchUrl' => "https://libtools2.smith.edu/folio/web/search/search-courses?query=(department.name==\"SC*\" and courseNumber==\"{$courseNumber}\" and courseListing.termId==\"{$termId}\") sortby name",
+                        'folioSearchUrl' => rtrim(Yii::$app->params['folio']['searchBaseUrl'], '/') . '/search-courses?query=' . $query,
                         'folioResult' => $folioSearchResult
                     ];
                 }
@@ -400,68 +403,22 @@ class CourseAssignmentsController extends ActiveController
         return $response;
     }
 
-    /**
-     * Search for a course in FOLIO by course number and term
-     * 
-     * @param string $courseNumber Course number (e.g., "FRN 101")
-     * @param string $termId FOLIO term ID
-     * @return array|null FOLIO course data or null if not found
-     */
-    private function searchFolioCourse($courseNumber, $termId)
+    private function getFolioService()
     {
-        try {
-            $client = new Client();
-            
-            // Build FOLIO query
-            $query = '(department.name=="SC*" and courseNumber=="' . $courseNumber . '" and courseListing.termId=="' . $termId . '") sortby name';
-            
-            $response = $client->createRequest()
-                ->setMethod('GET')
-                ->setUrl('https://libtools2.smith.edu/folio/web/search/search-courses')
-                ->setData(['query' => $query])
-                ->send();
-
-            if ($response->isOk && isset($response->data['data']['courses'])) {
-                $courses = $response->data['data']['courses'];
-                // Return null if no courses found (empty array)
-                if (empty($courses)) {
-                    return null;
-                }
-                // Return the first matching course, or all if multiple
-                return count($courses) === 1 ? $courses[0] : $courses;
-            }
-
-            Yii::warning('Failed to fetch FOLIO course: ' . $response->content);
-            return null;
-        } catch (\Exception $e) {
-            Yii::error('Error fetching FOLIO course: ' . $e->getMessage());
-            return null;
+        if ($this->folioService === null) {
+            $this->folioService = Yii::$container->get(FolioService::class);
         }
+
+        return $this->folioService;
     }
 
-    /**
-     * Fetch FOLIO terms from external API
-     * @return array
-     */
-    private function fetchFolioTerms()
+    private function getFolioTerms()
     {
-        try {
-            $client = new Client();
-            $response = $client->createRequest()
-                ->setMethod('GET')
-                ->setUrl('https://libtools2.smith.edu/folio/web/search/search-terms')
-                ->send();
-
-            if ($response->isOk && isset($response->data['data']['terms'])) {
-                return $response->data['data']['terms'];
-            }
-
-            Yii::warning('Failed to fetch FOLIO terms: ' . $response->content);
-            return [];
-        } catch (\Exception $e) {
-            Yii::error('Error fetching FOLIO terms: ' . $e->getMessage());
-            return [];
+        if ($this->folioTerms === null) {
+            $this->folioTerms = $this->getFolioService()->searchTerms();
         }
+
+        return $this->folioTerms;
     }
 
     /**
