@@ -1,4 +1,4 @@
-FROM yiisoftware/yii2-php:7.2-apache
+FROM yiisoftware/yii2-php:7.2-apache@sha256:0e854316ab21576b4d0029bd744826ee2190d84526eac8df8789e3c712a978d2
 
 # ── Fix EOL Debian Buster repos → archive ───────────────────────────────────
 RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list \

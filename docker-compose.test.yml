@@ -3,7 +3,7 @@
 name: course-reserves-test
 services:
   db:
-    image: mariadb:10.3.39
+    image: mariadb:10.3.39@sha256:4f08c16ef56f0b097139c917e68d60f2c65d9f2b2defb770ee7e4d3a51bb7864
     environment:
       MYSQL_ROOT_PASSWORD: test-only-root
       MYSQL_DATABASE: reserves_test

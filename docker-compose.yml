@@ -3,7 +3,7 @@ services:
   # MariaDB 10.3  (matches production)
   # ─────────────────────────────────────────────
   db:
-    image: mariadb:10.3
+    image: mariadb:10.3.39@sha256:4f08c16ef56f0b097139c917e68d60f2c65d9f2b2defb770ee7e4d3a51bb7864
     container_name: course_reserves_db
     restart: unless-stopped
     environment:
@@ -30,7 +30,7 @@ services:
       - app_network
 
   # ─────────────────────────────────────────────
-  # PHP 7.4 + Apache  (Yii2 backend)
+  # PHP 7.2 + Apache  (Yii2 backend)
   # ─────────────────────────────────────────────
   backend:
     build:
@@ -91,7 +91,7 @@ services:
     container_name: course_reserves_faculty_form
     restart: unless-stopped
     # Override CMD to run on port 5174 (8080 is taken by the nginx proxy)
-    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5174 --mode docker"
+    command: sh -c "npm ci --workspaces=false && npm run dev -- --host 0.0.0.0 --port 5174 --mode docker"
     volumes:
       - ./apps/faculty-form:/app:cached
       - /app/node_modules
