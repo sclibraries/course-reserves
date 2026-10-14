@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config/environment.php';
 // faculty-refresh-token.php - JWT-based refresh to match authorize.php pattern
 
 use \Firebase\JWT\JWT;

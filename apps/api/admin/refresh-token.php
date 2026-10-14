@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config/environment.php';
 // refresh-token.php
 
 // Start session if your application logic requires it

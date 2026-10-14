@@ -14,11 +14,21 @@ class UserMeCest extends BaseFunctionalCest
     {
         parent::_before($I);
 
-        $this->_staffToken = $this->_requestToken(
-            'http://localhost/dev-auth/login',
-            ['username' => 'devadmin'],
-            'access_token'
-        );
+        $staff = User::findByUsername('devadmin');
+        if (!$staff) {
+            throw new \RuntimeException('The synthetic staff account must be seeded.');
+        }
+        $issuedAt = time();
+        $this->_staffToken = \Firebase\JWT\JWT::encode([
+            'iat' => $issuedAt,
+            'exp' => $issuedAt + 3600,
+            'username' => $staff->username,
+            'role' => $staff->role,
+            'id' => $staff->id,
+            'full_name' => $staff->full_name,
+            'email' => $staff->email,
+            'institution' => $staff->institution,
+        ], getenv('JWT_SECRET_KEY'), 'HS256');
 
         \PHPUnit\Framework\Assert::assertNull(
             User::findByUsername('tnobody'),

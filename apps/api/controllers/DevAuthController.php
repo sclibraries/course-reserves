@@ -17,6 +17,7 @@
 
 namespace app\controllers;
 
+use app\components\Environment;
 use Yii;
 use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
@@ -66,7 +67,7 @@ class DevAuthController extends Controller
      */
     public function actionLogin()
     {
-        if (YII_ENV !== 'dev') {
+        if (!Environment::isDev()) {
             throw new ForbiddenHttpException('This endpoint is only available in the development environment.');
         }
 

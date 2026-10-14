@@ -33,10 +33,11 @@ class FacultySubmissionController extends BaseRestController
         'collectionEnvelope' => 'items',
     ];
 
-    // Exempt mock-login from auth (dev-only endpoint that issues tokens itself)
+    // Exempt mock-login from auth and apply its environment/role policy.
     public function behaviors()
     {
         $behaviors = parent::behaviors();
+        $behaviors['mockLoginAccess'] = ['class' => \app\filters\MockLoginAccessFilter::class];
         $behaviors['authenticator']['except'][] = 'mock-login';
         return $behaviors;
     }
@@ -81,11 +82,6 @@ class FacultySubmissionController extends BaseRestController
      */
     public function actionMockLogin()
     {
-        // SECURITY: Only allow in development
-        if (YII_ENV_PROD) {
-            throw new ForbiddenHttpException('Mock login is not available in production.');
-        }
-
         $request = Yii::$app->request;
         $fullName = $request->post('full_name');
         $internalId = $request->post('internal_id');

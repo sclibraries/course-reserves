@@ -31,9 +31,9 @@ class CourseAssignmentsAccessCest extends BaseFunctionalCest
         $this->_insertAssignment($this->_facultyBInternalId, 'TST-102-01-209901');
 
         $this->_staffToken = $this->_requestToken(
-            'http://localhost/dev-auth/login',
-            ['username' => 'devadmin'],
-            'access_token'
+            'http://localhost/faculty-submission/mock-login',
+            ['full_name' => 'Synthetic Staff', 'role' => 'staff'],
+            'token'
         );
         $this->_facultyAToken = $this->_requestToken(
             'http://localhost/faculty-submission/mock-login',

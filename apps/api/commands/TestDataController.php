@@ -2,6 +2,7 @@
 
 namespace app\commands;
 
+use app\components\Environment;
 use app\services\SandboxFacultyWorkflowFixture;
 use Yii;
 use yii\console\Controller;
@@ -53,7 +54,7 @@ class TestDataController extends Controller
 
     private function assertNonProduction()
     {
-        if (YII_ENV_PROD) {
+        if (!Environment::allowsTestFixtures()) {
             $this->stderr("Refusing to modify test data in production.\n", Console::FG_RED);
             return false;
         }

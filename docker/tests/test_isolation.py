@@ -7,6 +7,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_BACKEND_ENVIRONMENT_KEYS = {
+    "YII_ENV",
     "DB_HOST", "DB_NAME", "DB_USER", "DB_PASS",
     "JWT_SECRET_KEY", "JWT_REFRESH_SECRET_KEY", "COOKIE_VALIDATION_KEY",
 }
@@ -34,6 +35,7 @@ class IsolationTest(unittest.TestCase):
         backend = config["services"]["backend"]
         self.assertEqual(set(backend["environment"]), ALLOWED_BACKEND_ENVIRONMENT_KEYS,
                          "Do not inherit application or provider credentials into the test stack")
+        self.assertEqual(backend["environment"]["YII_ENV"], "test")
         self.assertEqual(backend["environment"]["DB_NAME"], "reserves_test")
         self.assertEqual(backend["environment"]["DB_HOST"], "db")
         self.assertEqual(backend["environment"]["DB_PASS"], "test-only-password")

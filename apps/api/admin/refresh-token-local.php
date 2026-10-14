@@ -1,4 +1,10 @@
 <?php
+require_once __DIR__ . '/../config/environment.php';
+if (!\app\components\Environment::isDev()) {
+    http_response_code(404);
+    exit;
+}
+
 /**
  * refresh-token-local.php — Local Docker development token refresh endpoint
  *
@@ -10,9 +16,6 @@
 
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
-
-defined('YII_DEBUG') or define('YII_DEBUG', true);
-defined('YII_ENV')   or define('YII_ENV', 'dev');
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';

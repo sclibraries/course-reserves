@@ -2,6 +2,7 @@
 
 namespace app\filters;
 
+use app\components\Environment;
 use Yii;
 use yii\base\ActionFilter;
 use yii\web\ForbiddenHttpException;
@@ -30,7 +31,7 @@ class RoleAccessFilter extends ActionFilter
             return true;
         }
 
-        if (in_array($action->id, $this->devOnlyActions, true) && !$this->isDevelopmentEnvironment()) {
+        if (in_array($action->id, $this->devOnlyActions, true) && !Environment::isDev()) {
             throw new NotFoundHttpException('Page not found.');
         }
 
@@ -44,15 +45,5 @@ class RoleAccessFilter extends ActionFilter
         }
 
         return true;
-    }
-
-    /**
-     * Check whether Yii is running in development mode.
-     *
-     * @return bool
-     */
-    protected function isDevelopmentEnvironment()
-    {
-        return defined('YII_ENV_DEV') && YII_ENV_DEV;
     }
 }

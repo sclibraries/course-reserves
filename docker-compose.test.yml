@@ -28,6 +28,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      YII_ENV: test
       DB_HOST: db
       DB_NAME: reserves_test
       DB_USER: reserves_test

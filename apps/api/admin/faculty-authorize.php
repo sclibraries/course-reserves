@@ -1,12 +1,10 @@
 <?php
+require_once __DIR__ . '/../config/environment.php';
 // Mirror the structure of authorize.php for faculty, but without SQL lookups
 session_start();
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use app\services\FacultyTokenClaims;
-
-defined('YII_DEBUG') or define('YII_DEBUG', true);
-defined('YII_ENV') or define('YII_ENV', 'dev');
 
 // Allow CORS dynamically for known origins; redirects aren't impacted by CORS,
 // but token refresh/XHRs are during development.
