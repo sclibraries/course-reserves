@@ -1,5 +1,6 @@
 import { ADMIN_ERROR_MESSAGES } from '../../constants/admin';
 import { apiConfig } from '../../config/api.config';
+import { authFetch } from '../http/authFetch';
 
 const API_BASE = apiConfig.urls.courseReserves;
 
@@ -38,9 +39,8 @@ export const adminResourceService = {
     if (filters.perPage) queryParams.set('perPage', filters.perPage);
 
     try {
-      const response = await fetch(`${API_BASE}/resource?${queryParams}`, {
+      const response = await authFetch(`${API_BASE}/resource?${queryParams}`, {
         headers: {
-          'Authorization': this.getAuthToken(),
           'Content-Type': 'application/json'
         }
       });
@@ -59,8 +59,8 @@ export const adminResourceService = {
 
   async getResourceById(resourceId) {
     try {
-      const response = await fetch(`${API_BASE}/resource/${resourceId}`, {
-        headers: { 'Authorization': this.getAuthToken() }
+      const response = await authFetch(`${API_BASE}/resource/${resourceId}`, {
+        headers: {}
       });
       
       if (!response.ok) throw new Error(ADMIN_ERROR_MESSAGES.RESOURCE_FETCH_FAILED);
@@ -74,11 +74,10 @@ export const adminResourceService = {
 
   async createResource(resourceData) {
     try {
-      const response = await fetch(`${API_BASE}/resource`, {
+      const response = await authFetch(`${API_BASE}/resource`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.getAuthToken()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(resourceData)
       });
@@ -97,11 +96,10 @@ export const adminResourceService = {
 
   async updateResource(resourceId, updateData) {
     try {
-      const response = await fetch(`${API_BASE}/resource/${resourceId}`, {
+      const response = await authFetch(`${API_BASE}/resource/${resourceId}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.getAuthToken()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(updateData)
       });
@@ -117,9 +115,9 @@ export const adminResourceService = {
 
   async deleteResource(resourceId) {
     try {
-      const response = await fetch(`${API_BASE}/resource/${resourceId}`, {
+      const response = await authFetch(`${API_BASE}/resource/${resourceId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': this.getAuthToken() }
+        headers: {}
       });
 
       if (!response.ok) throw new Error(ADMIN_ERROR_MESSAGES.RESOURCE_DELETE_FAILED);
@@ -133,8 +131,8 @@ export const adminResourceService = {
 
   async getMaterialTypes() {
     try {
-      const response = await fetch(`${API_BASE}/material-type`, {
-        headers: { 'Authorization': this.getAuthToken() }
+      const response = await authFetch(`${API_BASE}/material-type`, {
+        headers: {}
       });
       
       if (!response.ok) throw new Error(ADMIN_ERROR_MESSAGES.MATERIAL_TYPES_FETCH_FAILED);
@@ -148,11 +146,10 @@ export const adminResourceService = {
 
   async updateResourceMetadata(resourceId, metadata) {
     try {
-      const response = await fetch(`${API_BASE}/resource/${resourceId}/metadata`, {
+      const response = await authFetch(`${API_BASE}/resource/${resourceId}/metadata`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.getAuthToken()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(metadata)
       });
@@ -174,11 +171,10 @@ export const adminResourceService = {
    */
   async updateUnifiedResourceOrder(offeringId, { electronic, print }) {
     try {
-      const response = await fetch(`${API_BASE}/resource/update-unified-order`, {
+      const response = await authFetch(`${API_BASE}/resource/update-unified-order`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.getAuthToken()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           offering_id: offeringId,

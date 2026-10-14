@@ -4,6 +4,7 @@
  */
 
 import { apiConfig } from '../../config/api.config';
+import { authFetch } from '../http/authFetch';
 
 export const submissionWorkflowService = {
   getAuthToken: () => apiConfig.getAuthToken(),
@@ -21,11 +22,10 @@ export const submissionWorkflowService = {
         per_page: perPage.toString()
       });
 
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/pending-submissions?${queryParams}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -71,11 +71,10 @@ export const submissionWorkflowService = {
    */
   async getSubmissionDetail(submissionId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/submission/${submissionId}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -100,12 +99,11 @@ export const submissionWorkflowService = {
    */
   async lockSubmission(submissionUuid, lockReason = 'Processing items') {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/faculty-submission/${submissionUuid}/lock`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ lock_reason: lockReason })
@@ -130,12 +128,11 @@ export const submissionWorkflowService = {
    */
   async unlockSubmission(submissionUuid) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/faculty-submission/${submissionUuid}/unlock`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -164,12 +161,11 @@ export const submissionWorkflowService = {
    */
   async updateItem(itemId, updates) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}`,
         {
           method: 'PUT',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(updates)
@@ -195,12 +191,11 @@ export const submissionWorkflowService = {
    */
   async claimItem(itemId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/claim`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -225,12 +220,11 @@ export const submissionWorkflowService = {
    */
   async unclaimItem(itemId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/unclaim`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -257,12 +251,11 @@ export const submissionWorkflowService = {
    */
   async assignItem(itemId, userId, reason = '') {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/assign`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ user_id: userId, reason })
@@ -289,12 +282,11 @@ export const submissionWorkflowService = {
    */
   async updateItemStatus(itemId, status) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}`,
         {
           method: 'PUT',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ item_status: status })
@@ -321,12 +313,11 @@ export const submissionWorkflowService = {
    */
   async completeProcessing(itemId, payload = {}) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/complete-processing`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
@@ -353,12 +344,11 @@ export const submissionWorkflowService = {
    */
   async switchItemWorkflow(itemId, newTemplateId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/switch-workflow`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ template_id: newTemplateId })
@@ -386,12 +376,11 @@ export const submissionWorkflowService = {
    */
   async addStaffCommunication(itemId, message, mentionedUserIds = []) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/staff-message`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
@@ -420,11 +409,10 @@ export const submissionWorkflowService = {
    */
   async getStaffCommunications(itemId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/staff-messages`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -447,11 +435,10 @@ export const submissionWorkflowService = {
    */
   async getStaffUsers() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/user/staff`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -474,11 +461,10 @@ export const submissionWorkflowService = {
    */
   async getMyClaimedItems() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/my-claimed-items`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -502,11 +488,10 @@ export const submissionWorkflowService = {
    */
   async getCurrentUser() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/user/current`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -884,11 +869,10 @@ export const submissionWorkflowService = {
    */
   async getSubmissionCommunications(submissionId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/submission/${submissionId}/communications`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -915,12 +899,11 @@ export const submissionWorkflowService = {
    */
   async createCommunication(submissionId, data) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/submission/${submissionId}/communications`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(data)
@@ -947,12 +930,11 @@ export const submissionWorkflowService = {
    */
   async updateCommunication(messageId, data) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/communications/${messageId}`,
         {
           method: 'PUT',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(data)
@@ -978,12 +960,11 @@ export const submissionWorkflowService = {
    */
   async markAsRead(messageId) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/communications/${messageId}/read`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -1011,11 +992,10 @@ export const submissionWorkflowService = {
         return [];
       }
 
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/search-staff?q=${encodeURIComponent(query)}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -1039,11 +1019,10 @@ export const submissionWorkflowService = {
    */
   async getUnreadCount() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/my-unread-count`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -1066,11 +1045,10 @@ export const submissionWorkflowService = {
    */
   async getMyMentions() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/submission-workflow/my-mentions`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -1096,12 +1074,11 @@ export const submissionWorkflowService = {
    */
   async linkFolioCourse(instanceId, stepId, data) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}/workflow-admin/instance/${instanceId}/steps/${stepId}/folio/link`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(data)

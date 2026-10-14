@@ -4,6 +4,7 @@
  */
 
 import { apiConfig } from '../../config/api.config';
+import { authFetch } from '../http/authFetch';
 
 class ChecklistService {
   getAuthToken() {
@@ -17,11 +18,10 @@ class ChecklistService {
    */
   async listTemplates() {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${apiConfig.endpoints.checklist.listTemplates}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -51,11 +51,10 @@ class ChecklistService {
   async getTemplate(templateId) {
     try {
       const url = apiConfig.endpoints.checklist.getTemplate.replace(':id', templateId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -81,12 +80,11 @@ class ChecklistService {
    */
   async createTemplate(templateData, username) {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${apiConfig.endpoints.checklist.createTemplate}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -118,12 +116,11 @@ class ChecklistService {
   async updateTemplate(templateId, templateData, username) {
     try {
       const url = apiConfig.endpoints.checklist.updateTemplate.replace(':id', templateId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'PUT',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -152,12 +149,11 @@ class ChecklistService {
   async deleteTemplate(templateId) {
     try {
       const url = apiConfig.endpoints.checklist.deleteTemplate.replace(':id', templateId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'DELETE',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -182,12 +178,11 @@ class ChecklistService {
   async duplicateTemplate(templateId) {
     try {
       const url = apiConfig.endpoints.checklist.duplicateTemplate.replace(':id', templateId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -212,11 +207,10 @@ class ChecklistService {
   async getItemChecklist(itemId) {
     try {
       const url = apiConfig.endpoints.checklist.getItemChecklist.replace(':itemId', itemId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           }
         }
@@ -250,12 +244,11 @@ class ChecklistService {
   async assignChecklistToItem(itemId, templateId, username) {
     try {
       const url = apiConfig.endpoints.checklist.assignChecklist.replace(':itemId', itemId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
@@ -297,12 +290,11 @@ class ChecklistService {
         body.completed_by = username;
       }
       
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'PATCH',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(body),
@@ -330,12 +322,11 @@ class ChecklistService {
   async completeItemChecklist(itemId, username) {
     try {
       const url = apiConfig.endpoints.checklist.completeChecklist.replace(':itemId', itemId);
-      const response = await fetch(
+      const response = await authFetch(
         `${apiConfig.urls.courseReserves}${url}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': this.getAuthToken(),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ completed_by: username })

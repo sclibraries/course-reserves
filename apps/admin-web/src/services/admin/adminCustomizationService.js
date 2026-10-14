@@ -1,7 +1,7 @@
 import { config } from '../../config'
+import { authFetch } from '../http/authFetch';
 
 const COURSE_API = config.api.urls.courseReserves;
-const getAuthToken = config.api.getAuthToken;
 
 export const adminCustomizationService = {
     async getCustomization() {
@@ -12,11 +12,10 @@ export const adminCustomizationService = {
         return response.json();
     }, 
     async updateCustomization(id, customizationData) {
-        const response = await fetch(`${COURSE_API}${config.api.endpoints.customizations.updateCustomizations}/${id}`, {
+        const response = await authFetch(`${COURSE_API}${config.api.endpoints.customizations.updateCustomizations}/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `${getAuthToken()}`,
             },
             body: JSON.stringify(customizationData)
         });
@@ -28,11 +27,10 @@ export const adminCustomizationService = {
         return response.json();
     },
     async updateCustomizationSection(id, sectionData) {
-        const response = await fetch(`${COURSE_API}${config.api.endpoints.customizations.updateCustomizations}/${id}`, {
+        const response = await authFetch(`${COURSE_API}${config.api.endpoints.customizations.updateCustomizations}/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `${getAuthToken()}`,
             },
             body: JSON.stringify(sectionData)
         });
