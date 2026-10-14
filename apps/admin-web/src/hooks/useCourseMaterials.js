@@ -6,7 +6,7 @@ import {
   fetchCrossLinkedCourses,
   fetchMergedResources,
 } from '../components/page-sections/course-record/api';
-import { isItemVisible, parseVisibilityDate } from '../util/resourceVisibility';
+import { getItemVisibility, isItemVisible } from '../util/resourceVisibility';
 import { folioSearchService } from '../services/folioSearchService';
 
 export function useCourseMaterials(record, { filter = 'all', searchQuery = '', canBypassVisibility = false } = {}) {
@@ -553,59 +553,15 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', c
   const processedRecords = useMemo(() => {
     let hiddenCount = 0;
     let visibleCount = 0;
-    let upcomingDates = [];
-
-    const checkRecordVisibility = (item) => {
-      if (item.isElectronic && item.resource) {
-        if (canBypassVisibility) return { isVisible: true };
-
-        const now = new Date();
-        
-        const usePrimaryLinkVisibility = item.resource.use_primary_link_visibility === "1" || 
-                                       item.resource.use_primary_link_visibility === 1 || 
-                                       item.resource.use_primary_link_visibility === true;
-        
-        if (usePrimaryLinkVisibility) {
-          const startVisibility = parseVisibilityDate(item.resource.primary_link_start_visibility);
-          const endVisibility = parseVisibilityDate(item.resource.primary_link_end_visibility, 'end');
-            
-          if (startVisibility && now < startVisibility) {
-            upcomingDates.push(startVisibility);
-            return { isVisible: false, startDate: startVisibility };
-          }
-          
-          if (endVisibility && now > endVisibility) {
-            return { isVisible: false };
-          }
-        } else {
-          const useResourceVisibility = item.resource.use_resource_visibility === "1" || 
-                                       item.resource.use_resource_visibility === 1 || 
-                                       item.resource.use_resource_visibility === true;
-          
-          if (useResourceVisibility) {
-            const startVisibility = parseVisibilityDate(item.resource.start_visibility);
-            const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
-
-            if ((startVisibility && now < startVisibility)) {
-              upcomingDates.push(startVisibility);
-              return { isVisible: false, startDate: startVisibility };
-            }
-
-            if ((endVisibility && now > endVisibility)) {
-              return { isVisible: false };
-            }
-          }
-        }
-      }
-      return { isVisible: true };
-    };
+    const upcomingDates = [];
 
     records.forEach(record => {
-      const visibility = checkRecordVisibility(record);
+      const visibility = getItemVisibility(record, canBypassVisibility);
       if (visibility.isVisible) {
         visibleCount++;
       } else {
         hiddenCount++;
+        if (visibility.startDate) upcomingDates.push(visibility.startDate);
       }
     });
 
