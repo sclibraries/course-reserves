@@ -60,7 +60,7 @@ class SubmissionItemMaterializationService
             $scaffoldService = new SubmissionCourseScaffoldService();
             $scaffoldService->ensureSubmissionCourseScaffold($submission);
 
-            if ($this->isAlreadyMaterialized($item)) {
+            if (self::isMaterialized($item)) {
                 $this->markItemComplete($item, $staffId, $payload);
                 $transaction->commit();
                 return $this->buildResult($item);
@@ -230,9 +230,28 @@ class SubmissionItemMaterializationService
         }
     }
 
-    private function isAlreadyMaterialized(SubmissionNewResource $item)
+    public static function isMaterialized($item)
     {
-        return !empty($item->materialized_course_resource_id) || !empty($item->materialized_physical_reference_id);
+        foreach ([
+            'materialized_resource_id',
+            'materialized_course_resource_id',
+            'materialized_physical_reference_id',
+            'materialized_folder_id',
+            'materialized_by_staff_id',
+            'materialized_at',
+        ] as $field) {
+            if (is_array($item)) {
+                $value = $item[$field] ?? null;
+            } else {
+                $value = is_object($item) && isset($item->$field) ? $item->$field : null;
+            }
+
+            if ($value !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function saveResourceLinks(Resources $resource, array $data)

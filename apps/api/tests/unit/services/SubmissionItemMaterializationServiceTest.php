@@ -6,6 +6,40 @@ use app\services\SubmissionItemMaterializationService;
 
 class SubmissionItemMaterializationServiceTest extends \Codeception\Test\Unit
 {
+    public function testEveryNonNullMaterializationFieldMarksTheItemAsMaterialized()
+    {
+        $markers = [
+            'materialized_resource_id' => 91,
+            'materialized_course_resource_id' => 92,
+            'materialized_physical_reference_id' => 93,
+            'materialized_folder_id' => 94,
+            'materialized_by_staff_id' => 'test-api033-staff',
+            'materialized_at' => '2026-10-14 12:00:00',
+        ];
+
+        foreach ($markers as $field => $value) {
+            $item = (object)[
+                'materialized_resource_id' => null,
+                'materialized_course_resource_id' => null,
+                'materialized_physical_reference_id' => null,
+                'materialized_folder_id' => null,
+                'materialized_by_staff_id' => null,
+                'materialized_at' => null,
+                $field => $value,
+            ];
+
+            $this->assertTrue(SubmissionItemMaterializationService::isMaterialized($item), $field);
+        }
+
+        $this->assertTrue(SubmissionItemMaterializationService::isMaterialized([
+            'materialized_folder_id' => 0,
+        ]));
+        $this->assertFalse(SubmissionItemMaterializationService::isMaterialized([
+            'materialized_folder_id' => null,
+            'materialized_at' => null,
+        ]));
+    }
+
     public function testPhysicalItemsAreDetectedFromBarcodeOrFolioInstance()
     {
         $service = new SubmissionItemMaterializationService();

@@ -18,6 +18,7 @@ use app\models\Course;
 use app\models\CourseOffering;
 use app\services\FacultyTokenClaims;
 use app\services\SubmissionOwnershipPolicy;
+use app\services\SubmissionMaterializationGuard;
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use yii\helpers\ArrayHelper;
@@ -1087,6 +1088,39 @@ class FacultySubmissionController extends BaseRestController
 
         $data = Yii::$app->request->getBodyParams();
         (new SubmissionOwnershipPolicy())->assertUpdateDoesNotChangeOwnership($data);
+
+        if (isset($data['items']) || isset($data['folders'])) {
+            $existingItems = SubmissionNewResource::find()
+                ->where(['submission_id' => $submission->submission_id])
+                ->orderBy(['id' => SORT_ASC])
+                ->asArray()
+                ->all();
+            $foldersData = isset($data['folders']) && is_array($data['folders']) ? $data['folders'] : [];
+            $folderUuidToNameMap = SubmissionMaterializationGuard::folderUuidToNameMap($foldersData);
+            $guard = new SubmissionMaterializationGuard();
+            $incomingItems = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
+
+            if (!isset($data['items']) && isset($data['folders'])) {
+                $incomingItems = $guard->incomingItemsAfterFolderUpdate($existingItems, $foldersData);
+            }
+
+            $changedMaterializedItemIds = $guard->changedMaterializedItemIds(
+                $existingItems,
+                $incomingItems,
+                $folderUuidToNameMap
+            );
+            if ($changedMaterializedItemIds) {
+                Yii::$app->response->statusCode = 409;
+                return [
+                    'success' => false,
+                    'error_code' => 'materialized_item_correction_required',
+                    'message' => 'Processed course-reserve items must be corrected by library staff.',
+                    'submission_uuid' => $submission->submission_uuid,
+                    'item_ids' => $changedMaterializedItemIds,
+                ];
+            }
+        }
+
         $transaction = Yii::$app->db->beginTransaction();
         
         try {
@@ -1141,8 +1175,7 @@ class FacultySubmissionController extends BaseRestController
      */
     private function updateFolders($submission, $foldersData)
     {
-        // Build a map of folder_uuid to folder_name for items to reference
-        $folderUuidToNameMap = [];
+        $folderUuidToNameMap = SubmissionMaterializationGuard::folderUuidToNameMap($foldersData);
         
         // First pass: get existing folders indexed by folder_name (not ID)
         $existingFolders = SubmissionFolder::find()
@@ -1154,16 +1187,10 @@ class FacultySubmissionController extends BaseRestController
 
         foreach ($foldersData as $folderData) {
             $folderName = $folderData['folder_name'] ?? $folderData['name'] ?? null;
-            $folderUuid = $folderData['folder_uuid'] ?? $folderData['id'] ?? null;
             
             if (!$folderName) {
                 Yii::warning('Skipping folder without name: ' . json_encode($folderData), __METHOD__);
                 continue;
-            }
-            
-            // Map UUID to name for items to use
-            if ($folderUuid) {
-                $folderUuidToNameMap[$folderUuid] = $folderName;
             }
             
             if (isset($existingFolders[$folderName])) {
@@ -1301,36 +1328,7 @@ class FacultySubmissionController extends BaseRestController
 
     private function buildUpdatedResourceData(array $currentData, array $itemData): array
     {
-        $nestedResourceData = $itemData['resource_data'] ?? [];
-        if (!is_array($nestedResourceData)) {
-            $nestedResourceData = [];
-        }
-
-        $resourceData = array_merge($currentData, $nestedResourceData);
-        $fieldMap = [
-            'title' => ['title'],
-            'authors' => ['author', 'authors'],
-            'materialType' => ['material_type', 'materialType'],
-            'journal' => ['journal'],
-            'publisher' => ['publisher'],
-            'isbn' => ['isbn'],
-            'url' => ['url'],
-        ];
-
-        foreach ($fieldMap as $resourceField => $payloadFields) {
-            foreach ($payloadFields as $payloadField) {
-                if (array_key_exists($payloadField, $itemData)) {
-                    $resourceData[$resourceField] = $itemData[$payloadField];
-                    break;
-                }
-            }
-        }
-
-        $resourceData['title'] = $resourceData['title'] ?? '';
-        $resourceData['authors'] = $resourceData['authors'] ?? '';
-        $resourceData['materialType'] = $resourceData['materialType'] ?? 'book';
-
-        return $resourceData;
+        return SubmissionMaterializationGuard::buildUpdatedResourceData($currentData, $itemData);
     }
 
     private function buildNewResourceData(array $itemData): array
