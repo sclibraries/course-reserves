@@ -10,13 +10,13 @@ use app\models\CourseResources;
 use Yii;
 use yii\rest\ActiveController;
 use app\models\ResourceLinks;
+use app\components\Roles;
 use yii\filters\auth\HttpBearerAuth;
 use yii\web\ForbiddenHttpException;
 
 class ResourceController extends ActiveController
 {
     private const RESOURCE_WRITE_ACTIONS = ['create', 'update', 'delete', 'add-link', 'delete-link'];
-    private const RESOURCE_WRITE_ROLES = ['staff', 'admin'];
 
     public $modelClass = 'app\models\Resources';
 
@@ -549,7 +549,7 @@ class ResourceController extends ActiveController
 
     private function assertResourceWriteAccess($identity): void
     {
-        if (!in_array($identity->role ?? null, self::RESOURCE_WRITE_ROLES, true)) {
+        if (!Roles::isStaff($identity->role ?? null)) {
             throw new ForbiddenHttpException('Resource writes require a staff or admin role.');
         }
     }

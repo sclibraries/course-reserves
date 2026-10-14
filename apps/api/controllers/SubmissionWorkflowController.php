@@ -12,6 +12,7 @@ use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
 use yii\web\ConflictHttpException;
 use yii\data\ActiveDataProvider;
+use app\components\Roles;
 use app\models\FacultySubmission;
 use app\models\SubmissionWorkflowAssignment;
 use app\models\SubmissionNewResource;
@@ -24,8 +25,6 @@ use app\services\SubmissionItemMaterializationService;
  */
 class SubmissionWorkflowController extends Controller
 {
-    private const STAFF_WORKFLOW_ROLES = ['staff', 'admin'];
-
     public function behaviors()
     {
         $behaviors = parent::behaviors();
@@ -88,7 +87,7 @@ class SubmissionWorkflowController extends Controller
 
     private function isStaffWorkflowUser($identity): bool
     {
-        return in_array($identity->role ?? null, self::STAFF_WORKFLOW_ROLES, true);
+        return Roles::isStaff($identity->role ?? null);
     }
 
     /**

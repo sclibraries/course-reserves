@@ -8,6 +8,7 @@ use yii\filters\auth\HttpBearerAuth;
 use yii\filters\ContentNegotiator;
 use yii\web\Response;
 use app\models\JwtIdentity;
+use app\components\Roles;
 
 /**
  * Base controller for all REST endpoints.
@@ -84,7 +85,7 @@ class BaseRestController extends Controller
                 'role'         => $identity->role,
             ];
             Yii::$app->params['facultyUser'] = $userParams;
-            if (in_array($identity->role, ['staff', 'admin'])) {
+            if (Roles::isStaff($identity->role)) {
                 Yii::$app->params['staffUser'] = $userParams;
             }
         }

@@ -2051,7 +2051,7 @@ class FacultySubmissionController extends BaseRestController
     {
         if (
             !is_array($userCtx)
-            || !in_array(($userCtx['role'] ?? ''), ['staff', 'admin'], true)
+            || !\app\components\Roles::isStaff($userCtx['role'] ?? '')
             || empty($userCtx['user_id'])
         ) {
             throw new ForbiddenHttpException('Staff authentication required to lock submissions');
