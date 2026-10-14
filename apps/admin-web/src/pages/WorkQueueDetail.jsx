@@ -374,7 +374,7 @@ const WorkQueueDetail = () => {
                       <ItemStatusDropdown
                         currentStatus={selectedItem.status}
                         itemId={selectedItem.id}
-                        onStatusChange={handleStatusChange}
+                        onStatusChange={(status) => handleStatusChange(selectedItem.id, status)}
                       />
                     </div>
 
