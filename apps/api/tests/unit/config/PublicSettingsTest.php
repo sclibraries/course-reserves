@@ -7,7 +7,7 @@ class PublicSettingsTest extends \Codeception\Test\Unit
 
     protected function _before()
     {
-        foreach (['CORS_ALLOWED_ORIGINS', 'EBSCO_PROFILE', 'EBSCO_IP_PREFIXES', 'ADMIN_EMAIL', 'ADMIN_EMAILS'] as $key) {
+        foreach (['CORS_ALLOWED_ORIGINS', 'EBSCO_PROFILE', 'EBSCO_IP_PREFIXES', 'ADMIN_EMAILS'] as $key) {
             $this->previous[$key] = getenv($key);
             putenv($key);
         }
@@ -26,7 +26,6 @@ class PublicSettingsTest extends \Codeception\Test\Unit
         $this->assertSame([], $params['corsOrigins'] ?? null);
         $this->assertSame('', $params['ebsco']['edsProfile']);
         $this->assertSame([], $params['ebsco']['ipAddresses']);
-        $this->assertSame('', $params['adminEmail']);
         $this->assertSame([], $params['adminEmails']);
     }
 
@@ -35,13 +34,11 @@ class PublicSettingsTest extends \Codeception\Test\Unit
         putenv('CORS_ALLOWED_ORIGINS= https://app.example.test, ,https://staff.example.test ');
         putenv('EBSCO_PROFILE=synthetic-profile');
         putenv('EBSCO_IP_PREFIXES= 192.0.2, ,198.51.100 ');
-        putenv('ADMIN_EMAIL=admin@example.test');
         putenv('ADMIN_EMAILS= first@example.test, ,second@example.test ');
         $params = require codecept_root_dir('config/params.php');
         $this->assertSame(['https://app.example.test', 'https://staff.example.test'], $params['corsOrigins'] ?? null);
         $this->assertSame('synthetic-profile', $params['ebsco']['edsProfile']);
         $this->assertSame(['192.0.2', '198.51.100'], $params['ebsco']['ipAddresses']);
-        $this->assertSame('admin@example.test', $params['adminEmail']);
         $this->assertSame(['first@example.test', 'second@example.test'], $params['adminEmails']);
     }
 

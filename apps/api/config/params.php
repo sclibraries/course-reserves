@@ -19,6 +19,5 @@ return [
         'username' => getenv('HITCHCOCK_USERNAME'),
         'password' => getenv('HITCHCOCK_PASSWORD'),
     ],
-    'adminEmail' => getenv('ADMIN_EMAIL') ?: '',
     'adminEmails' => $listFromEnvironment('ADMIN_EMAILS'),
 ];

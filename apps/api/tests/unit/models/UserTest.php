@@ -3,42 +3,93 @@
 namespace tests\unit\models;
 
 use app\models\User;
+use Yii;
 
 class UserTest extends \Codeception\Test\Unit
 {
-    public function testFindUserById()
+    /**
+     * Finds a synthetic stored user and returns null for a missing username.
+     *
+     * @return void
+     */
+    public function testFindByUsernameUsesStoredUserRow()
     {
-        expect_that($user = User::findIdentity(100));
-        expect($user->username)->equals('admin');
+        $username = 'api065-user';
+        $command = Yii::$app->db->createCommand();
+        $command->delete('users', ['username' => $username])->execute();
 
-        expect_not(User::findIdentity(999));
-    }
+        try {
+            $row = [
+                'username' => $username,
+                'full_name' => 'API 065 Test User',
+                'email' => 'api065-user@example.edu',
+                'institution' => 'Smith College',
+                'role' => 'user',
+            ];
+            $command->insert('users', $row)->execute();
 
-    public function testFindUserByAccessToken()
-    {
-        expect_that($user = User::findIdentityByAccessToken('100-token'));
-        expect($user->username)->equals('admin');
-
-        expect_not(User::findIdentityByAccessToken('non-existing'));        
-    }
-
-    public function testFindUserByUsername()
-    {
-        expect_that($user = User::findByUsername('admin'));
-        expect_not(User::findByUsername('not-admin'));
+            $user = User::findByUsername($username);
+            $this->assertInstanceOf(User::class, $user);
+            $this->assertSame($username, $user->username);
+            $this->assertNull(User::findByUsername('api065-missing-user'));
+        } finally {
+            $command->delete('users', ['username' => $username])->execute();
+        }
     }
 
     /**
-     * @depends testFindUserByUsername
+     * Requires model fields and accepts an allowed institutional email domain.
+     *
+     * @return void
      */
-    public function testValidateUser($user)
+    public function testRulesRequireFieldsAndAllowInstitutionalEmailDomain()
     {
-        $user = User::findByUsername('admin');
-        expect_that($user->validateAuthKey('test100key'));
-        expect_not($user->validateAuthKey('test102key'));
+        $user = new User();
+        $user->username = 'api065-validation-user';
+        $user->full_name = '';
+        $user->email = 'api065-validation-user@smith.edu';
+        $user->institution = 'Smith College';
 
-        expect_that($user->validatePassword('admin'));
-        expect_not($user->validatePassword('123456'));        
+        $this->assertFalse($user->validate());
+        $this->assertArrayHasKey('full_name', $user->getErrors());
+
+        $user->full_name = 'API 065 Validation User';
+        $this->assertTrue($user->validate());
     }
 
+    /**
+     * Returns all permissions for admins and institution permissions for users.
+     *
+     * @return void
+     */
+    public function testGetPermissionsForSyntheticAdminAndUser()
+    {
+        $institution = 'API 065 Test Institution';
+        $permission = 'api065-test-permission';
+        $command = Yii::$app->db->createCommand();
+        $where = [
+            'institution' => $institution,
+            'permission_key' => $permission,
+        ];
+        $command->delete('institution_permissions', $where)->execute();
+
+        try {
+            $row = [
+                'institution' => $institution,
+                'permission_key' => $permission,
+                'granted' => 1,
+            ];
+            $command->insert('institution_permissions', $row)->execute();
+
+            $admin = new User(['role' => 'admin']);
+            $this->assertContains($permission, $admin->getPermissions());
+
+            $user = new User();
+            $user->role = 'user';
+            $user->institution = $institution;
+            $this->assertSame([$permission], $user->getPermissions());
+        } finally {
+            $command->delete('institution_permissions', $where)->execute();
+        }
+    }
 }
