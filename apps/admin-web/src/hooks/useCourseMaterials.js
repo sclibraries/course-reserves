@@ -6,7 +6,7 @@ import {
   fetchCrossLinkedCourses,
   fetchMergedResources,
 } from '../components/page-sections/course-record/api';
-import { parseVisibilityDate } from '../util/resourceVisibility';
+import { isItemVisible, parseVisibilityDate } from '../util/resourceVisibility';
 
 export function useCourseMaterials(record, { filter = 'all', searchQuery = '', canBypassVisibility = false } = {}) {
   const [records, setRecords] = useState([]);
@@ -370,25 +370,6 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', c
     });
   }, []);
 
-  const isRecordVisible = useCallback((item) => {
-    if (item.isElectronic && item.resource) {
-      if (canBypassVisibility) return true;
-
-      const now = new Date();
-      const startVisibility = parseVisibilityDate(item.resource.start_visibility);
-      const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
-
-      if (startVisibility && now < startVisibility) {
-        return false;
-      }
-
-      if (endVisibility && now > endVisibility) {
-        return false;
-      }
-    }
-    return true;
-  }, [canBypassVisibility]);
-
   const combinedResults = useMemo(() => {
     const filteredBySearch = searchQuery.trim() !== ''
       ? records.filter(item =>
@@ -405,7 +386,7 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', c
           filter === 'electronic' ? item.isElectronic : !item.isElectronic
         );
 
-    const visibilityFiltered = filtered.filter(item => isRecordVisible(item));
+    const visibilityFiltered = filtered.filter(item => isItemVisible(item, canBypassVisibility));
   
     const electronicResources = visibilityFiltered.filter(item => item.isElectronic);
     const hasElectronic = electronicResources.length > 0;
@@ -568,7 +549,7 @@ export function useCourseMaterials(record, { filter = 'all', searchQuery = '', c
     while (j < groupedArray.length)   merged.push(groupedArray[j++]);
   
     return merged;
-  }, [records, filter, searchQuery, isRecordVisible]);
+  }, [records, filter, searchQuery, canBypassVisibility]);
 
   const processedRecords = useMemo(() => {
     let hiddenCount = 0;

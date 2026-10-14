@@ -5,21 +5,7 @@ import { faBook, faExclamationCircle, faLaptop } from '@fortawesome/free-solid-s
 import RecordCard from './RecordCard';
 import RecordTable from './RecordTable';
 import { useCourseView } from '../../../contexts/CourseViewContext';
-import { parseVisibilityDate } from '../../../util/resourceVisibility';
-
-function isItemVisible(item, canBypassVisibility) {
-  if (item.isElectronic && item.resource) {
-    if (canBypassVisibility) return true;
-    const now = new Date();
-    if (item.resource.start_visibility !== null || item.resource.end_visibility !== null) {
-      const start = parseVisibilityDate(item.resource.start_visibility);
-      const end = parseVisibilityDate(item.resource.end_visibility, 'end');
-      if (start && now < start) return false;
-      if (end && now > end) return false;
-    }
-  }
-  return true;
-}
+import { isItemVisible } from '../../../util/resourceVisibility';
 
 export default function MaterialsDisplay({
   isLoading, error, materials, combinedResults, availability,

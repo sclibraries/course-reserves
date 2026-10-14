@@ -17,6 +17,62 @@ export const parseVisibilityDate = (value, boundary = 'start') => {
 };
 
 /**
+ * Format a visibility boundary using the viewer's local date settings.
+ *
+ * @param {string|Date|null} value - Visibility boundary value
+ * @param {'start'|'end'} boundary - Boundary side to parse
+ * @returns {string|undefined} Formatted date, or undefined when absent/invalid
+ */
+export const formatVisibilityDate = (value, boundary = 'start') => (
+  parseVisibilityDate(value, boundary)?.toLocaleDateString()
+);
+
+/**
+ * Get visibility details for an individual record.
+ *
+ * @param {Object} item - Record item with electronic-resource data
+ * @param {boolean} canBypassVisibility - Whether visibility restrictions can be bypassed
+ * @returns {Object} Visibility status and, when hidden, its boundary and message
+ */
+export const getItemVisibility = (item, canBypassVisibility) => {
+  if (item.isElectronic && item.resource) {
+    if (canBypassVisibility) return { isVisible: true };
+
+    const now = new Date();
+    const startVisibility = parseVisibilityDate(item.resource.start_visibility);
+    const endVisibility = parseVisibilityDate(item.resource.end_visibility, 'end');
+
+    if (startVisibility && now < startVisibility) {
+      return {
+        isVisible: false,
+        message: `Available from ${startVisibility.toLocaleDateString()}`,
+        startDate: startVisibility,
+      };
+    }
+
+    if (endVisibility && now > endVisibility) {
+      return {
+        isVisible: false,
+        message: `Available until ${endVisibility.toLocaleDateString()}`,
+        endDate: endVisibility,
+      };
+    }
+  }
+  return { isVisible: true };
+};
+
+/**
+ * Check whether an individual record is visible to the current viewer.
+ *
+ * @param {Object} item - Record item with electronic-resource data
+ * @param {boolean} canBypassVisibility - Whether visibility restrictions can be bypassed
+ * @returns {boolean} Whether the item should be shown
+ */
+export function isItemVisible(item, canBypassVisibility) {
+  return getItemVisibility(item, canBypassVisibility).isVisible;
+}
+
+/**
  * Check if a primary resource link is visible based on visibility settings
  * 
  * @param {Object} resource - The resource object containing visibility settings
@@ -105,6 +161,19 @@ export const isLinkVisible = (link, canBypassVisibility) => {
   
   return true;
 };
+
+/**
+ * Filter link lists by the current viewer's visibility permissions.
+ *
+ * @param {Array} links - Resource links to filter
+ * @param {boolean} canBypassVisibility - Whether visibility restrictions can be bypassed
+ * @returns {Array} Visible links, or an empty list for invalid input
+ */
+export const getVisibleLinks = (links, canBypassVisibility) => (
+  Array.isArray(links)
+    ? links.filter(link => isLinkVisible(link, canBypassVisibility))
+    : []
+);
 
 /**
  * Get visibility information for displaying to authenticated users
