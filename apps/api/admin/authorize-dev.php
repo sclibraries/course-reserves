@@ -1,9 +1,5 @@
 <?php
 require_once __DIR__ . '/../config/environment.php';
-if (!\app\components\Environment::isDev()) {
-    http_response_code(404);
-    exit;
-}
 
 session_start();
 use \Firebase\JWT\JWT;

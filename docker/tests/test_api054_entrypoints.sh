@@ -2,10 +2,10 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-project_name=${1:-api054-entrypoints}
+project_name=${1:-api054fr-entrypoints}
 case "$project_name" in
-    api054-*) ;;
-    *) printf 'Compose project name must start with api054-.\n' >&2; exit 2 ;;
+    api054fr-*) ;;
+    *) printf 'Compose project name must start with api054fr-.\n' >&2; exit 2 ;;
 esac
 
 compose() {
@@ -137,9 +137,9 @@ if [ "$environment" = dev ]; then
     check_status /admin/refresh-token-dev.php '400 401'
 else
     check_status /admin/authorize-local.php 404
-    check_status /admin/authorize-dev.php 404
+    check_status /admin/authorize-dev.php 400
     check_status /admin/refresh-token-local.php 404
-    check_status /admin/refresh-token-dev.php 404
+    check_status /admin/refresh-token-dev.php 400
 fi
 CONTAINER_SCRIPT
 done
