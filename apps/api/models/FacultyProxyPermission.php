@@ -170,7 +170,7 @@ class FacultyProxyPermission extends ActiveRecord
     /**
      * Check if permission is currently active
      */
-    public function isActive()
+    public function isActive($updateExpiredStatus = true)
     {
         if ($this->status !== self::STATUS_ACTIVE) {
             return false;
@@ -178,8 +178,10 @@ class FacultyProxyPermission extends ActiveRecord
 
         // Check expiration
         if ($this->expires_at && strtotime($this->expires_at) < time()) {
-            $this->status = self::STATUS_EXPIRED;
-            $this->save();
+            if ($updateExpiredStatus) {
+                $this->status = self::STATUS_EXPIRED;
+                $this->save();
+            }
             return false;
         }
 
@@ -189,9 +191,9 @@ class FacultyProxyPermission extends ActiveRecord
     /**
      * Check if proxy can access specific course
      */
-    public function canAccessCourse($folioCourseListingId)
+    public function canAccessCourse($folioCourseListingId, $updateExpiredStatus = true)
     {
-        if (!$this->isActive()) {
+        if (!$this->isActive($updateExpiredStatus)) {
             return false;
         }
 
@@ -215,9 +217,9 @@ class FacultyProxyPermission extends ActiveRecord
     /**
      * Check if proxy can edit (not just view)
      */
-    public function canEdit()
+    public function canEdit($updateExpiredStatus = true)
     {
-        return $this->isActive() && $this->permission_type !== self::PERMISSION_VIEW_ONLY;
+        return $this->isActive($updateExpiredStatus) && $this->permission_type !== self::PERMISSION_VIEW_ONLY;
     }
 
     /**
