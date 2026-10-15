@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useResumeProxyInvitation } from './useResumeProxyInvitation';
 
@@ -16,7 +16,12 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const ResumeProbe = () => {
   useResumeProxyInvitation();
-  return <span data-testid="location">{useLocation().pathname}</span>;
+  const location = useLocation();
+  const navigate = useNavigate();
+  return <>
+    <span data-testid="location">{location.pathname}</span>
+    <button onClick={() => navigate('/')}>Return to dashboard</button>
+  </>;
 };
 
 describe('useResumeProxyInvitation', () => {
@@ -49,18 +54,29 @@ describe('useResumeProxyInvitation', () => {
     });
   };
 
-  it('resumes a stored invitation route after the user becomes authenticated', async () => {
+  it('consumes a stored invitation while resuming once after authentication', async () => {
     sessionStorage.setItem('faculty-proxy-invitation-token', 'test-token');
     mocks.isAuthenticated = true;
     await renderHook('/');
 
-    expect(container?.textContent).toBe('/faculty/accept-proxy-invitation/test-token');
+    expect(container?.querySelector('[data-testid="location"]')?.textContent)
+      .toBe('/faculty/accept-proxy-invitation/test-token');
+    expect(sessionStorage.getItem('faculty-proxy-invitation-token')).toBeNull();
+
+    const dashboard = container?.querySelector('button');
+    await act(async () => {
+      dashboard?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(container?.querySelector('[data-testid="location"]')?.textContent).toBe('/');
+    expect(sessionStorage.getItem('faculty-proxy-invitation-token')).toBeNull();
   });
 
   it('keeps the current route when no invitation token is stored', async () => {
     mocks.isAuthenticated = true;
     await renderHook('/');
 
-    expect(container?.textContent).toBe('/');
+    expect(container?.querySelector('[data-testid="location"]')?.textContent).toBe('/');
   });
 });

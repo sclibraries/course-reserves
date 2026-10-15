@@ -9,10 +9,13 @@ export const useResumeProxyInvitation = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuthenticated || location.pathname.startsWith('/faculty/accept-proxy-invitation/')) return;
+    if (!isAuthenticated) return;
     try {
       const token = sessionStorage.getItem(PROXY_INVITATION_SESSION_KEY);
-      if (token) navigate(`/faculty/accept-proxy-invitation/${encodeURIComponent(token)}`, { replace: true });
+      if (!token) return;
+      sessionStorage.removeItem(PROXY_INVITATION_SESSION_KEY);
+      if (location.pathname.startsWith('/faculty/accept-proxy-invitation/')) return;
+      navigate(`/faculty/accept-proxy-invitation/${encodeURIComponent(token)}`, { replace: true });
     } catch { /* Session storage can be disabled. */ }
   }, [isAuthenticated, location.pathname, navigate]);
 };

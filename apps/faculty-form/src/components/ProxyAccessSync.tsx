@@ -1,7 +1,12 @@
 import { useLocation } from 'react-router-dom';
-import { ProxyAccessSelector } from '@/components/ProxyAccessSelector';
+import { useProxyAccessGrants } from '@/hooks/useProxyAccessGrants';
+
+const OffDashboardGrantSync = () => {
+  useProxyAccessGrants({ loadCourses: false });
+  return null;
+};
 
 export const ProxyAccessSync = () => {
-  const location = useLocation();
-  return location.pathname === '/' ? null : <ProxyAccessSelector renderSelector={false} />;
+  const isDashboard = useLocation().pathname === '/';
+  return isDashboard ? null : <OffDashboardGrantSync />;
 };

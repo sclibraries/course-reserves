@@ -13,6 +13,10 @@ import { useActingForStore } from '@/store/actingForStore';
 
 export const PROXY_INVITATION_SESSION_KEY = 'faculty-proxy-invitation-token';
 
+const clearStoredInvitationToken = () => {
+  try { sessionStorage.removeItem(PROXY_INVITATION_SESSION_KEY); } catch { /* Session storage can be disabled. */ }
+};
+
 const errorDetails = (error: unknown) => {
   const response = (error as { response?: { status?: number; data?: { message?: string; error?: string } } }).response;
   return {
@@ -32,17 +36,25 @@ const AcceptProxyInvitation = () => {
   const [acceptMessage, setAcceptMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    try { sessionStorage.setItem(PROXY_INVITATION_SESSION_KEY, token); } catch { /* Session storage can be disabled. */ }
     let current = true;
     validateProxyInvitation(token).then((response) => {
       if (!current) return;
       if (response.valid && response.invitation) setInvitation(response.invitation);
-      else setValidationMessage(response.message || 'This invitation is invalid or has expired.');
+      else {
+        clearStoredInvitationToken();
+        setValidationMessage(response.message || 'This invitation is invalid or has expired.');
+      }
     }).catch((error: unknown) => {
-      if (current) setValidationMessage(errorDetails(error).message || 'Unable to validate this invitation.');
+      const { status, message } = errorDetails(error);
+      if (status === 404 || status === 410) clearStoredInvitationToken();
+      if (current) setValidationMessage(message || 'Unable to validate this invitation.');
     }).finally(() => { if (current) setValidating(false); });
     return () => { current = false; };
   }, [token]);
+
+  const handleSignIn = () => {
+    try { sessionStorage.setItem(PROXY_INVITATION_SESSION_KEY, token); } catch { /* Session storage can be disabled. */ }
+  };
 
   const signInUrl = () => {
     const basePath = (import.meta.env.VITE_BASE_PATH || '/').replace(/\/?$/, '/');
@@ -55,6 +67,7 @@ const AcceptProxyInvitation = () => {
     setAcceptMessage(null);
     try {
       const accepted = await acceptProxyInvitation(token);
+      clearStoredInvitationToken();
       const grants = await getMyFacultyAccess();
       const permissionId = accepted.permission?.permission_id;
       const grant = grants.items.find((item) => String(item.permission_id) === String(permissionId) && item.status === 'active');
@@ -63,10 +76,10 @@ const AcceptProxyInvitation = () => {
         username: grant.faculty_id,
         displayName: grant.faculty_display_name || grant.faculty_id,
       });
-      try { sessionStorage.removeItem(PROXY_INVITATION_SESSION_KEY); } catch { /* Non-fatal after acceptance. */ }
       navigate('/', { replace: true });
     } catch (error) {
       const { status, message } = errorDetails(error);
+      if (status === 409 || status === 410) clearStoredInvitationToken();
       setAcceptMessage(status === 401
         ? 'Please sign in again to accept this invitation.'
         : message || (status === 409
@@ -91,7 +104,7 @@ const AcceptProxyInvitation = () => {
           <p className="text-sm text-muted-foreground">Invitation expires {new Date(invitation.invitation_expires_at).toLocaleString()}.</p>
         </section>
       ) : <p role="alert">{validationMessage}</p>}
-      {invitation && !isAuthenticated && <Button asChild><a href={signInUrl()}>Sign in to accept</a></Button>}
+      {invitation && !isAuthenticated && <Button asChild><a href={signInUrl()} onClick={handleSignIn}>Sign in to accept</a></Button>}
       {invitation && isAuthenticated && <Button disabled={accepting} onClick={handleAccept}>
         {accepting ? 'Accepting…' : 'Accept invitation'}
       </Button>}
