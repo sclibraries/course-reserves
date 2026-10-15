@@ -72,7 +72,7 @@ function Admin() {
   const canCustomize = isAdmin || userPermissions.some(perm => perm.startsWith('customize_'));
   const canManageSubmissions = isAdmin || userPermissions.includes('manage_submissions');
   const canManageWorkflows = isDevelopment && isAdmin; // Only admins in development can manage workflow templates
-  const canManageProxyAccess = canAccessProxyTab(user?.role, canManageSubmissions);
+  const canManageProxyAccess = canAccessProxyTab(user?.role);
   const tabRegistry = useMemo(() => createAdminTabRegistry({
     canManageCourses,
     canManageResources,

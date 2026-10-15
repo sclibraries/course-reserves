@@ -11,10 +11,9 @@ import MyWorkQueue from '../components/page-sections/admin/MyWorkQueue';
 import MyMentions from '../components/page-sections/admin/MyMentions';
 import TrackingReport from './TrackingReport';
 import FacultyProxyAccess from '../components/page-sections/admin/proxy-access/FacultyProxyAccess';
+import { isStaffOrAdminRole } from '../util/roles';
 
-export const canAccessProxyTab = (role, canManageSubmissions) => (
-  canManageSubmissions || role === 'staff' || role === 'admin'
-);
+export const canAccessProxyTab = (role) => isStaffOrAdminRole(role);
 
 export function createAdminTabRegistry({
   canManageCourses,

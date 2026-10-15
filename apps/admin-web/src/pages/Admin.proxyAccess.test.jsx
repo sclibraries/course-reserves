@@ -78,6 +78,12 @@ describe('Admin proxy access tab visibility', () => {
     expect(mocks.setSearchParams).toHaveBeenCalledWith({ tab: 'proxy-access' });
   });
 
+  it('shows Proxy access for an admin role', async () => {
+    await renderAdmin('admin');
+
+    expect(container.querySelector('[aria-label="Proxy Access Tab"]')).not.toBeNull();
+  });
+
   it('does not show Proxy access to a non-staff user without submission permission', async () => {
     await renderAdmin('employee');
 
@@ -85,9 +91,9 @@ describe('Admin proxy access tab visibility', () => {
     expect(container.textContent).toContain('Access Restricted');
   });
 
-  it('also shows Proxy access when an employee has submission-management permission', async () => {
+  it('does not show Proxy access when an employee has submission-management permission', async () => {
     await renderAdmin('employee', ['manage_submissions']);
 
-    expect(container.querySelector('[aria-label="Proxy Access Tab"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Proxy Access Tab"]')).toBeNull();
   });
 });

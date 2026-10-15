@@ -32,3 +32,16 @@ export const parseDateBoundary = (value, boundary = 'start') => {
 export const formatLocalDate = (value, boundary = 'start') => (
   parseDateBoundary(value, boundary)?.toLocaleDateString() ?? null
 );
+
+/**
+ * Format a date-time using the viewer's local date and time settings.
+ * Timezone-less strings, including MariaDB TIMESTAMP values, are interpreted as local time.
+ *
+ * @param {string|Date|null} value - Date-time value
+ * @returns {string|null} Formatted date-time, or null when absent/invalid
+ */
+export const formatLocalDateTime = (value) => {
+  const normalizedValue = typeof value === 'string' ? value.replace(' ', 'T') : value;
+
+  return parseDateBoundary(normalizedValue)?.toLocaleString() ?? null;
+};

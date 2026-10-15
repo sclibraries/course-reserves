@@ -44,3 +44,16 @@ describe('formatLocalDate', () => {
     expect(dateBoundaries.formatLocalDate?.('not-a-date')).toBeNull();
   });
 });
+
+describe('formatLocalDateTime', () => {
+  it('formats a timezone-less SQL timestamp in the viewer local date and time', () => {
+    const localDateTime = new Date(2026, 9, 6, 14, 45).toLocaleString();
+
+    expect(dateBoundaries.formatLocalDateTime?.('2026-10-06 14:45:00')).toBe(localDateTime);
+  });
+
+  it('returns null for empty or invalid timestamps', () => {
+    expect(dateBoundaries.formatLocalDateTime?.('')).toBeNull();
+    expect(dateBoundaries.formatLocalDateTime?.('not-a-date')).toBeNull();
+  });
+});

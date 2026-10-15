@@ -183,7 +183,9 @@ describe('FacultyProxyAccess', () => {
     expect(container.textContent).toContain('test-staff-1 · staff');
     expect(container.textContent).toContain('test-proxy-1');
     expect(container.textContent).toContain('test-course-1');
-    expect(container.textContent).toContain('2026-10-06 14:45:00');
+    const activityTime = container.querySelector('time[dateTime="2026-10-06 14:45:00"]');
+    expect(activityTime.textContent).toBe(new Date(2026, 9, 6, 14, 45).toLocaleString());
+    expect(activityTime.getAttribute('dateTime')).toBe('2026-10-06 14:45:00');
   });
 
   it('filters grants by status and faculty ID', async () => {

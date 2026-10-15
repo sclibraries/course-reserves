@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Alert, Table } from 'reactstrap';
+import { formatLocalDateTime } from '../../../../util/dateBoundaries';
 
 const getActor = (entry) => {
   const details = entry.details || {};
@@ -46,7 +47,11 @@ export default function ProxyActivityLog({ entries }) {
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.log_id}>
-                  <td><time dateTime={entry.created_at}>{entry.created_at || '—'}</time></td>
+                  <td>
+                    <time dateTime={entry.created_at}>
+                      {formatLocalDateTime(entry.created_at) ?? '—'}
+                    </time>
+                  </td>
                   <td>{(entry.action || 'unknown').replaceAll('_', ' ')}</td>
                   <td>{entry.faculty_shibboleth_id}</td>
                   <td>{entry.proxy_shibboleth_id}</td>
