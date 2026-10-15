@@ -6,6 +6,7 @@ use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use app\services\FacultyRoleResolver;
 use app\services\FacultyTokenClaims;
+use app\services\SafeRedirect;
 
 // Allow CORS dynamically for known origins; redirects aren't impacted by CORS,
 // but token refresh/XHRs are during development.
@@ -126,31 +127,22 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
                 break;
             }
         }
-        $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'libtools2.smith.edu';
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
-        $isLocalhost = $host === 'localhost' || strpos($host, '127.0.0.1') === 0 || strpos($host, ':') !== false;
-        $defaultRedirect = $isLocalhost
+        $isLocalRequest = SafeRedirect::isLocalHost($host);
+        $defaultRedirect = $isLocalRequest
             ? $scheme . '://' . $host . '/course-reserves/faculty'
             : 'https://libtools2.smith.edu/course-reserves/faculty';
 
-        if ($redirectParam) {
-            if (preg_match('#^https?://#i', $redirectParam)) {
-                $redirectUrl = $redirectParam; // absolute URL
-            } elseif (strpos($redirectParam, '/') === 0) {
-                // If Referer is present, prefer its origin to preserve localhost:port during dev
-                $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : null;
-                if ($referer && preg_match('#^(https?://[^/]+)#i', $referer, $m)) {
-                    $origin = $m[1];
-                    $redirectUrl = rtrim($origin, '/') . $redirectParam;
-                } else {
-                    $redirectUrl = $scheme . '://' . $host . $redirectParam; // fallback to current host
-                }
-            } else {
-                $redirectUrl = $defaultRedirect;
-            }
-        } else {
-            $redirectUrl = $defaultRedirect;
-        }
+        $corsOrigins = isset($config['components']['cors']['cors']['Origin'])
+            ? $config['components']['cors']['cors']['Origin']
+            : [];
+        $redirectUrl = SafeRedirect::resolve(
+            $redirectParam,
+            isset($app->params['facultyFormUrl']) ? $app->params['facultyFormUrl'] : null,
+            $corsOrigins,
+            $scheme,
+            $host,
+            $defaultRedirect
+        );
 
         // Redirect to frontend — tokens delivered via cookies, not URL
         header('Location: ' . $redirectUrl);
