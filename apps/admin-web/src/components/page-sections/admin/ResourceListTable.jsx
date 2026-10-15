@@ -23,29 +23,7 @@ import { ResourceFormType } from '../../admin/forms/constants/formTypes';
 import { useResourceFormModal } from '../../../hooks/admin/useResourceFormModal';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { toast } from 'react-toastify';
-import { LIBPROXY_PREFIX } from '../../../util/externalLinks';
-
-/**
- * Adjusts the proxy settings in a resource URL
- * @function
- * @param {Object} data - Resource data
- */
-function adjustProxy(data) {
-  if (!data || typeof data.link !== "string") {
-    throw new Error("Invalid data or missing link property");
-  }
-  
-  // Keep this component's loose flags and undefined return distinct from proxyUtil.
-  if (data.use_proxy == 1) {
-    if (!data.link.startsWith(LIBPROXY_PREFIX)) {
-      data.link = LIBPROXY_PREFIX + data.link;
-    }
-  } else if (data.use_proxy == 0) {
-    if (data.link.startsWith(LIBPROXY_PREFIX)) {
-      data.link = data.link.replace(LIBPROXY_PREFIX, "");
-    }
-  }
-}
+import { adjustProxy } from '../../../util/proxyUtil';
 
 /**
  * Delete confirmation modal component
@@ -336,7 +314,7 @@ ResourceListTable.propTypes = {
       name: PropTypes.string,
       item_url: PropTypes.string,
       link: PropTypes.string,  // Added missing property used in adjustProxy
-      use_proxy: PropTypes.number, // Added missing property used in adjustProxy
+      use_proxy: PropTypes.oneOf([0, 1, '0', '1', true, false]),
       material_type_name: PropTypes.string,
       created_at: PropTypes.string,
       course_count: PropTypes.number,
