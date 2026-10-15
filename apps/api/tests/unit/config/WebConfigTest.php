@@ -33,12 +33,12 @@ class WebConfigTest extends \Codeception\Test\Unit
 
     public function testFacultySubmissionUuidCommunicationsRoutesAreDeclaredOnce()
     {
-        $source = file_get_contents(codecept_root_dir('config/web.php'));
+        $config = require codecept_root_dir('config/web.php');
+        $pattern = 'GET faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/communications';
+        $rules = $config['components']['urlManager']['rules'];
 
-        $this->assertSame(1, substr_count(
-            $source,
-            "'GET faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/communications' => 'faculty-submission/communications'"
-        ));
+        $this->assertArrayHasKey($pattern, $rules);
+        $this->assertSame('faculty-submission/communications', $rules[$pattern]);
     }
 
     public function testFacultyFormDockerOriginIsAllowedForCors()
@@ -57,15 +57,12 @@ class WebConfigTest extends \Codeception\Test\Unit
 
     public function testSubmissionWorkflowCompleteProcessingRouteIsDeclared()
     {
-        $source = file_get_contents(codecept_root_dir('config/web.php'));
+        $config = require codecept_root_dir('config/web.php');
+        $rules = $config['components']['urlManager']['rules'];
+        $post = 'POST submission-workflow/item/<itemId:\\d+>/complete-processing';
+        $options = 'OPTIONS submission-workflow/item/<itemId:\\d+>/complete-processing';
 
-        $this->assertStringContainsString(
-            "'POST submission-workflow/item/<itemId:\\d+>/complete-processing' => 'submission-workflow/complete-processing'",
-            $source
-        );
-        $this->assertStringContainsString(
-            "'OPTIONS submission-workflow/item/<itemId:\\d+>/complete-processing' => 'submission-workflow/options'",
-            $source
-        );
+        $this->assertSame('submission-workflow/complete-processing', $rules[$post]);
+        $this->assertSame('submission-workflow/options', $rules[$options]);
     }
 }

@@ -1,0 +1,40 @@
+<?php
+
+// Staff workflow routes must precede the generic REST rule.
+return [
+    // Staff Workflow endpoints - MUST be before UrlRule
+    'GET submission-workflow/pending-submissions' => 'submission-workflow/pending-submissions',
+    'GET submission-workflow/my-assignments' => 'submission-workflow/my-assignments',
+    'GET submission-workflow/my-claimed-items' => 'submission-workflow/my-claimed-items',
+    'GET submission-workflow/search-staff' => 'submission-workflow/search-staff',
+    'GET submission-workflow/my-unread-count' => 'submission-workflow/my-unread-count',
+    'GET submission-workflow/my-mentions' => 'submission-workflow/my-mentions',
+    'POST submission-workflow/assign-submission' => 'submission-workflow/assign-submission',
+    'PUT submission-workflow/assignment/<id:\d+>' => 'submission-workflow/update-assignment',
+    'GET submission-workflow/submission/<id:\d+>' => 'submission-workflow/view-submission',
+    'GET submission-workflow/submission/<id:\d+>/communications' => 'submission-workflow/communications',
+    'POST submission-workflow/submission/<id:\d+>/communications' => 'submission-workflow/create-communication',
+    'PUT submission-workflow/communications/<messageId:\d+>' => 'submission-workflow/update-communication',
+    'POST submission-workflow/communications/<messageId:\d+>/read' => 'submission-workflow/mark-communication-read',
+    'POST submission-workflow/complete/<id:\d+>' => 'submission-workflow/complete-submission',
+    'PUT submission-workflow/item/<itemId:\d+>' => 'submission-workflow/update-item',
+    'POST submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/complete-processing',
+    'POST submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/claim-item',
+    'OPTIONS submission-workflow/pending-submissions' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/my-assignments' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/my-claimed-items' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/search-staff' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/my-unread-count' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/my-mentions' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/assign-submission' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/assignment/<id:\d+>' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/submission/<id:\d+>' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/submission/<id:\d+>/communications' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/submission/<id:[^/]+>/communications' => 'submission-workflow/options', // Catch undefined/invalid IDs
+    'OPTIONS submission-workflow/communications/<messageId:\d+>' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/communications/<messageId:\d+>/read' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/complete/<id:\d+>' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/item/<itemId:\d+>' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/options',
+];
