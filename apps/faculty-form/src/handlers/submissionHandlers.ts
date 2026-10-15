@@ -6,6 +6,7 @@ import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { API_ENDPOINTS, DEFAULT_CONFIG } from "@/config/endpoints";
 import { validateReserveForSubmission } from "@/utils/reserveValidation";
 import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submissionUpdateErrors";
+import { withActingForFaculty } from "./actingForPayload";
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
@@ -114,9 +115,6 @@ const getSubmissionErrorMessage = async (res: Response) => {
   return text;
 };
 
-/**
- * Handlers for submission operations
- */
 export const createSubmissionHandlers = (
   navigate: (path: string) => void,
   reserve: CourseReserve,
@@ -297,7 +295,7 @@ export const createSubmissionHandlers = (
           // CREATE new submission using POST endpoint
           url = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_SUBMIT_COMPLETE}`;
           method = 'POST';
-          payload = submissionData;
+          payload = withActingForFaculty(submissionData);
         }
         
         const res = await fetch(url, {
@@ -478,7 +476,7 @@ export const createSubmissionHandlers = (
             'Content-Type': 'application/json',
             ...getAuthHeaders(), // Add authentication token
           },
-          body: JSON.stringify(submissionData)
+          body: JSON.stringify(withActingForFaculty(submissionData))
         });
 
         if (!res.ok) {

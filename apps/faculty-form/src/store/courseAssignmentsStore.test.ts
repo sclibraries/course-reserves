@@ -39,7 +39,7 @@ let apiClient: typeof import('@/services/apiClient').default;
 let useCourseAssignmentsStore: typeof CourseAssignmentsStore;
 let adapterCalls: number;
 let capturedConfig: InternalAxiosRequestConfig | undefined;
-let responseData: { success: boolean; courses: CourseAssignment[] };
+let responseData: { success: boolean; courses: CourseAssignment[]; can_edit?: boolean };
 let adapterError: Error | null;
 let originalAdapter: ReturnType<typeof import('axios').default.create>['defaults']['adapter'];
 
@@ -94,6 +94,10 @@ describe('courseAssignmentsStore', () => {
       assignments: [],
       loading: false,
       error: null,
+      actingForAssignments: [],
+      actingForLoading: false,
+      actingForError: null,
+      actingForCanEdit: null,
     });
   });
 
@@ -146,6 +150,61 @@ describe('courseAssignmentsStore', () => {
       assignments: [],
       loading: false,
       error: 'Course service unavailable',
+    });
+  });
+
+  it('loads proxy courses with the acting-for username without replacing the faculty member’s own list', async () => {
+    useCourseAssignmentsStore.setState({ assignments: [course] });
+    responseData = { success: true, courses: [{ ...course, assignment: { ...course.assignment, course_id: 'TEST-200' } }], can_edit: false };
+
+    await useCourseAssignmentsStore.getState().fetchActingForAssignments('test-faculty');
+
+    expect(capturedConfig).toBeDefined();
+    const requestUrl = new URL(apiClient.getUri(capturedConfig));
+    expect(requestUrl.pathname).toBe(`${COURSE_RESERVES_PATH}${COURSE_ASSIGNMENTS_PATH}`);
+    expect(requestUrl.searchParams.get('acting_for_faculty_id')).toBe('test-faculty');
+    expect(useCourseAssignmentsStore.getState()).toMatchObject({
+      assignments: [course],
+      actingForAssignments: [{ assignment: { course_id: 'TEST-200' } }],
+      actingForCanEdit: false,
+      actingForLoading: false,
+      actingForError: null,
+    });
+  });
+
+  it('clears acting-for course state when the selection is removed', () => {
+    useCourseAssignmentsStore.getState().clearActingForAssignments();
+
+    expect(useCourseAssignmentsStore.getState()).toMatchObject({
+      actingForAssignments: [],
+      actingForCanEdit: null,
+      actingForLoading: false,
+      actingForError: null,
+    });
+  });
+
+  it.each([
+    [403, 'No active proxy grant for this faculty member'],
+    [409, 'The faculty member must re-invite you because their roster is unavailable'],
+  ])('keeps the API message for acting-for errors with status %i', async (status, message) => {
+    useCourseAssignmentsStore.setState({
+      actingForAssignments: [course],
+      actingForCanEdit: true,
+    });
+    const error = Object.assign(new Error(`Request failed with status code ${status}`), {
+      response: { status, data: { message } },
+    });
+    adapterError = error;
+
+    await expect(
+      useCourseAssignmentsStore.getState().fetchActingForAssignments('test-faculty'),
+    ).rejects.toBe(error);
+
+    expect(useCourseAssignmentsStore.getState()).toMatchObject({
+      actingForAssignments: [],
+      actingForCanEdit: null,
+      actingForLoading: false,
+      actingForError: message,
     });
   });
 });

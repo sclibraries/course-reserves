@@ -35,6 +35,8 @@ export interface BackendSubmission {
   locked_by_staff_id?: string | null;
   lock_reason?: string | null;
   can_edit?: boolean;
+  access?: 'owner' | 'proxy' | 'co_instructor';
+  proxy_can_edit?: boolean;
   folders?: BackendFolder[];
   unfoldered_items?: BackendMaterial[];
   submission_notes?: string | null;
@@ -106,6 +108,13 @@ const mapLockFields = (submission: BackendSubmission): Pick<
     : !(submission.is_locked ?? false),
 });
 
+const mapProxyFields = (submission: BackendSubmission): Pick<CourseReserve, 'access' | 'proxyCanEdit' | 'canEdit'> => ({
+  ...(submission.access ? { access: submission.access } : {}),
+  ...(typeof submission.proxy_can_edit === 'boolean'
+    ? { proxyCanEdit: submission.proxy_can_edit, canEdit: submission.proxy_can_edit }
+    : {}),
+});
+
 const formatLastUpdated = (updatedAt: string) => new Date(updatedAt).toLocaleDateString('en-US', {
   month: 'short',
   day: 'numeric',
@@ -132,6 +141,7 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
     isTestData: false,
     courseAssignmentId,
     ...mapLockFields(submission),
+    ...mapProxyFields(submission),
   };
 };
 
@@ -151,6 +161,7 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
     lastUpdated: formatLastUpdated(submission.updated_at),
     isTestData: false,
     ...mapLockFields(submission),
+    ...mapProxyFields(submission),
     submissionNotes: submission.submission_notes || null,
     neededByDate: submission.needed_by_date || null,
   };

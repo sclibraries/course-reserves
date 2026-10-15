@@ -25,7 +25,14 @@ export const API_ENDPOINTS = {
     // EBSCO Discovery Search
     EBSCO_SEARCH: '/ebsco-search/search',
     // Course Assignments - new backend service
-    COURSE_ASSIGNMENTS: '/course-assignments/instructor-courses'
+    COURSE_ASSIGNMENTS: '/course-assignments/instructor-courses',
+    FACULTY_PROXY_MY_PROXIES: '/faculty-proxy/my-proxies',
+    FACULTY_PROXY_INVITE: '/faculty-proxy/invite-proxy',
+    FACULTY_PROXY_MY_FACULTY_ACCESS: '/faculty-proxy/my-faculty-access',
+    FACULTY_PROXY_VALIDATE_TOKEN: '/faculty-proxy/validate-token',
+    FACULTY_PROXY_ACCEPT: '/faculty-proxy/accept-invitation',
+    FACULTY_PROXY_REVOKE: '/faculty-proxy/revoke-proxy',
+    FACULTY_PROXY_ACTIVITY_LOG: '/faculty-proxy/activity-log'
   },
 
   // Authentication
@@ -33,7 +40,8 @@ export const API_ENDPOINTS = {
     BASE_URL: `${BASE_API_URL}${AUTH_PATH}`,
     LOGIN: '/login',
     LOGOUT: '/logout',
-    VERIFY: '/verify'
+    VERIFY: '/verify',
+    FACULTY_AUTHORIZE: '/faculty-authorize.php'
   },
 
   // FOLIO Library Management System

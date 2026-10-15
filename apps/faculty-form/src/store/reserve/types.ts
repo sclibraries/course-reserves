@@ -131,6 +131,8 @@ export interface CourseReserve {
   lockedBy?: string | null; // Staff name who locked it
   lockReason?: string | null; // Reason for locking
   canEdit?: boolean; // Backend flag indicating if current user can edit
+  access?: 'owner' | 'proxy' | 'co_instructor';
+  proxyCanEdit?: boolean;
 
   // Submission fields
   submissionNotes?: string | null; // Faculty notes about the submission

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { API_ENDPOINTS } from '@/config/endpoints';
 import { clearCourseReservesStorage } from './courseReservesStore';
+import { useActingForStore } from './actingForStore';
 
 export const FACULTY_FORM_AUTH_PATH = '/form/auth';
 
@@ -81,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
         // Logout
         logout: () => {
           console.log('🚪 User logged out');
+          useActingForStore.getState().clearSelection();
           
           // Optional: mark logout in progress for other modules that may read it
           sessionStorage.setItem('logout-in-progress', 'true');

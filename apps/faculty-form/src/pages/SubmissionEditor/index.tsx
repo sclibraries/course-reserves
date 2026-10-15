@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
@@ -86,6 +86,10 @@ const SubmissionEditor = () => {
         </div>
       </div>
     );
+  }
+
+  if (reserve.access === 'proxy' && reserve.proxyCanEdit === false) {
+    return <Navigate to={`/submission/${id}`} replace />;
   }
 
   const isEditingSubmission = reserve.status === 'submitted';

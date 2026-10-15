@@ -29,6 +29,8 @@ export interface Submission {
   needsReviewItems: number;
   lastUpdated: string;
   isLocked?: boolean;
+  access?: 'owner' | 'proxy' | 'co_instructor';
+  proxyCanEdit?: boolean;
 }
 
 interface SubmissionCardProps {
@@ -40,7 +42,7 @@ export const SubmissionCard = ({ submission, onDelete }: SubmissionCardProps) =>
   const navigate = useNavigate();
 
   const handleOpen = () => {
-    if (submission.status === "draft") {
+    if (submission.status === "draft" && submission.proxyCanEdit !== false) {
       navigate(`/submission/${submission.id}/edit`);
     } else {
       navigate(`/submission/${submission.id}`);
@@ -60,6 +62,8 @@ export const SubmissionCard = ({ submission, onDelete }: SubmissionCardProps) =>
             </Badge>
           </div>
           <div className="flex items-center gap-2">
+            {submission.access === 'proxy' && <Badge variant="outline">Proxy</Badge>}
+            {submission.access === 'co_instructor' && <Badge variant="outline">Co-instructor</Badge>}
             {submission?.isLocked && (
               <Badge
                 variant="outline"
@@ -103,7 +107,7 @@ export const SubmissionCard = ({ submission, onDelete }: SubmissionCardProps) =>
         >
           View Status
         </Button>
-        {submission.status === "draft" && (
+        {submission.status === "draft" && submission.proxyCanEdit !== false && (
           <>
             <Button 
               variant="ghost"

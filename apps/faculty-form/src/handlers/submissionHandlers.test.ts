@@ -368,6 +368,40 @@ describe('createSubmissionHandlers', () => {
       }),
     ]);
   });
+
+  it.each(['normal', 'clone'] as const)('adds acting_for_faculty_id to a new %s submission only at the top level', async (flow) => {
+    const { createSubmissionHandlers } = await import('./submissionHandlers');
+    const { useActingForStore } = await import('@/store/actingForStore');
+    const { useAuthStore } = await import('@/store/authStore');
+    const { reserve, organizedContent } = buildPayloadContractScenario('draft');
+    useActingForStore.getState().selectFaculty({ username: 'test-faculty', displayName: 'Test Faculty' });
+    useAuthStore.setState({
+      user: {
+        iat: 1,
+        exp: 2,
+        id: 'faculty-1',
+        username: 'faculty1',
+        full_name: 'Faculty One',
+        email: 'faculty1@example.test',
+        role: 'faculty',
+        institution: 'SM',
+      },
+      isAuthenticated: true,
+    });
+    vi.mocked(fetch).mockResolvedValue(successfulSubmissionResponse('created-uuid'));
+
+    const handlers = createSubmissionHandlers(vi.fn(), reserve, organizedContent, vi.fn());
+    if (flow === 'normal') handlers.confirmSubmit(false);
+    else handlers.confirmDuplicateSubmit(false);
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [, request] = vi.mocked(fetch).mock.calls[0];
+    const payload = JSON.parse(String((request as RequestInit).body));
+
+    expect(payload.acting_for_faculty_id).toBe('test-faculty');
+    expect(payload.metadata.submittedBy.username).toBe('faculty1');
+    expect(payload.metadata).not.toHaveProperty('acting_for_faculty_id');
+  });
 });
 
 function makeLocalStorageMock() {
@@ -397,6 +431,7 @@ function buildReserve() {
     term: '2026SP',
     status: 'draft' as const,
     lastUpdated: '2026-06-17T12:00:00.000Z',
+    folders: [],
     items: [
       {
         id: 'item-1',

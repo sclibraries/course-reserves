@@ -13,6 +13,11 @@ import ClonePrevious from "./pages/ClonePrevious";
 import CloneEditor from "./pages/CloneEditor";
 import CloneMatchingTest from "./pages/CloneMatchingTest";
 import NotFound from "./pages/NotFound";
+import ManageDesignees from "./pages/ManageDesignees";
+import AcceptProxyInvitation from "./pages/AcceptProxyInvitation";
+import { ActingForBanner } from "./components/ActingForBanner";
+import { ProxyInvitationResume } from "./components/ProxyInvitationResume";
+import { ProxyAccessSync } from "./components/ProxyAccessSync";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +27,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter basename={import.meta.env.VITE_BASE_PATH || '/'}>
+        <ProxyInvitationResume />
+        <ProxyAccessSync />
+        <ActingForBanner />
         <Routes>
           {/* Auth-only route - redirects to / if authenticated */}
           <Route path="/auth" element={
@@ -36,6 +44,12 @@ const App = () => (
               <Index />
             </ProtectedRoute>
           } />
+          <Route path="/designees" element={
+            <ProtectedRoute>
+              <ManageDesignees />
+            </ProtectedRoute>
+          } />
+          <Route path="/faculty/accept-proxy-invitation/:token" element={<AcceptProxyInvitation />} />
           <Route path="/new-submission" element={
             <ProtectedRoute>
               <NewSubmission />

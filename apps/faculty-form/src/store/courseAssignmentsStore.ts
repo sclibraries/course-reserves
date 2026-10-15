@@ -5,6 +5,7 @@ import apiClient from '@/services/apiClient';
 
 // Types for course assignments from the backend
 export interface CourseAssignment {
+  canEdit?: boolean;
   assignment: {
     academic_period: string;
     course_id: string;
@@ -46,9 +47,15 @@ interface CourseAssignmentsState {
   assignments: CourseAssignment[];
   loading: boolean;
   error: string | null;
+  actingForAssignments: CourseAssignment[];
+  actingForLoading: boolean;
+  actingForError: string | null;
+  actingForCanEdit: boolean | null;
   
   // Actions
   fetchCourseAssignments: () => Promise<void>;
+  fetchActingForAssignments: (facultyUsername: string, canEditFallback?: boolean) => Promise<void>;
+  clearActingForAssignments: () => void;
   clearAssignments: () => void;
 }
 
@@ -60,6 +67,10 @@ export const useCourseAssignmentsStore = create<CourseAssignmentsState>()(
         assignments: [],
         loading: false,
         error: null,
+        actingForAssignments: [],
+        actingForLoading: false,
+        actingForError: null,
+        actingForCanEdit: null,
 
         // Fetch course assignments from backend
         fetchCourseAssignments: async () => {
@@ -97,6 +108,56 @@ export const useCourseAssignmentsStore = create<CourseAssignmentsState>()(
           });
           throw error;
         }
+      },
+
+      fetchActingForAssignments: async (facultyUsername, canEditFallback = true) => {
+        set({
+          actingForAssignments: [],
+          actingForLoading: true,
+          actingForError: null,
+          actingForCanEdit: canEditFallback,
+        });
+
+        try {
+          const response = await apiClient.get(
+            `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.COURSE_ASSIGNMENTS}`,
+            { params: { acting_for_faculty_id: facultyUsername } },
+          );
+          const data = response.data;
+          const courses = data.success && Array.isArray(data.courses) ? data.courses : [];
+
+          set({
+            actingForAssignments: courses,
+            actingForCanEdit: typeof data.can_edit === 'boolean' ? data.can_edit : canEditFallback,
+            actingForLoading: false,
+            actingForError: null,
+          });
+        } catch (error) {
+          const responseData = (error as { response?: { data?: { message?: string; error?: string; error_code?: string } } })
+            .response?.data;
+          const errorMessage = responseData?.message || responseData?.error ||
+            (responseData?.error_code === 'proxy_roster_unavailable'
+              ? 'Your faculty member must re-invite you to restore course access.'
+              : null) ||
+            (error instanceof Error ? error.message : 'Failed to fetch the faculty course list');
+
+          set({
+            actingForAssignments: [],
+            actingForCanEdit: null,
+            actingForLoading: false,
+            actingForError: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      clearActingForAssignments: () => {
+        set({
+          actingForAssignments: [],
+          actingForLoading: false,
+          actingForError: null,
+          actingForCanEdit: null,
+        });
       },
 
       // Clear course assignments
