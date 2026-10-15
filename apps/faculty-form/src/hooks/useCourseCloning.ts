@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/config/endpoints';
+import { fetchMergedCourseResources, fetchPhysicalCourseResources } from '@/services/courseResourceFetch';
 
 export interface PreviousCourse {
   courseListingId: string;
@@ -90,7 +91,6 @@ export const useCourseCloning = () => {
     } else {
       query = `(department.name=="SC*" and courseListing.instructorObjects="${firstName}*") sortby name`;
     }
-
     const searchUrl = `${API_ENDPOINTS.FOLIO.BASE_URL}${API_ENDPOINTS.FOLIO.SEARCH_COURSES}?query=${encodeURIComponent(query)}`;
 
     const coursesRes = await fetch(searchUrl, {
@@ -106,7 +106,6 @@ export const useCourseCloning = () => {
 
     const coursesData = await coursesRes.json();
     const courses = coursesData.data?.courses || [];
-
     const coursesWithCounts = await Promise.all(
       courses.map(async (course: {
         courseListingObject?: { id?: string; termObject?: { name?: string }; instructorObjects?: Array<{ name?: string }>; };
@@ -121,15 +120,7 @@ export const useCourseCloning = () => {
           let physicalCount = 0;
 
           try {
-            const electronicRes = await fetch(
-              `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}/course/get-merged-resources?courseListingId=${courseListingId}`,
-              {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                mode: 'cors',
-                credentials: 'omit'
-              }
-            );
+            const electronicRes = await fetchMergedCourseResources(courseListingId);
 
             if (electronicRes.ok) {
               const electronicData = await electronicRes.json();
@@ -141,15 +132,7 @@ export const useCourseCloning = () => {
           }
 
           try {
-            const physicalRes = await fetch(
-              `${API_ENDPOINTS.FOLIO.BASE_URL}/search/search-course-listings?courseListingId=${courseListingId}`,
-              {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                mode: 'cors',
-                credentials: 'omit'
-              }
-            );
+            const physicalRes = await fetchPhysicalCourseResources(courseListingId);
 
             if (physicalRes.ok) {
               const physicalData = await physicalRes.json();
@@ -267,15 +250,7 @@ export const useCourseCloning = () => {
       
       // Fetch merged resources (includes both electronic and physical references)
       try {
-        const mergedRes = await fetch(
-          `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}/course/get-merged-resources?courseListingId=${courseListingId}`,
-          {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            mode: 'cors',
-            credentials: 'omit'
-          }
-        );
+        const mergedRes = await fetchMergedCourseResources(courseListingId);
         
         if (mergedRes.ok) {
           const mergedData = await mergedRes.json();
@@ -295,15 +270,7 @@ export const useCourseCloning = () => {
       
       // Fetch physical reserves with full FOLIO data
       try {
-        const physicalRes = await fetch(
-          `${API_ENDPOINTS.FOLIO.BASE_URL}/search/search-course-listings?courseListingId=${courseListingId}`,
-          {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            mode: 'cors',
-            credentials: 'omit'
-          }
-        );
+        const physicalRes = await fetchPhysicalCourseResources(courseListingId);
         
         if (physicalRes.ok) {
           const physicalData = await physicalRes.json();
@@ -319,7 +286,6 @@ export const useCourseCloning = () => {
       return { physicalReserves: [], electronicResources: [] };
     }
   }, []);
-
   return {
     loadingPreviousCourses,
     hasLoadedPreviousCourses,
