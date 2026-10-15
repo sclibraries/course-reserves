@@ -3,6 +3,8 @@
 namespace app\models;
 
 use yii\db\ActiveRecord;
+use yii\db\Expression;
+use yii\db\Query;
 use yii\behaviors\TimestampBehavior;
 
 /**
@@ -12,6 +14,7 @@ use yii\behaviors\TimestampBehavior;
  * @property string $faculty_shibboleth_id
  * @property string $proxy_shibboleth_id
  * @property string $faculty_display_name
+ * @property string $faculty_internal_id
  * @property string $proxy_display_name
  * @property string $proxy_email
  * @property string $permission_type
@@ -70,6 +73,7 @@ class FacultyProxyPermission extends ActiveRecord
         return [
             [['faculty_shibboleth_id', 'proxy_shibboleth_id'], 'required'],
             [['notes'], 'string'],
+            [['faculty_internal_id'], 'string', 'max' => 255],
             [['invited_at', 'invitation_expires_at', 'accepted_at', 'expires_at', 'revoked_at', 'created_at', 'updated_at'], 'safe'],
             [['faculty_shibboleth_id', 'proxy_shibboleth_id', 'faculty_display_name', 'proxy_display_name', 'proxy_email'], 'string', 'max' => 255],
             [['invitation_token'], 'string', 'max' => 64],
@@ -91,6 +95,7 @@ class FacultyProxyPermission extends ActiveRecord
             'faculty_shibboleth_id' => 'Faculty User ID',
             'proxy_shibboleth_id' => 'Proxy User ID',
             'faculty_display_name' => 'Faculty Name',
+            'faculty_internal_id' => 'Faculty Internal ID',
             'proxy_display_name' => 'Proxy Name',
             'proxy_email' => 'Proxy Email',
             'permission_type' => 'Permission Type',
@@ -198,21 +203,33 @@ class FacultyProxyPermission extends ActiveRecord
             return false;
         }
 
-        if ($this->permission_type === self::PERMISSION_FULL_ACCESS) {
-            return true;
-        }
+        return self::find()
+            ->alias('proxy_permission')
+            ->where(['proxy_permission.permission_id' => $this->permission_id])
+            ->andWhere(self::courseScopeCondition('proxy_permission', $folioCourseListingId))
+            ->exists();
+    }
 
-        if ($this->permission_type === self::PERMISSION_VIEW_ONLY) {
-            return true; // Can view but not edit
-        }
+    /**
+     * SQL predicate shared by row authorization and accessible submission queries.
+     */
+    public static function courseScopeCondition($permissionAlias, $folioCourseListingId)
+    {
+        $courseScope = (new Query())
+            ->select(new Expression('1'))
+            ->from(['course_scope' => FacultyProxyCoursePermission::tableName()])
+            ->where('course_scope.permission_id = ' . $permissionAlias . '.permission_id')
+            ->andWhere(['=', 'course_scope.folio_course_listing_id', $folioCourseListingId]);
 
-        if ($this->permission_type === self::PERMISSION_SPECIFIC_COURSES) {
-            return $this->getCoursePermissions()
-                ->where(['folio_course_listing_id' => $folioCourseListingId])
-                ->exists();
-        }
-
-        return false;
+        return [
+            'or',
+            [$permissionAlias . '.permission_type' => [self::PERMISSION_FULL_ACCESS, self::PERMISSION_VIEW_ONLY]],
+            [
+                'and',
+                [$permissionAlias . '.permission_type' => self::PERMISSION_SPECIFIC_COURSES],
+                ['exists', $courseScope],
+            ],
+        ];
     }
 
     /**

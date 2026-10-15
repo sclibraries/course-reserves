@@ -7,6 +7,7 @@ class FacultySubmissionConfirmationMigrationCest
 {
     private $migrationVersion = 'm261014_000001_add_confirmation_delivery_state';
     private $proxyMigrationVersion = 'm261014_000002_add_proxy_invitation_expiry';
+    private $api074MigrationVersion = 'm261015_000001_add_faculty_internal_id_to_proxy_permissions';
     private $facultyId = 'test-api032-migration-faculty';
 
     /**
@@ -18,6 +19,7 @@ class FacultySubmissionConfirmationMigrationCest
         $db = \Yii::$app->db;
         $confirmationMigrationIsDown = false;
         $proxyMigrationIsDown = false;
+        $api074MigrationIsDown = false;
 
         try {
             $applied = (int) $db->createCommand(
@@ -32,7 +34,15 @@ class FacultySubmissionConfirmationMigrationCest
             )->queryScalar();
             Assert::assertSame(1, $proxyMigrationApplied, 'API-070 migration must be applied by test-stack setup.');
 
-            // Roll back the later API-070 migration so migrate/down 1 targets this test's migration.
+            $api074MigrationApplied = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api074MigrationVersion]
+            )->queryScalar();
+            Assert::assertSame(1, $api074MigrationApplied, 'API-074 migration must be applied by test-stack setup.');
+
+            // Roll back later migrations so migrate/down 1 targets the confirmation migration.
+            $this->runMigration('down');
+            $api074MigrationIsDown = true;
             $this->runMigration('down');
             $proxyMigrationIsDown = true;
             $confirmationMigrationIsDown = true;
@@ -68,6 +78,8 @@ class FacultySubmissionConfirmationMigrationCest
 
             $this->runMigration('up');
             $proxyMigrationIsDown = false;
+            $this->runMigration('up');
+            $api074MigrationIsDown = false;
             $output = $this->runMigration('up');
             Assert::assertStringContainsString('No new migrations found', $output);
             $this->assertMigratedRows($db);
@@ -76,6 +88,9 @@ class FacultySubmissionConfirmationMigrationCest
                 $this->runMigration('up');
             }
             if ($proxyMigrationIsDown) {
+                $this->runMigration('up');
+            }
+            if ($api074MigrationIsDown) {
                 $this->runMigration('up');
             }
             $db->schema->refreshTableSchema('faculty_submissions');

@@ -187,40 +187,16 @@ class FacultySubmissionController extends BaseRestController
             $sortBy = 'created_at';
         }
         
-        // Get submissions where user is owner or has proxy access
-        $ownSubmissions = FacultySubmission::find()
-            ->where(['shibboleth_user_id' => $facultyUser['user_id']]);
-
-        // Get faculty IDs where current user has proxy access
-        $proxyFacultyIds = \app\models\FacultyProxyPermission::find()
-            ->select('faculty_shibboleth_id')
-            ->where([
-                'proxy_shibboleth_id' => $facultyUser['user_id'],
-                'status' => \app\models\FacultyProxyPermission::STATUS_ACTIVE
-            ])
-            ->column();
-
-        $query = $ownSubmissions;
-        if (!empty($proxyFacultyIds)) {
-            $proxySubmissions = FacultySubmission::find()
-                ->where(['shibboleth_user_id' => $proxyFacultyIds]);
-            
-            $query = FacultySubmission::find()
-                ->where([
-                    'or',
-                    ['shibboleth_user_id' => $facultyUser['user_id']],
-                    ['shibboleth_user_id' => $proxyFacultyIds]
-                ]);
-        }
-        
+        $ownership = new SubmissionOwnershipPolicy();
         $dataProvider = new ActiveDataProvider([
-            'query' => $query->with(['reuseResources', 'newResources'])
+            'query' => $ownership->accessibleSubmissionsQuery($facultyUser)
+                ->with(['reuseResources', 'newResources'])
                 ->orderBy([$sortBy => $sortOrder]),
             // Let per-page and page be controlled by query params (defaults handled by Yii)
         ]);
 
         $models = $dataProvider->getModels();
-        $items = array_map(function($m) {
+        $items = array_map(function($m) use ($ownership, $facultyUser) {
             $item = $m->toArray();
             
             // Get all resources (unified table with is_reuse flag)
@@ -341,6 +317,12 @@ class FacultySubmissionController extends BaseRestController
             $item['locked_by'] = $m->locked_by_staff_id;
             $item['lock_reason'] = $m->lock_reason;
             $item['can_edit'] = $m->canEdit();
+
+            $access = $ownership->accessDetails($m, $facultyUser);
+            $item['access'] = $access['access'];
+            if ($access['access'] === 'proxy') {
+                $item['proxy_can_edit'] = $access['proxy_can_edit'];
+            }
             
             return $item;
         }, $models);

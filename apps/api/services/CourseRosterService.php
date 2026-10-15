@@ -12,6 +12,7 @@ class CourseRosterService
 {
     private $folioService;
     private $folioTerms;
+    private $instructorSubmissionCourses = [];
 
     public function __construct($folioService = null)
     {
@@ -96,22 +97,23 @@ class CourseRosterService
      */
     public function isAssignmentForCourse(array $assignment, $termCode, $courseCode, $section, $terms = null)
     {
-        $term = $this->mapAcademicPeriodToTerm($assignment['academic_period'] ?? null, $terms);
-        $course = $this->parseCourseId($assignment['course_id'] ?? null);
+        $rosteredCourse = $this->submissionCourseValues($assignment, $terms);
 
-        return $term !== null && isset($term['name']) && $term['name'] === $termCode &&
-            $course['courseNumber'] !== null &&
-            $this->normalizeCourseCode($course['courseNumber']) === $this->normalizeCourseCode($courseCode) &&
-            $this->normalizeSection($course['sectionName']) === $this->normalizeSection($section);
+        return $rosteredCourse !== null && $rosteredCourse['term_code'] === $termCode &&
+            $rosteredCourse['course_code'] === $this->normalizeCourseCode($courseCode) &&
+            $rosteredCourse['section'] === $this->normalizeSection($section);
     }
 
     /**
-     * Check the actor's Instructor rows using the shared course and term mapping.
+     * Return normalized submission course identity tuples for an instructor's ITS roster.
      */
-    public function isInstructorRostered($smithId, $termCode, $courseCode, $section)
+    public function getInstructorSubmissionCourses($smithId)
     {
         if (empty($smithId)) {
-            return false;
+            return [];
+        }
+        if (array_key_exists($smithId, $this->instructorSubmissionCourses)) {
+            return $this->instructorSubmissionCourses[$smithId];
         }
 
         $assignments = CourseAssignments::find()
@@ -119,17 +121,52 @@ class CourseRosterService
             ->asArray()
             ->all();
         $terms = $this->getFolioTerms();
+        $courses = [];
 
         foreach ($assignments as $assignment) {
             if (strcasecmp((string)($assignment['role'] ?? ''), 'Instructor') !== 0) {
                 continue;
             }
-            if ($this->isAssignmentForCourse($assignment, $termCode, $courseCode, $section, $terms)) {
+
+            $course = $this->submissionCourseValues($assignment, $terms);
+            if ($course !== null) {
+                $courses[] = $course;
+            }
+        }
+
+        $this->instructorSubmissionCourses[$smithId] = $courses;
+        return $courses;
+    }
+
+    /**
+     * Check the actor's Instructor rows using the shared course and term mapping.
+     */
+    public function isInstructorRostered($smithId, $termCode, $courseCode, $section)
+    {
+        foreach ($this->getInstructorSubmissionCourses($smithId) as $course) {
+            if ($course['term_code'] === $termCode &&
+                $course['course_code'] === $this->normalizeCourseCode($courseCode) &&
+                $course['section'] === $this->normalizeSection($section)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function submissionCourseValues(array $assignment, $terms)
+    {
+        $term = $this->mapAcademicPeriodToTerm($assignment['academic_period'] ?? null, $terms);
+        $course = $this->parseCourseId($assignment['course_id'] ?? null);
+        if ($term === null || !isset($term['name']) || $course['courseNumber'] === null) {
+            return null;
+        }
+
+        return [
+            'term_code' => $term['name'],
+            'course_code' => $this->normalizeCourseCode($course['courseNumber']),
+            'section' => $this->normalizeSection($course['sectionName']),
+        ];
     }
 
     private function normalizeCourseCode($courseCode)

@@ -71,6 +71,7 @@ class ProxyInvitationService
         $permission = new FacultyProxyPermission();
         $permission->faculty_shibboleth_id = $actor['user_id'];
         $permission->faculty_display_name = $actor['display_name'] ?? null;
+        $permission->faculty_internal_id = $actor['internal_id'] ?? null;
         $permission->proxy_shibboleth_id = 'pending_' . bin2hex(random_bytes(16));
         $permission->proxy_email = $email;
         $permission->permission_type = $permissionType;

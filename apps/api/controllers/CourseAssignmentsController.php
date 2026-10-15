@@ -9,14 +9,18 @@ use yii\web\ServerErrorHttpException;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 use app\models\CourseAssignments;
+use app\models\FacultyProxyPermission;
 use app\services\CourseRosterService;
 use app\services\FolioService;
+use app\services\InstructorCourseListService;
+use yii\web\ForbiddenHttpException;
 
 class CourseAssignmentsController extends ActiveController
 {
     public $modelClass = 'app\models\CourseAssignments';
     private $courseRosterService;
     private $folioService;
+    private $instructorCourseListService;
 
     public function init()
     {
@@ -292,6 +296,11 @@ class CourseAssignmentsController extends ActiveController
             throw new \yii\web\UnauthorizedHttpException('Authentication required');
         }
 
+        $actingForFacultyId = Yii::$app->request->get('acting_for_faculty_id');
+        if ($actingForFacultyId !== null) {
+            return $this->instructorCoursesForDesignee($actingForFacultyId, $identity);
+        }
+
         // Extract user info from JWT token
         $fullName = $identity->fullName;
         $internalId = $identity->internalId;
@@ -304,103 +313,54 @@ class CourseAssignmentsController extends ActiveController
     }
 
     /**
-     * Core logic to fetch instructor courses with FOLIO enrichment
-     * 
-     * @param string $fullName Instructor's full name
-     * @param string $internalId Smith ID
-     * @param bool $debug Whether to include debug information
-     * @return array
+     * Return course assignments for an instructor, optionally including debug data.
      */
     protected function getInstructorCourses($fullName, $internalId, $debug = false)
     {
-        // Fetch all course assignments for this instructor
-        $assignments = CourseAssignments::find()
-            ->where(['smith_id' => $internalId])
-            ->asArray()
-            ->all();
+        return $this->getInstructorCourseListService()->getInstructorCourses($fullName, $internalId, $debug);
+    }
 
-        if (empty($assignments)) {
-            return [
-                'success' => true,
-                'instructor' => [
-                    'full_name' => $fullName,
-                    'internal_id' => $internalId
-                ],
-                'courses' => [],
-                'count' => 0
-            ];
+    private function instructorCoursesForDesignee($facultyId, $identity)
+    {
+        if (Roles::isStaff($identity->role ?? null)) {
+            throw new ForbiddenHttpException('Staff acting-for course lookup is not supported');
+        }
+        if (!is_string($facultyId) || $facultyId === '') {
+            throw new ForbiddenHttpException('No active proxy permission for this faculty member');
         }
 
-        // Fetch FOLIO terms once
-        $terms = $this->getCourseRosterService()->getFolioTerms();
+        $permission = FacultyProxyPermission::find()
+            ->where([
+                'faculty_shibboleth_id' => $facultyId,
+                'proxy_shibboleth_id' => $identity->username ?? null,
+                'status' => FacultyProxyPermission::STATUS_ACTIVE,
+            ])
+            ->one();
+        if (!$permission || !$permission->isActive(false)) {
+            throw new ForbiddenHttpException('No active proxy permission for this faculty member');
+        }
 
-        $enrichedCourses = [];
-        $debugInfo = [];
-
-        foreach ($assignments as $assignment) {
-            // Parse course information
-
-            $parsedCourse = $this->getCourseRosterService()->parseCourseId($assignment['course_id']);
-
-            $folioTerm = $this->getCourseRosterService()->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
-
-            $courseData = [
-                'assignment' => $assignment,
-                'parsed_course' => $parsedCourse,
-                'folio_term' => $folioTerm,
-                'folio_course' => null
-            ];
-
-            // If we have a valid term and parsed course, search FOLIO
-            if ($folioTerm && $parsedCourse['courseNumber']) {
-                $termId = $folioTerm['id'];
-                $courseNumber = $parsedCourse['courseNumber'];
-                
-                // Search FOLIO courses
-                $query = '(department.name=="SC*" and courseNumber=="' . $courseNumber . '" and courseListing.termId=="' . $termId . '") sortby name';
-                $folioSearchResult = $this->getFolioService()->searchCourses($query);
-                
-                if ($debug) {
-                    $debugInfo[] = [
-                        'course_id' => $assignment['course_id'],
-                        'courseNumber' => $courseNumber,
-                        'termId' => $termId,
-                        'folioSearchUrl' => rtrim(Yii::$app->params['folio']['searchBaseUrl'], '/') . '/search-courses?query=' . $query,
-                        'folioResult' => $folioSearchResult
-                    ];
-                }
-
-                // If FOLIO search returns empty, include backend course info
-                if (empty($folioSearchResult)) {
-                    $courseData['folio_course'] = [
-                        'courseNumber' => $parsedCourse['courseNumber'],
-                        'name' => $assignment['course_title'],
-                        'sectionName' => $parsedCourse['sectionName'],
-                        'source' => 'backend',
-                        'message' => 'Course not yet created in FOLIO'
-                    ];
-                } else {
-                    $courseData['folio_course'] = $folioSearchResult;
-                }
+        $courseList = $this->getInstructorCourseListService();
+        if (empty($permission->faculty_internal_id)) {
+            if ($permission->permission_type !== FacultyProxyPermission::PERMISSION_SPECIFIC_COURSES) {
+                Yii::$app->response->statusCode = 409;
+                return [
+                    'error_code' => 'proxy_roster_unavailable',
+                    'message' => 'Ask the faculty member to re-invite you so their course roster can be loaded.',
+                ];
             }
-
-            $enrichedCourses[] = $courseData;
+            $response = $courseList->coursesFromSpecificGrant($permission);
+        } else {
+            $response = $courseList->getInstructorCourses(
+                $permission->faculty_display_name,
+                $permission->faculty_internal_id
+            );
+            if ($permission->permission_type === FacultyProxyPermission::PERMISSION_SPECIFIC_COURSES) {
+                $response = $courseList->filterToGrantCourses($response, $permission);
+            }
         }
 
-        $response = [
-            'success' => true,
-            'instructor' => [
-                'full_name' => $fullName,
-                'internal_id' => $internalId
-            ],
-            'courses' => $enrichedCourses,
-            'count' => count($enrichedCourses)
-        ];
-
-        if ($debug) {
-            $response['debug'] = $debugInfo;
-        }
-
+        $response['can_edit'] = $permission->canEdit(false);
         return $response;
     }
 
@@ -420,5 +380,17 @@ class CourseAssignmentsController extends ActiveController
         }
 
         return $this->courseRosterService;
+    }
+
+    private function getInstructorCourseListService()
+    {
+        if ($this->instructorCourseListService === null) {
+            $this->instructorCourseListService = new InstructorCourseListService(
+                $this->getFolioService(),
+                $this->getCourseRosterService()
+            );
+        }
+
+        return $this->instructorCourseListService;
     }
 }
