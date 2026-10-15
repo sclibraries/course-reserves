@@ -653,16 +653,6 @@ class FacultySubmissionController extends BaseRestController
         }
 
         if ($submission->save()) {
-            // Log proxy activity if applicable
-            if ($isProxySubmission && $permission) {
-                $permission->logActivity('submission_created', $submission->submission_id, [
-                    'course_title' => $submission->course_title,
-                    'term_code' => $submission->term_code,
-                    'course_code' => $submission->course_code,
-                    'section' => $submission->section
-                ]);
-            }
-            
             return $submission;
         } else {
             Yii::$app->response->statusCode = 422;

@@ -6,6 +6,7 @@ $listFromEnvironment = static function ($name) {
 
 return [
     'corsOrigins' => $listFromEnvironment('CORS_ALLOWED_ORIGINS'),
+    'facultyFormUrl' => getenv('FACULTY_FORM_URL') ?: null,
     'folio' => [
         'searchBaseUrl' => getenv('FOLIO_SEARCH_BASE_URL') ?: 'https://libtools2.smith.edu/folio/web/search',
         'timeoutSeconds' => (int)(getenv('FOLIO_TIMEOUT_SECONDS') ?: 5),

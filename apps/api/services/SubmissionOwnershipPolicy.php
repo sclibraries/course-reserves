@@ -76,6 +76,10 @@ class SubmissionOwnershipPolicy
             throw new ForbiddenHttpException('Only view access - cannot create submissions');
         }
 
+        $permission->logActivity('acted_for', null, [
+            'folio_course_listing_id' => $folioCourseListingId,
+        ]);
+
         return [
             'owner_id' => $actingForFacultyId,
             'is_proxy' => true,

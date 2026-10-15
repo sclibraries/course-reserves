@@ -2,7 +2,6 @@
 
 namespace app\models;
 
-use Yii;
 use yii\db\ActiveRecord;
 use yii\behaviors\TimestampBehavior;
 
@@ -18,6 +17,7 @@ use yii\behaviors\TimestampBehavior;
  * @property string $permission_type
  * @property string $status
  * @property string $invited_at
+ * @property string $invitation_expires_at
  * @property string $accepted_at
  * @property string $expires_at
  * @property string $revoked_at
@@ -70,7 +70,7 @@ class FacultyProxyPermission extends ActiveRecord
         return [
             [['faculty_shibboleth_id', 'proxy_shibboleth_id'], 'required'],
             [['notes'], 'string'],
-            [['invited_at', 'accepted_at', 'expires_at', 'revoked_at', 'created_at', 'updated_at'], 'safe'],
+            [['invited_at', 'invitation_expires_at', 'accepted_at', 'expires_at', 'revoked_at', 'created_at', 'updated_at'], 'safe'],
             [['faculty_shibboleth_id', 'proxy_shibboleth_id', 'faculty_display_name', 'proxy_display_name', 'proxy_email'], 'string', 'max' => 255],
             [['invitation_token'], 'string', 'max' => 64],
             [['permission_type'], 'in', 'range' => [self::PERMISSION_FULL_ACCESS, self::PERMISSION_VIEW_ONLY, self::PERMISSION_SPECIFIC_COURSES]],
@@ -125,6 +125,7 @@ class FacultyProxyPermission extends ActiveRecord
         
         if ($insert) {
             $this->invited_at = date('Y-m-d H:i:s');
+            $this->invitation_expires_at = date('Y-m-d H:i:s', strtotime($this->invited_at . ' +14 days'));
         }
 
         return parent::beforeSave($insert);
@@ -258,25 +259,6 @@ class FacultyProxyPermission extends ActiveRecord
         $log->action = $action;
         $log->submission_id = $submissionId;
         $log->details = $details ? json_encode($details) : null;
-        $log->save();
-    }
-
-    /**
-     * Send invitation email (placeholder - implement with your email system)
-     */
-    public function sendInvitationEmail()
-    {
-        // TODO: Implement email sending
-        // This would send an email to proxy_email with the invitation_token
-        
-        $invitationUrl = Yii::$app->params['frontendUrl'] . '/faculty/accept-proxy-invitation/' . $this->invitation_token;
-        
-        // Log the invitation
-        $this->logActivity('invitation_sent', null, [
-            'invitation_url' => $invitationUrl,
-            'proxy_email' => $this->proxy_email
-        ]);
-        
-        return true; // Return true for now, implement actual email sending
+        return $log->save();
     }
 }
