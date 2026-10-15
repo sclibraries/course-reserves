@@ -92,6 +92,10 @@ export const apiConfig = {
         fields: '/material-type/fields',
       },
     },
+    facultyProxy: {
+      staffGrants: '/faculty-proxy/staff/grants',
+      staffActivityLog: '/faculty-proxy/staff/activity-log',
+    },
     customizations: {
       getCustomizations: '/college-customization',
       updateCustomizations: '/college-customization',
