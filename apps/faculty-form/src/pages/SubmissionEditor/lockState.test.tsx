@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useEditorUIStore } from '@/store/useEditorUIStore';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -53,6 +54,7 @@ describe('SubmissionEditor lock state', () => {
   let root: Root | null = null;
 
   beforeEach(() => {
+    useEditorUIStore.getState().closeCorrectionRequiredDialog();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -60,6 +62,7 @@ describe('SubmissionEditor lock state', () => {
   });
   afterEach(() => {
     act(() => root?.unmount());
+    useEditorUIStore.getState().closeCorrectionRequiredDialog();
     container?.remove();
     container = null; root = null;
     document.body.innerHTML = '';
@@ -81,5 +84,16 @@ describe('SubmissionEditor lock state', () => {
     const editCourseBtn = buttons.find((b) => b.textContent?.includes('Edit Course Info'));
     expect(editCourseBtn).not.toBeUndefined();
     expect(editCourseBtn!.disabled).toBe(true);
+  });
+
+  it('mounts the correction dialog in the editor and displays its store detail', () => {
+    act(() => useEditorUIStore.getState().openCorrectionRequiredDialog({
+      submissionUuid: 'sub-1',
+      itemIds: [259],
+      attemptedUpdate: { items: [{ item_uuid: '259', title: 'Climate and Society' }] },
+    }));
+
+    expect(document.body.textContent).toContain('must be corrected by library staff');
+    expect(document.body.textContent).toContain('Climate and Society');
   });
 });

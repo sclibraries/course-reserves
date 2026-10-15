@@ -2,9 +2,10 @@ import { toast } from "sonner";
 import type { CourseReserve, CourseFolder, CourseItem } from "../store/courseReservesStore";
 import { useAuthStore, getAuthHeaders } from "@/store/authStore";
 import { useDraftStore } from "@/store/draftStore";
-import { useReserveStore } from "@/store/useReserveStore";
+import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { API_ENDPOINTS, DEFAULT_CONFIG } from "@/config/endpoints";
 import { validateReserveForSubmission } from "@/utils/reserveValidation";
+import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submissionUpdateErrors";
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
@@ -310,19 +311,9 @@ export const createSubmissionHandlers = (
           body: JSON.stringify(payload)
         });
 
-        // Handle locked submission (423): turn it into read-only lock state
-        // rather than a generic submission error.
-        if (res.status === 423) {
-          let lockData: { locked_by?: string | null; locked_at?: string | null; lock_reason?: string | null } = {};
-          try { lockData = await res.json(); } catch { /* non-JSON body */ }
-          useReserveStore.getState().applyLockState(reserve.id, lockData);
-          useDraftStore.getState().deleteDraft(reserve.id);
-          toast.error('This submission was locked by staff and can no longer be edited.');
-          return;
-        }
-
         if (!res.ok) {
-          throw new Error(await getSubmissionErrorMessage(res));
+          const result = await handleSubmitFailure(res, reserve, payload, getSubmissionErrorMessage);
+          if (result === 'locked') return;
         }
 
         const result = await res.json();
@@ -353,6 +344,10 @@ export const createSubmissionHandlers = (
         // Navigate with query param to force fresh data fetch from backend
         navigate(`/submission/${submissionUuid}?refresh=true`);
       } catch (err) {
+        if (err instanceof CorrectionRequiredError) {
+          useEditorUIStore.getState().openCorrectionRequiredDialog(err.detail);
+          return;
+        }
         toast.error(`Submission failed: ${(err as Error).message}`);
       }
     })();

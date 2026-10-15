@@ -122,6 +122,29 @@ describe('createSubmissionHandlers', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it('keeps an unrelated 409 on the existing generic error path', async () => {
+    const { createSubmissionHandlers } = await import('./submissionHandlers');
+    const { toast } = await import('sonner');
+    const { useEditorUIStore } = await import('@/store/useEditorUIStore');
+    const { reserve, organizedContent } = buildPayloadContractScenario('submitted');
+    useEditorUIStore.getState().closeCorrectionRequiredDialog();
+    const navigate = vi.fn();
+
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      error_code: 'submission_conflict',
+      message: 'This submission changed elsewhere.',
+    }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
+
+    const handlers = createSubmissionHandlers(navigate, reserve, organizedContent, vi.fn());
+    handlers.confirmSubmit(false);
+
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Submission failed: This submission changed elsewhere.');
+    });
+    expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('blocks invalid reserve data before sending a submission request', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
     const { toast } = await import('sonner');

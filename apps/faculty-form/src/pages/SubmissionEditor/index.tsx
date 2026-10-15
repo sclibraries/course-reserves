@@ -24,6 +24,7 @@ import { CourseModal } from '@/components/CourseModal';
 import { CloneDialog } from '@/components/CloneDialog';
 import { DiscoverySearchDialog } from '@/components/DiscoverySearchDialog';
 import { SyllabusUploadDialog } from '@/components/SyllabusUploadDialog';
+import CorrectionRequiredDialog from '@/components/Communications/CorrectionRequiredDialog';
 import SubmissionEditorContext from './SubmissionEditorContext';
 import Header from './Header';
 import ActionBar from './ActionBar';
@@ -204,6 +205,7 @@ const SubmissionEditor = () => {
         <CloneDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} reserveId={id!} courseCode={reserve.courseCode} userName={user?.full_name || ''} currentItemsCount={reserve.items.length} onAddResource={cloneResourceHandler.handleAddSingleResource} initialMode={cloneDialogMode} directToResources={cloneDialogDirectToResources} />
         <DiscoverySearchDialog open={discoverySearchOpen} onOpenChange={setDiscoverySearchOpen} onItemsSelected={handleItemsFromExternalSource} />
         <SyllabusUploadDialog open={syllabusUploadOpen} onOpenChange={setSyllabusUploadOpen} onItemsExtracted={handleItemsFromExternalSource} />
+        <CorrectionRequiredDialog />
       </div>
     </SubmissionEditorContext.Provider>
   );

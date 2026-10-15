@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSubmissionHandlers } from './submissionHandlers';
 import { useReserveStore } from '@/store/useReserveStore';
 import { useDraftStore } from '@/store/draftStore';
+import { useEditorUIStore } from '@/store/useEditorUIStore';
 
 const toastError = vi.fn();
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: (...a: unknown[]) => toastError(...a) } }));
@@ -55,6 +56,7 @@ describe('confirmSubmit on 423', () => {
     });
     expect(navigate).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith('This submission was locked by staff and can no longer be edited.');
   });
 
   it('clears the persisted draft on a 423 lock conflict', async () => {
@@ -67,5 +69,38 @@ describe('confirmSubmit on 423', () => {
       expect(r.isLocked).toBe(true);
     });
     expect(useDraftStore.getState().getDraft('sub-1')).toBeUndefined();
+  });
+
+  it('opens correction state for API-033 and keeps the proposed draft', async () => {
+    const detail = {
+      success: false,
+      error_code: 'materialized_item_correction_required',
+      message: 'Processed course-reserve items must be corrected by library staff.',
+      submission_uuid: 'sub-1',
+      item_ids: [259],
+    };
+    useDraftStore.getState().setDraft('sub-1', { uuid: 'sub-1', items: ['proposed change'] } as never);
+    useEditorUIStore.setState({ correctionRequiredDialogOpen: false, correctionRequiredDetail: null });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(detail), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const navigate = vi.fn();
+    const handlers = createSubmissionHandlers(navigate, reserve, organized, vi.fn());
+    handlers.confirmSubmit(false);
+
+    await vi.waitFor(() => {
+      expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(true);
+    });
+
+    expect(useEditorUIStore.getState().correctionRequiredDetail).toMatchObject({
+      submissionUuid: 'sub-1',
+      itemIds: [259],
+      attemptedUpdate: { items: [] },
+    });
+    expect(useDraftStore.getState().getDraft('sub-1')).toBeDefined();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

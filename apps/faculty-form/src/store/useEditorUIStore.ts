@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SortOption, FilterOption } from '@/components/ItemSortingToolbar';
 import type { ItemData } from '@/components/ItemModal';
+import type { CorrectionRequiredDetail } from '@/services/submissionUpdateErrors';
 
 interface EditorUIState {
   modalOpen: boolean;
@@ -9,6 +10,8 @@ interface EditorUIState {
   emailConfirmation: boolean;
   courseModalOpen: boolean;
   showInstructions: boolean;
+  correctionRequiredDialogOpen: boolean;
+  correctionRequiredDetail: CorrectionRequiredDetail | null;
   sortBy: SortOption;
   searchQuery: string;
   filters: FilterOption;
@@ -19,6 +22,8 @@ interface EditorUIState {
   setEmailConfirmation: (v: boolean) => void;
   setCourseModalOpen: (open: boolean) => void;
   setShowInstructions: (v: boolean) => void;
+  openCorrectionRequiredDialog: (detail: CorrectionRequiredDetail) => void;
+  closeCorrectionRequiredDialog: () => void;
   setSortBy: (sort: SortOption) => void;
   setSearchQuery: (q: string) => void;
   setFilters: (filters: FilterOption) => void;
@@ -33,6 +38,8 @@ export const useEditorUIStore = create<EditorUIState>()((set, get) => ({
   emailConfirmation: false,
   courseModalOpen: false,
   showInstructions: false,
+  correctionRequiredDialogOpen: false,
+  correctionRequiredDetail: null,
   sortBy: 'position' as SortOption,
   searchQuery: '',
   filters: { materialTypes: [], statuses: [] },
@@ -43,6 +50,8 @@ export const useEditorUIStore = create<EditorUIState>()((set, get) => ({
   setEmailConfirmation: (v) => set({ emailConfirmation: v }),
   setCourseModalOpen: (open) => set({ courseModalOpen: open }),
   setShowInstructions: (v) => set({ showInstructions: v }),
+  openCorrectionRequiredDialog: (detail) => set({ correctionRequiredDialogOpen: true, correctionRequiredDetail: detail }),
+  closeCorrectionRequiredDialog: () => set({ correctionRequiredDialogOpen: false, correctionRequiredDetail: null }),
   setSortBy: (sort) => set({ sortBy: sort }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setFilters: (filters) => set({ filters }),
