@@ -11,6 +11,7 @@ import MyWorkQueue from '../components/page-sections/admin/MyWorkQueue';
 import MyMentions from '../components/page-sections/admin/MyMentions';
 import TrackingReport from './TrackingReport';
 import FacultyProxyAccess from '../components/page-sections/admin/proxy-access/FacultyProxyAccess';
+import NeedsLinkingList from '../components/page-sections/admin/linking/NeedsLinkingList';
 import { isStaffOrAdminRole } from '../util/roles';
 
 export const canAccessProxyTab = (role) => isStaffOrAdminRole(role);
@@ -80,6 +81,13 @@ export function createAdminTabRegistry({
             )}
           </>
         ),
+      },
+      {
+        key: 'needs-linking',
+        label: 'Needs Linking',
+        navigationGroup: 'workflow',
+        canAccess: canManageSubmissions,
+        renderContent: () => <div className="fade-in"><NeedsLinkingList /></div>,
       },
       {
         key: 'submissions',

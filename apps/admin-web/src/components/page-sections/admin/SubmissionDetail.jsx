@@ -32,12 +32,9 @@ import '../../../css/SubmissionWorkflow.css';
 
 // Components
 import SubmissionHeader from './submission/SubmissionHeader';
-import CourseVerificationCard from './submission/CourseVerificationCard';
+import LinkingPanel from './linking/LinkingPanel';
 import ItemCard from './submission/ItemCard';
 import StatCard from './submission/shared/StatCard';
-
-// Hooks
-import { useCourseVerification } from '../../../hooks/admin/useCourseVerification';
 
 /**
  * Main submission detail component
@@ -82,24 +79,6 @@ function SubmissionDetail() {
     };
     loadCurrentUser();
   }, []);
-
-
-
-  // --- Gate Logic ---
-  
-  const {
-    searchQuery,
-    setSearchQuery,
-    searchResults,
-    isSearching,
-    verifyingCourseId,
-    handleSearch,
-    handleVerify
-  } = useCourseVerification(
-    selectedSubmission?.submission, 
-    fetchSubmissionDetail
-  );
-
 
 
 
@@ -183,7 +162,8 @@ function SubmissionDetail() {
   }
 
   const { submission, folders, unfolderedItems, statistics } = selectedSubmission;
-  const isCourseLinked = Boolean(submission.folioCourseListingId);
+  const isCourseLinked = submission.linkState === 'linked' || Boolean(submission.folioCourseListingId);
+  const submissionItems = [...folders.flatMap(folder => folder.items), ...unfolderedItems];
 
   // Helper for numbering items
   let currentNumber = 1;
@@ -206,20 +186,14 @@ function SubmissionDetail() {
         onUnlock={handleUnlock} 
       />
 
-      {/* GATE: Course Verification */}
-      {!isCourseLinked? (
-        <CourseVerificationCard 
-          submission={submission}
-          onSearch={handleSearch}
-          onVerify={(course) => handleVerify(course)}
-          searchResults={searchResults}
-          isSearching={isSearching}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          verifyingCourseId={verifyingCourseId}
-        />
-      ) : (
-        /* DASHBOARD */
+      <LinkingPanel
+        submission={submission}
+        items={submissionItems}
+        onChanged={() => fetchSubmissionDetail(submissionId)}
+      />
+
+      {/* Course processing dashboard is available only after linking. */}
+      {isCourseLinked && (
         <>
 
 

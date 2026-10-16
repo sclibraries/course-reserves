@@ -15,6 +15,7 @@ import {
   determinePriority,
 } from './submissionWorkflow/submissionFormatters';
 import { formatSubmissionDetail } from './submissionWorkflow/submissionDetailFormatter';
+import { linkingApi } from './submissionWorkflow/linkingApi';
 
 export const submissionWorkflowService = {
   getAuthToken: () => apiConfig.getAuthToken(),
@@ -22,6 +23,7 @@ export const submissionWorkflowService = {
   ...itemsApi,
   ...staffApi,
   ...communicationsApi,
+  ...linkingApi,
   formatSubmissionForDisplay,
   formatProcessingContext,
   formatClaimedItem,

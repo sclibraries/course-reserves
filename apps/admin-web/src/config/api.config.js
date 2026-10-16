@@ -121,6 +121,16 @@ export const apiConfig = {
       markAsRead: '/submission-workflow/communications/:messageId/read',
       searchStaff: '/submission-workflow/search-staff',
     },
+    workflowLinking: {
+      needsLinking: '/workflow/needs-linking',
+      submissionCandidates: '/workflow/submission/:uuid/candidates',
+      submissionLink: '/workflow/submission/:uuid/link',
+      submissionCorrect: '/workflow/submission/:uuid/correct',
+      submissionLinkOverride: '/workflow/submission/:uuid/link-override',
+      submissionUnlink: '/workflow/submission/:uuid/unlink',
+      submissionRecheck: '/workflow/submission/:uuid/recheck',
+      submissionTimeline: '/workflow/submission/:uuid/timeline',
+    },
     workflow: {
       // Template Management
       listTemplates: '/workflow-admin/templates',

@@ -160,7 +160,14 @@ export function formatSubmissionDetail(response) {
       duplicateNote: response.duplicate_note,
       emailConfirmationSent: Boolean(response.email_confirmation_sent),
       folioCourseListingId: response.folio_course_listing_id,
-      offeringId: response.offering_id
+      offeringId: response.offering_id,
+      ...('link_state' in response ? { linkState: response.link_state } : {}),
+      ...('link_flag' in response ? { linkFlag: response.link_flag } : {}),
+      ...('linked_at' in response ? { linkedAt: response.linked_at } : {}),
+      ...('linked_by' in response ? { linkedBy: response.linked_by } : {}),
+      ...('its_course_id' in response ? { itsCourseId: response.its_course_id } : {}),
+      ...('academic_period' in response ? { academicPeriod: response.academic_period } : {}),
+      ...('roster_term_id' in response ? { rosterTermId: response.roster_term_id } : {}),
     },
 
     folders: Object.values(folders).sort((a, b) =>

@@ -64,6 +64,45 @@ describe('submissionWorkflowService.completeProcessing', () => {
 });
 
 describe('submissionWorkflowService.formatSubmissionDetail', () => {
+  it('exposes the roster and link state fields used by the linking panel', () => {
+    const formatted = submissionWorkflowService.formatSubmissionDetail({
+      submission_id: 32,
+      submission_uuid: 'synthetic-linking-uuid',
+      course_code: 'AFR 155',
+      course_title: 'African Studies',
+      section: '01',
+      term_code: '2026FA',
+      roster_term_id: 'synthetic-term-id',
+      academic_period: '2026FA',
+      its_course_id: 'AFR-155-01-2026FA',
+      link_state: 'linked',
+      link_flag: 'mismatch_override',
+      linked_at: '2026-10-16T12:00:00Z',
+      linked_by: 'synthetic-staff',
+      folio_course_listing_id: 'synthetic-listing-id',
+      offering_id: 44,
+      newResources: [],
+      reuseResources: [],
+      communications: [],
+    });
+
+    expect(formatted.submission).toEqual(expect.objectContaining({
+      uuid: 'synthetic-linking-uuid',
+      courseCode: 'AFR 155',
+      section: '01',
+      term: '2026FA',
+      rosterTermId: 'synthetic-term-id',
+      academicPeriod: '2026FA',
+      itsCourseId: 'AFR-155-01-2026FA',
+      linkState: 'linked',
+      linkFlag: 'mismatch_override',
+      linkedAt: '2026-10-16T12:00:00Z',
+      linkedBy: 'synthetic-staff',
+      folioCourseListingId: 'synthetic-listing-id',
+      offeringId: 44,
+    }));
+  });
+
   it('preserves processing context and course linkage fields on normalized items', () => {
     const formatted = submissionWorkflowService.formatSubmissionDetail({
       submission_id: 31,
