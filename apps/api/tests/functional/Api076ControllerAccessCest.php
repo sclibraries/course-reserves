@@ -50,6 +50,7 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
             'term' => 'test-api076-term',
             'course_name' => 'test-api076-course-name',
             'course_code' => 'test-api076-code',
+            'instructor' => json_encode([['name' => 'test-api076-instructor']]),
         ])->execute();
         $this->trackingEventId = (int)\Yii::$app->db->getLastInsertID();
 
@@ -98,10 +99,26 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
             \PHPUnit\Framework\Assert::assertSame(201, $status, 'Tracking create must remain public for ' . $role . '.');
         }
 
+        $topCoursesStatus = $this->requestAs($I, 'anonymous', 'GET', 'tracking/top-courses');
+        \PHPUnit\Framework\Assert::assertSame(200, $topCoursesStatus, 'Tracking top-courses should allow anonymous access.');
+        $topCoursesResponse = $I->grabJsonResponse();
+        \PHPUnit\Framework\Assert::assertSame(['topCourses'], array_keys($topCoursesResponse));
+        \PHPUnit\Framework\Assert::assertCount(1, $topCoursesResponse['topCourses']);
+        $topCourse = $topCoursesResponse['topCourses'][0];
+        \PHPUnit\Framework\Assert::assertSame(
+            ['name', 'count', 'college', 'term', 'instructors'],
+            array_keys($topCourse),
+            'Popular course rows should contain aggregate public fields only.'
+        );
+        \PHPUnit\Framework\Assert::assertSame(['test-api076-instructor'], $topCourse['instructors']);
+        foreach (['faculty', 'employee', 'staff'] as $role) {
+            $status = $this->requestAs($I, $role, 'GET', 'tracking/top-courses');
+            \PHPUnit\Framework\Assert::assertSame(200, $status, 'Tracking top-courses should allow ' . $role . '.');
+        }
+
         $requests = [
             ['index', 'GET', 'tracking/index', [], [], 200],
             ['view', 'GET', 'tracking/view', [], ['id' => $this->trackingEventId], 200],
-            ['top-courses', 'GET', 'tracking/top-courses', [], [], 200],
             ['analytics', 'GET', 'tracking/analytics', [], [], 200],
             ['course-detail', 'GET', 'tracking/course-detail', [], ['course-name' => 'test-api076-course-name'], 200],
             ['update', 'PUT', 'tracking/update', ['course_name' => 'test-api076-updated'], ['id' => $this->trackingEventId], 200],

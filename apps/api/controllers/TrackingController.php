@@ -42,10 +42,9 @@ class TrackingController extends ActiveController
             'view' => Roles::STAFF,
             'update' => Roles::STAFF,
             'delete' => Roles::STAFF,
-            'top-courses' => Roles::STAFF,
             'analytics' => Roles::STAFF,
             'course-detail' => Roles::STAFF,
-        ], ['create']);
+        ], ['create', 'top-courses']);
     }
 
     public function actions()
@@ -95,7 +94,6 @@ class TrackingController extends ActiveController
                 'COUNT(*) as count',
                 'college',
                 'term',
-                'course_id',
                 'instructor'
             ])
             ->andWhere(['IS NOT', 'course_name', null])
@@ -119,7 +117,6 @@ class TrackingController extends ActiveController
     
         return [
             'topCourses' => $topCourses,
-            'collegeFilter' => $college ?? 'All Colleges',
         ];
     } 
     /**
