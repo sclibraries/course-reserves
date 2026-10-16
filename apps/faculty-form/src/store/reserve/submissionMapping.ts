@@ -21,6 +21,8 @@ interface BackendFolder {
 
 export interface BackendSubmission {
   submission_uuid: string;
+  its_course_id?: string | null;
+  academic_period?: string | null;
   course_code: string;
   course_title: string;
   section?: string;
@@ -123,7 +125,7 @@ const formatLastUpdated = (updatedAt: string) => new Date(updatedAt).toLocaleDat
 
 export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseReserve => {
   const { folders, items } = mapSubmissionItems(submission, false);
-  const courseAssignmentId = submission.section
+  const legacyCourseAssignmentId = submission.section
     ? `${submission.course_code}-${submission.section}-${submission.term_code}`
     : submission.course_code;
 
@@ -139,7 +141,8 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
     folders,
     lastUpdated: formatLastUpdated(submission.updated_at),
     isTestData: false,
-    courseAssignmentId,
+    courseAssignmentId: submission.its_course_id || legacyCourseAssignmentId,
+    ...(submission.academic_period ? { academicPeriod: submission.academic_period } : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
   };
@@ -160,6 +163,8 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
     folders,
     lastUpdated: formatLastUpdated(submission.updated_at),
     isTestData: false,
+    ...(submission.its_course_id ? { courseAssignmentId: submission.its_course_id } : {}),
+    ...(submission.academic_period ? { academicPeriod: submission.academic_period } : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
     submissionNotes: submission.submission_notes || null,

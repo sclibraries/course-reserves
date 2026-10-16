@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { CourseAssignment } from "@/store/courseAssignmentsStore";
 import { useCourseReservesStore } from "@/store/courseReservesStore";
 import { toast } from "sonner";
+import { getCourseTermLabel } from "@/utils/courseTermLabel";
 
 interface CourseAssignmentCardProps {
   assignment: CourseAssignment;
@@ -19,6 +20,7 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
   const folioTerm = assignment.folio_term;
   const parsedCourse = assignment.parsed_course;
   const assignmentData = assignment.assignment;
+  const termLabel = getCourseTermLabel(folioTerm?.name, assignmentData?.academic_period);
   
   const isInFolio = folioCourse?.id && folioCourse?.source !== 'backend';
   const courseAssignmentId = assignmentData?.course_id || '';
@@ -52,11 +54,12 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
       courseTitle: assignmentData?.course_title || folioCourse?.name || "",
       section: parsedCourse?.sectionName || "",
       instructors: instructorNames,
-      term: folioTerm?.name || "",
+      term: termLabel,
       status: "draft",
       items: [],
       folders: [],
       courseAssignmentId: courseAssignmentId, // Link to the course assignment
+      academicPeriod: assignmentData?.academic_period,
     });
     
     toast.success(`Created course reserve: ${parsedCourse?.courseNumber || assignmentData?.course_id}`);
@@ -73,7 +76,7 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
             </h3>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs">
-                {folioTerm?.name || 'Unknown Term'}
+                {termLabel}
               </Badge>
               <Badge variant="outline" className="text-xs">
                 Section {parsedCourse?.sectionName || 'N/A'}
@@ -89,7 +92,7 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
             <strong>Role:</strong> {assignmentData?.role || 'N/A'}
           </p>
           <p className="text-muted-foreground">
-            <strong>Term:</strong> {folioTerm?.name || 'N/A'}
+            <strong>Term:</strong> {termLabel}
           </p>
           {folioCourse?.departmentObject && typeof folioCourse.departmentObject === 'object' && (
             <p className="text-muted-foreground">

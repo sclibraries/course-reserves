@@ -123,6 +123,7 @@ export interface CourseReserve {
   lastUpdated: string;
   isTestData?: boolean; // Flag to distinguish test data from user-created
   courseAssignmentId?: string; // Link to course assignment (if created from assignment)
+  academicPeriod?: string | null; // ITS roster period used to start this reserve
 
   // Lock status fields from backend
   assigneeStaffUserId?: string | null; // Staff member assigned (locks the course for editing)

@@ -1,9 +1,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
-import { CoursesTable } from './CoursesTable';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseAssignment } from '@/store/courseAssignmentsStore';
+
+let CoursesTable: typeof import('./CoursesTable').CoursesTable;
+let useCourseReservesStore: typeof import('@/store/courseReservesStore').useCourseReservesStore;
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -26,11 +28,20 @@ describe('CoursesTable acting-for permissions', () => {
   let container: HTMLDivElement | null = null;
   let root: Root | null = null;
 
+  beforeEach(async () => {
+    vi.stubGlobal('localStorage', makeLocalStorageMock());
+    vi.resetModules();
+    ({ useCourseReservesStore } = await import('@/store/courseReservesStore'));
+    ({ CoursesTable } = await import('./CoursesTable'));
+  });
+
   afterEach(() => {
     act(() => root?.unmount());
     container?.remove();
     container = null;
     root = null;
+    useCourseReservesStore.setState({ reserves: [] });
+    vi.unstubAllGlobals();
   });
 
   const renderAssignment = (canEdit?: boolean) => {
@@ -64,4 +75,61 @@ describe('CoursesTable acting-for permissions', () => {
 
     expect(container?.textContent).toContain('Add Reserves');
   });
+
+  it('keeps a course startable and uses its roster term when FOLIO has no term', () => {
+    const rosterAssignment = {
+      ...assignment,
+      assignment: {
+        ...assignment.assignment,
+        academic_period: 'AP_202702',
+        course_id: 'BIO-101-01-202702',
+      },
+      folio_term: null,
+    } as unknown as CourseAssignment;
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <MemoryRouter>
+          <CoursesTable courses={[{
+            type: 'assignment',
+            assignment: rosterAssignment,
+            key: 'BIO-101-01-202702',
+          }]} />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain('Spring 2027');
+    const addButton = [...(container.querySelectorAll('button'))]
+      .find((button) => button.textContent?.includes('Add Reserves'));
+    expect(addButton).toBeDefined();
+
+    act(() => addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+    expect(useCourseReservesStore.getState().reserves[0]).toMatchObject({
+      term: 'Spring 2027',
+      courseAssignmentId: 'BIO-101-01-202702',
+      academicPeriod: 'AP_202702',
+    });
+    const persisted = JSON.parse(localStorage.getItem('course-reserves-storage') || '{}');
+    expect(persisted.state.reserves[0]).toMatchObject({
+      courseAssignmentId: 'BIO-101-01-202702',
+      academicPeriod: 'AP_202702',
+    });
+  });
 });
+
+function makeLocalStorageMock() {
+  const values: Record<string, string> = {};
+  return {
+    getItem: (key: string) => values[key] ?? null,
+    setItem: (key: string, value: string) => { values[key] = String(value); },
+    removeItem: (key: string) => { delete values[key]; },
+    clear: () => { Object.keys(values).forEach((key) => delete values[key]); },
+    key: (index: number) => Object.keys(values)[index] ?? null,
+    get length() { return Object.keys(values).length; },
+  };
+}

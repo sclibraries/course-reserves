@@ -122,6 +122,34 @@ describe('createSubmissionHandlers', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [422, 'roster_course_required'],
+    [403, 'roster_course_not_found'],
+  ])('shows the roster guidance for %s %s responses', async (status, errorCode) => {
+    const { createSubmissionHandlers } = await import('./submissionHandlers');
+    const { toast } = await import('sonner');
+    const reserve = buildReserve();
+
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error_code: errorCode }), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const handlers = createSubmissionHandlers(vi.fn(), reserve, {
+      folders: [],
+      ungroupedItems: reserve.items,
+      mixedContent: reserve.items.map((item, position) => ({ type: 'item' as const, item, position })),
+    }, vi.fn());
+
+    handlers.confirmSubmit(false);
+
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Submission failed: This course isn't on your teaching roster for that term - contact the library"
+      );
+    });
+  });
+
   it('keeps an unrelated 409 on the existing generic error path', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
     const { toast } = await import('sonner');
@@ -229,6 +257,10 @@ describe('createSubmissionHandlers', () => {
       courseCode: 'BIO 220',
       courseTitle: 'Ecology',
       term: '2026FA',
+    });
+    expect(payload).toMatchObject({
+      its_course_id: 'BIO-220-01-202701',
+      academic_period: 'AP_202701',
     });
     expect(payload.displayOrder).toEqual([
       { type: 'folder', id: 'folder-week-1', displayPosition: 0 },
@@ -399,6 +431,8 @@ describe('createSubmissionHandlers', () => {
     const payload = JSON.parse(String((request as RequestInit).body));
 
     expect(payload.acting_for_faculty_id).toBe('test-faculty');
+    expect(payload.its_course_id).toBe('BIO-220-01-202701');
+    expect(payload.academic_period).toBe('AP_202701');
     expect(payload.metadata.submittedBy.username).toBe('faculty1');
     expect(payload.metadata).not.toHaveProperty('acting_for_faculty_id');
   });
@@ -517,6 +551,8 @@ function buildPayloadContractScenario(status: 'draft' | 'submitted') {
     lastUpdated: '2026-06-24T12:00:00.000Z',
     submissionNotes: 'Please process quickly',
     neededByDate: '2026-08-20',
+    courseAssignmentId: 'BIO-220-01-202701',
+    academicPeriod: 'AP_202701',
     items: [reuseItem, manualItem],
     folders: [folder],
   };

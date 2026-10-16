@@ -7,6 +7,8 @@ import { API_ENDPOINTS, DEFAULT_CONFIG } from "@/config/endpoints";
 import { validateReserveForSubmission } from "@/utils/reserveValidation";
 import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submissionUpdateErrors";
 import { withActingForFaculty } from "./actingForPayload";
+import { withRosterCourse } from "./rosterSubmissionPayload";
+import { getSubmissionErrorMessage } from "./submissionErrorMessage";
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
@@ -91,28 +93,6 @@ const transformItemForBackend = (item: CourseItem, displayOrder: number, folderN
       copiedItem: item.copiedItem,
     }
   };
-};
-
-const getSubmissionErrorMessage = async (res: Response) => {
-  const text = await res.text();
-
-  if (!text) {
-    return `HTTP ${res.status}: ${res.statusText}`;
-  }
-
-  try {
-    const body = JSON.parse(text);
-    if (typeof body?.message === 'string' && body.message.trim()) {
-      return body.message;
-    }
-    if (typeof body?.error === 'string' && body.error.trim()) {
-      return body.error;
-    }
-  } catch {
-    // Fall through to the response text when the backend returns plain text.
-  }
-
-  return text;
 };
 
 export const createSubmissionHandlers = (
@@ -295,7 +275,7 @@ export const createSubmissionHandlers = (
           // CREATE new submission using POST endpoint
           url = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_SUBMIT_COMPLETE}`;
           method = 'POST';
-          payload = withActingForFaculty(submissionData);
+          payload = withActingForFaculty(withRosterCourse(submissionData, reserve));
         }
         
         const res = await fetch(url, {
@@ -476,7 +456,7 @@ export const createSubmissionHandlers = (
             'Content-Type': 'application/json',
             ...getAuthHeaders(), // Add authentication token
           },
-          body: JSON.stringify(withActingForFaculty(submissionData))
+          body: JSON.stringify(withActingForFaculty(withRosterCourse(submissionData, reserve)))
         });
 
         if (!res.ok) {

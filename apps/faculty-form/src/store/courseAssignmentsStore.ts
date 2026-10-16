@@ -20,13 +20,13 @@ export interface CourseAssignment {
     sectionName: string;
     raw: string;
   };
-  folio_term: {
+  folio_term?: {
     id: string;
     name: string;
     startDate: string;
     endDate: string;
     metadata?: unknown;
-  };
+  } | null;
   folio_course: {
     id?: string;
     name?: string;

@@ -7,6 +7,7 @@ import { Edit, Eye, Plus } from 'lucide-react';
 import { useCourseReservesStore } from '@/store/courseReservesStore';
 import type { CourseAssignment } from '@/store/courseAssignmentsStore';
 import type { Submission } from '@/components/SubmissionCard';
+import { getCourseTermLabel } from '@/utils/courseTermLabel';
 
 type CourseRow = {
   type: 'submission' | 'assignment';
@@ -21,16 +22,18 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
 
   const handleAddReserves = (assignment: CourseAssignment) => {
     const { assignment: course, parsed_course: parsedCourse, folio_term: folioTerm, folio_course: folioCourse } = assignment;
+    const termLabel = getCourseTermLabel(folioTerm?.name, course.academic_period);
     const reserveId = addReserve({
       courseCode: folioCourse?.courseNumber || parsedCourse.courseNumber,
       courseTitle: folioCourse?.name || course.course_title,
       section: parsedCourse.sectionName,
       instructors: '',
-      term: folioTerm.name,
+      term: termLabel,
       status: 'draft',
       items: [],
       folders: [],
       courseAssignmentId: course.course_id,
+      academicPeriod: course.academic_period,
     });
     navigate(`/submission/${reserveId}/edit`);
   };
@@ -87,6 +90,7 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
             const assignment = item.assignment;
             const course = assignment.assignment;
             const canEdit = assignment.canEdit !== false;
+            const termLabel = getCourseTermLabel(assignment.folio_term?.name, course.academic_period);
             return (
               <TableRow key={item.key} className="hover:bg-muted/50">
                 <TableCell>
@@ -94,7 +98,7 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
                   <div className="text-sm text-muted-foreground truncate max-w-xs">{assignment.folio_course?.name || course.course_title}</div>
                 </TableCell>
                 <TableCell className="text-sm">{assignment.parsed_course.sectionName}</TableCell>
-                <TableCell><Badge variant="secondary" className="text-xs">{assignment.folio_term.name}</Badge></TableCell>
+                <TableCell><Badge variant="secondary" className="text-xs">{termLabel}</Badge></TableCell>
                 <TableCell><Badge variant="outline" className="text-xs">Not Started</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
