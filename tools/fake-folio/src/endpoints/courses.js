@@ -11,7 +11,7 @@ export function searchCourses(data, query) {
   );
 
   return {
-    courses: results.length === 1 ? results[0] : results,
+    courses: results,
     totalRecords: results.length,
   };
 }

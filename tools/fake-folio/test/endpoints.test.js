@@ -52,7 +52,7 @@ test('search-terms returns both real-format terms and the complete listed fields
   });
 });
 
-test('search-courses returns all listed course fields and middleware singleton shape', async () => {
+test('search-courses returns an array with all listed fields for one hit', async () => {
   await withServer(async (baseUrl) => {
     const terms = await getJson(baseUrl, '/folio/web/search/search-terms');
     const termId = terms.body.data.terms.find((item) => item.name === 'Spring 2027').id;
@@ -60,11 +60,13 @@ test('search-courses returns all listed course fields and middleware singleton s
       'courseListing.termId=="' + termId + '") sortby name';
     const { response, body } = await getJson(baseUrl, '/folio/web/search/search-courses?' +
       new URLSearchParams({ query }));
-    const course = body.data.courses;
+    const courses = body.data.courses;
 
     assert.equal(response.status, 200);
     assertEnvelope(body);
-    assert.equal(Array.isArray(course), false, 'one hit must use the middleware object shape');
+    assert.ok(Array.isArray(courses));
+    assert.equal(courses.length, 1);
+    const course = courses[0];
     for (const field of ['id', 'name', 'courseNumber', 'sectionName', 'departmentId',
       'departmentObject', 'courseListingId', 'courseListingObject']) {
       assert.ok(course[field], 'missing course field ' + field);
@@ -78,6 +80,20 @@ test('search-courses returns all listed course fields and middleware singleton s
     for (const field of ['id', 'name', 'code', 'startDate', 'endDate']) {
       assert.ok(course.courseListingObject.termObject[field], 'missing nested term field ' + field);
     }
+  });
+});
+
+test('one-hit search JSON matches the API wrapper array contract', async () => {
+  await withServer(async (baseUrl) => {
+    const query = new URLSearchParams({ query: 'courseNumber=="TST 103"' });
+    const response = await fetch(baseUrl + '/folio/web/search/search-courses?' + query);
+    const body = JSON.parse(await response.text());
+
+    assert.equal(response.status, 200);
+    assertEnvelope(body);
+    assert.ok(Array.isArray(body.data.courses));
+    assert.equal(body.data.courses.length, 1);
+    assert.equal(body.data.courses[0].courseNumber, 'TST 103');
   });
 });
 
@@ -137,7 +153,7 @@ test('search-course-listings returns reserves with every copied item field', asy
   await withServer(async (baseUrl) => {
     const courses = await getJson(baseUrl, '/folio/web/search/search-courses?' +
       new URLSearchParams({ query: 'courseNumber=="TST 101" and courseListing.termId=="00000000-0000-4000-8000-000000000002"' }));
-    const listingId = courses.body.data.courses.courseListingId;
+    const listingId = courses.body.data.courses[0].courseListingId;
     const { response, body } = await getJson(baseUrl, '/folio/web/search/search-course-listings?' +
       new URLSearchParams({ courseListingId: listingId }));
     const reserve = body.data.reserves[0];
@@ -299,7 +315,7 @@ test('control actions create the absent scenario, change reserve and item status
     assert.notEqual(created.data.course.id, created.data.course.courseListingId);
     const createdScenario = await getJson(baseUrl, coursesUrl +
       new URLSearchParams({ query: 'courseNumber=="TST 102"' }));
-    assert.equal(createdScenario.body.data.courses.courseNumber, 'TST 102');
+    assert.equal(createdScenario.body.data.courses[0].courseNumber, 'TST 102');
 
     response = await fetch(baseUrl + '/_fake-folio/api/courses', {
       method: 'POST',
@@ -315,7 +331,7 @@ test('control actions create the absent scenario, change reserve and item status
     created = await response.json();
     const createdTemplate = await getJson(baseUrl, coursesUrl +
       new URLSearchParams({ query: 'courseNumber=="TST 199"' }));
-    assert.equal(createdTemplate.body.data.courses.id, created.data.course.id);
+    assert.equal(createdTemplate.body.data.courses[0].id, created.data.course.id);
 
     const listingId = '00000000-0000-4000-8000-000000000201';
     const itemId = '00000000-0000-4000-8000-000000000303';
