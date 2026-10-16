@@ -1,5 +1,10 @@
 import type { CourseFolder, CourseItem, CourseReserve } from './types';
 
+type MaterialResourceData = Partial<Pick<
+  CourseItem,
+  'doi' | 'issn' | 'journalTitle' | 'volume' | 'issue' | 'eds'
+>>;
+
 interface BackendMaterial {
   id: string | number;
   title: string;
@@ -10,6 +15,7 @@ interface BackendMaterial {
   barcode?: string;
   call_number?: string;
   folder_name?: string;
+  resource_data?: MaterialResourceData | string | null;
 }
 
 interface BackendFolder {
@@ -52,22 +58,43 @@ const mapMaterialStatus = (status: string): CourseItem['status'] => (
         status === 'needs-review' ? 'needs-review' : 'draft'
 );
 
+const parseResourceData = (resourceData?: BackendMaterial['resource_data']): MaterialResourceData => {
+  if (!resourceData) return {};
+  if (typeof resourceData !== 'string') return resourceData;
+
+  try {
+    return JSON.parse(resourceData) as MaterialResourceData;
+  } catch {
+    return {};
+  }
+};
+
 const mapMaterial = (
   material: BackendMaterial,
   folderId?: string,
   includeBackendId = false
-): CourseItem => ({
-  id: `material-${material.id}`,
-  ...(includeBackendId ? { backendItemId: String(material.id) } : {}),
-  title: material.title,
-  authors: material.authors,
-  materialType: material.material_type as CourseItem['materialType'],
-  status: mapMaterialStatus(material.status),
-  barcode: material.barcode,
-  callNumber: material.call_number,
-  ...(folderId ? { folderId } : {}),
-  displayOrder: material.display_order,
-});
+): CourseItem => {
+  const resourceData = parseResourceData(material.resource_data);
+
+  return {
+    id: `material-${material.id}`,
+    ...(includeBackendId ? { backendItemId: String(material.id) } : {}),
+    title: material.title,
+    authors: material.authors,
+    materialType: material.material_type as CourseItem['materialType'],
+    status: mapMaterialStatus(material.status),
+    barcode: material.barcode,
+    callNumber: material.call_number,
+    doi: resourceData.doi,
+    issn: resourceData.issn,
+    journalTitle: resourceData.journalTitle,
+    volume: resourceData.volume,
+    issue: resourceData.issue,
+    eds: resourceData.eds,
+    ...(folderId ? { folderId } : {}),
+    displayOrder: material.display_order,
+  };
+};
 
 const mapSubmissionItems = (submission: BackendSubmission, includeBackendIds: boolean) => {
   const folders: CourseFolder[] = (submission.folders || []).map((folder) => {

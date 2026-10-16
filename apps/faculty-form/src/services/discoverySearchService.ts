@@ -103,6 +103,7 @@ export interface EBSCOSearchResponse {
 // Simplified item format for our UI
 export interface DiscoverySearchResult {
   id: string;
+  dbId: string;
   title: string;
   authors: string[];
   publicationType: string;
@@ -169,7 +170,7 @@ export async function searchDiscovery(
   appliedLimiters: string[];
 }> {
   const isFieldQuery = Array.isArray(query);
-  
+
   if (!queryString) {
     // Validate simple query
     if (!isFieldQuery && !query.trim()) {
@@ -180,9 +181,7 @@ export async function searchDiscovery(
       return { results: [], totalHits: 0, searchTime: 0, queryString: '', appliedLimiters: [] };
     }
   }
-
   let searchUrl = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.EBSCO_SEARCH}`;
-  
   // Use queryString if provided (for limiter changes), otherwise build query
   if (queryString) {
     // Using QueryString from EBSCO (for limiter changes or pagination)
@@ -386,6 +385,7 @@ function parseEBSCORecords(records: EBSCORecord[]): DiscoverySearchResult[] {
 
     return {
       id: record.An,
+      dbId: record.DbId,
       title,
       authors,
       publicationType,

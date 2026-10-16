@@ -82,4 +82,50 @@ describe('searchDiscovery', () => {
       message: 'Unable to search the library right now. Please try again.',
     });
   });
+
+  it('keeps the EDS database id needed to retrieve the full record', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        status: 'success',
+        code: 200,
+        data: {
+          request: {
+            QueryString: 'climate change',
+            SearchCriteriaWithActions: { QueriesWithAction: [] },
+          },
+          statistics: { TotalHits: 1, TotalSearchTime: 3 },
+          recordFormat: 'EP Display',
+          records: [{
+            AccessLevel: 'open',
+            pubType: 'Academic Journal',
+            PubTypeId: 'academicJournal',
+            ResultId: 1,
+            DbId: 'synthetic-database',
+            DbLabel: 'Synthetic Database',
+            An: 'synthetic-an',
+            PLink: 'https://search.ebscohost.com/record/synthetic',
+            PDF: '',
+            HTML: '',
+            FullText: '',
+            ImageInfo: '',
+            Items: {
+              Ti: [{ Label: 'Title', Group: 'Ti', Data: 'Synthetic Article', CleanData: 'Synthetic Article' }],
+              Au: [{ Label: 'Author', Group: 'Au', Data: 'Test Author', CleanData: 'Test Author' }],
+            },
+          }],
+          facets: [],
+          availableCriteria: [],
+        },
+      }),
+    } as Response);
+
+    const response = await searchDiscovery('climate change');
+
+    expect(response.results[0]).toMatchObject({
+      id: 'synthetic-an',
+      dbId: 'synthetic-database',
+      pLink: 'https://search.ebscohost.com/record/synthetic',
+    });
+  });
 });

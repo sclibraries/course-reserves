@@ -208,6 +208,106 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
         );
     }
 
+    public function submittedEdsIdentitySurvivesFacultyAndStaffViews(FunctionalTester $I)
+    {
+        $edsFields = [
+            'doi' => '10.1000/cx028',
+            'issn' => '1234-5678',
+            'journalTitle' => 'Synthetic Journal of Test Data',
+            'volume' => '12',
+            'issue' => '3',
+            'eds' => [
+                'dbId' => 'synthetic-database',
+                'an' => 'synthetic-an',
+                'plink' => 'https://search.ebscohost.com/record/synthetic-cx028',
+            ],
+        ];
+        $resourceData = array_merge($edsFields, [
+            'title' => 'Synthetic EDS article',
+            'authors' => 'Test Author',
+            'materialType' => 'article',
+        ]);
+        $this->request(
+            $I,
+            $this->ownerToken(),
+            'POST',
+            \Yii::$app->urlManager->createUrl(['faculty-submission/submit-complete']),
+            [
+                'its_course_id' => 'TST-079-79-209909',
+                'academic_period' => 'AP_209909',
+                'courseInfo' => [
+                    'courseCode' => 'TST 079',
+                    'courseTitle' => 'Synthetic EDS course',
+                    'term' => 'Fall 2099',
+                    'section' => '79',
+                    'instructors' => 'Test API077 Faculty',
+                ],
+                'resources' => [[
+                    'resource_data' => $resourceData,
+                ]],
+                'folders' => [],
+                'metadata' => [],
+            ]
+        );
+
+        $submission = \Yii::$app->db->createCommand(
+            'SELECT submission_id, submission_uuid FROM faculty_submissions '
+            . 'WHERE its_course_id = :course_id AND shibboleth_user_id = :owner_id',
+            [':course_id' => 'TST-079-79-209909', ':owner_id' => $this->ownerId]
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertIsArray($submission);
+
+        $index = $this->request(
+            $I,
+            $this->ownerToken(),
+            'GET',
+            \Yii::$app->urlManager->createUrl(['faculty-submission/index'])
+        );
+        $indexedSubmission = null;
+        foreach ($index['items'] as $item) {
+            if ($item['submission_uuid'] === $submission['submission_uuid']) {
+                $indexedSubmission = $item;
+                break;
+            }
+        }
+        \PHPUnit\Framework\Assert::assertIsArray($indexedSubmission);
+        $this->assertEdsIdentity($edsFields, $indexedSubmission['unfoldered_items'][0]);
+
+        $facultyView = $this->request(
+            $I,
+            $this->ownerToken(),
+            'GET',
+            \Yii::$app->urlManager->createUrl([
+                'faculty-submission/view',
+                'id' => $submission['submission_uuid'],
+            ])
+        );
+        $this->assertEdsIdentity($edsFields, $facultyView['newResources'][0]);
+
+        $staffView = $this->request(
+            $I,
+            $this->token('test-api077-staff', 'staff'),
+            'GET',
+            \Yii::$app->urlManager->createUrl([
+                'submission-workflow/view-submission',
+                'id' => $submission['submission_id'],
+            ])
+        );
+        $this->assertEdsIdentity($edsFields, $staffView['newResources'][0]);
+    }
+
+    private function assertEdsIdentity(array $expected, array $resource)
+    {
+        $resourceData = $resource['resource_data'] ?? null;
+        if (is_string($resourceData)) {
+            $resourceData = json_decode($resourceData, true);
+        }
+        \PHPUnit\Framework\Assert::assertIsArray($resourceData);
+        foreach ($expected as $key => $value) {
+            \PHPUnit\Framework\Assert::assertSame($value, $resourceData[$key] ?? null, $key . ' changed in resource_data');
+        }
+    }
+
     private function request(FunctionalTester $I, $token, $method, $url, array $body = null)
     {
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);

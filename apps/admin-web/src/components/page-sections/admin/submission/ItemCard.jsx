@@ -12,6 +12,18 @@ import StatusBadge from './shared/StatusBadge';
 import PriorityBadge from './shared/PriorityBadge';
 import { getProcessingBlockReason } from '../../../../services/admin/processingHandoff';
 
+const getHttpUrl = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const trimmedValue = value.trim();
+
+  try {
+    const parsedUrl = new URL(trimmedValue);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' ? trimmedValue : null;
+  } catch {
+    return null;
+  }
+};
+
 const ItemCard = ({ 
   item, 
   displayNumber, 
@@ -21,6 +33,7 @@ const ItemCard = ({
   currentUserId
 }) => {
   const processingBlockReason = getProcessingBlockReason(item);
+  const fullRecordUrl = getHttpUrl(item.eds?.plink);
 
   return (
     <div className="item-card browse-mode">
@@ -67,6 +80,38 @@ const ItemCard = ({
         {item.callNumber && (
           <span>
             <strong>Call Number:</strong> {item.callNumber}
+          </span>
+        )}
+        {item.doi && (
+          <span>
+            <strong>DOI:</strong> {item.doi}
+          </span>
+        )}
+        {item.issn && (
+          <span>
+            <strong>ISSN:</strong> {item.issn}
+          </span>
+        )}
+        {item.journalTitle && (
+          <span>
+            <strong>Journal:</strong> {item.journalTitle}
+          </span>
+        )}
+        {item.volume && (
+          <span>
+            <strong>Volume:</strong> {item.volume}
+          </span>
+        )}
+        {item.issue && (
+          <span>
+            <strong>Issue:</strong> {item.issue}
+          </span>
+        )}
+        {fullRecordUrl && (
+          <span>
+            <a href={fullRecordUrl} target="_blank" rel="noopener noreferrer">
+              View full record
+            </a>
           </span>
         )}
         {item.url && (
@@ -205,6 +250,16 @@ ItemCard.propTypes = {
     authors: PropTypes.string,
     barcode: PropTypes.string,
     callNumber: PropTypes.string,
+    doi: PropTypes.string,
+    issn: PropTypes.string,
+    journalTitle: PropTypes.string,
+    volume: PropTypes.string,
+    issue: PropTypes.string,
+    eds: PropTypes.shape({
+      dbId: PropTypes.string,
+      an: PropTypes.string,
+      plink: PropTypes.string
+    }),
     url: PropTypes.string,
     materialType: PropTypes.string.isRequired,
     status: PropTypes.string.isRequired,

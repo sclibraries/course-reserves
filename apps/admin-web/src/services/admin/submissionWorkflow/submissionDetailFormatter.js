@@ -25,7 +25,11 @@ export function formatSubmissionDetail(response) {
   const allItems = [...newResources, ...reuseResources].map(resource => {
     let data = {};
     try {
-      data = resource.resource_data ? JSON.parse(resource.resource_data) : {};
+      if (resource.resource_data) {
+        data = typeof resource.resource_data === 'string'
+          ? JSON.parse(resource.resource_data)
+          : resource.resource_data;
+      }
     } catch (e) {
       console.warn('Failed to parse resource_data:', e);
       data = { title: 'Unknown', materialType: 'unknown' };
@@ -62,6 +66,12 @@ export function formatSubmissionDetail(response) {
       materialType: data.materialType || 'unknown',
       url: data.url || null,
       isbn: data.isbn || null,
+      doi: data.doi || null,
+      issn: data.issn || null,
+      journalTitle: data.journalTitle || null,
+      volume: data.volume || null,
+      issue: data.issue || null,
+      eds: data.eds || null,
       publisher: data.publisher || null,
       publicationYear: data.publicationYear || null,
       barcode: resource.source_barcode,

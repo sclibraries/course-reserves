@@ -266,8 +266,8 @@ class FacultySubmissionController extends BaseRestController
                     'status' => $resource->item_status,
                     'display_order' => $resource->display_order,
                     'folder_name' => $resource->folder_name,
+                    'resource_data' => $resourceData,
                 ];
-                
                 // Add to appropriate folder or unfoldered list
                 if ($resource->folder_name && isset($folderStructure[$resource->folder_name])) {
                     $folderStructure[$resource->folder_name]['items'][] = $materialItem;

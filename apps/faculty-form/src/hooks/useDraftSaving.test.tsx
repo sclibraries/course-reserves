@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDraftSaving } from './useDraftSaving';
-import type { CourseReserve } from '@/store/courseReservesStore';
+import type { CourseItem, CourseReserve } from '@/store/courseReservesStore';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -109,5 +109,33 @@ describe('useDraftSaving', () => {
     });
 
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('preserves structured EDS metadata in draft payloads', () => {
+    const onSave = vi.fn(async () => true);
+    const onReady = (nextApi: DraftSavingApi) => {
+      api = nextApi;
+    };
+    const eds = {
+      dbId: 'synthetic-database',
+      an: 'synthetic-an',
+      plink: 'https://search.ebscohost.com/record/synthetic',
+    };
+
+    act(() => {
+      root?.render(<Harness autoSaveEnabled={false} onSave={onSave} onReady={onReady} />);
+    });
+
+    const item: CourseItem = {
+      id: 'item-1',
+      title: 'Synthetic Article',
+      materialType: 'article',
+      status: 'draft',
+      issn: '1234-5678',
+      eds,
+    };
+    const draft = api?.convertReserveToDraft({ ...reserve, items: [item] });
+
+    expect(draft?.items[0]).toMatchObject({ issn: '1234-5678', eds });
   });
 });

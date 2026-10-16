@@ -602,40 +602,11 @@ export function DiscoverySearchDialog({
       }
     }
 
-    // Build notes with links and key metadata
-    const notesParts: string[] = [];
-    
-    // Add access information at the top
-    if (result.hasFullText && result.fullTextUrl) {
-      notesParts.push('✓ Full Text Available');
-      notesParts.push(`Access: ${result.fullTextUrl}`);
-    } else if (result.url) {
-      notesParts.push(`Resource URL: ${result.url}`);
-    }
-    
-    // Add Discover link for reference
-    notesParts.push(`Discover: ${result.pLink}`);
-    
-    // Add database source
-    notesParts.push(`Source: ${result.database}`);
-    
-    // Add DOI if present
-    if (result.doi) {
-      notesParts.push(`DOI: ${result.doi}`);
-    }
-    
-    // Add abstract
-    if (result.abstract) {
-      const truncatedAbstract = result.abstract.substring(0, 350);
-      notesParts.push(`\nAbstract: ${truncatedAbstract}${result.abstract.length > 350 ? '...' : ''}`);
-    }
-
     // Build library notes with comprehensive metadata
     const libraryNotesParts: string[] = [];
     
     // Identifiers
     if (result.isbn) libraryNotesParts.push(`ISBN: ${result.isbn}`);
-    if (result.issn) libraryNotesParts.push(`ISSN: ${result.issn}`);
     
     // Publication details
     if (fullDate) {
@@ -682,10 +653,15 @@ export function DiscoverySearchDialog({
       title: result.title,
       authors: result.authors.length > 0 ? result.authors.join('; ') : undefined,
       isbn: result.isbn,
+      doi: result.doi,
+      issn: result.issn,
+      journalTitle: result.journalTitle,
+      volume: result.volumeNumber,
+      issue: result.issueNumber,
+      eds: { dbId: result.dbId, an: result.id, plink: result.pLink },
       url: primaryUrl,
       materialType,
       status: 'draft',
-      notes: notesParts.join('\n'),
       libraryNotes: libraryNotesParts.length > 0 ? libraryNotesParts.join('\n') : undefined,
       publicationYear: pubYear,
       publisher: pubInfoParts.join(', ') || undefined

@@ -64,6 +64,12 @@ export interface DraftItemPayload {
   volume?: string | null;
   issue?: string | null;
   doi?: string | null;
+  issn?: string | null;
+  eds?: {
+    dbId: string;
+    an: string;
+    plink: string;
+  } | null;
   url?: string | null;
   
   // Notes

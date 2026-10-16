@@ -45,6 +45,8 @@ function convertReserveToDraft(reserve: CourseReserve, currentVersion: number = 
     volume: item.volume || null,
     issue: item.issue || null,
     doi: item.doi || null,
+    issn: item.issn || null,
+    eds: item.eds || null,
     url: item.url || null,
     notes: item.notes || null,
     libraryNotes: item.libraryNotes || null,

@@ -60,6 +60,12 @@ export interface CourseItem {
   volume?: string;
   issue?: string;
   doi?: string;
+  issn?: string;
+  eds?: {
+    dbId: string;
+    an: string;
+    plink: string;
+  };
   url?: string;
   materialType: 'book' | 'article' | 'chapter' | 'video' | 'website' | 'other';
   status: 'draft' | 'pending' | 'in-progress' | 'complete' | 'needs-review';

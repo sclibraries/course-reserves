@@ -131,4 +131,83 @@ describe('DiscoverySearchDialog', () => {
     expect(container.querySelector('[class*="bg-destructive/10"]')?.className).toContain('whitespace-pre-line');
     expect(container.textContent).not.toContain('HTTP 503');
   });
+
+  it('maps EDS identity and citation fields without generating faculty notes', async () => {
+    vi.mocked(searchDiscovery).mockResolvedValueOnce({
+      results: [{
+        id: 'synthetic-an',
+        dbId: 'synthetic-database',
+        title: 'Synthetic Article',
+        authors: ['Test Author'],
+        publicationType: 'Academic Journal',
+        database: 'Synthetic Database',
+        pLink: 'https://search.ebscohost.com/record/synthetic',
+        doi: '10.1000/synthetic',
+        issn: '1234-5678',
+        journalTitle: 'Synthetic Journal',
+        volumeNumber: '12',
+        issueNumber: '3',
+        hasFullText: false,
+        abstract: 'A synthetic abstract.',
+      }],
+      totalHits: 1,
+      searchTime: 3,
+      queryString: 'climate change',
+      appliedLimiters: [],
+    });
+    const onItemsSelected = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <DiscoverySearchDialog
+          open={true}
+          onOpenChange={() => undefined}
+          onItemsSelected={onItemsSelected}
+        />
+      );
+    });
+
+    const input = document.querySelector('input[placeholder^="Search by title"]') as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    const form = input.closest('form');
+
+    await act(async () => {
+      valueSetter?.call(input, 'climate change');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    const resultTitle = Array.from(container.querySelectorAll('h3')).find((title) =>
+      title.textContent === 'Synthetic Article'
+    );
+    const resultCard = resultTitle?.closest('div.border');
+    act(() => {
+      resultCard?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const addButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add 1 Item')
+    );
+    act(() => {
+      addButton?.click();
+    });
+
+    expect(onItemsSelected).toHaveBeenCalledWith([expect.objectContaining({
+      doi: '10.1000/synthetic',
+      issn: '1234-5678',
+      journalTitle: 'Synthetic Journal',
+      volume: '12',
+      issue: '3',
+      eds: {
+        dbId: 'synthetic-database',
+        an: 'synthetic-an',
+        plink: 'https://search.ebscohost.com/record/synthetic',
+      },
+    })]);
+    expect(onItemsSelected.mock.calls[0][0][0]).not.toHaveProperty('notes');
+  });
 });

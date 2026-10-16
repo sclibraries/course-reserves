@@ -10,6 +10,7 @@ import {
 function makeResult(id: string, title: string): DiscoverySearchResult {
   return {
     id,
+    dbId: 'synthetic-database',
     title,
     authors: [],
     publicationType: 'Academic Journal',

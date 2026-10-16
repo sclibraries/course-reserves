@@ -31,7 +31,6 @@ const transformItemForBackend = (item: CourseItem, displayOrder: number, folderN
     source_call_number: item.callNumber || null,
     source_resource_id: item.holdingsId || null,
     source_folio_instance_id: item.instanceId || null,
-    
     // Display/organization
     display_order: displayOrder,
     folder_name: folderName || null,
@@ -66,7 +65,8 @@ const transformItemForBackend = (item: CourseItem, displayOrder: number, folderN
       volume: item.volume,
       issue: item.issue,
       doi: item.doi,
-      
+      issn: item.issn,
+      eds: item.eds,
       // Electronic fields
       url: item.url,
       
