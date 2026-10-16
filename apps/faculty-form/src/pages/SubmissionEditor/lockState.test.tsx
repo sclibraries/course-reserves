@@ -6,6 +6,7 @@ import { useEditorUIStore } from '@/store/useEditorUIStore';
 const mocks = vi.hoisted(() => ({
   fetchSubmissionDetails: vi.fn(),
   hasUnsavedChanges: false,
+  reserve: undefined as unknown,
 }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,7 +43,8 @@ vi.mock('@/store/courseAssignmentsStore', () => ({
 
 vi.mock('@/hooks/useSubmissionEditor', () => ({
   useSubmissionEditor: () => ({
-    id: 'sub-1', reserve: lockedReserve, user: { full_name: 'Dr X' },
+    id: 'sub-1', reserve: (mocks.reserve as typeof lockedReserve | undefined) || lockedReserve,
+    user: { full_name: 'Dr X' },
     modalOpen: false, setModalOpen: () => {}, editingItem: null, setEditingItem: () => {},
     showSubmitDialog: false, setShowSubmitDialog: () => {},
     emailConfirmation: false, setEmailConfirmation: () => {},
@@ -90,6 +92,7 @@ describe('SubmissionEditor lock state', () => {
 
   beforeEach(() => {
     mocks.hasUnsavedChanges = false;
+    mocks.reserve = undefined;
     mocks.fetchSubmissionDetails.mockReset();
     useEditorUIStore.getState().closeCorrectionRequiredDialog();
     actingForMocks.selectedFaculty = null;
@@ -159,12 +162,15 @@ describe('SubmissionEditor lock state', () => {
   });
 
   it('shows a non-blocking notice when the server copy changed during refocus', () => {
-    mocks.hasUnsavedChanges = true;
+    mocks.reserve = {
+      ...lockedReserve,
+      items: [{ id: 'local-item', title: 'Local edit', materialType: 'book', status: 'draft' }],
+    };
     act(() => root!.render(<SubmissionEditor />));
     mocks.fetchSubmissionDetails.mockImplementation((
       _id: string,
       _silent: boolean,
-      options?: { isDirty: () => boolean; onRemoteItemsChanged?: (changed: boolean) => void }
+      options?: { previousServerReserve?: unknown; onRemoteItemsChanged?: (changed: boolean) => void }
     ) => {
       options?.onRemoteItemsChanged?.(true);
       return Promise.resolve(lockedReserve);
@@ -172,16 +178,18 @@ describe('SubmissionEditor lock state', () => {
     act(() => window.dispatchEvent(new Event('focus')));
 
     expect(mocks.fetchSubmissionDetails).toHaveBeenCalledWith(
-      'sub-1', true, expect.objectContaining({ isDirty: expect.any(Function) })
+      'sub-1', true, expect.objectContaining({ previousServerReserve: lockedReserve })
     );
-    expect(mocks.fetchSubmissionDetails.mock.calls[0][2].isDirty()).toBe(true);
     expect(container!.textContent).toContain(
       'This submission was updated elsewhere. Your unsaved changes are kept.'
     );
   });
 
   it('explains that unsaved edits could not be saved after the submission becomes locked', () => {
-    mocks.hasUnsavedChanges = true;
+    mocks.reserve = {
+      ...lockedReserve,
+      items: [{ id: 'local-item', title: 'Local edit', materialType: 'book', status: 'draft' }],
+    };
     act(() => root!.render(<SubmissionEditor />));
 
     expect(container!.textContent).toContain(

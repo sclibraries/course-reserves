@@ -201,7 +201,6 @@ export interface CourseReservesState {
 }
 
 export interface SubmissionRefetchOptions {
-  isDirty?: () => boolean;
   previousServerReserve?: CourseReserve;
   onServerReserveFetched?: (reserve: CourseReserve) => void;
   onRemoteItemsChanged?: (changed: boolean) => void;

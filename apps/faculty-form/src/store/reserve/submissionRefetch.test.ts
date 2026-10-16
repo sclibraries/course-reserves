@@ -3,7 +3,6 @@ import { isSubmissionReadOnly } from '@/hooks/useSubmissionLock';
 import type { CourseReserve } from './types';
 
 type RefetchOptions = {
-  isDirty: () => boolean;
   previousServerReserve?: CourseReserve;
   onRemoteItemsChanged?: (changed: boolean) => void;
 };
@@ -32,7 +31,6 @@ describe('submission refocus refresh', () => {
       id: string, silent: boolean, options: RefetchOptions
     ) => Promise<CourseReserve | null>;
     const result = await fetchWithRefetchOptions('submission-1', true, {
-      isDirty: () => true,
       previousServerReserve: buildReserve({
         items: [{ id: 'material-22', title: 'Previous server title', materialType: 'book', status: 'draft' }],
         folders: [],

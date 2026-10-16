@@ -9,6 +9,7 @@ import { useCourseCloning } from '@/hooks/useCourseCloning';
 import { useOrganizedContent, useFilteredAndSortedContent } from '@/hooks/useContentOrganization';
 import { useDraftSaving } from '@/hooks/useDraftSaving';
 import { useSubmissionLock } from '@/hooks/useSubmissionLock';
+import { hasLocalMaterialEdits } from '@/store/reserve/submissionRefetchMerge';
 import { SubmissionLockBanner } from '@/components/SubmissionLockBanner';
 import { useReserveStore } from '@/store/useReserveStore';
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
@@ -61,7 +62,6 @@ const SubmissionEditor = () => {
   const { fetchPreviousCourses } = useCourseCloning();
 
   const [hasRemoteItemsChanged, setHasRemoteItemsChanged] = React.useState(false);
-  const hasUnsavedChangesRef = React.useRef(false);
   const serverReserveSnapshotRef = React.useRef<CourseReserve | undefined>(undefined);
   React.useEffect(() => {
     if (!serverReserveSnapshotRef.current && reserve) serverReserveSnapshotRef.current = reserve;
@@ -69,7 +69,6 @@ const SubmissionEditor = () => {
   const refetchSubmission = React.useCallback(() => {
     if (id) {
       void useReserveStore.getState().fetchSubmissionDetails(id, true, {
-        isDirty: () => hasUnsavedChangesRef.current,
         previousServerReserve: serverReserveSnapshotRef.current,
         onServerReserveFetched: (serverReserve) => { serverReserveSnapshotRef.current = serverReserve; },
         onRemoteItemsChanged: setHasRemoteItemsChanged,
@@ -84,7 +83,7 @@ const SubmissionEditor = () => {
     onSaveSuccess: () => { console.log('Draft save succeeded'); },
     onSaveError: (e) => { console.error('Draft save failed:', e); },
   });
-  hasUnsavedChangesRef.current = hasUnsavedChanges;
+  const hasLocalEdits = hasLocalMaterialEdits(reserve, serverReserveSnapshotRef.current);
 
   useUnsavedChangesWarning(true, hasUnsavedChanges);
   const organizedContent = useOrganizedContent(reserve);
@@ -206,7 +205,7 @@ const SubmissionEditor = () => {
           {isReadOnly && lockInfo && (
             <div className="mb-6">
               <SubmissionLockBanner lockInfo={lockInfo} onRefresh={refetchSubmission} onBack={() => navigate('/')} />
-              {hasUnsavedChanges && (
+              {hasLocalEdits && (
                 <p role="status" className="mt-3 text-sm text-amber-900">
                   Your unsaved changes could not be saved because library staff are working on this submission.
                 </p>

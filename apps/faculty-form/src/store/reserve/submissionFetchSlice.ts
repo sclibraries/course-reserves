@@ -85,7 +85,6 @@ export const createSubmissionFetchSlice: ReserveSlice<
         const result = mergeRefetchedSubmission(
           existingReserve,
           serverReserve,
-          refetchOptions?.isDirty?.() ?? false,
           refetchOptions?.previousServerReserve
         );
         mergedReserve = result.reserve;

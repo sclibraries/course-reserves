@@ -17,7 +17,7 @@ describe('mergeRefetchedSubmission', () => {
       folders: [{ id: 'server-folder', title: 'Server folder', isOpen: false, items: [], position: 0 }],
     });
 
-    const result = mergeRefetchedSubmission(local, server, true, previousServer);
+    const result = mergeRefetchedSubmission(local, server, previousServer);
 
     expect(result.reserve.items).toEqual(local.items);
     expect(result.reserve.folders).toEqual(local.folders);
@@ -38,7 +38,7 @@ describe('mergeRefetchedSubmission', () => {
       items: [{ id: 'server-item', title: 'Server title', materialType: 'book', status: 'draft' }],
     });
 
-    expect(mergeRefetchedSubmission(local, unchangedServer, true, previousServer).hasRemoteItemsChanged)
+    expect(mergeRefetchedSubmission(local, unchangedServer, previousServer).hasRemoteItemsChanged)
       .toBe(false);
   });
 
@@ -49,7 +49,7 @@ describe('mergeRefetchedSubmission', () => {
       items: [{ id: 'server-item', title: 'Server title', materialType: 'book', status: 'draft' }],
     });
 
-    const result = mergeRefetchedSubmission(local, server, false);
+    const result = mergeRefetchedSubmission(local, server, local);
 
     expect(result).toEqual({ reserve: server, hasRemoteItemsChanged: false });
   });
@@ -62,7 +62,9 @@ describe('mergeRefetchedSubmission', () => {
       folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, items: [], position: 0 }],
     });
 
-    expect(mergeRefetchedSubmission(local, server, true).hasRemoteItemsChanged).toBe(false);
+    expect(mergeRefetchedSubmission(local, server, buildReserve({
+      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, items: [], position: 0 }],
+    })).hasRemoteItemsChanged).toBe(false);
   });
 });
 

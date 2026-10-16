@@ -8,10 +8,9 @@ export interface SubmissionRefetchMerge {
 export function mergeRefetchedSubmission(
   local: CourseReserve | undefined,
   server: CourseReserve,
-  hasUnsavedChanges: boolean,
   previousServer?: CourseReserve
 ): SubmissionRefetchMerge {
-  if (!local || !hasUnsavedChanges) {
+  if (!local || !hasLocalMaterialEdits(local, previousServer)) {
     return { reserve: server, hasRemoteItemsChanged: false };
   }
 
@@ -31,6 +30,13 @@ export function mergeRefetchedSubmission(
     },
     hasRemoteItemsChanged: materialsDiffer(previousServer || local, server),
   };
+}
+
+export function hasLocalMaterialEdits(
+  local: CourseReserve | undefined,
+  serverSnapshot: CourseReserve | undefined
+): boolean {
+  return !!local && !!serverSnapshot && materialsDiffer(local, serverSnapshot);
 }
 
 function materialsDiffer(local: CourseReserve, server: CourseReserve): boolean {
