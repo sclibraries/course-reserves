@@ -151,7 +151,11 @@ export interface CourseReservesState {
   // Actions
   initialize: () => void; // Initialize with test data if needed
   fetchSubmissions: (silent?: boolean) => Promise<void>; // Fetch submissions from backend
-  fetchSubmissionDetails: (submissionId: string, silent?: boolean) => Promise<CourseReserve | null>; // Fetch single submission with materials
+  fetchSubmissionDetails: (
+    submissionId: string,
+    silent?: boolean,
+    refetchOptions?: SubmissionRefetchOptions
+  ) => Promise<CourseReserve | null>; // Fetch single submission with materials
   deleteSubmission: (submissionId: string) => Promise<boolean>; // Delete a submission via API (only if not locked)
   applyLockState: (submissionId: string, lockData: { locked_by?: string | null; locked_at?: string | null; lock_reason?: string | null }) => void;
   startPolling: (intervalMs?: number) => void; // Start auto-refresh polling
@@ -194,6 +198,13 @@ export interface CourseReservesState {
     needsReviewItems: number;
     draftItems: number;
   };
+}
+
+export interface SubmissionRefetchOptions {
+  isDirty?: () => boolean;
+  previousServerReserve?: CourseReserve;
+  onServerReserveFetched?: (reserve: CourseReserve) => void;
+  onRemoteItemsChanged?: (changed: boolean) => void;
 }
 
 export type ReserveSlice<Keys extends keyof CourseReservesState> = StateCreator<

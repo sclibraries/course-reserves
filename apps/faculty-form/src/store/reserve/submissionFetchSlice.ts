@@ -1,4 +1,5 @@
-import type { CourseReserve, ReserveSlice } from './types';
+import type { CourseReserve, ReserveSlice, SubmissionRefetchOptions } from './types';
+import { mergeRefetchedSubmission } from './submissionRefetchMerge';
 import {
   mapSubmissionDetailItem,
   mapSubmissionIndexItem,
@@ -44,8 +45,16 @@ export const createSubmissionFetchSlice: ReserveSlice<
     }
   },
 
-  fetchSubmissionDetails: async (submissionId: string, silent = false) => {
+  fetchSubmissionDetails: async (
+    submissionId: string,
+    silent = false,
+    refetchOptions?: SubmissionRefetchOptions
+  ) => {
     try {
+      if (submissionId.startsWith('reserve-')) {
+        return get().reserves.find((item) => item.id === submissionId) || null;
+      }
+
       const { getAuthHeaders } = await import('../authStore');
       const { API_ENDPOINTS } = await import('@/config/endpoints');
       const response = await fetch(
@@ -67,18 +76,31 @@ export const createSubmissionFetchSlice: ReserveSlice<
       }
 
       console.log('📦 Fetched submission details:', submission);
-      const reserve = mapSubmissionDetailItem(submission);
+      const serverReserve = mapSubmissionDetailItem(submission);
+      let mergedReserve = serverReserve;
+      let hasRemoteItemsChanged = false;
       set((state) => {
         const existingIndex = state.reserves.findIndex((item) => item.id === submissionId);
-        if (existingIndex >= 0) {
-          const existingReserve = state.reserves[existingIndex];
-          const hasChanged = JSON.stringify(existingReserve) !== JSON.stringify(reserve);
-          if (!hasChanged && silent) return state;
-          return { reserves: state.reserves.map((item) => item.id === submissionId ? reserve : item) };
+        const existingReserve = existingIndex >= 0 ? state.reserves[existingIndex] : undefined;
+        const result = mergeRefetchedSubmission(
+          existingReserve,
+          serverReserve,
+          refetchOptions?.isDirty?.() ?? false,
+          refetchOptions?.previousServerReserve
+        );
+        mergedReserve = result.reserve;
+        hasRemoteItemsChanged = result.hasRemoteItemsChanged;
+        if (existingReserve && JSON.stringify(existingReserve) === JSON.stringify(mergedReserve) && silent) {
+          return state;
         }
-        return { reserves: [...state.reserves, reserve] };
+        if (existingIndex >= 0) {
+          return { reserves: state.reserves.map((item) => item.id === submissionId ? mergedReserve : item) };
+        }
+        return { reserves: [...state.reserves, mergedReserve] };
       });
-      return reserve;
+      refetchOptions?.onServerReserveFetched?.(serverReserve);
+      refetchOptions?.onRemoteItemsChanged?.(hasRemoteItemsChanged);
+      return mergedReserve;
     } catch (error) {
       console.error('❌ Failed to fetch submission details:', error);
       return null;

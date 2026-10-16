@@ -3,6 +3,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorUIStore } from '@/store/useEditorUIStore';
 
+const mocks = vi.hoisted(() => ({
+  fetchSubmissionDetails: vi.fn(),
+  hasUnsavedChanges: false,
+}));
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const lockedReserve = {
@@ -50,6 +55,15 @@ vi.mock('@/hooks/useSubmissionEditor', () => ({
     moveItemInFolder: () => {}, moveFolderPosition: () => {},
   }),
 }));
+vi.mock('@/hooks/useDraftSaving', () => ({
+  useDraftSaving: () => ({
+    saveDraft: vi.fn(), markChanged: vi.fn(), lastSaveTime: null,
+    saveError: null, hasUnsavedChanges: mocks.hasUnsavedChanges, isSaving: false,
+  }),
+}));
+vi.mock('@/store/useReserveStore', () => ({
+  useReserveStore: { getState: () => ({ fetchSubmissionDetails: mocks.fetchSubmissionDetails }) },
+}));
 // Silence side-effect hooks and heavy dialogs not under test.
 vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => {} }));
 vi.mock('@/hooks/useCourseCloning', () => ({ useCourseCloning: () => ({ fetchPreviousCourses: vi.fn() }) }));
@@ -75,6 +89,8 @@ describe('SubmissionEditor lock state', () => {
   let root: Root | null = null;
 
   beforeEach(() => {
+    mocks.hasUnsavedChanges = false;
+    mocks.fetchSubmissionDetails.mockReset();
     useEditorUIStore.getState().closeCorrectionRequiredDialog();
     actingForMocks.selectedFaculty = null;
     actingForMocks.canEdit = null;
@@ -140,6 +156,37 @@ describe('SubmissionEditor lock state', () => {
     act(() => root!.render(<SubmissionEditor />));
 
     expect(container!.querySelector('[data-testid="page-sticky-top"] [role="status"]')).toBeNull();
+  });
+
+  it('shows a non-blocking notice when the server copy changed during refocus', () => {
+    mocks.hasUnsavedChanges = true;
+    act(() => root!.render(<SubmissionEditor />));
+    mocks.fetchSubmissionDetails.mockImplementation((
+      _id: string,
+      _silent: boolean,
+      options?: { isDirty: () => boolean; onRemoteItemsChanged?: (changed: boolean) => void }
+    ) => {
+      options?.onRemoteItemsChanged?.(true);
+      return Promise.resolve(lockedReserve);
+    });
+    act(() => window.dispatchEvent(new Event('focus')));
+
+    expect(mocks.fetchSubmissionDetails).toHaveBeenCalledWith(
+      'sub-1', true, expect.objectContaining({ isDirty: expect.any(Function) })
+    );
+    expect(mocks.fetchSubmissionDetails.mock.calls[0][2].isDirty()).toBe(true);
+    expect(container!.textContent).toContain(
+      'This submission was updated elsewhere. Your unsaved changes are kept.'
+    );
+  });
+
+  it('explains that unsaved edits could not be saved after the submission becomes locked', () => {
+    mocks.hasUnsavedChanges = true;
+    act(() => root!.render(<SubmissionEditor />));
+
+    expect(container!.textContent).toContain(
+      'Your unsaved changes could not be saved because library staff are working on this submission.'
+    );
   });
 
   it('mounts the correction dialog in the editor and displays its store detail', () => {
