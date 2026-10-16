@@ -85,17 +85,32 @@ class FolioService
     public function searchTerms()
     {
         try {
-            $response = $this->sendGet($this->searchBaseUrl . '/search-terms');
-            if ($response->isOk && isset($response->data['data']['terms'])) {
-                return $response->data['data']['terms'];
-            }
-
-            Yii::warning('Failed to fetch FOLIO terms: ' . $response->content);
-            return [];
+            return $this->searchTermsStrict();
         } catch (\Exception $e) {
             Yii::error('Error fetching FOLIO terms: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Retrieve terms and preserve upstream failures for workflows that must distinguish errors.
+     *
+     * @return array
+     * @throws \RuntimeException when FOLIO returns an error or malformed payload
+     */
+    public function searchTermsStrict()
+    {
+        $response = $this->sendGet($this->searchBaseUrl . '/search-terms');
+        if (!$response->isOk) {
+            throw new \RuntimeException('FOLIO_HTTP_' . $response->statusCode);
+        }
+
+        $data = $response->getData();
+        if (!isset($data['data']['terms']) || !is_array($data['data']['terms'])) {
+            throw new \RuntimeException('FOLIO_MALFORMED_TERMS_RESPONSE');
+        }
+
+        return $data['data']['terms'];
     }
 
     /**
@@ -107,21 +122,37 @@ class FolioService
     public function searchCourses($query)
     {
         try {
-            $response = $this->sendGet($this->baseUrl, ['query' => $query]);
-            if ($response->isOk && isset($response->data['data']['courses'])) {
-                $courses = $response->data['data']['courses'];
-                if (empty($courses)) {
-                    return null;
-                }
-                return count($courses) === 1 ? $courses[0] : $courses;
-            }
-
-            Yii::warning('Failed to fetch FOLIO course: ' . $response->content);
-            return null;
+            return $this->searchCoursesStrict($query);
         } catch (\Exception $e) {
             Yii::error('Error fetching FOLIO course: ' . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Search courses and throw on upstream or response errors.
+     *
+     * @param string $query FOLIO search expression.
+     * @return array|null
+     * @throws \RuntimeException when FOLIO returns an error or malformed payload
+     */
+    public function searchCoursesStrict($query)
+    {
+        $response = $this->sendGet($this->baseUrl, ['query' => $query]);
+        if (!$response->isOk) {
+            throw new \RuntimeException('FOLIO_HTTP_' . $response->statusCode);
+        }
+
+        $data = $response->getData();
+        if (!isset($data['data']['courses']) || !is_array($data['data']['courses'])) {
+            throw new \RuntimeException('FOLIO_MALFORMED_COURSES_RESPONSE');
+        }
+
+        $courses = $data['data']['courses'];
+        if (empty($courses)) {
+            return null;
+        }
+        return count($courses) === 1 ? $courses[0] : $courses;
     }
 
     /**

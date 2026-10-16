@@ -14,6 +14,7 @@ class Api074ProxyMigrationCest
         $migrationIsDown = false;
         $api079MigrationIsDown = false;
         $api080MigrationIsDown = false;
+        $api081MigrationIsDown = false;
 
         try {
             $api079Applied = (int) $db->createCommand(
@@ -35,6 +36,8 @@ class Api074ProxyMigrationCest
             $this->assertColumn($db, true);
 
             $this->runMigration('down');
+            $api081MigrationIsDown = true;
+            $this->runMigration('down');
             $api080MigrationIsDown = true;
             $this->runMigration('down');
             $api079MigrationIsDown = true;
@@ -49,6 +52,8 @@ class Api074ProxyMigrationCest
             $api079MigrationIsDown = false;
             $this->runMigration('up');
             $api080MigrationIsDown = false;
+            $this->runMigration('up');
+            $api081MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_proxy_permissions');
             $this->assertColumn($db, true);
         } finally {
@@ -60,6 +65,9 @@ class Api074ProxyMigrationCest
                 $this->runMigration('up');
             }
             if ($api080MigrationIsDown) {
+                $this->runMigration('up');
+            }
+            if ($api081MigrationIsDown) {
                 $this->runMigration('up');
             }
         }

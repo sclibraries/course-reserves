@@ -3,6 +3,10 @@
 // Staff workflow routes must precede the generic REST rule.
 return [
     // Linking routes use submission UUIDs and precede the generic REST rule.
+    'GET workflow/needs-linking' => 'workflow-link/needs-linking',
+    'OPTIONS workflow/needs-linking' => 'workflow-link/options',
+    'POST workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/recheck' => 'workflow-link/recheck',
+    'OPTIONS workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/recheck' => 'workflow-link/options',
     'GET workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/candidates' => 'workflow-link/candidates',
     'GET workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/timeline' => 'workflow-link/timeline',
     'POST workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/link' => 'workflow-link/link',

@@ -12,12 +12,15 @@ class Api080WorkflowLinkMigrationCest
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
+        $api081MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
             )->queryScalar(), 'API-080 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api081MigrationIsDown = true;
             $this->runMigration('down');
             $migrationIsDown = true;
             $db->schema->refreshTableSchema('faculty_submissions');
@@ -64,9 +67,15 @@ class Api080WorkflowLinkMigrationCest
             $this->runMigration('down');
             $migrationIsDown = false;
             $this->runMigration('up');
+            $this->runMigration('up');
+            $api081MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
         } finally {
             if ($migrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api081MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
             }

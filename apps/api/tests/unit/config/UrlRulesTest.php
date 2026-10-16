@@ -31,7 +31,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         );
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
         $this->assertTrue(is_array($baseline));
-        $this->assertCount(161, $mergedRules);
+        $this->assertCount(165, $mergedRules);
         $this->assertSame($baseline, $mergedRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -51,6 +51,14 @@ class UrlRulesTest extends \Codeception\Test\Unit
                 'faculty-submission/create-communication', ['id' => $uuid],
             ]],
             ['OPTIONS', 'faculty-submission/' . $uuid, ['faculty-submission/options', ['id' => $uuid]]],
+            ['GET', 'workflow/needs-linking', ['workflow-link/needs-linking', []]],
+            ['OPTIONS', 'workflow/needs-linking', ['workflow-link/options', []]],
+            ['POST', 'workflow/submission/' . $uuid . '/recheck', [
+                'workflow-link/recheck', ['uuid' => $uuid],
+            ]],
+            ['OPTIONS', 'workflow/submission/' . $uuid . '/recheck', [
+                'workflow-link/options', ['uuid' => $uuid],
+            ]],
             ['GET', 'workflow/submission/' . $uuid . '/candidates', [
                 'workflow-link/candidates', ['uuid' => $uuid],
             ]],

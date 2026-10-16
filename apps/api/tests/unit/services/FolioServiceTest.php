@@ -101,6 +101,38 @@ class FolioServiceTest extends \Codeception\Test\Unit
         $this->assertSame([], $service->searchTerms());
         $this->assertNull($service->searchCourses('(courseNumber=="TST 101")'));
     }
+
+    public function testStrictCourseSearchPreservesFolioFailures()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [
+            ['status' => 503, 'data' => ['message' => 'unavailable']],
+        ];
+        $service = new TestableFolioService($transport);
+
+        $this->expectException(\RuntimeException::class);
+        $service->searchCoursesStrict('(courseNumber=="TST 101")');
+    }
+
+    public function testStrictTermSearchPreservesMalformedResponses()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [
+            ['status' => 200, 'data' => ['data' => ['unexpected' => []]]],
+        ];
+        $service = new TestableFolioService($transport);
+
+        $this->expectException(\RuntimeException::class);
+        $service->searchTermsStrict();
+    }
 }
 
 class TestableFolioService extends FolioService

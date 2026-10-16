@@ -6,10 +6,14 @@ namespace app\services;
 class SubmissionRosterTermResolver
 {
     private $courseRosterService;
+    private $folioService;
+    private $strictFolio;
 
-    public function __construct($folioService = null)
+    public function __construct($folioService = null, $strictFolio = false)
     {
-        $this->courseRosterService = new CourseRosterService($folioService);
+        $this->folioService = $folioService ?: \Yii::$container->get(FolioService::class);
+        $this->strictFolio = $strictFolio;
+        $this->courseRosterService = new CourseRosterService($this->folioService);
     }
 
     /**
@@ -22,7 +26,15 @@ class SubmissionRosterTermResolver
             return $submissionAttributes;
         }
 
-        $term = $this->courseRosterService->mapAcademicPeriodToTerm($submissionAttributes['academic_period']);
+        if ($this->strictFolio && method_exists($this->folioService, 'searchTermsStrict')) {
+            $terms = $this->folioService->searchTermsStrict();
+            $term = $this->courseRosterService->mapAcademicPeriodToTerm(
+                $submissionAttributes['academic_period'],
+                $terms
+            );
+        } else {
+            $term = $this->courseRosterService->mapAcademicPeriodToTerm($submissionAttributes['academic_period']);
+        }
         if ($term === null || empty($term['id']) || empty($term['name'])) {
             return $submissionAttributes;
         }

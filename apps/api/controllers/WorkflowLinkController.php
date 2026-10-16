@@ -6,6 +6,7 @@ use Yii;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 use app\services\SubmissionLinkService;
+use app\services\LinkSuggestionService;
 use yii\filters\auth\HttpBearerAuth;
 use yii\filters\ContentNegotiator;
 use yii\filters\Cors;
@@ -37,7 +38,7 @@ class WorkflowLinkController extends Controller
             ],
         ];
         $staffActions = [
-            'candidates', 'link', 'correct', 'link-override', 'unlink', 'timeline', 'options',
+            'candidates', 'needs-linking', 'recheck', 'link', 'correct', 'link-override', 'unlink', 'timeline', 'options',
         ];
         $rules = [];
         foreach ($staffActions as $action) {
@@ -58,7 +59,20 @@ class WorkflowLinkController extends Controller
 
     public function actionCandidates($uuid)
     {
-        return $this->service()->candidates($uuid, Yii::$app->request->get('query'));
+        return $this->suggestionService()->candidates($uuid, Yii::$app->request->get('query'));
+    }
+
+    public function actionNeedsLinking()
+    {
+        return $this->suggestionService()->needsLinking(
+            Yii::$app->request->get('page', 1),
+            Yii::$app->request->get('term')
+        );
+    }
+
+    public function actionRecheck($uuid)
+    {
+        return $this->suggestionService()->recheck($uuid, $this->actor());
     }
 
     public function actionTimeline($uuid)
@@ -97,6 +111,11 @@ class WorkflowLinkController extends Controller
     private function service()
     {
         return Yii::$container->get(SubmissionLinkService::class);
+    }
+
+    private function suggestionService()
+    {
+        return Yii::$container->get(LinkSuggestionService::class);
     }
 
     private function actor()

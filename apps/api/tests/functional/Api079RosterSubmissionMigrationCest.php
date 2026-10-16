@@ -16,6 +16,7 @@ class Api079RosterSubmissionMigrationCest
         $db = \Yii::$app->db;
         $migrationIsDown = false;
         $api080MigrationIsDown = false;
+        $api081MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
@@ -26,6 +27,8 @@ class Api079RosterSubmissionMigrationCest
                 [':version' => $this->api080MigrationVersion]
             )->queryScalar(), 'API-080 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api081MigrationIsDown = true;
             $this->runMigration('down');
             $api080MigrationIsDown = true;
             $this->runMigration('down');
@@ -79,6 +82,8 @@ class Api079RosterSubmissionMigrationCest
             $this->runMigration('up');
             $this->runMigration('up');
             $api080MigrationIsDown = false;
+            $this->runMigration('up');
+            $api081MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
         } finally {
             if ($migrationIsDown) {
@@ -86,6 +91,10 @@ class Api079RosterSubmissionMigrationCest
                 $db->schema->refreshTableSchema('faculty_submissions');
             }
             if ($api080MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api081MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
             }

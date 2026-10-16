@@ -11,6 +11,11 @@ return [
         'searchBaseUrl' => getenv('FOLIO_SEARCH_BASE_URL') ?: 'https://libtools2.smith.edu/folio/web/search',
         'timeoutSeconds' => (int)(getenv('FOLIO_TIMEOUT_SECONDS') ?: 5),
     ],
+    'linkSuggestions' => [
+        'staleMinutes' => (int)(getenv('LINK_SUGGESTION_STALE_MINUTES') ?: 10),
+        'refreshLimit' => (int)(getenv('LINK_SUGGESTION_REFRESH_LIMIT') ?: 10),
+        'pageSize' => (int)(getenv('LINK_SUGGESTION_PAGE_SIZE') ?: 20),
+    ],
     'ebsco' => [
         'endPoint' => 'https://eds-api.ebscohost.com/edsapi/rest',
         'authEndPoint' => 'https://eds-api.ebscohost.com/Authservice/rest',
