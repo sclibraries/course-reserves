@@ -111,8 +111,8 @@ if $FAKE_FOLIO; then
     echo "   Fake FOLIO controls:   http://localhost:8080/_fake-folio/"
     echo ""
     echo "📋 Fake FOLIO next steps:"
-    echo "   docker exec -it course_reserves_backend php yii migrate --interactive=0"
-    echo "   docker exec -it course_reserves_backend php yii dev-seed/test-courses"
+    echo "   docker exec -w /app course_reserves_backend php yii migrate --interactive=0"
+    echo "   docker exec -w /app course_reserves_backend php yii dev-seed/test-courses"
     echo "   Faculty form:         http://localhost:8080/form/"
 fi
 echo "   PHP API direct:        (internal - see nginx proxy)"
