@@ -80,7 +80,7 @@ class FacultyCommunicationsCest extends BaseFunctionalCest
         $submissions = json_decode($I->grabPageSource(), true);
         $fixture = null;
         foreach ($submissions['items'] as $submission) {
-            if ((int)$submission['submission_id'] === (int)$this->submissionId) {
+            if ($submission['submission_uuid'] === $this->submissionUuid) {
                 $fixture = $submission;
                 break;
             }

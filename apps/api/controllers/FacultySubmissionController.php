@@ -328,7 +328,7 @@ class FacultySubmissionController extends BaseRestController
         }, $models);
 
         $pagination = $dataProvider->getPagination();
-        return [
+        return \app\services\FacultySubmissionPresenter::submissionIndexResponse([
             'items' => $items,
             'meta' => [
                 'totalCount' => $dataProvider->getTotalCount(),
@@ -338,7 +338,7 @@ class FacultySubmissionController extends BaseRestController
                 'sortBy' => $sortBy,
                 'sortOrder' => $sortOrder === SORT_ASC ? 'asc' : 'desc',
             ],
-        ];
+        ]);
     }
 
     /**
@@ -509,7 +509,7 @@ class FacultySubmissionController extends BaseRestController
                 : 0,
         ];
         
-        return $response;
+        return \app\services\FacultySubmissionPresenter::submissionResponse($response);
     }
 
     /**
@@ -556,7 +556,7 @@ class FacultySubmissionController extends BaseRestController
         
         $totalItems = array_sum($statusCounts);
         
-        return [
+        return \app\services\FacultySubmissionPresenter::statusResponse([
             'submission_id' => $submission->submission_id,
             'course_code' => $submission->course_code,
             'course_title' => $submission->course_title,
@@ -572,7 +572,7 @@ class FacultySubmissionController extends BaseRestController
                     ? round(($statusCounts['complete'] / $totalItems) * 100, 1)
                     : 0,
             ],
-        ];
+        ]);
     }
 
     /**
@@ -635,7 +635,7 @@ class FacultySubmissionController extends BaseRestController
         }
 
         if ($submission->save()) {
-            return $submission;
+            return \app\services\FacultySubmissionPresenter::submissionResponse($submission);
         } else {
             Yii::$app->response->statusCode = 422;
             return ['errors' => $submission->errors];
@@ -752,7 +752,7 @@ class FacultySubmissionController extends BaseRestController
             $transaction->commit();
 
             // Return submission with all related data
-            return [
+            return \app\services\FacultySubmissionPresenter::submitCompleteResponse([
                 'success' => true,
                 'message' => 'Submission completed successfully',
                 'submission' => \app\services\SubmissionConfirmationState::projectResponse($submission),
@@ -762,7 +762,7 @@ class FacultySubmissionController extends BaseRestController
                     'reuse_items' => $metadata['reuseItems'] ?? 0,
                     'new_items' => $metadata['newItems'] ?? 0,
                 ]
-            ];
+            ]);
 
         } catch (\Exception $e) {
             $transaction->rollBack();
@@ -1382,7 +1382,7 @@ class FacultySubmissionController extends BaseRestController
         $response['unfoldered_items'] = $unfolderedItems;
         $response['lock_status'] = $submission->getLockStatus();
         
-        return $response;
+        return \app\services\FacultySubmissionPresenter::submissionResponse($response);
     }
 
     /**
@@ -1441,7 +1441,7 @@ class FacultySubmissionController extends BaseRestController
         $reuseResource->faculty_notes = $data['faculty_notes'] ?? null;
 
         if ($reuseResource->save()) {
-            return $reuseResource;
+            return \app\services\FacultySubmissionPresenter::resourceResponse($reuseResource);
         } else {
             Yii::$app->response->statusCode = 422;
             return ['errors' => $reuseResource->errors];
@@ -1476,7 +1476,7 @@ class FacultySubmissionController extends BaseRestController
         $newResource->priority = $data['priority'] ?? SubmissionNewResource::PRIORITY_MEDIUM;
 
         if ($newResource->save()) {
-            return $newResource;
+            return \app\services\FacultySubmissionPresenter::resourceResponse($newResource);
         } else {
             Yii::$app->response->statusCode = 422;
             return ['errors' => $newResource->errors];
@@ -1532,7 +1532,7 @@ class FacultySubmissionController extends BaseRestController
         if (!(new SubmissionOwnershipPolicy())->canAccess($submission, $facultyUser)) {
             throw new ForbiddenHttpException('Access denied to this submission');
         }
-        return ['messages' => $service->threads($submission->submission_id, true)];
+        return \app\services\FacultySubmissionPresenter::facultyCommunicationsResponse(['messages' => $service->threads($submission->submission_id, true)]);
     }
 
     public function actionCreateCommunication($id)
