@@ -1,5 +1,4 @@
-/** Shared z-index order for sticky bars; Radix popover and dialog portals use z-50. */
+/** Shared z-index for page sticky regions; Radix overlays render in z-50 portals. */
 export const STICKY_LAYERS = {
-  submissionEditor: 10,
-  actingForBanner: 20,
+  pageTop: 10,
 } as const;

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ItemModal, ItemData } from "@/components/ItemModal";
-import { ArrowLeft, Plus, Edit2, FileText, Calendar, Trash2, X, Pencil, Check } from "lucide-react";
+import { Plus, Edit2, FileText, Calendar, Trash2, X, Pencil, Check } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CloneEditorHeader } from "@/components/pageHeaders/CloneEditorHeader";
 
 interface ClonedCourse {
   courseCode: string;
@@ -199,41 +200,15 @@ const CloneEditor = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/clone-previous")}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Copying from {originalTerm} →</span>
-                  <span className="font-semibold">{courseData.courseCode} ({courseData.term})</span>
-                  <Badge variant="secondary" className="text-xs">
-                    Current Term
-                  </Badge>
-                  {isEditingCourse && (
-                    <Badge variant="outline" className="text-xs">
-                      Editing
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusBadge status="draft" />
-              <Button variant="ghost" onClick={handleSaveDraft} disabled={isEditingCourse}>
-                Save Draft
-              </Button>
-              <Button onClick={handleSubmit} disabled={isEditingCourse}>
-                Create Course
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <CloneEditorHeader
+        originalTerm={originalTerm}
+        courseCode={courseData.courseCode}
+        term={courseData.term}
+        isEditingCourse={isEditingCourse}
+        onBack={() => navigate("/clone-previous")}
+        onSaveDraft={handleSaveDraft}
+        onSubmit={handleSubmit}
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">

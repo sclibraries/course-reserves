@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { STICKY_LAYERS } from '@/constants/stickyLayers';
 import { useActingForStore } from '@/store/actingForStore';
 import { useCourseAssignmentsStore } from '@/store/courseAssignmentsStore';
 
@@ -21,8 +20,7 @@ export const ActingForBanner = () => {
   return (
     <div
       role="status"
-      className="sticky top-16 flex items-center justify-center gap-3 border-b bg-primary/10 px-4 py-2 text-sm"
-      style={{ zIndex: STICKY_LAYERS.actingForBanner }}
+      className="flex items-center justify-center gap-3 border-b bg-primary/10 px-4 py-2 text-sm"
     >
       <span>Acting for {selectedFaculty.displayName}</span>
       <span className="text-muted-foreground">{canEdit === null ? 'Loading access' : canEdit ? 'Can edit' : 'View only'}</span>

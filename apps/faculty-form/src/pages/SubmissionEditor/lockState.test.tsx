@@ -2,7 +2,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorUIStore } from '@/store/useEditorUIStore';
-import { ActingForBanner } from '@/components/ActingForBanner';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -114,12 +113,12 @@ describe('SubmissionEditor lock state', () => {
     expect(editCourseBtn!.disabled).toBe(true);
   });
 
-  it('keeps the header and action bar in one sticky stack below the acting-for banner', () => {
+  it('orders the editor header, acting-for banner, and action bar inside one sticky region', () => {
     actingForMocks.selectedFaculty = { username: 'test-faculty', displayName: 'Test Faculty' };
-    act(() => root!.render(<><ActingForBanner /><SubmissionEditor /></>));
+    act(() => root!.render(<SubmissionEditor />));
 
-    const banner = container!.querySelector('[role="status"]');
-    const stack = container!.querySelector('[data-testid="submission-editor-sticky-stack"]');
+    const stack = container!.querySelector('[data-testid="page-sticky-top"]');
+    const banner = stack?.querySelector('[role="status"]');
     const header = stack?.querySelector('header');
     const actionBar = stack?.querySelector('[data-testid="submission-editor-action-bar"]');
 
@@ -127,14 +126,20 @@ describe('SubmissionEditor lock state', () => {
     expect(stack?.classList.contains('sticky')).toBe(true);
     expect(stack?.classList.contains('top-0')).toBe(true);
     expect(header).not.toBeNull();
+    expect(banner).not.toBeNull();
     expect(actionBar).not.toBeNull();
     expect(header?.classList.contains('sticky')).toBe(false);
     expect(actionBar?.classList.contains('sticky')).toBe(false);
     expect(Boolean(header!.compareDocumentPosition(actionBar!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-    expect(banner?.classList.contains('sticky')).toBe(true);
-    expect(banner?.classList.contains('top-16')).toBe(true);
-    expect(Number(banner?.getAttribute('style')?.match(/z-index:\s*(\d+)/)?.[1]))
-      .toBeGreaterThan(Number(stack?.getAttribute('style')?.match(/z-index:\s*(\d+)/)?.[1]));
+    expect(Boolean(header!.compareDocumentPosition(banner!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(banner!.compareDocumentPosition(actionBar!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(banner?.classList.contains('sticky')).toBe(false);
+  });
+
+  it('omits the editor banner when no faculty member is selected', () => {
+    act(() => root!.render(<SubmissionEditor />));
+
+    expect(container!.querySelector('[data-testid="page-sticky-top"] [role="status"]')).toBeNull();
   });
 
   it('mounts the correction dialog in the editor and displays its store detail', () => {

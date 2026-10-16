@@ -24,11 +24,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Folder, Pencil, Trash2, Lock } from "lucide-react";
+import { Folder } from "lucide-react";
 import CommunicationsContainer from "@/components/Communications/CommunicationsContainer";
 import ItemMessageDialog from "@/components/Communications/ItemMessageDialog";
 import { CommunicationsAPI, CreateMessageRequest, Message } from "@/services/api/communications";
 import { toast } from "sonner";
+import { SubmissionDetailHeader } from "@/components/pageHeaders/SubmissionDetailHeader";
 
 const SubmissionDetail = () => {
   const navigate = useNavigate();
@@ -239,53 +240,13 @@ const SubmissionDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">My Course Reserves /</span>
-                  <span className="font-semibold">{reserve.courseCode} ({reserve.term})</span>
-                  {reserve.isLocked && (
-                    <Badge 
-                      variant="secondary" 
-                      className="flex items-center gap-1"
-                      title={`Locked by ${reserve.lockedBy || 'staff'}${reserve.lockedAt ? ` on ${new Date(reserve.lockedAt).toLocaleDateString()}` : ''}${reserve.lockReason ? `. Reason: ${reserve.lockReason}` : ''}`}
-                    >
-                      <Lock className="h-3 w-3" />
-                      {reserve.lockedBy ? `Locked by ${reserve.lockedBy}` : 'Locked by Staff'}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusBadge status={reserve.status === 'in-progress' ? 'partial' : reserve.status === 'submitted' ? 'submitted' : reserve.status === 'complete' ? 'complete' : 'draft'} />
-              {canEdit && (
-                <>
-                  <Button variant="outline" onClick={handleEditSubmission}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit Submission
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <SubmissionDetailHeader
+        reserve={reserve}
+        canEdit={canEdit}
+        onBack={() => navigate("/")}
+        onEdit={handleEditSubmission}
+        onDelete={() => setShowDeleteDialog(true)}
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

@@ -62,4 +62,16 @@ describe('ActingForBanner', () => {
     expect(mocks.clearActingForAssignments).toHaveBeenCalledOnce();
     expect(mocks.fetchCourseAssignments).toHaveBeenCalledOnce();
   });
+
+  it('does not position itself independently of its page layout', async () => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root?.render(<ActingForBanner />));
+
+    const banner = container.querySelector('[role="status"]');
+    expect(banner?.classList.contains('sticky')).toBe(false);
+    expect(banner?.classList.contains('top-16')).toBe(false);
+    expect(banner?.getAttribute('style')).toBeNull();
+  });
 });

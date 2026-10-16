@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Copy } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Copy } from "lucide-react";
 import { useCourseReservesStore } from "../store/courseReservesStore";
 import { useTermsStore } from "../store/termsStore";
 import { useAuthStore } from "../store/authStore";
 import { toast } from "sonner";
+import { CloneMatchingTestHeader } from "@/components/pageHeaders/CloneMatchingTestHeader";
 
 interface CourseMatch {
   nextTermCourse: {
@@ -172,19 +173,7 @@ const CloneMatchingTest = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-semibold">Clone Matching Test</h1>
-            </div>
-            <Badge variant="secondary">Debug Mode</Badge>
-          </div>
-        </div>
-      </header>
+      <CloneMatchingTestHeader onBack={() => navigate("/")} />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">

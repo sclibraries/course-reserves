@@ -15,9 +15,10 @@ import CloneMatchingTest from "./pages/CloneMatchingTest";
 import NotFound from "./pages/NotFound";
 import ManageDesignees from "./pages/ManageDesignees";
 import AcceptProxyInvitation from "./pages/AcceptProxyInvitation";
-import { ActingForBanner } from "./components/ActingForBanner";
+import { RouteActingForBanner } from "./components/RouteActingForBanner";
 import { ProxyInvitationResume } from "./components/ProxyInvitationResume";
 import { ProxyAccessSync } from "./components/ProxyAccessSync";
+import { STICKY_HEADER_ROUTES } from "./components/stickyHeaderRoutes";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +30,7 @@ const App = () => (
       <BrowserRouter basename={import.meta.env.VITE_BASE_PATH || '/'}>
         <ProxyInvitationResume />
         <ProxyAccessSync />
-        <ActingForBanner />
+        <RouteActingForBanner />
         <Routes>
           {/* Auth-only route - redirects to / if authenticated */}
           <Route path="/auth" element={
@@ -39,7 +40,7 @@ const App = () => (
           } />
           
           {/* Protected routes - require authentication */}
-          <Route path="/" element={
+          <Route path={STICKY_HEADER_ROUTES.dashboard} element={
             <ProtectedRoute>
               <Index />
             </ProtectedRoute>
@@ -50,17 +51,17 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/faculty/accept-proxy-invitation/:token" element={<AcceptProxyInvitation />} />
-          <Route path="/new-submission" element={
+          <Route path={STICKY_HEADER_ROUTES.newSubmission} element={
             <ProtectedRoute>
               <NewSubmission />
             </ProtectedRoute>
           } />
-          <Route path="/submission/:id/edit" element={
+          <Route path={STICKY_HEADER_ROUTES.submissionEdit} element={
             <ProtectedRoute>
               <SubmissionEditor />
             </ProtectedRoute>
           } />
-          <Route path="/submission/:id" element={
+          <Route path={STICKY_HEADER_ROUTES.submissionDetail} element={
             <ProtectedRoute>
               <SubmissionDetail />
             </ProtectedRoute>
@@ -70,12 +71,12 @@ const App = () => (
               <ClonePrevious />
             </ProtectedRoute>
           } />
-          <Route path="/clone-editor" element={
+          <Route path={STICKY_HEADER_ROUTES.cloneEditor} element={
             <ProtectedRoute>
               <CloneEditor />
             </ProtectedRoute>
           } />
-          <Route path="/clone-matching-test" element={
+          <Route path={STICKY_HEADER_ROUTES.cloneMatchingTest} element={
             <ProtectedRoute>
               <CloneMatchingTest />
             </ProtectedRoute>
