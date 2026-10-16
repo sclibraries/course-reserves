@@ -7,20 +7,23 @@ class SubmissionLinkCandidateService
 {
     private $folioService;
     private $matchRule;
+    private $termResolver;
 
     public function __construct($folioService = null, ?SubmissionLinkMatchRule $matchRule = null)
     {
         $this->folioService = $folioService ?: \Yii::$container->get(FolioService::class);
         $this->matchRule = $matchRule ?: new SubmissionLinkMatchRule();
+        $this->termResolver = new SubmissionRosterTermResolver($this->folioService);
     }
 
     public function candidates($submission, $manualQuery = null)
     {
+        $attributes = $this->termResolver->attributesForMatch($submission->attributes);
         $search = trim((string)($manualQuery ?: $submission->course_code));
         $query = '(courseNumber=="' . $this->escapeQuery($search) . '")';
-        if (!empty($submission->roster_term_id)) {
+        if (!empty($attributes['roster_term_id'])) {
             $query = '(' . substr($query, 1, -1) . ' and termId=="' .
-                $this->escapeQuery($submission->roster_term_id) . '")';
+                $this->escapeQuery($attributes['roster_term_id']) . '")';
         }
         $results = $this->folioService->searchCourses($query);
         if (is_array($results) && (isset($results['courseListingId']) || isset($results['courseNumber']))) {
@@ -29,7 +32,7 @@ class SubmissionLinkCandidateService
         $items = [];
         foreach (is_array($results) ? $results : [] as $listing) {
             if (!is_array($listing)) continue;
-            $match = $this->matchRule->evaluate($submission->attributes, $listing);
+            $match = $this->matchRule->evaluate($attributes, $listing);
             $listingObject = $listing['courseListingObject'] ?? [];
             $term = $listingObject['termObject'] ?? $listing['term'] ?? [];
             $items[] = [

@@ -152,9 +152,8 @@ class SubmissionWorkflowController extends Controller
         }
 
         $submission = FacultySubmission::findOne($data['submission_id']);
-        if (!$submission) {
-            throw new NotFoundHttpException('Submission not found');
-        }
+        if (!$submission) throw new NotFoundHttpException('Submission not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($submission)) return $blocked;
 
         $existingAssignment = SubmissionWorkflowAssignment::find()
             ->where(['submission_id' => $submission->submission_id])
@@ -197,9 +196,8 @@ class SubmissionWorkflowController extends Controller
             ->where(['assignment_id' => $id, 'assigned_staff_user_id' => $currentUser->id])
             ->one();
 
-        if (!$assignment) {
-            throw new NotFoundHttpException('Assignment not found');
-        }
+        if (!$assignment) throw new NotFoundHttpException('Assignment not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($assignment->submission)) return $blocked;
 
         if (isset($data['status'])) {
             $this->assertAssignmentStatusIsValid($data['status']);
@@ -855,9 +853,8 @@ class SubmissionWorkflowController extends Controller
             ->where(['submission_id' => $id, 'assigned_staff_user_id' => $currentUser->id])
             ->one();
 
-        if (!$assignment) {
-            throw new ForbiddenHttpException('You are not assigned to this submission');
-        }
+        if (!$assignment) throw new ForbiddenHttpException('You are not assigned to this submission');
+        if ($blocked = SubmissionLinkGuard::errorResponse($assignment->submission)) return $blocked;
 
         return $this->completeAssignment($assignment);
     }

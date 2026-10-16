@@ -73,19 +73,24 @@ class SubmissionLinkService
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $submission = $this->findSubmissionForUpdate($uuid);
-            $before = $this->snapshot($submission);
-            $changed = [];
+            if ($submission->link_state === 'linked') {
+                $transaction->rollBack();
+                return ['status' => 409, 'body' => ['error_code' => 'already_linked']];
+            }
+            $before = SubmissionLinkSnapshot::fromSubmission($submission);
             foreach (['course_code', 'section'] as $field) {
                 if (array_key_exists($field, $data)) {
                     $submission->$field = trim((string)$data[$field]);
-                    $changed[$field] = $submission->$field;
                 }
             }
             if (!$submission->save()) {
                 throw new ServerErrorHttpException('Failed to correct submission: ' . json_encode($submission->getErrors()));
             }
 
-            $message = 'The library corrected the course information: ' . json_encode($changed) . '. Reason: ' . $reason;
+            $message = (new SubmissionCorrectionMessageBuilder())->build(
+                $before,
+                SubmissionLinkSnapshot::fromSubmission($submission)
+            );
             $created = $this->communicationService->create($submission, [
                 'message' => $message,
                 'subject' => 'Course information updated',
@@ -106,7 +111,7 @@ class SubmissionLinkService
                 'corrected',
                 $reason,
                 $before,
-                $this->snapshot($submission)
+                SubmissionLinkSnapshot::fromSubmission($submission)
             );
             // TODO(API-045): emit the submission_corrected email event here.
             $transaction->commit();
@@ -132,7 +137,7 @@ class SubmissionLinkService
                 return ['status' => 409, 'body' => ['error_code' => 'items_published']];
             }
 
-            $before = $this->snapshot($submission);
+            $before = SubmissionLinkSnapshot::fromSubmission($submission);
             $submission->link_state = 'needs_linking';
             $submission->link_flag = null;
             $submission->offering_id = null;
@@ -149,7 +154,7 @@ class SubmissionLinkService
                 'unlinked',
                 $reason,
                 $before,
-                $this->snapshot($submission)
+                SubmissionLinkSnapshot::fromSubmission($submission)
             );
             $transaction->commit();
             return ['status' => 200, 'body' => $this->staffSubmission($submission)];
@@ -171,15 +176,6 @@ class SubmissionLinkService
         }
 
         $listing = $this->courseOfferingService->fetchListing($listingId);
-        $match = $this->matchRule->evaluate($submission->attributes, $listing);
-        if (!$override && $match['match'] !== 'exact') {
-            return ['status' => 409, 'body' => [
-                'error_code' => 'not_exact_match',
-                'fields' => $match['fields'],
-                'term_verified' => $match['term_verified'],
-            ]];
-        }
-
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $submission = $this->findSubmissionForUpdate($uuid);
@@ -190,7 +186,22 @@ class SubmissionLinkService
                     'linked_by' => $submission->linked_by,
                 ]];
             }
-            $before = $this->snapshot($submission);
+            $before = SubmissionLinkSnapshot::fromSubmission($submission);
+            $matchAttributes = (new SubmissionRosterTermResolver($this->folioService))
+                ->attributesForMatch($submission->attributes);
+            if (empty($submission->roster_term_id) && !empty($matchAttributes['roster_term_id'])) {
+                $submission->roster_term_id = $matchAttributes['roster_term_id'];
+                $submission->term_code = $matchAttributes['term_code'];
+            }
+            $match = $this->matchRule->evaluate($matchAttributes, $listing);
+            if (!$override && $match['match'] !== 'exact') {
+                $transaction->rollBack();
+                return ['status' => 409, 'body' => [
+                    'error_code' => 'not_exact_match',
+                    'fields' => $match['fields'],
+                    'term_verified' => $match['term_verified'],
+                ]];
+            }
             $result = $this->courseOfferingService->findOrCreateFromListing($listing);
             $submission->link_state = 'linked';
             $submission->link_flag = $override ? 'mismatch_override' : null;
@@ -209,7 +220,7 @@ class SubmissionLinkService
                 $override ? 'link_override' : 'linked',
                 $reason,
                 $before,
-                $this->snapshot($submission)
+                SubmissionLinkSnapshot::fromSubmission($submission)
             );
             $transaction->commit();
             $response = $this->staffSubmission($submission);
@@ -256,21 +267,6 @@ class SubmissionLinkService
         $reason = trim((string)$reason);
         if ($reason === '') throw new BadRequestHttpException('reason is required.');
         return $reason;
-    }
-
-    private function snapshot($submission)
-    {
-        return [
-            'course_code' => $submission->course_code,
-            'section' => $submission->section,
-            'term_code' => $submission->term_code,
-            'link_state' => $submission->link_state,
-            'link_flag' => $submission->link_flag,
-            'offering_id' => $submission->offering_id,
-            'folio_course_listing_id' => $submission->folio_course_listing_id,
-            'linked_at' => $submission->linked_at,
-            'linked_by' => $submission->linked_by,
-        ];
     }
 
     private function staffSubmission($submission)

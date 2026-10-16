@@ -49,6 +49,91 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         Assert::assertArrayHasKey('checked_at', $this->response($I));
     }
 
+    public function candidatesResolveMissingRosterTermBeforeMatching(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('candidate-null-term', [
+            'term_code' => 'AP_202701',
+            'roster_term_id' => null,
+        ]);
+        $this->folio->terms = [$this->folioTerm()];
+        $this->folio->searchResults = [$this->listing('candidate-null-term')];
+
+        $this->get($I, 'workflow/submission/' . $uuid . '/candidates', $this->staffToken);
+
+        $I->seeResponseCodeIs(200);
+        $item = $this->response($I)['items'][0];
+        Assert::assertSame('exact', $item['match']);
+        Assert::assertTrue($item['term_verified']);
+        Assert::assertStringContainsString('termId=="test-api080-term-1"', $this->folio->lastQuery);
+    }
+
+    public function linkResolvesMissingRosterTermAndRecordsItInTheEvent(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('link-null-term', [
+            'term_code' => 'AP_202701',
+            'roster_term_id' => null,
+        ]);
+        $listing = $this->listing('link-null-term');
+        $this->folio->terms = [$this->folioTerm()];
+        $this->folio->addListing($listing);
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $listing['courseListingId'],
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('test-api080-term-1', $this->response($I)['roster_term_id']);
+        Assert::assertSame('Spring 2027', $this->response($I)['term_code']);
+        $event = $this->event($uuid, 'linked');
+        Assert::assertNull(json_decode($event['before_json'], true)['roster_term_id']);
+        Assert::assertSame('AP_202701', json_decode($event['before_json'], true)['term_code']);
+        Assert::assertSame('test-api080-term-1', json_decode($event['after_json'], true)['roster_term_id']);
+        Assert::assertSame('Spring 2027', json_decode($event['after_json'], true)['term_code']);
+    }
+
+    public function unresolvedRosterTermStillRejectsAnExactLink(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('link-unknown-term', [
+            'term_code' => 'AP_202701',
+            'roster_term_id' => null,
+        ]);
+        $listing = $this->listing('link-unknown-term');
+        $this->folio->terms = [];
+        $this->folio->addListing($listing);
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $listing['courseListingId'],
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('not_exact_match', $this->response($I)['error_code']);
+        Assert::assertFalse($this->response($I)['fields']['term']);
+        Assert::assertFalse($this->response($I)['term_verified']);
+    }
+
+    public function linkRechecksMatchAfterLockingTheSubmission(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('link-locked-recheck');
+        $listing = $this->listing('link-locked-recheck');
+        $this->folio->addListing($listing);
+        $submissionId = $this->submissionId($uuid);
+        $this->folio->onFetch = function () use ($submissionId) {
+            \Yii::$app->db->createCommand()->update('faculty_submissions', [
+                'course_code' => 'AFR 156',
+            ], ['submission_id' => $submissionId])->execute();
+        };
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $listing['courseListingId'],
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('not_exact_match', $this->response($I)['error_code']);
+        $submission = \app\models\FacultySubmission::findOne($submissionId);
+        Assert::assertSame('AFR 156', $submission->course_code);
+        Assert::assertSame('needs_linking', $submission->link_state);
+    }
+
     public function exactLinkUsesFetchedFolioDataAndWritesTimelineEvent(FunctionalTester $I)
     {
         $uuid = $this->insertSubmission('exact-link');
@@ -120,7 +205,7 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
 
     public function correctionChangesOnlyCourseAndSectionAndMessagesFaculty(FunctionalTester $I)
     {
-        $uuid = $this->insertSubmission('correct');
+        $uuid = $this->insertSubmission('correct', ['shibboleth_user_id' => 'test-api080-faculty']);
         $this->post($I, 'workflow/submission/' . $uuid . '/correct', [
             'course_code' => 'AFR 156',
             'section' => '02',
@@ -138,8 +223,21 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         Assert::assertNotNull($message);
         Assert::assertSame(SubmissionCommunication::VISIBILITY_FACULTY, $message->visibility);
         Assert::assertSame('Library staff', $message->sender_name);
-        Assert::assertStringContainsString('Corrected from the roster record', $message->message);
-        Assert::assertSame('corrected', $this->event($uuid, 'corrected')['event_type']);
+        Assert::assertSame(
+            'We updated your course details to match the library system: course number AFR 155 -> AFR 156; section 01 -> 02.',
+            $message->message
+        );
+        Assert::assertStringNotContainsString('Corrected from the roster record', $message->message);
+        Assert::assertStringNotContainsString('{"course_code"', $message->message);
+        $event = $this->event($uuid, 'corrected');
+        Assert::assertSame('corrected', $event['event_type']);
+        Assert::assertSame('Corrected from the roster record', $event['reason']);
+
+        $this->request($I, 'GET', 'faculty-submission/communications', [], $this->facultyToken, [
+            'id' => $uuid,
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame($message->message, $this->response($I)['messages'][0]['message']);
 
         $this->post($I, 'workflow/submission/' . $uuid . '/correct', [
             'term_code' => 'Spring 2028',
@@ -148,6 +246,21 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(422);
         Assert::assertSame('term_change_not_allowed', $this->response($I)['error_code']);
         Assert::assertSame(1, $this->eventCount($uuid));
+    }
+
+    public function correctingLinkedSubmissionRequiresUnlinkingFirst(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('correct-linked', ['link_state' => 'linked']);
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/correct', [
+            'course_code' => 'AFR 156',
+            'reason' => 'Corrected from the roster record',
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('already_linked', $this->response($I)['error_code']);
+        Assert::assertSame('AFR 155', \app\models\FacultySubmission::findOne($this->submissionId($uuid))->course_code);
+        Assert::assertSame(0, $this->eventCount($uuid));
     }
 
     public function overrideRequiresReasonAndFlagsTheLink(FunctionalTester $I)
@@ -229,6 +342,46 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         Assert::assertEmpty($item->staff_notes);
         Assert::assertSame(0, (int) \app\models\ItemChecklistTask::findOne($taskId)->completed);
         Assert::assertSame($checklistId, (int) \app\models\ItemChecklist::findOne(['submission_item_id' => $itemId])->id);
+    }
+
+    public function submissionAssignmentAndCompletionWritesRejectUnlinkedSubmission(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('submission-gate');
+        $submissionId = $this->submissionId($uuid);
+        $this->post($I, 'submission-workflow/assign-submission', [
+            'submission_id' => $submissionId,
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('submission_not_linked', $this->response($I)['error_code']);
+        Assert::assertSame('submitted', \app\models\FacultySubmission::findOne($submissionId)->status);
+        Assert::assertFalse(\app\models\SubmissionWorkflowAssignment::find()->where([
+            'submission_id' => $submissionId,
+        ])->exists());
+
+        \Yii::$app->db->createCommand()->insert('submission_workflow_assignments', [
+            'submission_id' => $submissionId,
+            'assigned_staff_user_id' => 'test-api080-staff',
+            'assignment_type' => 'full_course',
+            'status' => 'assigned',
+        ])->execute();
+        $assignmentId = (int)\Yii::$app->db->getLastInsertID();
+        $this->request($I, 'PUT', 'submission-workflow/update-assignment', [
+            'status' => 'in_progress',
+        ], $this->staffToken, ['id' => $assignmentId]);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('submission_not_linked', $this->response($I)['error_code']);
+        Assert::assertSame('assigned', \app\models\SubmissionWorkflowAssignment::findOne($assignmentId)->status);
+
+        $this->request($I, 'POST', 'submission-workflow/complete-submission', [], $this->staffToken, [
+            'id' => $submissionId,
+        ]);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('submission_not_linked', $this->response($I)['error_code']);
+        Assert::assertSame('submitted', \app\models\FacultySubmission::findOne($submissionId)->status);
+        Assert::assertSame('assigned', \app\models\SubmissionWorkflowAssignment::findOne($assignmentId)->status);
     }
 
     public function timelineIsStaffOnly(FunctionalTester $I)
@@ -407,6 +560,16 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         ], $overrides);
     }
 
+    private function folioTerm()
+    {
+        return [
+            'id' => 'test-api080-term-1',
+            'name' => 'Spring 2027',
+            'startDate' => '2027-01-01T00:00:00.000Z',
+            'endDate' => '2027-06-01T00:00:00.000Z',
+        ];
+    }
+
     private function cleanup()
     {
         $db = \Yii::$app->db;
@@ -468,8 +631,10 @@ class TestApi080WorkflowFolioService
 {
     public $listings = [];
     public $searchResults = [];
+    public $terms = [];
     public $lastFetchedId;
     public $lastQuery;
+    public $onFetch;
 
     public function addListing(array $listing)
     {
@@ -479,6 +644,9 @@ class TestApi080WorkflowFolioService
     public function fetchCourseById($id)
     {
         $this->lastFetchedId = $id;
+        if ($this->onFetch !== null) {
+            call_user_func($this->onFetch);
+        }
         if (!isset($this->listings[$id])) {
             throw new \RuntimeException('FOLIO_COURSE_NOT_FOUND');
         }
@@ -489,5 +657,10 @@ class TestApi080WorkflowFolioService
     {
         $this->lastQuery = $query;
         return $this->searchResults ?: null;
+    }
+
+    public function searchTerms()
+    {
+        return $this->terms;
     }
 }

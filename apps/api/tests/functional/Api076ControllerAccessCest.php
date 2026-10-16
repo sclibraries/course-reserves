@@ -16,7 +16,9 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
     private $trackingEventId;
     private $instructorId;
     private $submissionUuid = '07607607-6076-4076-8076-076076076076';
+    private $unlinkedSubmissionUuid = '07607607-6076-4076-8076-076076076077';
     private $submissionItemId;
+    private $unlinkedSubmissionItemId;
 
     public function _before(FunctionalTester $I)
     {
@@ -59,22 +61,29 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
         ])->execute();
         $this->instructorId = (int)\Yii::$app->db->getLastInsertID();
 
-        \Yii::$app->db->createCommand()->insert('faculty_submissions', [
-            'submission_uuid' => $this->submissionUuid,
-            'shibboleth_user_id' => 'test-api076-faculty',
+        TestSubmissionFixture::create($this->submissionUuid, 'test-api076-faculty', [
             'term_code' => 'test-api076-term',
             'course_code' => 'TST API076',
             'section' => '76',
             'course_title' => 'Synthetic API-076 checklist submission',
             'status' => 'submitted',
-        ])->execute();
-        $submissionId = (int)\Yii::$app->db->getLastInsertID();
-        \Yii::$app->db->createCommand()->insert('submission_new_resources', [
-            'submission_id' => $submissionId,
-            'resource_data' => json_encode(['title' => 'test-api076-resource']),
-            'item_status' => 'pending',
-        ])->execute();
-        $this->submissionItemId = (int)\Yii::$app->db->getLastInsertID();
+            'link_state' => 'linked',
+        ]);
+        $this->submissionItemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :submission_id ORDER BY id DESC LIMIT 1',
+            [':submission_id' => $this->submissionId($this->submissionUuid)]
+        )->queryScalar();
+        TestSubmissionFixture::create($this->unlinkedSubmissionUuid, 'test-api076-unlinked-faculty', [
+            'term_code' => 'test-api076-term',
+            'course_code' => 'TST API076',
+            'section' => '76',
+            'course_title' => 'Synthetic API-076 unlinked checklist submission',
+            'status' => 'submitted',
+        ]);
+        $this->unlinkedSubmissionItemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :submission_id ORDER BY id DESC LIMIT 1',
+            [':submission_id' => $this->submissionId($this->unlinkedSubmissionUuid)]
+        )->queryScalar();
     }
 
     public function _after(FunctionalTester $I)
@@ -282,6 +291,17 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
         );
         $this->assertStaffOnly($I, 'Checklist duplicate-template', 'POST', 'checklist/duplicate-template', [], ['id' => $templateId], 200);
 
+        $unlinkedStatus = $this->requestAs(
+            $I,
+            'staff',
+            'POST',
+            'checklist/assign-checklist',
+            ['template_id' => $templateId],
+            ['itemId' => $this->unlinkedSubmissionItemId]
+        );
+        \PHPUnit\Framework\Assert::assertSame(409, $unlinkedStatus);
+        \PHPUnit\Framework\Assert::assertSame('submission_not_linked', $I->grabJsonResponse()['error_code']);
+
         $this->assertStaffOnly(
             $I,
             'Checklist assign-checklist',
@@ -409,6 +429,14 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
         ], getenv('JWT_SECRET_KEY'), 'HS256');
     }
 
+    private function submissionId($uuid)
+    {
+        return (int)\Yii::$app->db->createCommand(
+            'SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid',
+            [':uuid' => $uuid]
+        )->queryScalar();
+    }
+
     private function insertUser($username, $role)
     {
         \Yii::$app->db->createCommand()->insert('users', [
@@ -424,6 +452,7 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
 
     private function cleanupFixtures()
     {
+        TestSubmissionFixture::delete($this->unlinkedSubmissionUuid);
         \Yii::$app->db->createCommand()->delete('faculty_submissions', ['submission_uuid' => $this->submissionUuid])->execute();
         \Yii::$app->db->createCommand()->delete('checklist_templates', ['like', 'name', 'test-api076-%', false])->execute();
         \Yii::$app->db->createCommand()->delete('tracking_events', ['like', 'course_id', 'test-api076-%', false])->execute();
