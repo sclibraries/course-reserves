@@ -20,6 +20,25 @@ use yii\db\ActiveRecord;
  */
 class TrackingEvent extends ActiveRecord
 {
+    const EVENT_TYPES = [
+        'search',
+        'search_reset',
+        'term_change',
+        'search_mode_change',
+        'college_change',
+        'department_change',
+        'course_access',
+        'instructor_search',
+        'course_access_from_item_search',
+        'view_mode_change',
+        'filter_change',
+        'switched_to_card_view',
+        'switched_to_table_view',
+        'resource_click',
+        'resource_link_click',
+        'record_discover_link',
+    ];
+
     /**
      * {@inheritdoc}
      */
@@ -36,9 +55,9 @@ class TrackingEvent extends ActiveRecord
         return [
             [['college', 'event_type', 'course_id', 'term'], 'required'],
             [['college', 'event_type', 'course_id', 'term'], 'string', 'max' => 50],
+            [['event_type'], 'in', 'range' => self::EVENT_TYPES],
             [['course_name', 'course_code'], 'string', 'max' => 255],
             [['instructor', 'metadata'], 'safe'],
-            [['created_at'], 'safe'],
         ];
     }
 

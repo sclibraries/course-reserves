@@ -31,7 +31,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         );
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
         $this->assertTrue(is_array($baseline));
-        $this->assertCount(139, $mergedRules);
+        $this->assertCount(149, $mergedRules);
         $this->assertSame($baseline, $mergedRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -61,6 +61,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['OPTIONS', 'workflow-admin/template/999007203/duplicate', [
                 'workflow-admin/options', ['id' => '999007203'],
             ]],
+            ['GET', 'tracking/top-courses', ['tracking/top-courses', []]],
+            ['OPTIONS', 'tracking/analytics', ['tracking/options', []]],
+            ['GET', 'tracking/course-detail', ['tracking/course-detail', []]],
+            ['OPTIONS', 'material-type/all', ['material-type/options', []]],
+            ['GET', 'material-type/fields', ['material-type/fields', []]],
             ['GET', 'checklist/get-template/999007204', [
                 'checklist/get-template', ['id' => '999007204'],
             ]],

@@ -2,19 +2,18 @@
 
 namespace app\controllers;
 
+use app\components\ApiAccessBehaviors;
+use app\components\Roles;
 use Yii;
 use yii\rest\Controller;
 use yii\web\NotFoundHttpException;
 use yii\web\BadRequestHttpException;
-use yii\filters\auth\HttpBearerAuth;
-use yii\filters\AccessControl;
 use yii\filters\Cors;
 use app\models\ChecklistTemplate;
 use app\models\ChecklistTemplateTask;
 use app\models\ItemChecklist;
 use app\models\ItemChecklistTask;
 use app\models\SubmissionNewResource;
-use app\models\User;
 
 class ChecklistController extends Controller
 {
@@ -44,25 +43,18 @@ class ChecklistController extends Controller
             ],
         ];
         
-        // Add authentication - exclude OPTIONS
-        $behaviors['authenticator'] = [
-            'class' => HttpBearerAuth::class,
-            'except' => ['options'],
-        ];
-        
-        // Add access control - exclude OPTIONS
-        $behaviors['access'] = [
-            'class' => AccessControl::class,
-            'except' => ['options'],
-            'rules' => [
-                [
-                    'allow' => true,
-                    'roles' => ['@'], // Authenticated users
-                ],
-            ],
-        ];
-        
-        return $behaviors;
+        return ApiAccessBehaviors::withRoleRules($behaviors, [
+            'list-templates' => Roles::STAFF,
+            'get-template' => Roles::STAFF,
+            'create-template' => Roles::STAFF,
+            'update-template' => Roles::STAFF,
+            'delete-template' => Roles::STAFF,
+            'duplicate-template' => Roles::STAFF,
+            'get-item-checklist' => Roles::STAFF,
+            'assign-checklist' => Roles::STAFF,
+            'update-task' => Roles::STAFF,
+            'complete-checklist' => Roles::STAFF,
+        ]);
     }
 
     public function actionOptions() {
@@ -123,17 +115,7 @@ class ChecklistController extends Controller
             $template->setMaterialTypesArray($data['material_types'] ?? []);
             $template->is_active = true;
             
-            // Get user ID from username in payload, or use authenticated user's ID
-            $createdByUserId = null;
-            if (!empty($data['created_by'])) {
-                $user = User::findByUsername($data['created_by']);
-                if ($user) {
-                    $createdByUserId = $user->id;
-                }
-            } else if (Yii::$app->user->identity) {
-                $createdByUserId = Yii::$app->user->identity->id;
-            }
-            $template->created_by = $createdByUserId;
+            $template->created_by = Yii::$app->user->identity->id;
 
             if (!$template->save()) {
                 throw new BadRequestHttpException('Failed to create template: ' . json_encode($template->errors));
@@ -358,17 +340,7 @@ class ChecklistController extends Controller
             $checklist->submission_item_id = $itemId;
             $checklist->template_id = $data['template_id'];
             
-            // Get user ID from username in payload, or use authenticated user's ID
-            $assignedByUserId = null;
-            if (!empty($data['assigned_by'])) {
-                $user = User::findByUsername($data['assigned_by']);
-                if ($user) {
-                    $assignedByUserId = $user->id;
-                }
-            } else if (Yii::$app->user->identity) {
-                $assignedByUserId = Yii::$app->user->identity->id;
-            }
-            $checklist->assigned_by = $assignedByUserId;
+            $checklist->assigned_by = Yii::$app->user->identity->id;
 
             if (!$checklist->save()) {
                 throw new BadRequestHttpException('Failed to assign checklist: ' . json_encode($checklist->errors));
@@ -426,7 +398,7 @@ class ChecklistController extends Controller
             
             if ($task->completed) {
                 $task->completed_at = date('Y-m-d H:i:s');
-                $task->completed_by = Yii::$app->user->id ?? null;
+                $task->completed_by = (string)Yii::$app->user->identity->id;
             } else {
                 $task->completed_at = null;
                 $task->completed_by = null;
@@ -476,7 +448,7 @@ class ChecklistController extends Controller
                 [
                     'completed' => true,
                     'completed_at' => date('Y-m-d H:i:s'),
-                    'completed_by' => Yii::$app->user->id ?? null
+                    'completed_by' => (string)Yii::$app->user->identity->id
                 ],
                 [
                     'item_checklist_id' => $checklist->id,
@@ -486,7 +458,7 @@ class ChecklistController extends Controller
 
             // Mark checklist as complete
             $checklist->completed_at = date('Y-m-d H:i:s');
-            $checklist->completed_by = Yii::$app->user->id ?? null;
+            $checklist->completed_by = (string)Yii::$app->user->identity->id;
             $checklist->save();
 
             // Update submission item status

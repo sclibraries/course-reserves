@@ -3,6 +3,8 @@
 namespace app\controllers;
 
 use Yii;
+use app\components\ApiAccessBehaviors;
+use app\components\Roles;
 use yii\rest\ActiveController;
 use yii\filters\Cors;
 use yii\web\NotFoundHttpException;
@@ -27,13 +29,21 @@ class MaterialTypeController extends ActiveController
                 'Origin' => array_merge([
                     'http://localhost:5173',
                 ], Yii::$app->params['corsOrigins'] ?? []),
-                'Access-Control-Request-Method' => ['GET'],
+                'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Allow-Headers' => ['Content-Type', 'Authorization'],
             ],
         ];
 
-        return $behaviors;
+        return ApiAccessBehaviors::withRoleRules($behaviors, [
+            'index' => Roles::SIGNED_IN,
+            'view' => Roles::SIGNED_IN,
+            'all' => Roles::SIGNED_IN,
+            'fields' => Roles::SIGNED_IN,
+            'create' => Roles::STAFF,
+            'update' => Roles::STAFF,
+            'delete' => Roles::STAFF,
+        ]);
     }
 
     /**

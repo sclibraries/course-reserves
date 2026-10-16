@@ -89,6 +89,6 @@ class ItemChecklist extends ActiveRecord
             ->andWhere(['checklist_template_tasks.optional' => false])
             ->count();
         
-        return $incompleteTasks === 0;
+        return (int)$incompleteTasks === 0;
     }
 }

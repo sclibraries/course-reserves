@@ -137,6 +137,16 @@
     "OPTIONS checklist/update-task": "checklist/options",
     "OPTIONS checklist/complete-checklist": "checklist/options",
     "OPTIONS checklist/complete-checklist/<itemId:\\d+>": "checklist/options",
+    "GET tracking/top-courses": "tracking/top-courses",
+    "OPTIONS tracking/top-courses": "tracking/options",
+    "GET tracking/analytics": "tracking/analytics",
+    "OPTIONS tracking/analytics": "tracking/options",
+    "GET tracking/course-detail": "tracking/course-detail",
+    "OPTIONS tracking/course-detail": "tracking/options",
+    "GET material-type/all": "material-type/all",
+    "OPTIONS material-type/all": "material-type/options",
+    "GET material-type/fields": "material-type/fields",
+    "OPTIONS material-type/fields": "material-type/options",
     "0": {
         "class": "yii\\rest\\UrlRule",
         "controller": [

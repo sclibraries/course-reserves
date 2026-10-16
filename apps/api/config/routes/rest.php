@@ -2,6 +2,16 @@
 
 // Generic Yii REST routes follow the explicit route files.
 return [
+    'GET tracking/top-courses' => 'tracking/top-courses',
+    'OPTIONS tracking/top-courses' => 'tracking/options',
+    'GET tracking/analytics' => 'tracking/analytics',
+    'OPTIONS tracking/analytics' => 'tracking/options',
+    'GET tracking/course-detail' => 'tracking/course-detail',
+    'OPTIONS tracking/course-detail' => 'tracking/options',
+    'GET material-type/all' => 'material-type/all',
+    'OPTIONS material-type/all' => 'material-type/options',
+    'GET material-type/fields' => 'material-type/fields',
+    'OPTIONS material-type/fields' => 'material-type/options',
     [
         'class' => 'yii\rest\UrlRule',
         'controller' => [

@@ -1,6 +1,9 @@
 <?php
 namespace app\controllers;
 
+use app\components\ApiAccessBehaviors;
+use app\components\Roles;
+use Yii;
 use yii\rest\ActiveController;
 use yii\filters\ContentNegotiator;
 use yii\web\Response;
@@ -17,21 +20,16 @@ class TrackingController extends ActiveController
     public function behaviors()
     {
         $behaviors = parent::behaviors();
-
-        // Ensure all responses are in JSON format.
         $behaviors['contentNegotiator'] = [
             'class' => ContentNegotiator::class,
             'formats' => [
                 'application/json' => Response::FORMAT_JSON,
             ],
         ];
-
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => Yii::$app->params['corsOrigins'] ?? [],
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Max-Age' => 3600,
@@ -39,22 +37,26 @@ class TrackingController extends ActiveController
                 'Access-Control-Expose-Headers' => ['X-Pagination-Total-Count', 'X-Pagination-Page-Count'],
             ],
         ];
-
-        return $behaviors;
+        return ApiAccessBehaviors::withRoleRules($behaviors, [
+            'index' => Roles::STAFF,
+            'view' => Roles::STAFF,
+            'update' => Roles::STAFF,
+            'delete' => Roles::STAFF,
+            'top-courses' => Roles::STAFF,
+            'analytics' => Roles::STAFF,
+            'course-detail' => Roles::STAFF,
+        ], ['create']);
     }
 
     public function actions()
     {
         $actions = parent::actions();
-        
         // Customize the index action
         $actions['index']['prepareDataProvider'] = function ($action) {
             $modelClass = $this->modelClass;
             $query = $modelClass::find();
-            
             // Apply filters if provided
             $this->applyFilters($query);
-            
             // Set a high limit but allow override
             $pageSize = \Yii::$app->request->get('per-page', 20);
             
