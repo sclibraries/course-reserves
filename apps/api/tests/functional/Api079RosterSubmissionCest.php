@@ -63,6 +63,25 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
         Assert::assertSame('test-api079-roster-title', $submission['course_title']);
     }
 
+    public function ownSubmissionSucceedsWhenFolioTermsAreUnavailable(FunctionalTester $I)
+    {
+        $this->useFolioTerms([]);
+        $this->postComplete($I, $this->ownerToken, 'own-no-folio-terms', [
+            'its_course_id' => $this->rosterCourseId,
+            'academic_period' => $this->academicPeriod,
+        ]);
+
+        $I->seeResponseCodeIs(200);
+        $submission = $this->submissionByOwner($this->ownerId);
+        Assert::assertSame($this->rosterCourseId, $submission['its_course_id']);
+        Assert::assertSame($this->academicPeriod, $submission['academic_period']);
+        Assert::assertNull($submission['roster_term_id']);
+        Assert::assertSame($this->academicPeriod, $submission['term_code']);
+        Assert::assertSame('TST 101', $submission['course_code']);
+        Assert::assertSame('01', $submission['section']);
+        Assert::assertSame('test-api079-roster-title', $submission['course_title']);
+    }
+
     public function missingRosterFieldsReturn422(FunctionalTester $I)
     {
         $this->postComplete($I, $this->ownerToken, 'missing', []);
@@ -96,6 +115,24 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
             Assert::assertSame('roster_course_not_found', $this->response($I)['error_code'] ?? null);
             Assert::assertNull($this->submissionByTitle($case[0]));
         }
+    }
+
+    public function unparseableInstructorCourseIdRemainsForbidden(FunctionalTester $I)
+    {
+        $this->insertAssignment(
+            $this->ownerSmithId,
+            'unparseable',
+            $this->academicPeriod,
+            'test-api079-unparseable-course'
+        );
+        $this->postComplete($I, $this->ownerToken, 'unparseable-course', [
+            'its_course_id' => 'unparseable',
+            'academic_period' => $this->academicPeriod,
+        ]);
+
+        $I->seeResponseCodeIs(403);
+        Assert::assertSame('roster_course_not_found', $this->response($I)['error_code'] ?? null);
+        Assert::assertNull($this->submissionByTitle('unparseable-course'));
     }
 
     public function coInstructorCanSubmitItsRosterCourse(FunctionalTester $I)
@@ -140,6 +177,8 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
         Assert::assertSame($proxyId, $submission['proxy_shibboleth_user_id']);
         Assert::assertArrayHasKey('its_course_id', $submission);
         Assert::assertSame('TST-104-04-209902', $submission['its_course_id']);
+        Assert::assertSame('test-api079-term-a', $submission['roster_term_id']);
+        Assert::assertSame('Roster Term A', $submission['term_code']);
         Assert::assertSame('test-api079-proxy-roster-title', $submission['course_title']);
         Assert::assertSame('test-api079-proxy-roster-title', $this->response($I)['submission']['course_title']);
 
@@ -158,6 +197,39 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(409);
         Assert::assertSame('proxy_roster_unavailable', $this->response($I)['error_code']);
         Assert::assertNull($this->submissionByTitle('proxy-null-roster'));
+    }
+
+    public function proxySubmissionSucceedsWhenFolioTermsAreUnavailable(FunctionalTester $I)
+    {
+        $proxyId = 'test-api079-proxy-no-folio';
+        $courseId = 'TST-108-08-209902';
+        $this->useFolioTerms([]);
+        $this->insertAssignment(
+            $this->facultyInternalId,
+            $courseId,
+            $this->academicPeriod,
+            'test-api079-proxy-no-folio-title'
+        );
+        $this->insertGrant($this->ownerId, $proxyId, $this->facultyInternalId);
+        $this->postComplete(
+            $I,
+            $this->token($proxyId, 'employee', $this->proxySmithId),
+            'proxy-no-folio-terms',
+            [
+                'acting_for_faculty_id' => $this->ownerId,
+                'its_course_id' => $courseId,
+                'academic_period' => $this->academicPeriod,
+            ]
+        );
+
+        $I->seeResponseCodeIs(200);
+        $submission = $this->submissionByOwner($this->ownerId, $proxyId);
+        Assert::assertSame($courseId, $submission['its_course_id']);
+        Assert::assertSame($this->academicPeriod, $submission['term_code']);
+        Assert::assertNull($submission['roster_term_id']);
+        Assert::assertSame('TST 108', $submission['course_code']);
+        Assert::assertSame('08', $submission['section']);
+        Assert::assertSame('test-api079-proxy-no-folio-title', $submission['course_title']);
     }
 
     public function staffMaySubmitWithOrWithoutRosterFields(FunctionalTester $I)
@@ -259,6 +331,11 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
             \Yii::$app->urlManager->createUrl(['faculty-submission/submit-complete']),
             $payload
         );
+    }
+
+    private function useFolioTerms(array $terms)
+    {
+        \Yii::$container->set(FolioService::class, new TestApi079FolioService($terms));
     }
 
     private function response(FunctionalTester $I)
@@ -392,8 +469,19 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
 
 class TestApi079FolioService
 {
+    private $terms;
+
+    public function __construct($terms = null)
+    {
+        $this->terms = $terms;
+    }
+
     public function searchTerms()
     {
+        if ($this->terms !== null) {
+            return $this->terms;
+        }
+
         return [
             [
                 'id' => 'test-api079-term-a',

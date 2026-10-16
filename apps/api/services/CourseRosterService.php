@@ -115,16 +115,28 @@ class CourseRosterService
 
             $term = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
             $course = $this->parseCourseId($assignment['course_id']);
-            if ($term === null || empty($term['id']) || empty($term['name']) ||
-                $course['courseNumber'] === null) {
+            if ($course['courseNumber'] === null) {
                 continue;
+            }
+
+            if ($term === null || empty($term['id']) || empty($term['name'])) {
+                Yii::warning(
+                    'No FOLIO term maps to roster academic period ' . $assignment['academic_period']
+                    . '; storing the roster period as term_code.',
+                    __METHOD__
+                );
+                $termId = null;
+                $termName = $assignment['academic_period'];
+            } else {
+                $termId = $term['id'];
+                $termName = $term['name'];
             }
 
             return [
                 'its_course_id' => $assignment['course_id'],
                 'academic_period' => $assignment['academic_period'],
-                'roster_term_id' => $term['id'],
-                'term_code' => $term['name'],
+                'roster_term_id' => $termId,
+                'term_code' => $termName,
                 'course_code' => $course['courseNumber'],
                 'section' => $course['sectionName'],
                 'course_title' => $assignment['course_title'],
