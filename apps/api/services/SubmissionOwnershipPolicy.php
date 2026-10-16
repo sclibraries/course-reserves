@@ -5,8 +5,6 @@ namespace app\services;
 use app\components\Roles;
 use app\models\FacultyProxyPermission;
 use app\models\FacultySubmission;
-use yii\db\Expression;
-use yii\db\Query;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
@@ -28,31 +26,58 @@ class SubmissionOwnershipPolicy
      *
      * @return array owner_id, is_proxy and permission
      */
-    public function resolveOwner(array $actor, $actingForFacultyId, $folioCourseListingId, array $course)
+    public function resolveOwner(
+        array $actor,
+        $actingForFacultyId,
+        $folioCourseListingId,
+        array $course,
+        $itsCourseId = null,
+        $academicPeriod = null
+    )
     {
         $actorId = $actor['user_id'];
         $isStaff = Roles::isStaff($actor['role'] ?? null);
+        $hasRosterCourse = $itsCourseId !== null && $academicPeriod !== null;
         $isActingForOther = $actingForFacultyId !== null && $actingForFacultyId !== '' &&
             $actingForFacultyId !== $actorId;
 
         if ($isStaff) {
+            $rosterCourse = $hasRosterCourse
+                ? $this->rosterService->findInstructorCourse(null, $academicPeriod, $itsCourseId)
+                : null;
+            if ($hasRosterCourse && $rosterCourse === null) {
+                return $this->rosterCourseError(403, 'roster_course_not_found');
+            }
+
             return [
                 'owner_id' => $isActingForOther ? $actingForFacultyId : $actorId,
                 'is_proxy' => $isActingForOther,
                 'permission' => null,
+                'roster_course' => $rosterCourse,
             ];
         }
 
         if (!$isActingForOther) {
+            $rosterCourse = $hasRosterCourse
+                ? $this->rosterService->findInstructorCourse(
+                    $actor['internal_id'] ?? null,
+                    $academicPeriod,
+                    $itsCourseId
+                )
+                : null;
             $termCode = $course['term'] ?? $course['term_code'] ?? null;
             $courseCode = $course['courseCode'] ?? $course['course_code'] ?? null;
             $section = $course['section'] ?? null;
-            if (!$this->rosterService->isInstructorRostered(
-                $actor['internal_id'] ?? null,
-                $termCode,
-                $courseCode,
-                $section
-            )) {
+            if (($hasRosterCourse && $rosterCourse === null) ||
+                (!$hasRosterCourse && !$this->rosterService->isInstructorRostered(
+                    $actor['internal_id'] ?? null,
+                    $termCode,
+                    $courseCode,
+                    $section
+                ))) {
+                if ($hasRosterCourse) {
+                    return $this->rosterCourseError(403, 'roster_course_not_found');
+                }
                 throw new ForbiddenHttpException(
                     'course not found on your teaching roster; contact library staff'
                 );
@@ -62,12 +87,28 @@ class SubmissionOwnershipPolicy
                 'owner_id' => $actorId,
                 'is_proxy' => false,
                 'permission' => null,
+                'roster_course' => $rosterCourse,
             ];
         }
 
         $permission = $this->findPermission($actingForFacultyId, $actorId);
         if (!$permission || !$permission->isActive(false)) {
             throw new ForbiddenHttpException('No active proxy permission for this faculty member');
+        }
+
+        if ($hasRosterCourse && empty($permission->faculty_internal_id)) {
+            return $this->rosterCourseError(409, 'proxy_roster_unavailable');
+        }
+
+        $rosterCourse = $hasRosterCourse
+            ? $this->rosterService->findInstructorCourse(
+                $permission->faculty_internal_id,
+                $academicPeriod,
+                $itsCourseId
+            )
+            : null;
+        if ($hasRosterCourse && $rosterCourse === null) {
+            return $this->rosterCourseError(403, 'roster_course_not_found');
         }
 
         if (!$permission->canAccessCourse($folioCourseListingId, false)) {
@@ -86,7 +127,13 @@ class SubmissionOwnershipPolicy
             'owner_id' => $actingForFacultyId,
             'is_proxy' => true,
             'permission' => $permission,
+            'roster_course' => $rosterCourse,
         ];
+    }
+
+    private function rosterCourseError($statusCode, $errorCode)
+    {
+        return ['status_code' => $statusCode, 'error_code' => $errorCode];
     }
 
     /**
@@ -134,47 +181,7 @@ class SubmissionOwnershipPolicy
      */
     public function accessibleSubmissionsQuery(array $actor)
     {
-        $actorId = $actor['user_id'];
-        $query = FacultySubmission::find()->alias('submission');
-        $ownerCondition = ['submission.shibboleth_user_id' => $actorId];
-
-        if (Roles::isStaff($actor['role'] ?? null)) {
-            $activeGrantOwners = (new Query())
-                ->select('staff_permission.faculty_shibboleth_id')
-                ->from(['staff_permission' => FacultyProxyPermission::tableName()])
-                ->where(['staff_permission.proxy_shibboleth_id' => $actorId])
-                ->andWhere(['staff_permission.status' => FacultyProxyPermission::STATUS_ACTIVE]);
-
-            return $query->where([
-                'or',
-                $ownerCondition,
-                ['in', 'submission.shibboleth_user_id', $activeGrantOwners],
-            ]);
-        }
-
-        $proxyPermission = (new Query())
-            ->select(new Expression('1'))
-            ->from(['proxy_permission' => FacultyProxyPermission::tableName()])
-            ->where('proxy_permission.faculty_shibboleth_id = submission.shibboleth_user_id')
-            ->andWhere(['proxy_permission.proxy_shibboleth_id' => $actorId])
-            ->andWhere(['proxy_permission.status' => FacultyProxyPermission::STATUS_ACTIVE])
-            ->andWhere([
-                'or',
-                ['proxy_permission.expires_at' => null],
-                ['>=', 'proxy_permission.expires_at', date('Y-m-d H:i:s')],
-            ])
-            ->andWhere(FacultyProxyPermission::courseScopeCondition(
-                'proxy_permission',
-                new Expression('submission.folio_course_listing_id')
-            ));
-
-        $accessConditions = [$ownerCondition, ['exists', $proxyPermission]];
-        $rosteredConditions = $this->rosteredSubmissionConditions($actor);
-        if (!empty($rosteredConditions)) {
-            $accessConditions[] = array_merge(['or'], $rosteredConditions);
-        }
-
-        return $query->where(array_merge(['or'], $accessConditions));
+        return (new AccessibleSubmissionQueryBuilder($this->rosterService))->build($actor);
     }
 
     /**
@@ -238,31 +245,6 @@ class SubmissionOwnershipPolicy
                 'status' => FacultyProxyPermission::STATUS_ACTIVE,
             ])
             ->one();
-    }
-
-    private function rosteredSubmissionConditions(array $actor)
-    {
-        $courses = $this->rosterService->getInstructorSubmissionCourses($actor['internal_id'] ?? null);
-        $conditions = [];
-
-        foreach ($courses as $index => $course) {
-            $termParameter = ':roster_term_' . $index;
-            $courseParameter = ':roster_course_' . $index;
-            $sectionParameter = ':roster_section_' . $index;
-            $conditions[] = new Expression(
-                'BINARY `submission`.`term_code` = BINARY ' . $termParameter
-                . ' AND BINARY REGEXP_REPLACE(TRIM(`submission`.`course_code`), '
-                . "'[[:space:]]+', ' ') = BINARY " . $courseParameter
-                . ' AND BINARY TRIM(`submission`.`section`) = BINARY ' . $sectionParameter,
-                [
-                    $termParameter => $course['term_code'],
-                    $courseParameter => $course['course_code'],
-                    $sectionParameter => $course['section'],
-                ]
-            );
-        }
-
-        return $conditions;
     }
 
     /**

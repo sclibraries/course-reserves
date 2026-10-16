@@ -73,6 +73,8 @@ class FacultySubmissionConfirmationCest extends BaseFunctionalCest
 
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
         $I->sendJsonPost('faculty-submission/submit-complete', [
+            'its_course_id' => 'TST-032-01-209909',
+            'academic_period' => 'AP_209909',
             'courseInfo' => [
                 'courseCode' => 'TST 032',
                 'courseTitle' => 'Confirmation State Test',

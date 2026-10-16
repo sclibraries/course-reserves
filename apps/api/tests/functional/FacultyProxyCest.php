@@ -191,7 +191,12 @@ class FacultyProxyCest extends BaseFunctionalCest
         $this->submitActingFor($I, 'allowed', $this->listingId);
         $I->seeResponseCodeIs(200);
         $submission = \app\models\FacultySubmission::find()
-            ->where(['course_title' => 'test-api070-submission-allowed'])
+            ->where([
+                'shibboleth_user_id' => $this->facultyId,
+                'proxy_shibboleth_user_id' => $this->employeeId,
+                'its_course_id' => 'TEST-155-01-209901',
+                'academic_period' => 'AP_209901',
+            ])
             ->one();
         \PHPUnit\Framework\Assert::assertSame($this->facultyId, $submission->shibboleth_user_id);
         \PHPUnit\Framework\Assert::assertSame($this->employeeId, $submission->proxy_shibboleth_user_id);
@@ -295,6 +300,10 @@ class FacultyProxyCest extends BaseFunctionalCest
         $I->sendAjaxRequest('POST', \Yii::$app->urlManager->createUrl(['faculty-submission/submit-complete']), [
             'acting_for_faculty_id' => $this->facultyId,
             'folio_course_listing_id' => $listingId,
+            'its_course_id' => $listingId === $this->listingId
+                ? 'TEST-155-01-209901'
+                : 'TEST-156-02-209901',
+            'academic_period' => 'AP_209901',
             'courseInfo' => [
             'courseCode' => $listingId === $this->listingId ? 'TEST 155' : 'TEST 156',
                 'courseTitle' => 'test-api070-submission-' . $suffix,
@@ -369,6 +378,10 @@ class FacultyProxyCest extends BaseFunctionalCest
         ])->execute();
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
             'like', 'course_title', 'test-api070-submission-%',
+        ])->execute();
+        \Yii::$app->db->createCommand()->delete('faculty_submissions', [
+            'shibboleth_user_id' => $this->facultyId,
+            'proxy_shibboleth_user_id' => $this->employeeId,
         ])->execute();
     }
 }

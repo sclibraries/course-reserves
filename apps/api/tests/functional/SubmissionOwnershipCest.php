@@ -8,6 +8,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     private $actorId = 'test-ownership-owner-alpha';
     private $targetId = 'test-ownership-owner-bravo';
     private $actorSmithId = '999000101';
+    private $targetSmithId = '999000106';
     private $coInstructorSmithId = '999000103';
     private $actorToken;
 
@@ -22,6 +23,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
             new TestSubmissionOwnershipFolioStub()
         );
         $this->insertRosterAssignment($this->actorSmithId, 'TST-155-01-209909', 'AP_209909');
+        $this->insertRosterAssignment($this->targetSmithId, 'TST-155-01-209909', 'AP_209909');
         $this->actorToken = $this->mockLogin('ownership-owner-alpha', $this->actorSmithId);
     }
 
@@ -170,10 +172,8 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
 
         $this->postComplete($I, $token, 'unrostered-complete', 'test-unrostered-api056');
         $I->seeResponseCodeIs(403);
-        \PHPUnit\Framework\Assert::assertStringContainsString(
-            'course not found on your teaching roster; contact library staff',
-            $I->grabPageSource()
-        );
+        $rosterError = json_decode($I->grabPageSource(), true);
+        \PHPUnit\Framework\Assert::assertSame('roster_course_not_found', $rosterError['error_code'] ?? null);
         $this->assertNoSubmissionRows($I, 'unrostered-complete');
 
         $this->postCreate($I, $token, 'unrostered-create', null);
@@ -233,10 +233,8 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
 
         $this->postComplete($I, $token, 'crosslisted-partner', 'test-crosslisted-api056');
         $I->seeResponseCodeIs(403);
-        \PHPUnit\Framework\Assert::assertStringContainsString(
-            'course not found on your teaching roster; contact library staff',
-            $I->grabPageSource()
-        );
+        $rosterError = json_decode($I->grabPageSource(), true);
+        \PHPUnit\Framework\Assert::assertSame('roster_course_not_found', $rosterError['error_code'] ?? null);
         $this->assertNoSubmissionRows($I, 'crosslisted-partner');
     }
 
@@ -390,6 +388,8 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         $listingId = null
     ) {
         $payload = [
+            'its_course_id' => 'TST-155-01-209909',
+            'academic_period' => 'AP_209909',
             'courseInfo' => [
                 'courseCode' => 'TST 155',
                 'courseTitle' => 'test-ownership-' . $suffix,
@@ -511,6 +511,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \Yii::$app->db->createCommand()->insert('faculty_proxy_permissions', [
             'faculty_shibboleth_id' => $ownerId,
             'proxy_shibboleth_id' => $proxyId,
+            'faculty_internal_id' => $ownerId === $this->targetId ? $this->targetSmithId : null,
             'faculty_display_name' => 'Test Owner Bravo',
             'proxy_display_name' => 'Test Proxy',
             'permission_type' => $permissionType,
@@ -530,14 +531,19 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
 
     private function findSubmission($suffix)
     {
+        $ownerId = in_array($suffix, ['covered', 'staff-create', 'create-covered', 'employee-proxy'], true)
+            ? $this->targetId
+            : $this->actorId;
         return \Yii::$app->db->createCommand(
-            'SELECT * FROM faculty_submissions WHERE course_title = :course_title '
-            . 'AND course_code = :course_code AND term_code = :term_code AND section = :section',
+            'SELECT * FROM faculty_submissions WHERE shibboleth_user_id = :owner_id '
+            . 'AND ((its_course_id = :course_id AND academic_period = :academic_period) '
+            . 'OR course_title = :course_title) '
+            . 'ORDER BY submission_id DESC LIMIT 1',
             [
+                ':owner_id' => $ownerId,
+                ':course_id' => 'TST-155-01-209909',
+                ':academic_period' => 'AP_209909',
                 ':course_title' => 'test-ownership-' . $suffix,
-                ':course_code' => 'TST 155',
-                ':term_code' => 'Fall 2099',
-                ':section' => '01',
             ]
         )->queryOne();
     }
@@ -594,7 +600,9 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
     private function cleanupSubmissions()
     {
         $submissionIds = \Yii::$app->db->createCommand(
-            "SELECT submission_id FROM faculty_submissions WHERE course_title LIKE 'test-ownership-%'"
+            "SELECT submission_id FROM faculty_submissions WHERE shibboleth_user_id IN "
+            . "(:actor_id, :target_id) OR course_title LIKE 'test-ownership-%'",
+            [':actor_id' => $this->actorId, ':target_id' => $this->targetId]
         )->queryColumn();
         if (!$submissionIds) {
             return;
@@ -616,7 +624,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \Yii::$app->db->createCommand()->insert('course_assignments', [
             'academic_period' => $academicPeriod,
             'course_id' => $courseId,
-            'course_title' => 'Synthetic API-056 roster course',
+            'course_title' => 'test-ownership-roster-course',
             'smith_id' => $smithId,
             'role' => 'Instructor',
         ])->execute();
@@ -627,6 +635,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \Yii::$app->db->createCommand()->delete('course_assignments', [
             'smith_id' => [
                 $this->actorSmithId,
+                $this->targetSmithId,
                 $this->coInstructorSmithId,
                 '999000104',
                 '999000105',

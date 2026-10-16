@@ -18,6 +18,9 @@ use yii\behaviors\TimestampBehavior;
  * @property string $course_code
  * @property string $section
  * @property string $course_title
+ * @property string $its_course_id
+ * @property string $academic_period
+ * @property string $roster_term_id
  * @property string $folio_course_listing_id
  * @property int $offering_id
  * @property string $needed_by_date
@@ -96,6 +99,8 @@ class FacultySubmission extends ActiveRecord
             [['submission_uuid'], 'string', 'max' => 36],
             [['shibboleth_user_id', 'proxy_shibboleth_user_id', 'folio_course_listing_id', 'faculty_display_name', 'proxy_display_name', 'assignee_staff_user_id', 'locked_by_staff_id'], 'string', 'max' => 255],
             [['term_code'], 'string', 'max' => 32],
+            [['its_course_id', 'roster_term_id'], 'string', 'max' => 64],
+            [['academic_period'], 'string', 'max' => 16],
             [['course_code'], 'string', 'max' => 64],
             [['section'], 'string', 'max' => 16],
             [['course_title'], 'string', 'max' => 500],

@@ -93,6 +93,48 @@ class CourseRosterService
     }
 
     /**
+     * Find an exact Instructor roster row and map the fields stored on a submission.
+     */
+    public function findInstructorCourse($smithId, $academicPeriod, $courseId)
+    {
+        if (empty($academicPeriod) || empty($courseId)) {
+            return null;
+        }
+
+        $query = CourseAssignments::find()
+            ->where(['academic_period' => $academicPeriod, 'course_id' => $courseId]);
+        if ($smithId !== null) {
+            $query->andWhere(['smith_id' => $smithId]);
+        }
+
+        $terms = $this->getFolioTerms();
+        foreach ($query->orderBy(['smith_id' => SORT_ASC])->asArray()->all() as $assignment) {
+            if (strcasecmp((string)($assignment['role'] ?? ''), 'Instructor') !== 0) {
+                continue;
+            }
+
+            $term = $this->mapAcademicPeriodToTerm($assignment['academic_period'], $terms);
+            $course = $this->parseCourseId($assignment['course_id']);
+            if ($term === null || empty($term['id']) || empty($term['name']) ||
+                $course['courseNumber'] === null) {
+                continue;
+            }
+
+            return [
+                'its_course_id' => $assignment['course_id'],
+                'academic_period' => $assignment['academic_period'],
+                'roster_term_id' => $term['id'],
+                'term_code' => $term['name'],
+                'course_code' => $course['courseNumber'],
+                'section' => $course['sectionName'],
+                'course_title' => $assignment['course_title'],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Match one ITS row to the values the faculty form stores for a submission.
      */
     public function isAssignmentForCourse(array $assignment, $termCode, $courseCode, $section, $terms = null)

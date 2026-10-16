@@ -97,9 +97,9 @@ class FacultySubmissionCest extends BaseFunctionalCest
             'submission_uuid' => $this->otherSubmissionUuid,
         ])->execute();
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
-            'course_code' => 'TST API030',
-            'term_code' => 'Spring 2099',
-            'section' => '99',
+            'shibboleth_user_id' => $this->shibbolethId,
+            'its_course_id' => 'TST-API030-99-209902',
+            'academic_period' => 'AP_209902',
         ])->execute();
     }
 
@@ -154,6 +154,8 @@ class FacultySubmissionCest extends BaseFunctionalCest
         $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
         $url = \Yii::$app->urlManager->createUrl(['faculty-submission/submit-complete']);
         $I->sendAjaxRequest('POST', $url, [
+            'its_course_id' => 'TST-API030-99-209902',
+            'academic_period' => 'AP_209902',
             'courseInfo' => [
                 'courseCode' => 'TST API030',
                 'courseTitle' => 'Synthetic API-030 serialization',

@@ -8,6 +8,7 @@ class FacultySubmissionConfirmationMigrationCest
     private $migrationVersion = 'm261014_000001_add_confirmation_delivery_state';
     private $proxyMigrationVersion = 'm261014_000002_add_proxy_invitation_expiry';
     private $api074MigrationVersion = 'm261015_000001_add_faculty_internal_id_to_proxy_permissions';
+    private $api079MigrationVersion = 'm261016_000001_add_roster_course_to_faculty_submissions';
     private $facultyId = 'test-api032-migration-faculty';
 
     /**
@@ -20,6 +21,7 @@ class FacultySubmissionConfirmationMigrationCest
         $confirmationMigrationIsDown = false;
         $proxyMigrationIsDown = false;
         $api074MigrationIsDown = false;
+        $api079MigrationIsDown = false;
 
         try {
             $applied = (int) $db->createCommand(
@@ -40,7 +42,15 @@ class FacultySubmissionConfirmationMigrationCest
             )->queryScalar();
             Assert::assertSame(1, $api074MigrationApplied, 'API-074 migration must be applied by test-stack setup.');
 
+            $api079MigrationApplied = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api079MigrationVersion]
+            )->queryScalar();
+            Assert::assertSame(1, $api079MigrationApplied, 'API-079 migration must be applied by test-stack setup.');
+
             // Roll back later migrations so migrate/down 1 targets the confirmation migration.
+            $this->runMigration('down');
+            $api079MigrationIsDown = true;
             $this->runMigration('down');
             $api074MigrationIsDown = true;
             $this->runMigration('down');
@@ -55,14 +65,6 @@ class FacultySubmissionConfirmationMigrationCest
             $this->runMigration('up');
             $confirmationMigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
-            $this->assertMigratedRows($db);
-
-            foreach (['API032-HIST-1', 'API032-HIST-0'] as $courseCode) {
-                $row = $this->rowForCourse($db, $courseCode);
-                $submission = \app\models\FacultySubmission::findOne($row['submission_id']);
-                $submission->submission_notes = 'unrelated synthetic update';
-                Assert::assertTrue($submission->save(), json_encode($submission->errors));
-            }
             $this->assertMigratedRows($db);
 
             $confirmationMigrationIsDown = true;
@@ -80,6 +82,16 @@ class FacultySubmissionConfirmationMigrationCest
             $proxyMigrationIsDown = false;
             $this->runMigration('up');
             $api074MigrationIsDown = false;
+            $this->runMigration('up');
+            $api079MigrationIsDown = false;
+            foreach (['API032-HIST-1', 'API032-HIST-0'] as $courseCode) {
+                $row = $this->rowForCourse($db, $courseCode);
+                $submission = \app\models\FacultySubmission::findOne($row['submission_id']);
+                $submission->submission_notes = 'unrelated synthetic update';
+                Assert::assertTrue($submission->save(), json_encode($submission->errors));
+            }
+            $this->assertMigratedRows($db);
+
             $output = $this->runMigration('up');
             Assert::assertStringContainsString('No new migrations found', $output);
             $this->assertMigratedRows($db);
@@ -91,6 +103,9 @@ class FacultySubmissionConfirmationMigrationCest
                 $this->runMigration('up');
             }
             if ($api074MigrationIsDown) {
+                $this->runMigration('up');
+            }
+            if ($api079MigrationIsDown) {
                 $this->runMigration('up');
             }
             $db->schema->refreshTableSchema('faculty_submissions');

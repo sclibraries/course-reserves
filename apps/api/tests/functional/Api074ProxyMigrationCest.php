@@ -4,14 +4,22 @@ use PHPUnit\Framework\Assert;
 
 class Api074ProxyMigrationCest
 {
+    private $api079MigrationVersion = 'm261016_000001_add_roster_course_to_faculty_submissions';
     private $migrationVersion = 'm261015_000001_add_faculty_internal_id_to_proxy_permissions';
 
     public function addsNullableFacultyInternalIdAndRollsBackCleanly(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
+        $api079MigrationIsDown = false;
 
         try {
+            $api079Applied = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api079MigrationVersion]
+            )->queryScalar();
+            Assert::assertSame(1, $api079Applied, 'API-079 migration must be applied by test-stack setup.');
+
             $applied = (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
@@ -19,6 +27,8 @@ class Api074ProxyMigrationCest
             Assert::assertSame(1, $applied, 'API-074 migration must be applied by test-stack setup.');
             $this->assertColumn($db, true);
 
+            $this->runMigration('down');
+            $api079MigrationIsDown = true;
             $migrationIsDown = true;
             $this->runMigration('down');
             $db->schema->refreshTableSchema('faculty_proxy_permissions');
@@ -26,12 +36,17 @@ class Api074ProxyMigrationCest
 
             $this->runMigration('up');
             $migrationIsDown = false;
+            $this->runMigration('up');
+            $api079MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_proxy_permissions');
             $this->assertColumn($db, true);
         } finally {
             if ($migrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_proxy_permissions');
+            }
+            if ($api079MigrationIsDown) {
+                $this->runMigration('up');
             }
         }
     }

@@ -650,74 +650,80 @@ class FacultySubmissionController extends BaseRestController
     {
         $facultyUser = $this->getFacultyUser();
         $data = Yii::$app->request->getBodyParams();
+        $isStaff = \app\components\Roles::isStaff($facultyUser['role'] ?? null);
+        $itsCourseId = $data['its_course_id'] ?? null;
+        $academicPeriod = $data['academic_period'] ?? null;
+        $hasItsCourseId = is_string($itsCourseId) && trim($itsCourseId) !== '';
+        $hasAcademicPeriod = is_string($academicPeriod) && trim($academicPeriod) !== '';
+        if ($hasItsCourseId !== $hasAcademicPeriod || (!$isStaff && !$hasItsCourseId)) {
+            Yii::$app->response->statusCode = 422;
+            return ['error_code' => 'roster_course_required'];
+        }
 
-        // Validate payload structure
         if (empty($data['courseInfo'])) {
             throw new BadRequestHttpException('Missing courseInfo');
         }
-
         $courseInfo = $data['courseInfo'];
         $resources = $data['resources'] ?? [];
         $folders = $data['folders'] ?? [];
         $metadata = $data['metadata'] ?? [];
         $displayOrder = $data['displayOrder'] ?? [];
-
-        // submittedBy is informational; only top-level acting_for_faculty_id can select an owner.
         $submittedBy = $metadata['submittedBy'] ?? [];
-
-        // Validate required course info
         $this->validateCompleteSubmissionPayload($courseInfo, $resources);
-
         $folioCourseListingId = $data['folio_course_listing_id'] ?? null;
         $ownership = (new SubmissionOwnershipPolicy())->resolveOwner(
             $facultyUser,
             $data['acting_for_faculty_id'] ?? null,
             $folioCourseListingId,
-            $courseInfo
+            $courseInfo,
+            $hasItsCourseId ? $itsCourseId : null,
+            $hasAcademicPeriod ? $academicPeriod : null
         );
+        if (isset($ownership['error_code'])) {
+            Yii::$app->response->statusCode = $ownership['status_code'];
+            return ['error_code' => $ownership['error_code']];
+        }
         $facultyId = $ownership['owner_id'];
         $isProxySubmission = $ownership['is_proxy'];
+        $rosterCourse = $ownership['roster_course'] ?? null;
+        $termCode = $rosterCourse['term_code'] ?? $courseInfo['term'];
+        $courseCode = $rosterCourse['course_code'] ?? $courseInfo['courseCode'];
+        $section = $rosterCourse['section'] ?? $courseInfo['section'] ?? '';
+        $courseTitle = $rosterCourse['course_title'] ?? $courseInfo['courseTitle'];
 
-        $section = $courseInfo['section'] ?? '';
-
-        // Check for existing submission
+        $duplicateCriteria = $rosterCourse !== null
+            ? ['its_course_id' => $rosterCourse['its_course_id'], 'academic_period' => $rosterCourse['academic_period']]
+            : ['term_code' => $termCode, 'course_code' => $courseCode, 'section' => $section];
         $existingSubmission = FacultySubmission::find()
-            ->where([
-                'shibboleth_user_id' => $facultyId,
-                'term_code' => $courseInfo['term'],
-                'course_code' => $courseInfo['courseCode'],
-                'section' => $section
-            ])
+            ->where(['shibboleth_user_id' => $facultyId])
+            ->andWhere($duplicateCriteria)
             ->one();
 
         if ($existingSubmission) {
             throw new BadRequestHttpException('Submission already exists for this course and section');
         }
-
-        // Start transaction
         $transaction = Yii::$app->db->beginTransaction();
         try {
-            // Create submission
             $submission = new FacultySubmission();
             $submission->shibboleth_user_id = $facultyId;
             $submission->faculty_display_name = $courseInfo['instructors'] ?? $submittedBy['fullName'] ?? $facultyUser['display_name'];
-            $submission->term_code = $courseInfo['term'];
-            $submission->course_code = $courseInfo['courseCode'];
+            $submission->term_code = $termCode;
+            $submission->course_code = $courseCode;
             $submission->section = $section;
-            $submission->course_title = $courseInfo['courseTitle'];
+            $submission->course_title = $courseTitle;
+            $submission->its_course_id = $rosterCourse['its_course_id'] ?? null;
+            $submission->academic_period = $rosterCourse['academic_period'] ?? null;
+            $submission->roster_term_id = $rosterCourse['roster_term_id'] ?? null;
             $submission->folio_course_listing_id = $folioCourseListingId;
             $submission->status = FacultySubmission::STATUS_SUBMITTED;
             $submission->submitted_at = date('Y-m-d H:i:s');
-            
-            // Handle metadata flags
+
             if (!empty($metadata['duplicatePreviousCourse'])) {
                 $submission->is_duplicate_previous = 1;
                 $submission->duplicate_note = $metadata['duplicateNote'] ?? null;
             }
-            
             \app\services\SubmissionConfirmationState::request($submission, !empty($metadata['emailConfirmation']));
 
-            // Handle proxy submission
             if ($isProxySubmission) {
                 $submission->proxy_shibboleth_user_id = $facultyUser['user_id'];
                 $submission->proxy_display_name = $facultyUser['display_name'];
@@ -727,15 +733,12 @@ class FacultySubmissionController extends BaseRestController
                 throw new \Exception('Failed to save submission: ' . json_encode($submission->errors));
             }
 
-            // Process folders first to build ID mapping
             $folderIdMap = [];
-            
             foreach ($folders as $folder) {
                 $folderMapping = $this->createSubmissionFolder($submission->submission_id, $folder, $displayOrder);
                 $folderIdMap = array_merge($folderIdMap, $folderMapping);
             }
 
-            // Process resources with the new unified structure
             $processedResources = 0;
             foreach ($resources as $index => $resource) {
                 $processedResources += $this->processSubmissionResource(
@@ -746,12 +749,10 @@ class FacultySubmissionController extends BaseRestController
                 );
             }
 
-            // Store metadata
             $this->storeSubmissionMetadata($submission->submission_id, $metadata, $data, $facultyUser);
 
             $transaction->commit();
 
-            // Return submission with all related data
             return \app\services\FacultySubmissionPresenter::submitCompleteResponse([
                 'success' => true,
                 'message' => 'Submission completed successfully',
@@ -763,7 +764,6 @@ class FacultySubmissionController extends BaseRestController
                     'new_items' => $metadata['newItems'] ?? 0,
                 ]
             ]);
-
         } catch (\Exception $e) {
             $transaction->rollBack();
             Yii::error('Submission creation failed: ' . $e->getMessage(), __METHOD__);

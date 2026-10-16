@@ -145,6 +145,8 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
             'POST',
             \Yii::$app->urlManager->createUrl(['faculty-submission/submit-complete']),
             [
+                'its_course_id' => 'TST-079-79-209909',
+                'academic_period' => 'AP_209909',
                 'courseInfo' => [
                     'courseCode' => 'TST 079',
                     'courseTitle' => 'Synthetic API-077 submit course',
