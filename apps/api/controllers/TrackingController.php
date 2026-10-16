@@ -94,11 +94,12 @@ class TrackingController extends ActiveController
                 'COUNT(*) as count',
                 'college',
                 'term',
+                'course_id',
                 'instructor'
             ])
             ->andWhere(['IS NOT', 'course_name', null])
             ->andWhere(['event_type' => 'course_access']) // Only count actual course access events
-            ->groupBy(['course_name', 'college', 'term', 'instructor'])
+            ->groupBy(['course_name', 'college', 'term', 'course_id', 'instructor'])
             ->orderBy(['count' => SORT_DESC])
             ->limit(10)
             ->asArray()

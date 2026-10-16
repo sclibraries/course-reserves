@@ -106,11 +106,12 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertCount(1, $topCoursesResponse['topCourses']);
         $topCourse = $topCoursesResponse['topCourses'][0];
         \PHPUnit\Framework\Assert::assertSame(
-            ['name', 'count', 'college', 'term', 'instructors'],
+            ['name', 'count', 'college', 'term', 'course_id', 'instructors'],
             array_keys($topCourse),
             'Popular course rows should contain aggregate public fields only.'
         );
         \PHPUnit\Framework\Assert::assertSame(['test-api076-instructor'], $topCourse['instructors']);
+        \PHPUnit\Framework\Assert::assertSame('test-api076-course', $topCourse['course_id']);
         foreach (['faculty', 'employee', 'staff'] as $role) {
             $status = $this->requestAs($I, $role, 'GET', 'tracking/top-courses');
             \PHPUnit\Framework\Assert::assertSame(200, $status, 'Tracking top-courses should allow ' . $role . '.');
