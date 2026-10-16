@@ -49,6 +49,37 @@ run_compose() {
     fi
 }
 
+wait_for_fake_folio() {
+    local deadline=$((SECONDS + 20))
+    local http_status
+
+    while (( SECONDS < deadline )); do
+        if http_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --max-time 1 http://localhost:8080/_fake-folio/ 2>/dev/null)" \
+            && [[ "$http_status" == "200" ]]; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    return 1
+}
+
+verify_fake_folio() {
+    local folio_search_base_url
+
+    if ! folio_search_base_url="$(run_compose exec -T backend printenv FOLIO_SEARCH_BASE_URL 2>/dev/null)" \
+        || [[ "$folio_search_base_url" != http://fake-folio:3000/* ]]; then
+        echo "ERROR: Fake FOLIO mode verification failed: backend FOLIO_SEARCH_BASE_URL does not point to fake-folio. FOLIO traffic may be going to real FOLIO." >&2
+        return 1
+    fi
+
+    if ! wait_for_fake_folio; then
+        echo "ERROR: Fake FOLIO mode verification failed: http://localhost:8080/_fake-folio/ did not return HTTP 200 within 20 seconds. FOLIO traffic may be going to real FOLIO." >&2
+        return 1
+    fi
+}
+
 if $FRESH; then
     echo "⚠  --fresh: stopping containers and wiping DB volume..."
     run_compose down -v --remove-orphans 2>/dev/null || true
@@ -60,7 +91,14 @@ echo "   FOLIO upstream: $FOLIO_UPSTREAM"
 echo "   DB init SQL: ${DEV_DB_INIT_SQL:-packages/database/schema.sql} will auto-import if DB is new."
 echo ""
 
+echo "🔧 Building nginx proxy image..."
+run_compose build proxy
+
 run_compose up $BUILD_FLAG -d
+
+if $FAKE_FOLIO; then
+    verify_fake_folio
+fi
 
 echo ""
 echo "✅ Services started:"
@@ -71,6 +109,11 @@ echo "   Frontend (dev + HMR):  http://localhost:5173/course-reserves/"
 echo "   Full-stack via nginx:  http://localhost:8080/course-reserves/"
 if $FAKE_FOLIO; then
     echo "   Fake FOLIO controls:   http://localhost:8080/_fake-folio/"
+    echo ""
+    echo "📋 Fake FOLIO next steps:"
+    echo "   docker exec -it course_reserves_backend php yii migrate --interactive=0"
+    echo "   docker exec -it course_reserves_backend php yii dev-seed/test-courses"
+    echo "   Faculty form:         http://localhost:8080/form/"
 fi
 echo "   PHP API direct:        (internal - see nginx proxy)"
 echo "   DB (host):             127.0.0.1:3306  user=folio-reserves  pass=folio-reserves"
