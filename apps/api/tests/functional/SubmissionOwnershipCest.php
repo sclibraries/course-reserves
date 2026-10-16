@@ -267,9 +267,12 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
 
     public function updateRejectsOwnerAndCourseIdentityChanges(FunctionalTester $I)
     {
-        $uuid = '11111111-1111-4111-8111-111111111111';
-        $ownerId = 'sandbox.faculty@example.test';
-        $ownerToken = $this->mockLoginAs('S andbox.faculty@example.test', $ownerId);
+        $uuid = '77000000-0000-4000-8000-000000000023';
+        $ownerId = TestSubmissionFixture::FACULTY_A_ID;
+        $ownerToken = $this->mockLoginAs('T est-api078-faculty-a', $ownerId);
+        TestSubmissionFixture::create($uuid, $ownerId, [
+            'course_title' => 'test-ownership-seeded-submission',
+        ]);
         $seededSubmission = \Yii::$app->db->createCommand(
             'SELECT submission_id, shibboleth_user_id FROM faculty_submissions WHERE submission_uuid = :uuid',
             [':uuid' => $uuid]
@@ -277,33 +280,18 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertNotEmpty($seededSubmission);
         \PHPUnit\Framework\Assert::assertSame($ownerId, $seededSubmission['shibboleth_user_id']);
 
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'PUT',
-                'header' => "Authorization: Bearer " . $ownerToken . "\r\n"
-                    . "Content-Type: application/json\r\n",
-                'content' => json_encode([
-                    'shibboleth_user_id' => $this->targetId,
-                    'proxy_shibboleth_user_id' => 'test-ownership-proxy-forged',
-                    'proxy_display_name' => 'Forged Proxy',
-                    'acting_for_faculty_id' => $this->targetId,
-                    'term_code' => 'test-term-ownership-forged',
-                    'course_code' => 'test-course-ownership-forged',
-                    'section' => 'test-2',
-                    'folio_course_listing_id' => 'test-ownership-listing-forged',
-                ]),
-                'ignore_errors' => true,
-            ],
-        ]);
-        $responseBody = file_get_contents('http://localhost/faculty-submission/' . $uuid, false, $context);
-        $responseCode = 0;
-        foreach ($http_response_header as $header) {
-            if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches)) {
-                $responseCode = (int) $matches[1];
-                break;
-            }
-        }
-        \PHPUnit\Framework\Assert::assertSame(400, $responseCode, $responseBody);
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $ownerToken);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', [
+            'shibboleth_user_id' => $this->targetId,
+            'proxy_shibboleth_user_id' => 'test-ownership-proxy-forged',
+            'proxy_display_name' => 'Forged Proxy',
+            'acting_for_faculty_id' => $this->targetId,
+            'term_code' => 'test-term-ownership-forged',
+            'course_code' => 'test-course-ownership-forged',
+            'section' => 'test-2',
+            'folio_course_listing_id' => 'test-ownership-listing-forged',
+        ], ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
 
         $submission = \Yii::$app->db->createCommand(
             'SELECT shibboleth_user_id, proxy_shibboleth_user_id, term_code, course_code, section, folio_course_listing_id '
@@ -312,7 +300,7 @@ class SubmissionOwnershipCest extends BaseFunctionalCest
         )->queryOne();
         \PHPUnit\Framework\Assert::assertSame($ownerId, $submission['shibboleth_user_id']);
         \PHPUnit\Framework\Assert::assertNull($submission['proxy_shibboleth_user_id']);
-        \PHPUnit\Framework\Assert::assertSame('SANDBOX-2026', $submission['term_code']);
+        \PHPUnit\Framework\Assert::assertSame('Spring 2027', $submission['term_code']);
         \PHPUnit\Framework\Assert::assertSame('TST 101', $submission['course_code']);
         \PHPUnit\Framework\Assert::assertSame('01', $submission['section']);
         \PHPUnit\Framework\Assert::assertNull($submission['folio_course_listing_id']);
@@ -682,10 +670,10 @@ class TestSubmissionOwnershipFolioStub
                 'endDate' => '2099-12-31',
             ],
             [
-                'id' => 'test-sandbox-term-2026',
-                'name' => 'Sandbox Term 2026',
-                'startDate' => '2026-01-01',
-                'endDate' => '2026-12-31',
+                'id' => '00000000-0000-4000-8000-000000000002',
+                'name' => 'Spring 2027',
+                'startDate' => '2027-01-01',
+                'endDate' => '2027-05-31',
             ],
         ];
     }

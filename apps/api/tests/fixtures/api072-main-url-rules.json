@@ -1,8 +1,6 @@
 {
     "POST dev-auth/login": "dev-auth/login",
     "OPTIONS dev-auth/login": "dev-auth/login",
-    "GET sandbox-folio/search-courses": "sandbox-folio/search-courses",
-    "OPTIONS sandbox-folio/search-courses": "sandbox-folio/options",
     "GET faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>": "faculty-submission/view",
     "PUT faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>": "faculty-submission/update",
     "POST faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/submit": "faculty-submission/submit",

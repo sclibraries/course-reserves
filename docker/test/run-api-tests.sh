@@ -33,7 +33,7 @@ case "$migration_output" in
         exit 1
         ;;
 esac
-compose exec -T backend php yii test-data/seed-faculty-workflow
+compose exec -T backend php yii dev-seed/test-courses
 
 if compose exec -T backend php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors; then
     unit_exit_code=0

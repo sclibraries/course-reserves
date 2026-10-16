@@ -37,12 +37,6 @@ class FolioService
             throw new \RuntimeException('FOLIO_MISSING_COURSE_ID');
         }
 
-        if ($courseId === SandboxFacultyWorkflowFixture::FOLIO_COURSE_ID ||
-            $courseId === SandboxFacultyWorkflowFixture::FOLIO_COURSE_LISTING_ID
-        ) {
-            return (new SandboxFacultyWorkflowFixture())->getFolioCourse();
-        }
-
         $url    = $this->baseUrl . '?query=(id==' . rawurlencode($courseId) . ')';
 
         $response = $this->sendGet($url);

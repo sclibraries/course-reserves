@@ -26,7 +26,7 @@ describe('adminCourseService.linkExistingResources', () => {
 
 describe('adminCourseService.searchCoursesByQuery', () => {
 
-  it('routes sandbox course searches to the backend sandbox FOLIO fixture', async () => {
+  it('routes test-course searches through the normal FOLIO search path', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -41,6 +41,6 @@ describe('adminCourseService.searchCoursesByQuery', () => {
     await adminCourseService.searchCoursesByQuery('TST 101');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toContain('/course-reserves/backend/web/sandbox-folio/search-courses');
+    expect(fetchMock.mock.calls[0][0]).toContain('/folio/web/search/search-courses');
   });
 });

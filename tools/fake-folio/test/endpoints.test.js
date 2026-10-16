@@ -97,6 +97,27 @@ test('one-hit search JSON matches the API wrapper array contract', async () => {
   });
 });
 
+test('course id lookup does not match the distinct course listing id', async () => {
+  await withServer(async (baseUrl) => {
+    const terms = await getJson(baseUrl, '/folio/web/search/search-terms');
+    const springTermId = terms.body.data.terms.find((term) => term.name === 'Spring 2027').id;
+    const courseQuery = '(department.name=="SC*" and courseNumber=="TST 101" and ' +
+      'courseListing.termId=="' + springTermId + '")';
+    const courseSearch = await getJson(baseUrl, '/folio/web/search/search-courses?' +
+      new URLSearchParams({ query: courseQuery }));
+    const course = courseSearch.body.data.courses[0];
+    const courseIdSearch = await getJson(baseUrl, '/folio/web/search/search-courses?' +
+      new URLSearchParams({ query: 'id=="' + course.courseListingId + '"' }));
+    const listingIdSearch = await getJson(baseUrl, '/folio/web/search/search-courses?' +
+      new URLSearchParams({ query: 'courseListingId=="' + course.courseListingId + '"' }));
+
+    assert.equal(courseSearch.body.data.courses.length, 1);
+    assert.notEqual(course.id, course.courseListingId);
+    assert.deepEqual(courseIdSearch.body.data.courses, []);
+    assert.equal(listingIdSearch.body.data.courses[0].id, course.id);
+  });
+});
+
 test('search-courses accepts raw-space sortby and returns an array for multiple hits', async () => {
   await withServer(async (baseUrl) => {
     const query = '(cql.allRecords=1)';

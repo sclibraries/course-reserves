@@ -2,10 +2,6 @@ import PropTypes from 'prop-types';
 import { Card, CardBody, Button, Badge, Spinner } from 'reactstrap';
 import { FaBook } from 'react-icons/fa';
 
-const TERM_ALIASES = {
-  'SANDBOX-2026': ['Sandbox Term 2026', 'sandbox-term-2026'],
-};
-
 export const courseMatchesSubmissionTerm = (course, submission) => {
   const submissionTerm = submission?.term;
   if (!submissionTerm) return true;
@@ -19,9 +15,7 @@ export const courseMatchesSubmissionTerm = (course, submission) => {
     termObject.code,
   ].filter(Boolean);
 
-  return [submissionTerm, ...(TERM_ALIASES[submissionTerm] || [])].some((term) =>
-    courseTerms.includes(term)
-  );
+  return courseTerms.includes(submissionTerm);
 };
 
 /**

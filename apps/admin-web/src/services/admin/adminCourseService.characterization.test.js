@@ -201,7 +201,7 @@ const requestCases = () => {
     {
       name: 'searchCoursesByQuery',
       invoke: () => adminCourseService.searchCoursesByQuery('**TST 101'),
-      url: `${courseApi}/sandbox-folio/search-courses?query=(name%3D%22TST%20101*%22%20or%20courseNumber%3D%22TST%20101*%22)`,
+      url: `${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}?query=(name%3D%22TST%20101*%22%20or%20courseNumber%3D%22TST%20101*%22)`,
       init: undefined,
       responseJson: { data: result.data },
       expectedResult: result.data,
@@ -429,7 +429,7 @@ describe('adminCourseService request characterization', () => {
 
     await expect(adminCourseService.searchCoursesByQuery('TST 101')).resolves.toEqual([]);
     expect(fetchMock.mock.calls).toEqual([[
-      `${config.api.urls.courseReserves}/sandbox-folio/search-courses?query=(name%3D%22TST%20101*%22%20or%20courseNumber%3D%22TST%20101*%22)`,
+      `${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}?query=(name%3D%22TST%20101*%22%20or%20courseNumber%3D%22TST%20101*%22)`,
     ]]);
     expect(getAuthTokenSpy).not.toHaveBeenCalled();
   });

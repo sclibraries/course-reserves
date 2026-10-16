@@ -2,12 +2,11 @@
 /**
  * FacultySubmissionCest.php — Smoke tests for faculty submission CRUD.
  *
- * Uses the synthetic seed-faculty-workflow UUID and a manually-crafted
- * faculty JWT (same HS256 secret as faculty-authorize.php) so that
+ * Uses a test-owned submission and a manually-crafted faculty JWT so that
  * FacultySubmissionController authenticates the requests.
  *
- * The seeded UUID '11111111-1111-4111-8111-111111111111' belongs to shibboleth
- * user 'sandbox.faculty@example.test' and has status 'submitted' (editable).
+ * The submission belongs to the API-078 synthetic faculty A and has status
+ * 'submitted' (editable).
  *
  * Note: FacultySubmissionController extends BaseRestController which uses
  * HttpBearerAuth. Missing or invalid tokens cause HttpBearerAuth to throw
@@ -17,18 +16,19 @@
  */
 class FacultySubmissionCest extends BaseFunctionalCest
 {
-    /** UUID of an existing 'submitted' record owned by $shibbolethId. */
-    private $uuid = '11111111-1111-4111-8111-111111111111';
+    /** UUID of the test-owned 'submitted' record. */
+    private $uuid = '77000000-0000-4000-8000-000000000023';
 
     /** Shibboleth user ID that owns the above submission. */
-    private $shibbolethId = 'sandbox.faculty@example.test';
+    private $shibbolethId = 'test-api078-faculty-a';
 
     /** Faculty JWT minted in _before() and shared across tests. */
     private $token;
     private $staffToken;
     private $submissionId;
     private $otherSubmissionUuid = '33333333-3333-4333-8333-333333333333';
-    private $rosterSmithId = '999000131';
+    private $rosterSmithId = '999078001';
+    private $rosterCourseId = 'TST-API030-99-209902';
 
     /**
      * Delegate DB/URL setup to the base class, then mint a faculty JWT
@@ -41,17 +41,19 @@ class FacultySubmissionCest extends BaseFunctionalCest
             \app\services\FolioService::class,
             new TestFacultySubmissionFolioStub()
         );
+        TestSubmissionFixture::create($this->uuid, $this->shibbolethId);
         \Yii::$app->db->createCommand()->delete('course_assignments', [
             'smith_id' => $this->rosterSmithId,
+            'course_id' => $this->rosterCourseId,
         ])->execute();
         \Yii::$app->db->createCommand()->insert('course_assignments', [
             'academic_period' => 'AP_209902',
-            'course_id' => 'TST-API030-99-209902',
+            'course_id' => $this->rosterCourseId,
             'course_title' => 'Synthetic API-030 roster course',
             'smith_id' => $this->rosterSmithId,
             'role' => 'Instructor',
         ])->execute();
-        $this->submissionId = \Yii::$app->db->createCommand(
+        $this->submissionId = (int)\Yii::$app->db->createCommand(
             'SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid',
             [':uuid' => $this->uuid]
         )->queryScalar();
@@ -86,6 +88,7 @@ class FacultySubmissionCest extends BaseFunctionalCest
     {
         \Yii::$app->db->createCommand()->delete('course_assignments', [
             'smith_id' => $this->rosterSmithId,
+            'course_id' => $this->rosterCourseId,
         ])->execute();
         \Yii::$container->clear(\app\services\FolioService::class);
         \Yii::$app->db->createCommand()->delete(
@@ -96,6 +99,7 @@ class FacultySubmissionCest extends BaseFunctionalCest
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
             'submission_uuid' => $this->otherSubmissionUuid,
         ])->execute();
+        TestSubmissionFixture::delete($this->uuid);
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
             'shibboleth_user_id' => $this->shibbolethId,
             'its_course_id' => 'TST-API030-99-209902',

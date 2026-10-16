@@ -31,7 +31,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         );
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
         $this->assertTrue(is_array($baseline));
-        $this->assertCount(141, $mergedRules);
+        $this->assertCount(139, $mergedRules);
         $this->assertSame($baseline, $mergedRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -46,7 +46,6 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $cases = [
             ['POST', 'dev-auth/login', ['dev-auth/login', []]],
             ['OPTIONS', 'dev-auth/login', ['dev-auth/login', []]],
-            ['GET', 'sandbox-folio/search-courses', ['sandbox-folio/search-courses', []]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
             ['POST', 'faculty-submission/' . $uuid . '/communications', [
                 'faculty-submission/create-communication', ['id' => $uuid],

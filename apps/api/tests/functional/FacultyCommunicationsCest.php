@@ -5,7 +5,7 @@
  */
 class FacultyCommunicationsCest extends BaseFunctionalCest
 {
-    private $submissionUuid = '11111111-1111-4111-8111-111111111111';
+    private $submissionUuid = '77000000-0000-4000-8000-000000000023';
     private $otherSubmissionUuid = '33333333-3333-4333-8333-333333333333';
     private $submissionId;
     private $facultyToken;
@@ -14,21 +14,21 @@ class FacultyCommunicationsCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
-        $this->submissionId = \Yii::$app->db->createCommand(
-            'SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid',
-            [':uuid' => $this->submissionUuid]
-        )->queryScalar();
+        $this->submissionId = TestSubmissionFixture::create(
+            $this->submissionUuid,
+            TestSubmissionFixture::FACULTY_A_ID
+        );
 
         $secretKey = getenv('JWT_SECRET_KEY');
         $issuedAt = time();
         $this->facultyToken = \Firebase\JWT\JWT::encode([
             'iat' => $issuedAt,
             'exp' => $issuedAt + 3600,
-            'username' => 'sandbox.faculty@example.test',
+            'username' => TestSubmissionFixture::FACULTY_A_ID,
             'role' => 'faculty',
             'id' => 0,
             'full_name' => 'Test Faculty',
-            'email' => 'sandbox.faculty@example.test',
+            'email' => TestSubmissionFixture::FACULTY_A_ID . '@example.test',
             'institution' => 'SM',
         ], $secretKey, 'HS256');
         $this->staffToken = \Firebase\JWT\JWT::encode([
@@ -52,6 +52,7 @@ class FacultyCommunicationsCest extends BaseFunctionalCest
         \Yii::$app->db->createCommand()->delete('faculty_submissions', [
             'submission_uuid' => $this->otherSubmissionUuid,
         ])->execute();
+        TestSubmissionFixture::delete($this->submissionUuid);
     }
 
     public function facultyDetailDoesNotSerializeStaffOnlyMessages(FunctionalTester $I)
