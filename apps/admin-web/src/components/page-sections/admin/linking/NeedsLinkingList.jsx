@@ -72,34 +72,43 @@ function NeedsLinkingList() {
               <tr><th>Faculty</th><th>Course</th><th>Term</th><th>Waiting</th><th>Suggestion</th><th>Last checked</th></tr>
             </thead>
             <tbody>
-              {oldestFirst.map((item) => (
-                <tr
-                  key={item.submission_uuid}
-                  data-submission-uuid={item.submission_uuid}
-                  role="link"
-                  tabIndex={0}
-                  aria-label={`Open submission for ${item.faculty_display_name || 'faculty member'}`}
-                  onClick={() => navigate(`/admin/submissions/${item.submission_uuid}`)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      navigate(`/admin/submissions/${item.submission_uuid}`);
-                    }
-                  }}
-                >
-                  <td>
-                    <span className="text-primary text-decoration-underline">{item.faculty_display_name || 'Faculty member'}</span>
-                  </td>
-                  <td>
-                    <strong>{item.course_code}</strong>{item.section ? `-${item.section}` : ''}
-                    {item.course_title && <small className="d-block text-muted">{item.course_title}</small>}
-                  </td>
-                  <td>{item.term_code || 'Term unverified'}</td>
-                  <td>{formatWaitingTime(item.waiting_hours)}</td>
-                  <td><SuggestionBadge suggestion={item.suggestion} /></td>
-                  <td>{formatCheckedAt(item.checked_at)}</td>
-                </tr>
-              ))}
+              {oldestFirst.map((item) => {
+                const hasSubmissionId = Number.isInteger(item.submission_id);
+                return (
+                  <tr
+                    key={item.submission_uuid}
+                    data-submission-uuid={item.submission_uuid}
+                    role={hasSubmissionId ? 'link' : undefined}
+                    tabIndex={hasSubmissionId ? 0 : undefined}
+                    aria-label={hasSubmissionId
+                      ? `Open submission for ${item.faculty_display_name || 'faculty member'}`
+                      : undefined}
+                    onClick={hasSubmissionId
+                      ? () => navigate(`/admin/submissions/${item.submission_id}`)
+                      : undefined}
+                    onKeyDown={hasSubmissionId
+                      ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          navigate(`/admin/submissions/${item.submission_id}`);
+                        }
+                      }
+                      : undefined}
+                  >
+                    <td>
+                      <span className="text-primary text-decoration-underline">{item.faculty_display_name || 'Faculty member'}</span>
+                    </td>
+                    <td>
+                      <strong>{item.course_code}</strong>{item.section ? `-${item.section}` : ''}
+                      {item.course_title && <small className="d-block text-muted">{item.course_title}</small>}
+                    </td>
+                    <td>{item.term_code || 'Term unverified'}</td>
+                    <td>{formatWaitingTime(item.waiting_hours)}</td>
+                    <td><SuggestionBadge suggestion={item.suggestion} /></td>
+                    <td>{formatCheckedAt(item.checked_at)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         </div>
