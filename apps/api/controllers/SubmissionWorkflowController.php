@@ -18,6 +18,7 @@ use app\models\SubmissionWorkflowAssignment;
 use app\models\SubmissionNewResource;
 use app\models\User;
 use app\services\SubmissionItemMaterializationService;
+use app\services\SubmissionLinkGuard;
 
 /**
  * Staff Workflow Controller
@@ -258,9 +259,8 @@ class SubmissionWorkflowController extends Controller
         
         $item = SubmissionNewResource::findOne($itemId);
         
-        if (!$item) {
-            throw new NotFoundHttpException('Item not found');
-        }
+        if (!$item) throw new NotFoundHttpException('Item not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
 
         $this->assertItemCanBeMutatedBy($item, $currentUser, 'updated');
 
@@ -315,9 +315,8 @@ class SubmissionWorkflowController extends Controller
         
         $item = SubmissionNewResource::findOne($itemId);
         
-        if (!$item) {
-            throw new NotFoundHttpException('Item not found');
-        }
+        if (!$item) throw new NotFoundHttpException('Item not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
 
         $this->assertItemCanBeClaimedBy($item, $currentUser);
 
@@ -360,9 +359,8 @@ class SubmissionWorkflowController extends Controller
         $this->assertClaimActor($currentUser);
 
         $item = SubmissionNewResource::findOne($itemId);
-        if (!$item) {
-            throw new NotFoundHttpException('Item not found');
-        }
+        if (!$item) throw new NotFoundHttpException('Item not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
 
         $this->assertItemCanBeMutatedBy($item, $currentUser, 'completed');
 

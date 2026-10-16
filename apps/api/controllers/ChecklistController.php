@@ -14,6 +14,7 @@ use app\models\ChecklistTemplateTask;
 use app\models\ItemChecklist;
 use app\models\ItemChecklistTask;
 use app\models\SubmissionNewResource;
+use app\services\SubmissionLinkGuard;
 
 class ChecklistController extends Controller
 {
@@ -323,9 +324,8 @@ class ChecklistController extends Controller
 
         // Check if item exists
         $item = SubmissionNewResource::findOne($itemId);
-        if (!$item) {
-            throw new NotFoundHttpException('Item not found');
-        }
+        if (!$item) throw new NotFoundHttpException('Item not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
 
         // Check if template exists
         $template = ChecklistTemplate::findOne($data['template_id']);
@@ -388,9 +388,8 @@ class ChecklistController extends Controller
             ])
             ->one();
 
-        if (!$task) {
-            throw new NotFoundHttpException('Task not found');
-        }
+        if (!$task) throw new NotFoundHttpException('Task not found');
+        if ($blocked = SubmissionLinkGuard::errorResponse($task->itemChecklist->submissionItem->submission)) return $blocked;
 
         // Update completion status
         if (isset($data['completed'])) {
@@ -432,9 +431,8 @@ class ChecklistController extends Controller
             ->where(['submission_item_id' => $itemId])
             ->one();
 
-        if (!$checklist) {
-            throw new NotFoundHttpException('No checklist assigned to this item');
-        }
+        if (!$checklist) throw new NotFoundHttpException('No checklist assigned to this item');
+        if ($blocked = SubmissionLinkGuard::errorResponse($checklist->submissionItem->submission)) return $blocked;
 
         // Check if all required tasks are complete
         if (!$checklist->areRequiredTasksComplete()) {

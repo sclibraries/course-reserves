@@ -5,6 +5,7 @@ use PHPUnit\Framework\Assert;
 class Api074ProxyMigrationCest
 {
     private $api079MigrationVersion = 'm261016_000001_add_roster_course_to_faculty_submissions';
+    private $api080MigrationVersion = 'm261016_000002_add_workflow_linking';
     private $migrationVersion = 'm261015_000001_add_faculty_internal_id_to_proxy_permissions';
 
     public function addsNullableFacultyInternalIdAndRollsBackCleanly(FunctionalTester $I)
@@ -12,6 +13,7 @@ class Api074ProxyMigrationCest
         $db = \Yii::$app->db;
         $migrationIsDown = false;
         $api079MigrationIsDown = false;
+        $api080MigrationIsDown = false;
 
         try {
             $api079Applied = (int) $db->createCommand(
@@ -19,6 +21,11 @@ class Api074ProxyMigrationCest
                 [':version' => $this->api079MigrationVersion]
             )->queryScalar();
             Assert::assertSame(1, $api079Applied, 'API-079 migration must be applied by test-stack setup.');
+            $api080Applied = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api080MigrationVersion]
+            )->queryScalar();
+            Assert::assertSame(1, $api080Applied, 'API-080 migration must be applied by test-stack setup.');
 
             $applied = (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
@@ -28,9 +35,11 @@ class Api074ProxyMigrationCest
             $this->assertColumn($db, true);
 
             $this->runMigration('down');
-            $api079MigrationIsDown = true;
-            $migrationIsDown = true;
+            $api080MigrationIsDown = true;
             $this->runMigration('down');
+            $api079MigrationIsDown = true;
+            $this->runMigration('down');
+            $migrationIsDown = true;
             $db->schema->refreshTableSchema('faculty_proxy_permissions');
             Assert::assertNull($db->schema->getTableSchema('faculty_proxy_permissions')->getColumn('faculty_internal_id'));
 
@@ -38,6 +47,8 @@ class Api074ProxyMigrationCest
             $migrationIsDown = false;
             $this->runMigration('up');
             $api079MigrationIsDown = false;
+            $this->runMigration('up');
+            $api080MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_proxy_permissions');
             $this->assertColumn($db, true);
         } finally {
@@ -46,6 +57,9 @@ class Api074ProxyMigrationCest
                 $db->schema->refreshTableSchema('faculty_proxy_permissions');
             }
             if ($api079MigrationIsDown) {
+                $this->runMigration('up');
+            }
+            if ($api080MigrationIsDown) {
                 $this->runMigration('up');
             }
         }

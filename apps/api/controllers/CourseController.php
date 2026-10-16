@@ -17,6 +17,7 @@ use app\models\ResourceMetadata;
 use app\models\CourseOfferings;
 use app\models\ResourceLinks;
 use app\services\SubmissionCourseScaffoldService;
+use app\services\CourseOfferingLinkService;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 
@@ -544,166 +545,26 @@ class CourseController extends ActiveController
    public function actionCreateFromFolio()
     {
         $body = Yii::$app->request->post();
-
         if (empty($body['course']) || empty($body['offering'])) {
             throw new \yii\web\BadRequestHttpException('Missing course or offering data.');
         }
 
-        $courseData   = $body['course'];
-        $offeringData = $body['offering'];
-
-        // Required fields
-        $requiredCourse   = array('course_number','course_name','department_id');
-        $requiredOffering = array('folio_course_id','term_id','term_name');
-        foreach ($requiredCourse as $k) {
-            if (!isset($courseData[$k]) || $courseData[$k] === '') {
-                throw new \yii\web\BadRequestHttpException("Missing course field: {$k}");
-            }
-        }
-        foreach ($requiredOffering as $k) {
-            if (!isset($offeringData[$k]) || $offeringData[$k] === '') {
-                throw new \yii\web\BadRequestHttpException("Missing offering field: {$k}");
-            }
-        }
-
-        // Normalize
-        $code         = trim((string)$courseData['course_number']);
-        $name         = trim((string)$courseData['course_name']);
-        $deptId       = (string)$courseData['department_id'];
-        $deptName     = isset($courseData['department_name']) ? (string)$courseData['department_name'] : null;
-        $locationId   = isset($courseData['location_id'])     ? (string)$courseData['location_id']     : null;
-        $locationName = isset($courseData['location_name'])   ? (string)$courseData['location_name']   : null;
-
-        $section      = isset($offeringData['section_name']) ? (string)$offeringData['section_name'] : '';
-        $folioId      = trim((string)$offeringData['folio_course_id']);
-        $termId       = (string)$offeringData['term_id'];
-        $termName     = (string)$offeringData['term_name'];
-
-        // Dates (accept ISO8601 or Y-m-d H:i:s)
-        $startMysql   = !empty($offeringData['start_date']) ? $this->isoToMysql($offeringData['start_date']) : null;
-        $endMysql     = !empty($offeringData['end_date'])   ? $this->isoToMysql($offeringData['end_date'])   : null;
-
-        $tx = Yii::$app->db->beginTransaction();
-
-        
+        $transaction = Yii::$app->db->beginTransaction();
         try {
-            // 1) COURSE — find by stable key (course_number [+ location_id])
-            $courseLookup = array('course_number' => $code);
-            if ($locationId !== null && $locationId !== '') {
-                $courseLookup['location_id'] = $locationId;
-            }
-
-            /** @var \app\models\Courses|null $course */
-            $course = \app\models\Courses::findOne($courseLookup);
-            if (!$course) {
-                $course = new \app\models\Courses();
-                $course->course_number = $code;
-                if ($locationId !== null && $locationId !== '') {
-                    $course->location_id = $locationId;
-                }
-            }
-
-            // Refresh descriptors from FOLIO every time (rename-safe)
-            $course->course_name   = $name;
-            $course->department_id = $deptId;
-            if ($deptName     !== null) $course->department_name = $deptName;
-            if ($locationName !== null) $course->location_name   = $locationName;
-
-            if (!$course->save()) {
-                throw new \yii\web\ServerErrorHttpException('Course save failed: ' . json_encode($course->getErrors()));
-            }
-
-            $existingByFolio = \app\models\CourseOfferings::findOne(['folio_course_id' => $folioId]);
-            if ($existingByFolio && (int)$existingByFolio->course_id !== (int)$course->course_id) {
-                throw new \yii\web\ConflictHttpException(sprintf(
-                    'FOLIO course %s is already linked to a different course_id=%d. ' .
-                    'Please correct the listing in FOLIO or choose Reactivate on the existing course.',
-                    $folioId, $existingByFolio->course_id
-                ));
-            }
-
-            // Guard B: (course_id, term_id) exists with a different folio_course_id
-            $existingPair = \app\models\CourseOfferings::findOne([
-                'course_id' => $course->course_id,
-                'term_id'   => $termId,
-                'section_name' => $section,
-            ]);
-            if ($existingPair && $existingPair->folio_course_id && $existingPair->folio_course_id !== $folioId) {
-                throw new \yii\web\ConflictHttpException(sprintf(
-                    'This course already has an offering for term_id=%s (folio=%s). ' .
-                    'Incoming folio=%s does not match. Please verify in FOLIO.',
-                    $termId, $existingPair->folio_course_id, $folioId
-                ));
-            }
-
-            // 2) OFFERING — idempotent by folio_course_id, then by (course_id, term_id)
-            /** @var \app\models\CourseOfferings|null $offering */
-            $offering = \app\models\CourseOfferings::findOne(array('folio_course_id' => $folioId));
-            if (!$offering) {
-                $offering = \app\models\CourseOfferings::findOne(array(
-                    'course_id' => $course->course_id,
-                    'term_id'   => $termId,
-                    'section_name' => $section
-                ));
-            }
-
-            if (!$offering) {
-                $offering = new \app\models\CourseOfferings();
-                $offering->course_id       = $course->course_id;
-                $offering->folio_course_id = $folioId;
-                $offering->term_id         = $termId;
-                $offering->term_name       = $termName;
-                $offering->section_name    = $section;
-            } else {
-                $offering->section_name = $section;
-
-                if ($offering->folio_course_id === null || $offering->folio_course_id === '') {
-                    $offering->folio_course_id = $folioId;
-                }
-
-                if ($termName !== '') $offering->term_name = $termName;
-            }
-
-            // Refresh offering descriptors
-            if ($startMysql !== null) $offering->start_date = $startMysql;
-            if ($endMysql   !== null) $offering->end_date   = $endMysql;
-
-            // Always compute from dates; ignore any client-provided status
-            $offering->status = $this->computeOfferingStatus($offering->start_date, $offering->end_date);
-
-            if (!$offering->save()) {
-                // Handle race: refetch winner by folio or (course,term)
-                $winner = \app\models\CourseOfferings::findOne(array('folio_course_id' => $folioId));
-                if (!$winner) {
-                    $winner = \app\models\CourseOfferings::findOne(array(
-                        'course_id'    => $course->course_id,
-                        'term_id'      => $termId,
-                        'section_name' => $section,
-                    ));
-                }
-                if (!$winner) {
-                    throw new \yii\web\ServerErrorHttpException('Offering save failed: ' . json_encode($offering->getErrors()));
-                }
-                $offering = $winner;
-            }
-
-            $tx->commit();
-
-            // Response compatible with your FE
-            $latestStartIso = $offering->start_date ? date('c', strtotime($offering->start_date)) : null;
-
-            return array(
-                'course'                   => $course->toArray(),
-                'offering'                 => $offering->toArray(),
-                'current_offering_id'      => $offering->offering_id,
-                'offering_id'              => $offering->offering_id,
-                'latestOfferingStartDate'  => $latestStartIso,
-            );
-
-        } catch (\Throwable $e) {
-            if ($tx->isActive) $tx->rollBack();
-            Yii::error($e->getMessage(), __METHOD__);
-            throw $e;
+            $result = (new CourseOfferingLinkService())->findOrCreate($body['course'], $body['offering']);
+            $transaction->commit();
+            $offering = $result['offering'];
+            return [
+                'course' => $result['course']->toArray(),
+                'offering' => $offering->toArray(),
+                'current_offering_id' => $offering->offering_id,
+                'offering_id' => $offering->offering_id,
+                'latestOfferingStartDate' => $offering->start_date ? date('c', strtotime($offering->start_date)) : null,
+            ];
+        } catch (\Throwable $exception) {
+            if ($transaction->isActive) $transaction->rollBack();
+            Yii::error($exception->getMessage(), __METHOD__);
+            throw $exception;
         }
     }
 
@@ -1005,203 +866,58 @@ class CourseController extends ActiveController
     public function actionLinkCourseOffering()
     {
         $body = Yii::$app->request->post();
-
-        // Validate required fields
         if (empty($body['submission_id'])) {
             throw new \yii\web\BadRequestHttpException('Missing submission_id.');
         }
-        if (empty($body['selectedCourse'])) {
-            throw new \yii\web\BadRequestHttpException('Missing selectedCourse data.');
-        }
-
-        $submissionId = (int)$body['submission_id'];
-        $folioData = $body['selectedCourse'];
-
-        // Extract course information from FOLIO structure
-        if (empty($folioData['courseNumber'])) {
-            throw new \yii\web\BadRequestHttpException('Missing courseNumber in selectedCourse.');
-        }
-        if (empty($folioData['name'])) {
-            throw new \yii\web\BadRequestHttpException('Missing course name in selectedCourse.');
-        }
-        if (empty($folioData['departmentId'])) {
-            throw new \yii\web\BadRequestHttpException('Missing departmentId in selectedCourse.');
-        }
-        if (empty($folioData['courseListingId'])) {
+        if (empty($body['selectedCourse']['courseListingId'])) {
             throw new \yii\web\BadRequestHttpException('Missing courseListingId in selectedCourse.');
         }
-        if (empty($folioData['courseListingObject'])) {
-            throw new \yii\web\BadRequestHttpException('Missing courseListingObject in selectedCourse.');
-        }
 
-        $listingObj = $folioData['courseListingObject'];
-        if (empty($listingObj['termId'])) {
-            throw new \yii\web\BadRequestHttpException('Missing termId in courseListingObject.');
-        }
-        if (empty($listingObj['termObject'])) {
-            throw new \yii\web\BadRequestHttpException('Missing termObject in courseListingObject.');
-        }
-
-        // Find the faculty submission
-        $submission = \app\models\FacultySubmission::findOne($submissionId);
+        $submission = \app\models\FacultySubmission::findOne((int)$body['submission_id']);
         if (!$submission) {
-            throw new \yii\web\NotFoundHttpException('Faculty submission not found.');
+            throw new NotFoundHttpException('Faculty submission not found.');
         }
-
-        // Prepare course data
-        $courseNumber = trim((string)$folioData['courseNumber']);
-        $courseName = trim((string)$folioData['name']);
-        $departmentId = (string)$folioData['departmentId'];
-        $departmentName = isset($folioData['departmentObject']['name']) 
-            ? (string)$folioData['departmentObject']['name'] 
-            : null;
-        
-        $locationId = isset($listingObj['locationId']) ? (string)$listingObj['locationId'] : null;
-        $locationName = isset($listingObj['locationObject']['name']) 
-            ? (string)$listingObj['locationObject']['name'] 
-            : null;
-
-        // Prepare offering data
-        $folioCourseId = (string)$folioData['courseListingId'];
-        $termId = (string)$listingObj['termId'];
-        $termObj = $listingObj['termObject'];
-        $termName = isset($termObj['name']) ? (string)$termObj['name'] : '';
-        
-        // Section name - may not be present in all FOLIO data
-        $sectionName = '';
-        
-        // Parse dates
-        $startDate = null;
-        $endDate = null;
-        if (!empty($termObj['startDate'])) {
-            $startDate = $this->isoToMysql($termObj['startDate']);
+        $linkService = new CourseOfferingLinkService();
+        $listing = $linkService->fetchListing((string)$body['selectedCourse']['courseListingId']);
+        $match = (new \app\services\SubmissionLinkMatchRule())->evaluate($submission->attributes, $listing);
+        if ($match['match'] !== 'exact') {
+            Yii::$app->response->statusCode = 409;
+            return ['error_code' => 'not_exact_match', 'fields' => $match['fields']];
         }
-        if (!empty($termObj['endDate'])) {
-            $endDate = $this->isoToMysql($termObj['endDate']);
-        }
-
-        $tx = Yii::$app->db->beginTransaction();
-
+        $transaction = Yii::$app->db->beginTransaction();
         try {
-            // 1) Check/Create Permanent Course
-            $courseLookup = ['course_number' => $courseNumber];
-            if ($locationId !== null && $locationId !== '') {
-                $courseLookup['location_id'] = $locationId;
-            }
-
-            /** @var \app\models\Courses|null $course */
-            $course = \app\models\Courses::findOne($courseLookup);
-            if (!$course) {
-                // Create new course
-                $course = new \app\models\Courses();
-                $course->course_number = $courseNumber;
-                if ($locationId !== null && $locationId !== '') {
-                    $course->location_id = $locationId;
-                }
-            }
-
-            // Update course details from FOLIO (refresh descriptors)
-            $course->course_name = $courseName;
-            $course->department_id = $departmentId;
-            if ($departmentName !== null) {
-                $course->department_name = $departmentName;
-            }
-            if ($locationName !== null) {
-                $course->location_name = $locationName;
-            }
-
-            if (!$course->save()) {
-                throw new \yii\web\ServerErrorHttpException(
-                    'Failed to save course: ' . json_encode($course->getErrors())
-                );
-            }
-
-            // 2) Check for existing offering by folio_course_id
-            $existingByFolio = \app\models\CourseOfferings::findOne(['folio_course_id' => $folioCourseId]);
-            if ($existingByFolio && (int)$existingByFolio->course_id !== (int)$course->course_id) {
-                throw new \yii\web\ConflictHttpException(sprintf(
-                    'FOLIO course %s is already linked to a different course_id=%d.',
-                    $folioCourseId, $existingByFolio->course_id
-                ));
-            }
-
-            // Check for existing offering by (course_id, term_id, section_name)
-            $existingPair = \app\models\CourseOfferings::findOne([
-                'course_id' => $course->course_id,
-                'term_id' => $termId,
-                'section_name' => $sectionName,
-            ]);
-            if ($existingPair && $existingPair->folio_course_id 
-                && $existingPair->folio_course_id !== $folioCourseId) {
-                throw new \yii\web\ConflictHttpException(sprintf(
-                    'This course already has an offering for term_id=%s with different folio_course_id.',
-                    $termId
-                ));
-            }
-
-            // 3) Create or update offering
-            /** @var \app\models\CourseOfferings|null $offering */
-            $offering = \app\models\CourseOfferings::findOne(['folio_course_id' => $folioCourseId]);
-            if (!$offering) {
-                $offering = \app\models\CourseOfferings::findOne([
-                    'course_id' => $course->course_id,
-                    'term_id' => $termId,
-                    'section_name' => $sectionName,
-                ]);
-            }
-
-            if (!$offering) {
-                // Create new offering
-                $offering = new \app\models\CourseOfferings();
-                $offering->course_id = $course->course_id;
-                $offering->folio_course_id = $folioCourseId;
-                $offering->term_id = $termId;
-                $offering->term_name = $termName;
-                $offering->section_name = $sectionName;
-            } else {
-                // Update existing offering
-                if (empty($offering->folio_course_id)) {
-                    $offering->folio_course_id = $folioCourseId;
-                }
-                if ($termName !== '') {
-                    $offering->term_name = $termName;
-                }
-            }
-
-            // Set dates and status
-            if ($startDate !== null) {
-                $offering->start_date = $startDate;
-            }
-            if ($endDate !== null) {
-                $offering->end_date = $endDate;
-            }
-            $offering->status = $this->computeOfferingStatus($offering->start_date, $offering->end_date);
-
-            if (!$offering->save()) {
-                throw new \yii\web\ServerErrorHttpException(
-                    'Failed to save offering: ' . json_encode($offering->getErrors())
-                );
-            }
-
-            // 4) Link offering to faculty submission
-            $submission->offering_id = $offering->offering_id;
-            $submission->folio_course_listing_id = $folioCourseId;
-            
+            $identity = Yii::$app->user->identity;
+            $before = $this->submissionLinkSnapshot($submission);
+            $result = $linkService->findOrCreateFromListing($listing);
+            $submission->offering_id = $result['offering']->offering_id;
+            $submission->folio_course_listing_id = $result['offering']->folio_course_id;
+            $submission->link_state = 'linked';
+            $submission->link_flag = null;
+            $submission->linked_at = date('Y-m-d H:i:s');
+            $submission->linked_by = $identity->username ?? (string)$identity->id;
             if (!$submission->save()) {
-                throw new \yii\web\ServerErrorHttpException(
-                    'Failed to update submission: ' . json_encode($submission->getErrors())
-                );
+                throw new ServerErrorHttpException('Failed to update submission: ' . json_encode($submission->getErrors()));
             }
 
-            $scaffoldService = new SubmissionCourseScaffoldService();
-            $folderScaffold = $scaffoldService->ensureSubmissionCourseScaffold($submission);
-
-            $tx->commit();
+            $folderScaffold = (new SubmissionCourseScaffoldService())->ensureSubmissionCourseScaffold($submission);
+            (new \app\services\WorkflowEventLog())->record(
+                $submission->submission_id,
+                null,
+                [
+                    'username' => $submission->linked_by,
+                    'role' => $identity->role,
+                ],
+                'linked',
+                null,
+                $before,
+                $this->submissionLinkSnapshot($submission)
+            );
+            $transaction->commit();
 
             return [
                 'success' => true,
-                'course' => $course->toArray(),
-                'offering' => $offering->toArray(),
+                'course' => $result['course']->toArray(),
+                'offering' => $result['offering']->toArray(),
                 'submission' => [
                     'submission_id' => $submission->submission_id,
                     'submission_uuid' => $submission->submission_uuid,
@@ -1210,14 +926,23 @@ class CourseController extends ActiveController
                 ],
                 'folder_scaffold' => $folderScaffold,
             ];
-
-        } catch (\Throwable $e) {
-            if ($tx->isActive) {
-                $tx->rollBack();
-            }
-            Yii::error($e->getMessage(), __METHOD__);
-            throw $e;
+        } catch (\Throwable $exception) {
+            if ($transaction->isActive) $transaction->rollBack();
+            Yii::error($exception->getMessage(), __METHOD__);
+            throw $exception;
         }
+    }
+
+    private function submissionLinkSnapshot($submission)
+    {
+        return [
+            'link_state' => $submission->link_state,
+            'link_flag' => $submission->link_flag,
+            'offering_id' => $submission->offering_id,
+            'folio_course_listing_id' => $submission->folio_course_listing_id,
+            'linked_at' => $submission->linked_at,
+            'linked_by' => $submission->linked_by,
+        ];
     }
 
     // Stable url for public view of a course

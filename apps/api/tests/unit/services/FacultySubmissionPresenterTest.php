@@ -64,6 +64,30 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
         ], $response);
     }
 
+    public function testWorkflowLinkingFieldsAndEventsNeverReachFaculty()
+    {
+        $response = FacultySubmissionPresenter::submissionResponse([
+            'submission_uuid' => '77000000-0000-4000-8000-000000000080',
+            'course_code' => 'TST 080',
+            'link_state' => 'linked',
+            'link_flag' => 'mismatch_override',
+            'linked_at' => '2026-10-16 12:00:00',
+            'linked_by' => 'test-api080-staff',
+            'workflow_events' => [[
+                'event_type' => 'link_override',
+                'actor_username' => 'test-api080-staff',
+            ]],
+        ]);
+
+        $this->assertSame([
+            'submission_uuid' => '77000000-0000-4000-8000-000000000080',
+            'course_code' => 'TST 080',
+        ], $response);
+        $this->assertArrayNotHasKey('link_flag', $response);
+        $this->assertArrayNotHasKey('linked_by', $response);
+        $this->assertArrayNotHasKey('workflow_events', $response);
+    }
+
     public function testIndexStatusAndSubmitCompleteKeepOnlyAllowlistedResponseFields()
     {
         $index = FacultySubmissionPresenter::submissionIndexResponse([

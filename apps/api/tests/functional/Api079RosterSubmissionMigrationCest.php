@@ -8,18 +8,26 @@ use PHPUnit\Framework\Assert;
 class Api079RosterSubmissionMigrationCest
 {
     private $migrationVersion = 'm261016_000001_add_roster_course_to_faculty_submissions';
+    private $api080MigrationVersion = 'm261016_000002_add_workflow_linking';
     private $facultyId = 'test-api079-migration-faculty';
 
     public function addsNullableRosterCourseColumnsAndRollsBackCleanly(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
+        $api080MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
             )->queryScalar(), 'API-079 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api080MigrationVersion]
+            )->queryScalar(), 'API-080 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api080MigrationIsDown = true;
             $this->runMigration('down');
             $migrationIsDown = true;
             $db->schema->refreshTableSchema('faculty_submissions');
@@ -69,9 +77,15 @@ class Api079RosterSubmissionMigrationCest
             Assert::assertNull($schema->getColumn('roster_term_id'));
             $migrationIsDown = false;
             $this->runMigration('up');
+            $this->runMigration('up');
+            $api080MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
         } finally {
             if ($migrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api080MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
             }
