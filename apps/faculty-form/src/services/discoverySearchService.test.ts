@@ -50,15 +50,16 @@ describe('searchDiscovery', () => {
     );
   });
 
-  it('shows the unavailable guidance for a search_unavailable response', async () => {
+  it('shows unavailable guidance and its reference for a search_unavailable response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(searchFailure(503, {
       error_code: 'search_unavailable',
       message: 'raw upstream details must not be shown',
+      reference: '7F3K2Q',
     }) as Response);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     await expect(searchDiscovery('typed query')).rejects.toMatchObject({
-      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.',
+      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.\nReference: 7F3K2Q',
     });
   });
 

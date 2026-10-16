@@ -102,6 +102,10 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
     {
         $previousParams = \Yii::$app->params;
         $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
         $client = $this->createStubEbscoClient();
         \Yii::$container->setSingleton(Client::class, $client);
         \Yii::$app->params['ebsco'] = [
@@ -118,9 +122,16 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
             $this->assertSame(503, \Yii::$app->response->statusCode);
             $this->assertSame('search_unavailable', $response['error_code']);
             $this->assertSame('Library search is temporarily unavailable.', $response['message']);
+            $this->assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/D', $response['reference']);
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=search', $log);
+            $this->assertStringContainsString('step=config', $log);
+            $this->assertStringContainsString('EBSCO_PROFILE', $log);
         } finally {
             \Yii::$app->params = $previousParams;
             \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
             \Yii::$container->clear(Client::class);
         }
     }
@@ -129,6 +140,10 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
     {
         $previousParams = \Yii::$app->params;
         $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
         $client = $this->createStubEbscoClient();
         \Yii::$container->setSingleton(Client::class, $client);
         \Yii::$app->params['ebsco'] = [
@@ -144,11 +159,54 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
             $this->assertSame(2, $client->sendCount);
             $this->assertSame(503, \Yii::$app->response->statusCode);
             $this->assertSame('search_unavailable', $response['error_code']);
+            $this->assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/D', $response['reference']);
             $this->assertStringNotContainsString('Profile id missing', json_encode($response));
             $this->assertStringNotContainsString('synthetic-provider-body', json_encode($response));
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=search', $log);
+            $this->assertStringContainsString('step=create session', $log);
+            $this->assertStringContainsString('upstream_status=500', $log);
+            $this->assertStringContainsString('query="climate change"', $log);
         } finally {
             \Yii::$app->params = $previousParams;
             \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testAuthenticationFailureLogsTheAuthenticateStep()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        $client = $this->createStubEbscoClient('uidauth');
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionSearch('climate change');
+
+            $this->assertSame(1, $client->sendCount);
+            $this->assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/D', $response['reference']);
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=search', $log);
+            $this->assertStringContainsString('step=authenticate', $log);
+            $this->assertStringContainsString('upstream_status=500', $log);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
             \Yii::$container->clear(Client::class);
         }
     }
@@ -191,6 +249,10 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
     {
         $previousParams = \Yii::$app->params;
         $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
         $client = $this->createStubEbscoClient();
         \Yii::$container->setSingleton(Client::class, $client);
         \Yii::$app->params['ebsco'] = [
@@ -206,9 +268,113 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
             $this->assertSame(0, $client->sendCount);
             $this->assertSame(503, \Yii::$app->response->statusCode);
             $this->assertSame('search_unavailable', $response['error_code']);
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=info', $log);
+            $this->assertStringContainsString('step=config', $log);
         } finally {
             \Yii::$app->params = $previousParams;
             \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testSearchFailureLogsTheSearchStep()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        $client = $this->createStubEbscoClient('Search');
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionSearch('climate change');
+
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=search', $log);
+            $this->assertStringContainsString('step=search', $log);
+            $this->assertStringContainsString('upstream_status=500', $log);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testRetrieveFailureLogsTheRetrieveActionAndStep()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        $client = $this->createStubEbscoClient('Retrieve');
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionRetrieve('synthetic-db', 'synthetic-an');
+
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=retrieve', $log);
+            $this->assertStringContainsString('step=retrieve', $log);
+            $this->assertStringContainsString('upstream_status=500', $log);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testInfoFailureLogsTheInfoStep()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        $client = $this->createStubEbscoClient('Info');
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionInfo();
+
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=info', $log);
+            $this->assertStringContainsString('step=info', $log);
+            $this->assertStringContainsString('upstream_status=500', $log);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
             \Yii::$container->clear(Client::class);
         }
     }
@@ -221,22 +387,48 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
         return $reflection->invokeArgs($object, $arguments);
     }
 
-    private function createStubEbscoClient()
+    private function createStubEbscoClient($failurePath = 'createsession')
     {
-        return new class extends Client {
+        $client = new class extends Client {
             public $sendCount = 0;
+            public $failurePath;
 
             public function send($request)
             {
                 $this->sendCount++;
+                $url = $request->getUrl();
 
-                if (strpos($request->getUrl(), 'uidauth') !== false) {
+                if (stripos($url, $this->failurePath) !== false) {
+                    return $this->createResponse('synthetic-provider-body: Profile id missing.', ['http-code' => '500']);
+                }
+
+                if (strpos($url, 'uidauth') !== false) {
                     return $this->createResponse('', ['http-code' => '200'])
                         ->setData(['AuthToken' => 'synthetic-auth-token']);
                 }
 
-                return $this->createResponse('synthetic-provider-body: Profile id missing.', ['http-code' => '500']);
+                if (strpos($url, 'createsession') !== false) {
+                    return $this->createResponse('', ['http-code' => '200'])
+                        ->setData(['SessionToken' => 'synthetic-session-token']);
+                }
+
+                return $this->createResponse('', ['http-code' => '200']);
             }
         };
+        $client->failurePath = $failurePath;
+
+        return $client;
+    }
+
+    private function lastEbscoLog($logger)
+    {
+        $messages = $logger->messages;
+        for ($index = count($messages) - 1; $index >= 0; $index--) {
+            if ($messages[$index][2] === 'ebsco') {
+                return $messages[$index][0];
+            }
+        }
+
+        $this->fail('Expected an EBSCO failure log entry.');
     }
 }

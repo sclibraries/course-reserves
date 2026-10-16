@@ -16,15 +16,15 @@ describe('resourceApi EDS search errors', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows the unavailable guidance for search_unavailable responses', async () => {
+  it('shows unavailable guidance and its reference for search_unavailable responses', async () => {
     vi.mocked(authFetch).mockResolvedValue({
       ok: false,
       status: 503,
-      json: async () => ({ error_code: 'search_unavailable', message: 'raw provider text' }),
+      json: async () => ({ error_code: 'search_unavailable', message: 'raw provider text', reference: '7F3K2Q' }),
     });
 
     await expect(resourceApi.searchEDS('climate change')).rejects.toMatchObject({
-      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.',
+      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.\nReference: 7F3K2Q',
     });
   });
 
@@ -52,11 +52,11 @@ describe('resourceApi EDS search errors', () => {
     vi.mocked(authFetch).mockResolvedValue({
       ok: false,
       status: 503,
-      json: async () => ({ error_code: 'search_unavailable' }),
+      json: async () => ({ error_code: 'search_unavailable', reference: '7F3K2Q' }),
     });
 
     await expect(resourceApi.searchEDSPage('synthetic-query', 2)).rejects.toMatchObject({
-      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.',
+      message: 'Library search is temporarily unavailable. Please try again later, or add the item by citation.\nReference: 7F3K2Q',
     });
   });
 });

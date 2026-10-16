@@ -376,7 +376,7 @@ export const ResourceFormManager = ({
       setCurrentPage(nextPage);
     } catch (err) {
       console.error('Error loading more results:', err);
-      toast.error(err.message || getEdsSearchErrorMessage());
+      toast.error(<span style={{ whiteSpace: 'pre-line' }}>{err.message || getEdsSearchErrorMessage()}</span>);
     } finally {
       setLoading(false);
     }
@@ -549,7 +549,7 @@ export const ResourceFormManager = ({
   const renderSearchInterface = () => (
     <Container fluid className="p-0">
       {error && (
-        <Alert color="danger" className="mb-3" fade={false}>
+        <Alert color="danger" className="mb-3" fade={false} style={{ whiteSpace: 'pre-line' }}>
           {error}
         </Alert>
       )}

@@ -98,7 +98,7 @@ describe('DiscoverySearchDialog', () => {
 
   it('keeps the typed query visible when search is unavailable', async () => {
     vi.mocked(searchDiscovery).mockRejectedValueOnce(new Error(
-      'Library search is temporarily unavailable. Please try again later, or add the item by citation.'
+      'Library search is temporarily unavailable. Please try again later, or add the item by citation.\nReference: 7F3K2Q'
     ));
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -127,6 +127,8 @@ describe('DiscoverySearchDialog', () => {
 
     expect(input.value).toBe('typed query');
     expect(container.textContent).toContain('Library search is temporarily unavailable.');
+    expect(container.textContent).toContain('Reference: 7F3K2Q');
+    expect(container.querySelector('[class*="bg-destructive/10"]')?.className).toContain('whitespace-pre-line');
     expect(container.textContent).not.toContain('HTTP 503');
   });
 });

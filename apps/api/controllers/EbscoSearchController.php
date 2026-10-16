@@ -3,6 +3,8 @@ namespace app\controllers;
 
 use Yii;
 use app\services\EbscoErrorMapper;
+use app\services\EbscoConfig;
+use app\services\EbscoSearchRequestValidator;
 use yii\rest\ActiveController;
 use yii\filters\auth\HttpBearerAuth;
 use yii\httpclient\Client;
@@ -19,6 +21,8 @@ class EbscoSearchController extends ActiveController
     private $baseApiUrl = 'https://eds-api.ebscohost.com/edsapi/rest';
     private $authToken;
     private $sessionToken;
+    private $failureStep;
+    private $upstreamStatus;
 
     public function behaviors()
     {
@@ -138,16 +142,14 @@ class EbscoSearchController extends ActiveController
 
     public function actionSearch($query)
     {
-        $client = EbscoErrorMapper::createSearchClient($query);
+        EbscoSearchRequestValidator::validateSearchQuery($query);
+        $client = EbscoConfig::createClient();
         
         try {
-            // 1. Authenticate
             $this->authenticate($client);
     
-            // 2. Create session
             $this->createSession($client);
     
-            // 3. Get additional parameters from request
             $request = Yii::$app->request;
             $searchParams = [
                 'sort' => $request->get('sort', 'relevance'),
@@ -162,21 +164,16 @@ class EbscoSearchController extends ActiveController
                 'includeimagequickview' => $request->get('includeimagequickview', 'n'),
             ];
             
-            // 4. Get action parameters (facetfilter, limiter, expander, action, relatedcontent)
             $actionParams = [];
             
-            // Handle EBSCO action parameter (e.g., GoToPage(2), AddFacetFilter(...), SetSort(...))
             $action = $request->get('action');
             if (!empty($action)) {
                 $actionParams['action'] = $action;
             }
             
-            // Handle facet filters - can be single or array
             $facetfilter = $request->get('facetfilter');
             if (!empty($facetfilter)) {
-                // EBSCO expects facetfilter as comma-separated or multiple params
                 if (is_array($facetfilter)) {
-                    // Multiple facet filters - pass as facetfilter-1, facetfilter-2, etc.
                     $i = 1;
                     foreach ($facetfilter as $ff) {
                         $actionParams['facetfilter-' . $i] = $ff;
@@ -187,7 +184,6 @@ class EbscoSearchController extends ActiveController
                 }
             }
             
-            // Handle limiters - can be single or array
             $limiter = $request->get('limiter');
             if (!empty($limiter)) {
                 if (is_array($limiter)) {
@@ -201,7 +197,6 @@ class EbscoSearchController extends ActiveController
                 }
             }
             
-            // Handle expanders - can be single or array
             $expander = $request->get('expander');
             if (!empty($expander)) {
                 if (is_array($expander)) {
@@ -211,35 +206,28 @@ class EbscoSearchController extends ActiveController
                 }
             }
             
-            // Handle related content
             $relatedcontent = $request->get('relatedcontent');
             if (!empty($relatedcontent)) {
                 $actionParams['relatedcontent'] = $relatedcontent;
             }
             
-            // 5. Sanitize the query for proper UTF-8 encoding (handles diacritics, special chars)
             $query = $this->sanitizeUtf8Query($query);
 
-            // 6. Check if query is already in EBSCO format (query-1=AND,term)
             if (preg_match('/^query-\d+=/', $query)) {
-                // Query is pre-formatted - parse it
                 $processedQuery = $this->parseEbscoQueryString($query);
             } else {
-                // Simple search term - escape and format
                 $escapedQuery = $this->escapeEbscoQuery($query);
                 $processedQuery = ['query-1' => 'AND,' . $escapedQuery];
             }
     
-            // 7. Perform search with processed query, params, and actions
             $results = $this->performSearch($client, $processedQuery, $searchParams, $actionParams);
     
-            // 8. End session
             $this->endSession($client);
     
             return $this->formatResponse($results);
     
         } catch (\Exception $e) {
-            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
+            return $this->mapEbscoFailure($e, 'search', $query);
         }
     }
     
@@ -334,26 +322,22 @@ class EbscoSearchController extends ActiveController
 
     public function actionRetrieve($dbId, $an)
     {
-        $client = EbscoErrorMapper::createRetrieveClient($dbId, $an);
+        EbscoSearchRequestValidator::validateRetrieveIdentifiers($dbId, $an);
+        $client = EbscoConfig::createClient();
         
         try {
-            // 1. Authenticate (creates $this->authToken)
             $this->authenticate($client);
 
-            // 2. Create session (creates $this->sessionToken)
             $this->createSession($client);
 
-            // 3. Retrieve single record
             $recordData = $this->performRetrieve($client, $dbId, $an);
 
-            // 4. End session (if you don’t plan on more calls right now)
             $this->endSession($client);
 
-            // 5. Format and return the response
             return $this->formatResponse($recordData);
 
         } catch (\Exception $e) {
-            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
+            return $this->mapEbscoFailure($e, 'retrieve');
         }
     }
 
@@ -363,33 +347,39 @@ class EbscoSearchController extends ActiveController
      */
     public function actionInfo()
     {
-        $client = EbscoErrorMapper::createInfoClient();
+        $client = EbscoConfig::createClient();
         
         try {
-            // 1. Authenticate
             $this->authenticate($client);
     
-            // 2. Create session
             $this->createSession($client);
     
-            // 3. Get Info
             $infoData = $this->performInfo($client);
     
-            // 4. End session
             $this->endSession($client);
     
             return $this->formatResponse($infoData);
     
         } catch (\Exception $e) {
-            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
+            return $this->mapEbscoFailure($e, 'info');
         }
     }
 
+    private function mapEbscoFailure($exception, $action, $query = null)
+    {
+        return EbscoErrorMapper::mapFailure($exception, [$this->authToken, $this->sessionToken], [
+            'action' => $action,
+            'step' => $this->failureStep,
+            'upstream_status' => $this->upstreamStatus,
+            'query' => $query,
+        ]);
+    }
 
     private function authenticate(Client $client)
     {
-        EbscoErrorMapper::assertConfigured();
-        // IMPORTANT: Use createRequest() + setHeaders() + setContent() or setFormat() + setData()
+        $this->beginFailureStep('config');
+        EbscoConfig::assertConfigured();
+        $this->beginFailureStep('authenticate');
         $response = $client->createRequest()
             ->setMethod('POST')
             ->setUrl($this->baseAuthUrl . '/uidauth')
@@ -405,14 +395,15 @@ class EbscoSearchController extends ActiveController
                 'InterfaceId' => Yii::$app->params['ebsco']['edsProfile'],
             ])
             ->send();
+        $this->upstreamStatus = $response->statusCode;
 
         if (!$response->isOk) {
-            throw new \Exception('Authentication failed: ' . $response->content);
+            throw new \Exception($response->content, (int)$response->statusCode);
         }
 
         $data = $response->getData();
         if (empty($data['AuthToken'])) {
-            throw new \Exception('Invalid authentication response. No AuthToken present.');
+            throw new \Exception('Invalid authentication response. No AuthToken present.', (int)$response->statusCode);
         }
 
         $this->authToken = $data['AuthToken'];
@@ -420,7 +411,7 @@ class EbscoSearchController extends ActiveController
 
     private function createSession(Client $client)
     {
-        // The "createsession" endpoint might also need an Accept header if it requires JSON response
+        $this->beginFailureStep('create session');
         $response = $client->createRequest()
             ->setMethod('POST')
             ->setUrl($this->baseApiUrl . '/createsession')
@@ -435,16 +426,16 @@ class EbscoSearchController extends ActiveController
                 'Guest'   => 'n',
                 'Org'     => '',
             ])
-            // If this endpoint also expects some JSON data, pass it here, but often it's just an empty POST
             ->send();
+        $this->upstreamStatus = $response->statusCode;
 
         if (!$response->isOk) {
-            throw new \Exception('Session creation failed: ' . $response->content);
+            throw new \Exception($response->content, (int)$response->statusCode);
         }
 
         $data = $response->getData();
         if (empty($data['SessionToken'])) {
-            throw new \Exception('Invalid session response. No SessionToken present.');
+            throw new \Exception('Invalid session response. No SessionToken present.', (int)$response->statusCode);
         }
 
         $this->sessionToken = $data['SessionToken'];
@@ -452,7 +443,7 @@ class EbscoSearchController extends ActiveController
 
     private function performSearch(Client $client, array $queries, array $params = [], array $actionParams = [])
     {
-        // Build request data by merging queries with params
+        $this->beginFailureStep('search');
         $requestData = array_merge($queries, [
             'resultsperpage' => $params['resultsperpage'] ?? 20,
             'pagenumber'     => $params['pagenumber'] ?? 1,
@@ -466,12 +457,10 @@ class EbscoSearchController extends ActiveController
             'includeimagequickview' => $params['includeimagequickview'] ?? 'n',
         ]);
         
-        // Merge action parameters (action, facetfilter, limiter, expander, relatedcontent)
         if (!empty($actionParams)) {
             $requestData = array_merge($requestData, $actionParams);
         }
         
-        // A GET request for searching
         $response = $client->createRequest()
             ->setMethod('GET')
             ->setUrl($this->baseApiUrl . '/Search')
@@ -483,9 +472,10 @@ class EbscoSearchController extends ActiveController
             ])
             ->setData($requestData)
             ->send();
+        $this->upstreamStatus = $response->statusCode;
 
         if (!$response->isOk) {
-            throw new \Exception('Search failed: ' . $response->content);
+            throw new \Exception($response->content, (int)$response->statusCode);
         }
 
         return $this->processFullSearchResults($response->content);
@@ -493,6 +483,7 @@ class EbscoSearchController extends ActiveController
 
     private function performRetrieve(Client $client, $dbId, $an)
     {
+        $this->beginFailureStep('retrieve');
         $response = $client->createRequest()
             ->setMethod('GET')
             ->setUrl($this->baseApiUrl . '/Retrieve')
@@ -508,17 +499,18 @@ class EbscoSearchController extends ActiveController
                 'view'      => 'detailed',    // or 'brief' or whichever
             ])
             ->send();
+        $this->upstreamStatus = $response->statusCode;
 
         if (!$response->isOk) {
-            throw new \Exception('Retrieve failed: ' . $response->content);
+            throw new \Exception($response->content, (int)$response->statusCode);
         }
 
-        // We can parse the JSON here or pass it to a separate parser
         return $this->processRetrieveResults($response->content);
     }
 
     private function performInfo(Client $client)
     {
+        $this->beginFailureStep('info');
         $response = $client->createRequest()
             ->setMethod('GET')
             ->setUrl($this->baseApiUrl . '/Info')
@@ -528,9 +520,10 @@ class EbscoSearchController extends ActiveController
                 'Accept'                => 'application/json',
             ])
             ->send();
+        $this->upstreamStatus = $response->statusCode;
 
         if (!$response->isOk) {
-            throw new \Exception('Info request failed: ' . $response->content);
+            throw new \Exception($response->content, (int)$response->statusCode);
         }
 
         return $this->processInfoResults($response->content);
@@ -669,6 +662,7 @@ class EbscoSearchController extends ActiveController
 
     private function endSession(Client $client)
     {
+        $this->upstreamStatus = null;
         // This might also need headers like Accept: application/json
         $client->createRequest()
             ->setMethod('POST')
@@ -677,6 +671,12 @@ class EbscoSearchController extends ActiveController
                 'x-sessionToken' => $this->sessionToken,
             ])
             ->send();
+    }
+
+    private function beginFailureStep($step)
+    {
+        $this->failureStep = $step;
+        $this->upstreamStatus = null;
     }
 
     private function processFullSearchResults($content)

@@ -879,7 +879,7 @@ Słupińska, K., Duda, J., & Biercewicz, K. (2021). Planning an experiment...`}
               {renderLimiters()}
 
               {error && (
-                <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+                <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm whitespace-pre-line">
                   {error}
                 </div>
               )}
@@ -940,7 +940,7 @@ Słupińska, K., Duda, J., & Biercewicz, K. (2021). Planning an experiment...`}
                           </Badge>
                         </div>
                         {group.error ? (
-                          <p className="text-sm text-destructive">{group.error}</p>
+                          <p className="text-sm text-destructive whitespace-pre-line">{group.error}</p>
                         ) : (
                           <p className="text-xs text-muted-foreground">
                             Showing {group.results.length} of {group.totalHits.toLocaleString()} results in {group.searchTime}ms
@@ -992,7 +992,7 @@ Słupińska, K., Duda, J., & Biercewicz, K. (2021). Planning an experiment...`}
             )}
 
             {error && (
-              <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+              <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm whitespace-pre-line">
                 {error}
               </div>
             )}

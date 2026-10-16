@@ -2,27 +2,76 @@
 
 namespace tests\unit\services;
 
+use app\services\EbscoConfig;
 use app\services\EbscoErrorMapper;
-use yii\httpclient\Client;
-use yii\web\BadRequestHttpException;
 
 class EbscoErrorMapperTest extends \Codeception\Test\Unit
 {
-    public function testMissingConfigurationMapsToUnavailableWithoutSendingRequest()
+    public function testFailureReturnsReferenceAndLogsProviderDetailsWithTruncatedQuery()
     {
         $previousParams = \Yii::$app->params;
         $previousStatus = \Yii::$app->response->statusCode;
-        $client = new class extends Client {
-            public $sendCount = 0;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+        $query = str_repeat('climate ', 40);
+        $body = json_encode([
+            'ErrorNumber' => '114',
+            'ErrorDescription' => 'Required Data missing.',
+            'DetailedErrorDescription' => 'Profile id missing. eds-api.ebscohost.com UserId=synthetic-user Password=synthetic-password AuthToken=synthetic-auth-token SessionToken=synthetic-session x-authenticationToken=synthetic-auth-token x-sessionToken=synthetic-session eyJhbGciOiJub25lIn0.c2lnbmF0dXJl.c2lnbmF0dXJl',
+        ]);
 
-            public function send($request)
-            {
-                $this->sendCount++;
+        try {
+            $response = EbscoErrorMapper::mapFailure(
+                new \Exception($body, 503),
+                ['synthetic-auth-token', 'synthetic-session'],
+                ['action' => 'search', 'step' => 'create session', 'query' => $query]
+            );
 
-                return $this->createResponse('', ['http-code' => '200']);
-            }
-        };
-        \Yii::$container->setSingleton(Client::class, $client);
+            $this->assertSame(503, \Yii::$app->response->statusCode);
+            $this->assertSame('search_unavailable', $response['error_code']);
+            $this->assertSame('Library search is temporarily unavailable.', $response['message']);
+            $this->assertStringNotContainsString('Profile id missing', json_encode($response));
+            $this->assertStringNotContainsString('synthetic-auth-token', json_encode($response));
+            $this->assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/D', $response['reference']);
+
+            $log = $this->lastEbscoLog($logger);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=search', $log);
+            $this->assertStringContainsString('step=create session', $log);
+            $this->assertStringContainsString('upstream_status=503', $log);
+            $this->assertStringContainsString('ErrorNumber', $log);
+            $this->assertStringContainsString('114', $log);
+            $this->assertStringContainsString('ErrorDescription', $log);
+            $this->assertStringContainsString('Required Data missing.', $log);
+            $this->assertStringContainsString('eds-api.ebscohost.com', $log);
+            $this->assertStringContainsString('query="' . rtrim(substr($query, 0, 200)) . '"', $log);
+            $this->assertStringNotContainsString('synthetic-user', $log);
+            $this->assertStringNotContainsString('synthetic-password', $log);
+            $this->assertStringNotContainsString('synthetic-auth-token', $log);
+            $this->assertStringNotContainsString('synthetic-session', $log);
+            $this->assertStringNotContainsString('eyJhbGciOiJub25lIn0.c2lnbmF0dXJl.c2lnbmF0dXJl', $log);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::setLogger($previousLogger);
+        }
+    }
+
+    public function testMissingConfigurationLogsTheSettingNameWithoutSecretValues()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $previousLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
         \Yii::$app->params['ebsco'] = [
             'userId' => 'synthetic-user',
             'password' => 'synthetic-password',
@@ -31,49 +80,32 @@ class EbscoErrorMapperTest extends \Codeception\Test\Unit
 
         try {
             try {
-                EbscoErrorMapper::assertConfigured();
-                $client->createRequest()->send();
+                EbscoConfig::assertConfigured();
                 $this->fail('Missing EBSCO_PROFILE should stop the request.');
             } catch (\RuntimeException $exception) {
-                $response = EbscoErrorMapper::mapFailure($exception);
+                $response = EbscoErrorMapper::mapFailure(
+                    $exception,
+                    [],
+                    ['action' => 'info', 'step' => 'config']
+                );
             }
 
-            $this->assertSame(0, $client->sendCount);
-            $this->assertSame(503, \Yii::$app->response->statusCode);
-            $this->assertSame([
-                'error_code' => 'search_unavailable',
-                'message' => 'Library search is temporarily unavailable.',
-            ], $response);
-            $this->assertSame('Missing EBSCO setting: EBSCO_PROFILE', $exception->getMessage());
+            $log = $this->lastEbscoLog($logger);
+            $this->assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/D', $response['reference']);
+            $this->assertStringStartsWith($response['reference'], $log);
+            $this->assertStringContainsString('action=info', $log);
+            $this->assertStringContainsString('step=config', $log);
+            $this->assertStringContainsString('EBSCO_PROFILE', $log);
+            $this->assertStringNotContainsString('synthetic-user', $log);
+            $this->assertStringNotContainsString('synthetic-password', $log);
         } finally {
             \Yii::$app->params = $previousParams;
             \Yii::$app->response->statusCode = $previousStatus;
-            \Yii::$container->clear(Client::class);
+            \Yii::setLogger($previousLogger);
         }
     }
 
-    public function testUpstreamFailureMapsToSafeUnavailableResponse()
-    {
-        $previousStatus = \Yii::$app->response->statusCode;
-
-        try {
-            $response = EbscoErrorMapper::mapFailure(new \Exception(
-                'Session creation failed: Profile id missing. synthetic-token=do-not-return'
-            ));
-
-            $this->assertSame(503, \Yii::$app->response->statusCode);
-            $this->assertSame([
-                'error_code' => 'search_unavailable',
-                'message' => 'Library search is temporarily unavailable.',
-            ], $response);
-            $this->assertStringNotContainsString('Profile id missing', json_encode($response));
-            $this->assertStringNotContainsString('synthetic-token', json_encode($response));
-        } finally {
-            \Yii::$app->response->statusCode = $previousStatus;
-        }
-    }
-
-    public function testEveryRequiredCredentialIsCheckedBeforeARequest()
+    public function testConfigurationGuardRequiresEveryCredential()
     {
         $previousParams = \Yii::$app->params;
         $settings = [
@@ -81,55 +113,39 @@ class EbscoErrorMapperTest extends \Codeception\Test\Unit
             'password' => 'synthetic-password',
             'edsProfile' => 'synthetic-profile',
         ];
-        $missingSettings = [
+        $settingNames = [
             'userId' => 'EBSCO_USER_ID',
             'password' => 'EBSCO_PASSWORD',
             'edsProfile' => 'EBSCO_PROFILE',
         ];
 
         try {
-            foreach ($missingSettings as $key => $settingName) {
-                $settings[$key] = '';
-                \Yii::$app->params['ebsco'] = $settings;
+            foreach ($settingNames as $key => $settingName) {
+                $missingSettings = $settings;
+                $missingSettings[$key] = '';
+                \Yii::$app->params['ebsco'] = $missingSettings;
+
                 try {
-                    EbscoErrorMapper::assertConfigured();
+                    EbscoConfig::assertConfigured();
                     $this->fail($settingName . ' should be required.');
                 } catch (\RuntimeException $exception) {
                     $this->assertSame('Missing EBSCO setting: ' . $settingName, $exception->getMessage());
                 }
-                $settings[$key] = 'synthetic-value';
             }
         } finally {
             \Yii::$app->params = $previousParams;
         }
     }
 
-    public function testSensitiveDetailsAreRedactedBeforeFailureIsLogged()
+    private function lastEbscoLog($logger)
     {
-        $reflection = new \ReflectionMethod(EbscoErrorMapper::class, 'redact');
-        $reflection->setAccessible(true);
-        $message = $reflection->invoke(null,
-            'Session failed: Profile id missing. {"AuthToken":"synthetic-token","Password":"synthetic-password","UserId":"synthetic-user"}',
-            ['synthetic-user', 'synthetic-password', 'synthetic-token']
-        );
+        $messages = $logger->messages;
+        for ($index = count($messages) - 1; $index >= 0; $index--) {
+            if ($messages[$index][2] === 'ebsco') {
+                return $messages[$index][0];
+            }
+        }
 
-        $this->assertStringContainsString('Profile id missing', $message);
-        $this->assertStringNotContainsString('synthetic-token', $message);
-        $this->assertStringNotContainsString('synthetic-password', $message);
-        $this->assertStringNotContainsString('synthetic-user', $message);
-    }
-
-    public function testEmptySearchQueryRemainsBadRequest()
-    {
-        $this->expectException(BadRequestHttpException::class);
-
-        EbscoErrorMapper::createSearchClient('   ');
-    }
-
-    public function testMissingRetrieveIdentifiersRemainBadRequest()
-    {
-        $this->expectException(BadRequestHttpException::class);
-
-        EbscoErrorMapper::createRetrieveClient('dbid', '');
+        $this->fail('Expected an EBSCO failure log entry.');
     }
 }

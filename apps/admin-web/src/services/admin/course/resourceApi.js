@@ -4,9 +4,12 @@ import { authFetch } from '../../http/authFetch';
 
 const COURSE_API = config.api.urls.courseReserves;
 
-export function getEdsSearchErrorMessage(status = 0, errorCode) {
+export function getEdsSearchErrorMessage(status = 0, errorCode, reference) {
   if (status === 503 && errorCode === 'search_unavailable') {
-    return 'Library search is temporarily unavailable. Please try again later, or add the item by citation.';
+    const message = 'Library search is temporarily unavailable. Please try again later, or add the item by citation.';
+    return typeof reference === 'string' && /^[A-Z0-9]{6,8}$/.test(reference)
+      ? `${message}\nReference: ${reference}`
+      : message;
   }
   if (status === 429) {
     return 'There are too many searches right now. Please wait a moment and try again.';
@@ -29,7 +32,7 @@ async function fetchEdsSearch(url) {
     } catch {
       data = {};
     }
-    throw new Error(getEdsSearchErrorMessage(response.status, data?.error_code));
+    throw new Error(getEdsSearchErrorMessage(response.status, data?.error_code, data?.reference));
   }
 
   try {

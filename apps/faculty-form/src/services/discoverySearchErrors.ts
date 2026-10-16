@@ -11,7 +11,10 @@ export async function getDiscoverySearchErrorMessage(response: Response): Promis
     try {
       const payload = await response.json();
       if (payload?.error_code === 'search_unavailable') {
-        return UNAVAILABLE_MESSAGE;
+        const reference = typeof payload.reference === 'string' && /^[A-Z0-9]{6,8}$/.test(payload.reference)
+          ? `\nReference: ${payload.reference}`
+          : '';
+        return `${UNAVAILABLE_MESSAGE}${reference}`;
       }
     } catch {
       return GENERIC_MESSAGE;
