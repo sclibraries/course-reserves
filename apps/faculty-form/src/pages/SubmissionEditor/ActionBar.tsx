@@ -17,7 +17,7 @@ export default function ActionBar() {
   const [showInstructions, setShowInstructions] = React.useState(false);
 
   return (
-    <div className="sticky top-0 z-10 bg-background border-b shadow-sm">
+    <div data-testid="submission-editor-action-bar" className="bg-background border-b shadow-sm">
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 px-4 py-3">
         <div className="flex justify-between items-center gap-3 flex-wrap">
           <div className="flex items-center gap-3">

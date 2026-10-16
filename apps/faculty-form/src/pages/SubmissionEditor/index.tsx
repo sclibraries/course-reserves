@@ -26,8 +26,7 @@ import { DiscoverySearchDialog } from '@/components/DiscoverySearchDialog';
 import { SyllabusUploadDialog } from '@/components/SyllabusUploadDialog';
 import CorrectionRequiredDialog from '@/components/Communications/CorrectionRequiredDialog';
 import SubmissionEditorContext from './SubmissionEditorContext';
-import Header from './Header';
-import ActionBar from './ActionBar';
+import StickyStack from './StickyStack';
 import ContentList from './ContentList';
 import SubmitDialog from './SubmitDialog';
 import DuplicateDialog from './DuplicateDialog';
@@ -172,7 +171,7 @@ const SubmissionEditor = () => {
   return (
     <SubmissionEditorContext.Provider value={ctxValue}>
       <div className="min-h-screen bg-background">
-        <Header />
+        <StickyStack />
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6 pb-4 border-b">
             <div className="flex items-center justify-between">
@@ -191,7 +190,6 @@ const SubmissionEditor = () => {
             </div>
           )}
           <fieldset disabled={isReadOnly} className="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-70">
-            <ActionBar />
             <ContentList
               organizedContent={organizedContent}
               filteredAndSortedContent={filteredAndSortedContent}

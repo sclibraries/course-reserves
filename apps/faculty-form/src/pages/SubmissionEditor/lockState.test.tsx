@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorUIStore } from '@/store/useEditorUIStore';
+import { ActingForBanner } from '@/components/ActingForBanner';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -11,6 +12,29 @@ const lockedReserve = {
   items: [], folders: [], isLocked: true, canEdit: false,
   lockedBy: 'Jane Staff', lockedAt: '2026-06-20T10:00:00Z', lockReason: 'Processing',
 };
+
+const actingForMocks = vi.hoisted(() => ({
+  selectedFaculty: null as { username: string; displayName: string } | null,
+  canEdit: null as boolean | null,
+  clearSelection: vi.fn(),
+  clearActingForAssignments: vi.fn(),
+  fetchCourseAssignments: vi.fn(),
+}));
+
+vi.mock('@/store/actingForStore', () => ({
+  useActingForStore: (selector: (state: Record<string, unknown>) => unknown) => selector({
+    selectedFaculty: actingForMocks.selectedFaculty,
+    clearSelection: actingForMocks.clearSelection,
+  }),
+}));
+
+vi.mock('@/store/courseAssignmentsStore', () => ({
+  useCourseAssignmentsStore: (selector: (state: Record<string, unknown>) => unknown) => selector({
+    actingForCanEdit: actingForMocks.canEdit,
+    clearActingForAssignments: actingForMocks.clearActingForAssignments,
+    fetchCourseAssignments: actingForMocks.fetchCourseAssignments,
+  }),
+}));
 
 vi.mock('@/hooks/useSubmissionEditor', () => ({
   useSubmissionEditor: () => ({
@@ -35,8 +59,6 @@ vi.mock('@/hooks/useContentOrganization', () => ({
   useOrganizedContent: () => ({ ungroupedItems: [], folders: [] }),
   useFilteredAndSortedContent: () => ({ ungroupedItems: [], folders: [] }),
 }));
-vi.mock('./Header', () => ({ default: () => null }));
-vi.mock('./ActionBar', () => ({ default: () => <button>Add Item</button> }));
 vi.mock('./ContentList', () => ({ default: () => null }));
 vi.mock('./SubmitDialog', () => ({ default: () => null }));
 vi.mock('./DuplicateDialog', () => ({ default: () => null }));
@@ -55,6 +77,11 @@ describe('SubmissionEditor lock state', () => {
 
   beforeEach(() => {
     useEditorUIStore.getState().closeCorrectionRequiredDialog();
+    actingForMocks.selectedFaculty = null;
+    actingForMocks.canEdit = null;
+    actingForMocks.clearSelection.mockReset();
+    actingForMocks.clearActingForAssignments.mockReset();
+    actingForMocks.fetchCourseAssignments.mockReset().mockResolvedValue(undefined);
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -63,6 +90,7 @@ describe('SubmissionEditor lock state', () => {
   afterEach(() => {
     act(() => root?.unmount());
     useEditorUIStore.getState().closeCorrectionRequiredDialog();
+    actingForMocks.selectedFaculty = null;
     container?.remove();
     container = null; root = null;
     document.body.innerHTML = '';
@@ -84,6 +112,29 @@ describe('SubmissionEditor lock state', () => {
     const editCourseBtn = buttons.find((b) => b.textContent?.includes('Edit Course Info'));
     expect(editCourseBtn).not.toBeUndefined();
     expect(editCourseBtn!.disabled).toBe(true);
+  });
+
+  it('keeps the header and action bar in one sticky stack below the acting-for banner', () => {
+    actingForMocks.selectedFaculty = { username: 'test-faculty', displayName: 'Test Faculty' };
+    act(() => root!.render(<><ActingForBanner /><SubmissionEditor /></>));
+
+    const banner = container!.querySelector('[role="status"]');
+    const stack = container!.querySelector('[data-testid="submission-editor-sticky-stack"]');
+    const header = stack?.querySelector('header');
+    const actionBar = stack?.querySelector('[data-testid="submission-editor-action-bar"]');
+
+    expect(stack).not.toBeNull();
+    expect(stack?.classList.contains('sticky')).toBe(true);
+    expect(stack?.classList.contains('top-0')).toBe(true);
+    expect(header).not.toBeNull();
+    expect(actionBar).not.toBeNull();
+    expect(header?.classList.contains('sticky')).toBe(false);
+    expect(actionBar?.classList.contains('sticky')).toBe(false);
+    expect(Boolean(header!.compareDocumentPosition(actionBar!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(banner?.classList.contains('sticky')).toBe(true);
+    expect(banner?.classList.contains('top-16')).toBe(true);
+    expect(Number(banner?.getAttribute('style')?.match(/z-index:\s*(\d+)/)?.[1]))
+      .toBeGreaterThan(Number(stack?.getAttribute('style')?.match(/z-index:\s*(\d+)/)?.[1]));
   });
 
   it('mounts the correction dialog in the editor and displays its store detail', () => {
