@@ -44,7 +44,7 @@ class Environment
         return self::REQUIRED_PRODUCTION_SETTINGS;
     }
 
-    public static function missingProductionSettings()
+    public static function missingProductionSettings($environment = null)
     {
         $missing = [];
         foreach (self::REQUIRED_PRODUCTION_SETTINGS as $setting) {
@@ -54,6 +54,33 @@ class Environment
             }
         }
 
+        if ($environment === null) {
+            $environment = defined('YII_ENV') ? YII_ENV : getenv('YII_ENV');
+        }
+        if (self::resolve($environment) === 'prod' && self::usesNonProductionFolioHost(getenv('FOLIO_SEARCH_BASE_URL'))) {
+            $missing[] = 'FOLIO_SEARCH_BASE_URL';
+        }
+
         return $missing;
+    }
+
+    private static function usesNonProductionFolioHost($url)
+    {
+        if ($url === false || trim($url) === '') {
+            return false;
+        }
+
+        $parts = parse_url(trim($url));
+        if ($parts === false || empty($parts['host'])) {
+            return true;
+        }
+
+        $host = strtolower(rtrim($parts['host'], '.'));
+        $host = trim($host, '[]');
+        if (in_array($host, ['fake-folio', 'localhost', '127.0.0.1', '::1', '0.0.0.0'], true)) {
+            return true;
+        }
+
+        return substr($host, -5) === '.test' || substr($host, -10) === '.localhost';
     }
 }

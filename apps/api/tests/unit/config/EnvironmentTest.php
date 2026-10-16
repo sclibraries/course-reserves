@@ -10,6 +10,7 @@ class EnvironmentTest extends \Codeception\Test\Unit
 
     protected function _before()
     {
+        $this->previous['FOLIO_SEARCH_BASE_URL'] = getenv('FOLIO_SEARCH_BASE_URL');
         foreach (Environment::requiredProductionSettings() as $setting) {
             $this->previous[$setting] = getenv($setting);
             putenv($setting . '=test-api054-' . strtolower($setting));
@@ -56,6 +57,28 @@ class EnvironmentTest extends \Codeception\Test\Unit
             $this->assertStringNotContainsString('test-api054-', implode(' ', $missing));
             putenv($setting . '=test-api054-' . strtolower($setting));
         }
+    }
+
+    public function testProductionRejectsFakeFolioHostsButAllowsTheProductionHost()
+    {
+        foreach ([
+            'https://fake-folio/folio/web/search',
+            'http://localhost/folio/web/search',
+            'http://127.0.0.1/folio/web/search',
+            'http://fake-folio.test/folio/web/search',
+        ] as $url) {
+            putenv('FOLIO_SEARCH_BASE_URL=' . $url);
+            $this->assertSame(['FOLIO_SEARCH_BASE_URL'], Environment::missingProductionSettings('prod'));
+        }
+
+        putenv('FOLIO_SEARCH_BASE_URL=https://libtools2.smith.edu/folio/web/search');
+        $this->assertSame([], Environment::missingProductionSettings('prod'));
+    }
+
+    public function testDevelopmentAllowsFakeFolioHost()
+    {
+        putenv('FOLIO_SEARCH_BASE_URL=http://fake-folio/folio/web/search');
+        $this->assertSame([], Environment::missingProductionSettings('dev'));
     }
 
     public function testFixturePermissionIncludesDevelopmentAndTestOnly()

@@ -10,9 +10,9 @@ defined('YII_ENV') or define('YII_ENV', $environment);
 defined('YII_DEBUG') or define('YII_DEBUG', \app\components\Environment::debugEnabled($environment));
 
 if ($environment === 'prod') {
-    $missing = \app\components\Environment::missingProductionSettings();
+    $missing = \app\components\Environment::missingProductionSettings($environment);
     if ($missing) {
-        $message = 'Missing required production settings: ' . implode(', ', $missing);
+        $message = 'Missing or unsafe production settings: ' . implode(', ', $missing);
         if (PHP_SAPI === 'cli') {
             fwrite(STDERR, $message . PHP_EOL);
             exit(1);
