@@ -13,12 +13,12 @@ import { ResourceFormType } from './constants/formTypes';
 
 // Services
 import { adminCourseService } from '../../../services/admin/adminCourseService';
+import { getEdsSearchErrorMessage } from '../../../services/admin/course/resourceApi';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { hitchcockService } from '../../../services/admin/hitchcockService';
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
 import { adjustProxy, LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
-import { config } from '../../../config';
 
 /**
  * ResourceFormManager - Unified component for managing all resource forms
@@ -235,7 +235,7 @@ export const ResourceFormManager = ({
         
         // Handle new backend response structure
         if (data.status !== 'success' || data.code !== 200) {
-          throw new Error(data.message || 'Invalid response from EBSCO search');
+          throw new Error(getEdsSearchErrorMessage());
         }
         
         results = data.data?.records || [];
@@ -365,24 +365,10 @@ export const ResourceFormManager = ({
     setLoading(true);
     
     try {
-      // Use QueryString for pagination
-      const searchUrl = `${config.api.urls.courseReserves}${config.api.endpoints.ebsco.search}?query=${ebscoQueryString}&action=GoToPage(${nextPage})`;
-      
-      const response = await fetch(searchUrl, {
-        headers: { 
-          'Authorization': config.api.getAuthToken(),
-          'Content-Type': 'application/json' 
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load more results: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const data = await adminCourseService.searchEDSPage(ebscoQueryString, nextPage);
       
       if (data.status !== 'success' || data.code !== 200) {
-        throw new Error(data.message || 'Failed to load more results');
+        throw new Error(getEdsSearchErrorMessage());
       }
       
       const newResults = data.data?.records || [];
@@ -390,7 +376,7 @@ export const ResourceFormManager = ({
       setCurrentPage(nextPage);
     } catch (err) {
       console.error('Error loading more results:', err);
-      toast.error('Failed to load more results');
+      toast.error(err.message || getEdsSearchErrorMessage());
     } finally {
       setLoading(false);
     }

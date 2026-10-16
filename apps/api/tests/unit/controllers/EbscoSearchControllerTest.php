@@ -3,6 +3,7 @@
 namespace tests\unit\controllers;
 
 use app\controllers\EbscoSearchController;
+use yii\httpclient\Client;
 use yii\caching\ArrayCache;
 use yii\filters\auth\HttpBearerAuth;
 use yii\web\TooManyRequestsHttpException;
@@ -97,11 +98,145 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
         }
     }
 
+    public function testMissingProfileReturnsUnavailableBeforeAnyHttpRequest()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $client = $this->createStubEbscoClient();
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => '',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionSearch('climate change');
+
+            $this->assertSame(0, $client->sendCount);
+            $this->assertSame(503, \Yii::$app->response->statusCode);
+            $this->assertSame('search_unavailable', $response['error_code']);
+            $this->assertSame('Library search is temporarily unavailable.', $response['message']);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testSessionFailureReturnsUnavailableWithoutProviderText()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $client = $this->createStubEbscoClient();
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => 'synthetic-profile',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionSearch('climate change');
+
+            $this->assertSame(2, $client->sendCount);
+            $this->assertSame(503, \Yii::$app->response->statusCode);
+            $this->assertSame('search_unavailable', $response['error_code']);
+            $this->assertStringNotContainsString('Profile id missing', json_encode($response));
+            $this->assertStringNotContainsString('synthetic-provider-body', json_encode($response));
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testInvalidQueryRemainsBadRequestBeforeAnyHttpRequest()
+    {
+        $client = $this->createStubEbscoClient();
+        \Yii::$container->setSingleton(Client::class, $client);
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $controller->actionSearch('   ');
+            $this->fail('An empty query should be rejected.');
+        } catch (\yii\web\BadRequestHttpException $exception) {
+            $this->assertSame(400, $exception->statusCode);
+            $this->assertSame(0, $client->sendCount);
+        } finally {
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testRetrieveRejectsMissingIdentifiersBeforeAnyHttpRequest()
+    {
+        $client = $this->createStubEbscoClient();
+        \Yii::$container->setSingleton(Client::class, $client);
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $controller->actionRetrieve('synthetic-db', '');
+            $this->fail('A missing accession number should be rejected.');
+        } catch (\yii\web\BadRequestHttpException $exception) {
+            $this->assertSame(400, $exception->statusCode);
+            $this->assertSame(0, $client->sendCount);
+        } finally {
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
+    public function testInfoActionUsesSharedConfigurationGuard()
+    {
+        $previousParams = \Yii::$app->params;
+        $previousStatus = \Yii::$app->response->statusCode;
+        $client = $this->createStubEbscoClient();
+        \Yii::$container->setSingleton(Client::class, $client);
+        \Yii::$app->params['ebsco'] = [
+            'userId' => 'synthetic-user',
+            'password' => 'synthetic-password',
+            'edsProfile' => '',
+        ];
+
+        try {
+            $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+            $response = $controller->actionInfo();
+
+            $this->assertSame(0, $client->sendCount);
+            $this->assertSame(503, \Yii::$app->response->statusCode);
+            $this->assertSame('search_unavailable', $response['error_code']);
+        } finally {
+            \Yii::$app->params = $previousParams;
+            \Yii::$app->response->statusCode = $previousStatus;
+            \Yii::$container->clear(Client::class);
+        }
+    }
+
     private function invokeMethod($object, $methodName, array $arguments = [])
     {
         $reflection = new \ReflectionMethod($object, $methodName);
         $reflection->setAccessible(true);
 
         return $reflection->invokeArgs($object, $arguments);
+    }
+
+    private function createStubEbscoClient()
+    {
+        return new class extends Client {
+            public $sendCount = 0;
+
+            public function send($request)
+            {
+                $this->sendCount++;
+
+                if (strpos($request->getUrl(), 'uidauth') !== false) {
+                    return $this->createResponse('', ['http-code' => '200'])
+                        ->setData(['AuthToken' => 'synthetic-auth-token']);
+                }
+
+                return $this->createResponse('synthetic-provider-body: Profile id missing.', ['http-code' => '500']);
+            }
+        };
     }
 }

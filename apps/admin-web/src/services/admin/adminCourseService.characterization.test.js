@@ -118,6 +118,14 @@ const requestCases = () => {
       sendsToken: true,
     },
     {
+      name: 'searchEDSPage',
+      invoke: () => adminCourseService.searchEDSPage('synthetic-query', 2),
+      url: `${courseApi}/ebsco-search/search?query=synthetic-query&action=GoToPage(2)`,
+      init: { headers: { Authorization: 'Bearer test-token' } },
+      expectedResult: result,
+      sendsToken: true,
+    },
+    {
       name: 'createResource',
       invoke: () => adminCourseService.createResource(41, 29, formData, folioData),
       url: `${courseApi}/course/create-resource`,
@@ -314,6 +322,7 @@ describe('adminCourseService request characterization', () => {
       'reactivateCourse',
       'searchCoursesByQuery',
       'searchEDS',
+      'searchEDSPage',
       'searchFolioCourses',
       'searchResources',
       'unlinkCourses',

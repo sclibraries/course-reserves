@@ -1,6 +1,6 @@
 import { API_ENDPOINTS, DEFAULT_CONFIG } from '@/config/endpoints';
 import { getAuthHeaders } from '@/store/authStore';
-
+import { getDiscoverySearchErrorMessage } from './discoverySearchErrors';
 // Types based on the new improved EBSCO API response structure
 export interface EBSCOItemGroup {
   Label: string;
@@ -274,7 +274,7 @@ export async function searchDiscovery(
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(await getDiscoverySearchErrorMessage(response));
     }
 
     const data: EBSCOSearchResponse = await response.json();

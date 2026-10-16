@@ -2,9 +2,9 @@
 namespace app\controllers;
 
 use Yii;
+use app\services\EbscoErrorMapper;
 use yii\rest\ActiveController;
 use yii\filters\auth\HttpBearerAuth;
-use yii\web\BadRequestHttpException;
 use yii\httpclient\Client;
 use yii\web\Response;
 use yii\filters\ContentNegotiator;
@@ -138,7 +138,7 @@ class EbscoSearchController extends ActiveController
 
     public function actionSearch($query)
     {
-        $client = new Client();
+        $client = EbscoErrorMapper::createSearchClient($query);
         
         try {
             // 1. Authenticate
@@ -239,7 +239,7 @@ class EbscoSearchController extends ActiveController
             return $this->formatResponse($results);
     
         } catch (\Exception $e) {
-            throw new BadRequestHttpException($e->getMessage());
+            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
         }
     }
     
@@ -332,11 +332,9 @@ class EbscoSearchController extends ActiveController
         return $query;
     }
 
-    
-
     public function actionRetrieve($dbId, $an)
     {
-        $client = new Client();
+        $client = EbscoErrorMapper::createRetrieveClient($dbId, $an);
         
         try {
             // 1. Authenticate (creates $this->authToken)
@@ -355,7 +353,7 @@ class EbscoSearchController extends ActiveController
             return $this->formatResponse($recordData);
 
         } catch (\Exception $e) {
-            throw new BadRequestHttpException($e->getMessage());
+            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
         }
     }
 
@@ -365,7 +363,7 @@ class EbscoSearchController extends ActiveController
      */
     public function actionInfo()
     {
-        $client = new Client();
+        $client = EbscoErrorMapper::createInfoClient();
         
         try {
             // 1. Authenticate
@@ -383,13 +381,14 @@ class EbscoSearchController extends ActiveController
             return $this->formatResponse($infoData);
     
         } catch (\Exception $e) {
-            throw new BadRequestHttpException($e->getMessage());
+            return EbscoErrorMapper::mapFailure($e, [$this->authToken, $this->sessionToken]);
         }
     }
 
 
     private function authenticate(Client $client)
     {
+        EbscoErrorMapper::assertConfigured();
         // IMPORTANT: Use createRequest() + setHeaders() + setContent() or setFormat() + setData()
         $response = $client->createRequest()
             ->setMethod('POST')

@@ -4,6 +4,42 @@ import { authFetch } from '../../http/authFetch';
 
 const COURSE_API = config.api.urls.courseReserves;
 
+export function getEdsSearchErrorMessage(status = 0, errorCode) {
+  if (status === 503 && errorCode === 'search_unavailable') {
+    return 'Library search is temporarily unavailable. Please try again later, or add the item by citation.';
+  }
+  if (status === 429) {
+    return 'There are too many searches right now. Please wait a moment and try again.';
+  }
+  return 'Unable to search the library right now. Please try again.';
+}
+
+async function fetchEdsSearch(url) {
+  let response;
+  try {
+    response = await authFetch(url, { headers: {} });
+  } catch {
+    throw new Error(getEdsSearchErrorMessage());
+  }
+
+  let data;
+  if (!response.ok) {
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+    throw new Error(getEdsSearchErrorMessage(response.status, data?.error_code));
+  }
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(getEdsSearchErrorMessage());
+  }
+  return data;
+}
+
 export const resourceApi = {
   async searchResources(searchTerm) {
     const response = await authFetch(
@@ -26,12 +62,16 @@ export const resourceApi = {
   },
 
   async searchEDS(searchTerm) {
-    const response = await authFetch(
-      `${COURSE_API}${config.api.endpoints.ebsco.search}?query=${encodeURIComponent(searchTerm)}`,
-      { headers: {} }
+    return fetchEdsSearch(
+      `${COURSE_API}${config.api.endpoints.ebsco.search}?query=${encodeURIComponent(searchTerm)}`
     );
-    if (!response.ok) throw new Error('EDS search failed.');
-    return response.json();
+  },
+
+  async searchEDSPage(queryString, page) {
+    const action = encodeURIComponent(`GoToPage(${page})`);
+    return fetchEdsSearch(
+      `${COURSE_API}${config.api.endpoints.ebsco.search}?query=${encodeURIComponent(queryString)}&action=${action}`
+    );
   },
 
   async createResource(offering_id, courseId, formData, folioData) {

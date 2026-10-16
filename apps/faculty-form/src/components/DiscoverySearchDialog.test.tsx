@@ -39,6 +39,7 @@ vi.mock('@/components/ui/select', () => ({
 }));
 
 import { DiscoverySearchDialog } from './DiscoverySearchDialog';
+import { searchDiscovery } from '@/services/discoverySearchService';
 
 describe('DiscoverySearchDialog', () => {
   let container: HTMLDivElement | null = null;
@@ -93,5 +94,39 @@ describe('DiscoverySearchDialog', () => {
 
     expect(scrollableEditorContent?.className).toContain('overflow-y-auto');
     expect(submitButton?.className).toContain('shrink-0');
+  });
+
+  it('keeps the typed query visible when search is unavailable', async () => {
+    vi.mocked(searchDiscovery).mockRejectedValueOnce(new Error(
+      'Library search is temporarily unavailable. Please try again later, or add the item by citation.'
+    ));
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <DiscoverySearchDialog
+          open={true}
+          onOpenChange={() => undefined}
+          onItemsSelected={() => undefined}
+        />
+      );
+    });
+
+    const input = document.querySelector('input[placeholder^="Search by title"]') as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    const form = input.closest('form');
+
+    await act(async () => {
+      valueSetter?.call(input, 'typed query');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(input.value).toBe('typed query');
+    expect(container.textContent).toContain('Library search is temporarily unavailable.');
+    expect(container.textContent).not.toContain('HTTP 503');
   });
 });
