@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import { config } from '../config';
-import { authFetch } from '../services/http/authFetch';
+import apiClient from '../services/apiClient';
 import useSearchStore from '../store/searchStore';
 import '../css/Home.css';
 import '../css/CourseList.css'; // Import the same CSS file used in Search page
@@ -26,13 +26,7 @@ function Home() {
         setLoading(true);
         const url = `${config.api.urls.courseReserves}${config.api.endpoints.admin.reports}/top-courses?limit=10` +
           (college && college !== 'default' ? `&college=${encodeURIComponent(college)}` : '');
-        const response = await authFetch(url);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch popular courses');
-        }
-        
-        const data = await response.json();
+        const { data } = await apiClient.get(url);
         setAnalyticsData({
           topCourses: data.topCourses || [],
           collegeData: data.collegeData || [],
