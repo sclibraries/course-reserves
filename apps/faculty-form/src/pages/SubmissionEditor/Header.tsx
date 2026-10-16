@@ -26,16 +26,15 @@ export default function Header() {
   const navigate = useNavigate();
   const {
     reserve,
+    id,
     isEditingSubmission,
+    hasPreviousOffering,
     isReadOnly,
     saveDraft,
     isSaving,
     hasUnsavedChanges,
     lastSaveTime,
     saveError,
-    duplicateSourceCourse,
-    loadingDuplicateSource,
-    handleOpenDuplicateDialog,
     submissionHandlers,
   } = useSubmissionEditorContext();
 
@@ -76,16 +75,16 @@ export default function Header() {
             <Button variant="ghost" onClick={saveDraft} disabled={isSaving || isReadOnly}>
               {isSaving ? 'Saving...' : 'Save Draft'}
             </Button>
-            {!isEditingSubmission && duplicateSourceCourse && (
+            {!isEditingSubmission && hasPreviousOffering && (
               <Button
                 variant="secondary"
                 className="bg-amber-500/90 hover:bg-amber-500 text-white"
-                onClick={handleOpenDuplicateDialog}
-                disabled={loadingDuplicateSource || isReadOnly}
+                onClick={() => navigate(`/submission/${id}/edit/add?tab=reuse`, { state: { openDuplicateFlow: true } })}
+                disabled={isReadOnly}
                 title="Submit indicating you're reusing all previous materials"
               >
                 <Copy className="mr-2 h-4 w-4" />
-                {loadingDuplicateSource ? 'Loading...' : 'Duplicate Previous Course'}
+                Reuse last time’s list
               </Button>
             )}
             <Button onClick={submissionHandlers.handleSubmit} disabled={isReadOnly}>

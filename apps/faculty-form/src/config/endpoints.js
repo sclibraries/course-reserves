@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
     COMMUNICATIONS_READ: '/faculty-submission/:uuid/communications/:id/read',
     // EBSCO Discovery Search
     EBSCO_SEARCH: '/ebsco-search/search',
+    EBSCO_RETRIEVE: '/ebsco-search/retrieve',
     // Course Assignments - new backend service
     COURSE_ASSIGNMENTS: '/course-assignments/instructor-courses',
     FACULTY_PROXY_MY_PROXIES: '/faculty-proxy/my-proxies',

@@ -22,9 +22,10 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 vi.mock('react-router-dom', () => ({
   Navigate: () => null,
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/submission/submission-1/edit', search: '', state: null }),
   useParams: () => ({ id: 'submission-1' }),
 }));
-vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => {} }));
+vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
 vi.mock('@/hooks/useCourseCloning', () => ({ useCourseCloning: () => ({ fetchPreviousCourses: vi.fn() }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({

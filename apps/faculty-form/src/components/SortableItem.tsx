@@ -16,6 +16,7 @@ import type { CourseItem, CourseFolder } from "../store/courseReservesStore";
 
 interface SortableItemProps {
   item: CourseItem;
+  isNew?: boolean;
   index: number;
   totalItems: number;
   onEdit: (item: CourseItem) => void;
@@ -30,6 +31,7 @@ interface SortableItemProps {
 
 export const SortableItem = ({ 
   item, 
+  isNew = false,
   index, 
   totalItems, 
   onEdit, 
@@ -98,6 +100,7 @@ export const SortableItem = ({
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1">
                 <h4 className="font-medium text-sm leading-tight">{item.title}</h4>
+                {isNew && <Badge variant="outline" className="mt-1 text-xs">New</Badge>}
                 {item.authors && (
                   <p className="text-sm text-muted-foreground mt-1">{item.authors}</p>
                 )}

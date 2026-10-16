@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { CourseReserve, CourseItem } from '@/store/courseReservesStore';
 import type { LockInfo } from '@/hooks/useSubmissionLock';
+import type { AddedMaterialVisitItem } from '@/store/addedMaterialsVisitStore';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyHandlers = Record<string, (...args: any[]) => any>;
@@ -9,6 +10,7 @@ export interface SubmissionEditorContextValue {
   id: string;
   reserve: CourseReserve;
   isEditingSubmission: boolean;
+  hasPreviousOffering: boolean;
   // Lock / read-only state
   isReadOnly: boolean;
   lockInfo: LockInfo | null;
@@ -47,7 +49,10 @@ export interface SubmissionEditorContextValue {
   // Extra state for DuplicateDialog
   user: { full_name?: string; [key: string]: unknown } | null;
   updateReserve: (id: string, updates: Partial<CourseReserve>) => void;
-  addItem: (reserveId: string, item: Omit<CourseItem, 'id'>) => boolean;
+  addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
+  addItemsFromExternalSource: (items: Partial<CourseItem>[]) => void;
+  addedMaterials: AddedMaterialVisitItem[];
+  undoAddedMaterial: (itemId: string) => void;
 }
 
 const SubmissionEditorContext = createContext<SubmissionEditorContextValue | null>(null);

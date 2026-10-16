@@ -95,4 +95,44 @@ describe('DuplicateDialog resource notes', () => {
     });
     expect(updateReserve.mock.calls[0][1].items[0].notes).not.toContain('undefined');
   });
+
+  it('adds reused items through the shared add handler without submitting the reserve', async () => {
+    const addItem = vi.fn(() => true);
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root!.render(
+      <DuplicateDialog
+        showDuplicateDialog={true}
+        setShowDuplicateDialog={() => {}}
+        reserve={{ courseCode: 'TEST 057' } as never}
+        user={{ full_name: 'Test Faculty' } as never}
+        id="test-api057-reserve"
+        emailConfirmation={false}
+        setEmailConfirmation={() => {}}
+        updateReserve={updateReserve}
+        submissionHandlers={{ confirmDuplicateSubmit }}
+        addItem={addItem}
+        duplicateSourceCourse={{
+          term: 'Fall 2099', courseName: 'Synthetic API-057 course',
+          resourceCount: 1, electronicCount: 1, physicalCount: 0,
+        }}
+        addToCurrentReserve
+      />
+    ));
+
+    await act(async () => {
+      Array.from(container!.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('Add previous course materials'))
+        ?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(addItem).toHaveBeenCalledWith('test-api057-reserve', expect.objectContaining({
+      title: 'Synthetic resource without staff note',
+      notes: 'Public description Public note',
+    }));
+    expect(updateReserve).not.toHaveBeenCalled();
+    expect(confirmDuplicateSubmit).not.toHaveBeenCalled();
+  });
 });

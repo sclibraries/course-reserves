@@ -55,9 +55,10 @@ interface ItemModalProps {
   onOpenChange: (open: boolean) => void;
   onSave: (item: ItemData) => void;
   initialData?: ItemData;
+  showSuccessToast?: boolean;
 }
 
-export const ItemModal = ({ open, onOpenChange, onSave, initialData }: ItemModalProps) => {
+export const ItemModal = ({ open, onOpenChange, onSave, initialData, showSuccessToast = true }: ItemModalProps) => {
   const [formData, setFormData] = useState<ItemData>({
     materialType: "",
     title: "",
@@ -148,7 +149,7 @@ export const ItemModal = ({ open, onOpenChange, onSave, initialData }: ItemModal
 
     onSave(formData);
     onOpenChange(false);
-    toast.success("Item saved successfully");
+    if (showSuccessToast) toast.success("Item saved successfully");
   };
 
   const handleCancel = () => {

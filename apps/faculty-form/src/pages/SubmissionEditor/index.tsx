@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
@@ -12,10 +12,12 @@ import { useSubmissionLock } from '@/hooks/useSubmissionLock';
 import { hasLocalMaterialEdits } from '@/store/reserve/submissionRefetchMerge';
 import { SubmissionLockBanner } from '@/components/SubmissionLockBanner';
 import { useReserveStore } from '@/store/useReserveStore';
+import { EMPTY_ADDED_MATERIALS, useAddedMaterialsVisitStore } from '@/store/addedMaterialsVisitStore';
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import type { DraftPayload } from '@/store/draftStore';
 import type { CourseItem, CourseReserve } from '@/store/courseReservesStore';
 import { createItemHandlers } from '@/handlers/itemHandlers';
+import { createAddMaterialHandler } from '@/handlers/addMaterialHandler';
 import { createFolderHandlers, createCourseHandlers } from '@/handlers/folderHandlers';
 import { createDragHandlers } from '@/handlers/dragHandlers';
 import { createSubmissionHandlers } from '@/handlers/submissionHandlers';
@@ -31,9 +33,12 @@ import StickyStack from './StickyStack';
 import ContentList from './ContentList';
 import SubmitDialog from './SubmitDialog';
 import DuplicateDialog from './DuplicateDialog';
+import AddMaterialsPage from '../AddMaterials/AddMaterialsPage';
 
 const SubmissionEditor = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAddMaterialsPage = location.pathname.includes('/edit/add');
   const {
     id, reserve, user,
     modalOpen, setModalOpen, editingItem, setEditingItem,
@@ -48,7 +53,7 @@ const SubmissionEditor = () => {
   } = useSubmissionEditor();
 
   const firstName = user?.full_name?.split(' ')[0] || '';
-  usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
+  const previousCourseDetection = usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
 
   const [cloneDialogOpen, setCloneDialogOpen] = React.useState(false);
   const [cloneDialogMode, setCloneDialogMode] = React.useState<'exact' | 'all'>('exact');
@@ -83,6 +88,36 @@ const SubmissionEditor = () => {
     onSaveSuccess: () => { console.log('Draft save succeeded'); },
     onSaveError: (e) => { console.error('Draft save failed:', e); },
   });
+  const addedMaterials = useAddedMaterialsVisitStore((state) => state.itemsByReserve[id || ''] || EMPTY_ADDED_MATERIALS);
+  const undoAddedMaterial = (itemId: string) => {
+    if (reserve?.items.some((item) => item.id === itemId)) {
+      deleteItem(id!, itemId);
+      markChanged();
+    }
+    if (id) useAddedMaterialsVisitStore.getState().remove(id, itemId);
+  };
+  const onAddedMaterial = (item: CourseItem) => {
+    if (!isAddMaterialsPage || !id) return;
+    useAddedMaterialsVisitStore.getState().add(id, { id: item.id, title: item.title });
+    toast.success(`Added: ${item.title}`, {
+      action: { label: 'Undo', onClick: () => undoAddedMaterial(item.id) },
+    });
+  };
+  const requestedFolderId = new URLSearchParams(location.search).get('folder');
+  const defaultFolderId = isAddMaterialsPage && reserve?.folders.some((folder) => folder.id === requestedFolderId)
+    ? requestedFolderId || undefined
+    : undefined;
+  const wrappedAddItem = createAddMaterialHandler({
+    reserveId: id || '',
+    addItem,
+    markChanged,
+    defaultFolderId,
+    getLastAddedItem: () => {
+      const items = useReserveStore.getState().getReserveById(id || '')?.items || [];
+      return items[items.length - 1];
+    },
+    onAdded: onAddedMaterial,
+  });
   const hasLocalEdits = hasLocalMaterialEdits(reserve, serverReserveSnapshotRef.current);
 
   useUnsavedChangesWarning(true, hasUnsavedChanges);
@@ -106,11 +141,6 @@ const SubmissionEditor = () => {
 
   const isEditingSubmission = reserve.status === 'submitted';
 
-  const wrappedAddItem = (...a: Parameters<typeof addItem>) => {
-    const added = addItem(...a);
-    if (added) markChanged();
-    return added;
-  };
   const wrappedUpdateItem = (...a: Parameters<typeof updateItem>) => { updateItem(...a); markChanged(); };
   const wrappedDeleteItem = (...a: Parameters<typeof deleteItem>) => { deleteItem(...a); markChanged(); };
   const wrappedUpdateReserve = (...a: Parameters<typeof updateReserve>) => { updateReserve(...a); markChanged(); };
@@ -125,7 +155,7 @@ const SubmissionEditor = () => {
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, reserve.items, wrappedReorderItems, wrappedAddItemToFolder, hasActiveFiltersOrSort);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
-  const cloneResourceHandler = createCloneResourceHandler(reserve, id, wrappedAddItem);
+  const cloneResourceHandler = createCloneResourceHandler(reserve, id, wrappedAddItem, !isAddMaterialsPage);
 
   const handleOpenCloneDialog = (mode: 'exact' | 'all' = 'exact', directToResources = false) => { setCloneDialogMode(mode); setCloneDialogDirectToResources(directToResources); setCloneDialogOpen(true); };
 
@@ -139,27 +169,18 @@ const SubmissionEditor = () => {
   };
 
   const handleItemsFromExternalSource = (items: Partial<CourseItem>[]) => {
-    let addedCount = 0;
     let skippedCount = 0;
 
     items.forEach((item) => {
-      const added = addItem(id!, {
+      const added = wrappedAddItem(id!, {
         ...item,
         status: item.status || 'draft',
         materialType: item.materialType || 'other',
         title: item.title || 'Untitled',
       });
 
-      if (added) {
-        addedCount += 1;
-      } else {
-        skippedCount += 1;
-      }
+      if (!added) skippedCount += 1;
     });
-
-    if (addedCount > 0) {
-      markChanged();
-    }
 
     if (skippedCount > 0) {
       toast.error(`${skippedCount} duplicate item${skippedCount === 1 ? '' : 's'} skipped.`);
@@ -168,6 +189,7 @@ const SubmissionEditor = () => {
 
   const ctxValue = {
     id: id!, reserve, isEditingSubmission,
+    hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
     saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
     duplicateSourceCourse, loadingDuplicateSource, handleOpenDuplicateDialog, handleOpenCloneDialog,
@@ -178,13 +200,25 @@ const SubmissionEditor = () => {
     moveItemInFolder: (...a: Parameters<typeof moveItemInFolder>) => { moveItemInFolder(...a); markChanged(); },
     addItemToFolder: (...a: Parameters<typeof addItemToFolder>) => { addItemToFolder(...a); markChanged(); },
     moveFolderPosition: (...a: Parameters<typeof moveFolderPosition>) => { moveFolderPosition(...a); markChanged(); },
-    user, updateReserve, addItem,
+    user, updateReserve: wrappedUpdateReserve, addItem: wrappedAddItem,
+    addItemsFromExternalSource: handleItemsFromExternalSource,
+    addedMaterials, undoAddedMaterial,
   };
 
   return (
     <SubmissionEditorContext.Provider value={ctxValue}>
       <div className="min-h-screen bg-background">
         <StickyStack />
+        {isAddMaterialsPage ? (
+          <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {isReadOnly && lockInfo && (
+              <div className="mb-6">
+                <SubmissionLockBanner lockInfo={lockInfo} onRefresh={refetchSubmission} onBack={() => navigate(`/submission/${id}`)} />
+              </div>
+            )}
+            <AddMaterialsPage />
+          </main>
+        ) : (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6 pb-4 border-b">
             <div className="flex items-center justify-between">
@@ -223,9 +257,10 @@ const SubmissionEditor = () => {
             />
           </fieldset>
         </main>
-        <ItemModal open={modalOpen} onOpenChange={setModalOpen} onSave={(data) => itemHandlers.handleSaveItem(data, editingItem)} initialData={editingItem} />
+        )}
+        <ItemModal open={modalOpen} onOpenChange={setModalOpen} onSave={(data) => itemHandlers.handleSaveItem(data, editingItem)} initialData={editingItem} showSuccessToast={!isAddMaterialsPage} />
         <SubmitDialog showSubmitDialog={showSubmitDialog} setShowSubmitDialog={setShowSubmitDialog} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} />
-        <DuplicateDialog showDuplicateDialog={showDuplicateDialog} setShowDuplicateDialog={setShowDuplicateDialog} reserve={reserve} user={user} id={id!} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} updateReserve={updateReserve} submissionHandlers={submissionHandlers} addItem={addItem} duplicateSourceCourse={duplicateSourceCourse} />
+        <DuplicateDialog showDuplicateDialog={showDuplicateDialog} setShowDuplicateDialog={setShowDuplicateDialog} reserve={reserve} user={user} id={id!} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} updateReserve={wrappedUpdateReserve} submissionHandlers={submissionHandlers} addItem={wrappedAddItem} duplicateSourceCourse={duplicateSourceCourse} addToCurrentReserve={isAddMaterialsPage} />
         <CourseModal open={courseModalOpen} onOpenChange={setCourseModalOpen} onSave={courseHandlers.handleSaveCourse} initialData={{ courseCode: reserve.courseCode, courseTitle: reserve.courseTitle, section: reserve.section, instructors: reserve.instructors, term: reserve.term }} isEditing={true} />
         <CloneDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} reserveId={id!} courseCode={reserve.courseCode} userName={user?.full_name || ''} currentItemsCount={reserve.items.length} onAddResource={cloneResourceHandler.handleAddSingleResource} initialMode={cloneDialogMode} directToResources={cloneDialogDirectToResources} />
         <DiscoverySearchDialog open={discoverySearchOpen} onOpenChange={setDiscoverySearchOpen} onItemsSelected={handleItemsFromExternalSource} />

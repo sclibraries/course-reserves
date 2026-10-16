@@ -14,6 +14,8 @@ const stickyHeaderRoutes = [
   '/',
   '/new-submission',
   '/submission/reserve-test/edit',
+  '/submission/reserve-test/edit/add',
+  '/submission/reserve-test/edit/add/record/synthetic-db/synthetic-an',
   '/submission/reserve-test',
   '/clone-editor',
   '/clone-matching-test',

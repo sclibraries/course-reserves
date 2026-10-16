@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus } from 'lucide-react';
 import {
   DndContext,
@@ -54,6 +55,8 @@ export default function ContentList({
   const {
     id,
     reserve,
+    hasPreviousOffering,
+    addedMaterials,
     itemHandlers,
     folderHandlers,
     dragHandlers,
@@ -61,11 +64,14 @@ export default function ContentList({
     moveItemInFolder,
     addItemToFolder,
     moveFolderPosition,
-    duplicateSourceCourse,
-    handleOpenCloneDialog,
-    setDiscoverySearchOpen,
-    setSyllabusUploadOpen,
   } = useSubmissionEditorContext();
+  const navigate = useNavigate();
+  const newItemIds = addedMaterials.map((item) => item.id);
+  const navigateToAddMaterials = (tab: string, folderId?: string) => {
+    const params = new URLSearchParams({ tab });
+    if (folderId) params.set('folder', folderId);
+    navigate(`/submission/${id}/edit/add?${params.toString()}`);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -106,15 +112,15 @@ export default function ContentList({
 
       {totalDisplayedItems === 0 ? (
         <EmptyState
-          hasItems={reserve.items.length > 0}
-          hasFolders={reserve.folders.length > 0}
-          onAddItem={itemHandlers.handleAddItem}
+          hasItems={hasActiveFiltersOrSort && reserve.items.length > 0}
+          hasFolders={hasActiveFiltersOrSort && reserve.folders.some((folder) => folder.items.length > 0)}
+          onAddItem={() => navigateToAddMaterials('type')}
           onCreateFolder={folderHandlers.handleCreateFolder}
           onClearFilters={resetFilters}
-          onSearchLibrary={() => setDiscoverySearchOpen(true)}
-          onPasteCitations={() => setSyllabusUploadOpen(true)}
-          onUsePrevious={() => handleOpenCloneDialog('all', false)}
-          hasPreviousCourse={duplicateSourceCourse !== null}
+          onSearchLibrary={() => navigateToAddMaterials('search')}
+          onPasteCitations={() => navigateToAddMaterials('paste')}
+          onUsePrevious={() => navigateToAddMaterials('reuse')}
+          hasPreviousCourse={hasPreviousOffering}
         />
       ) : (
         <div className="space-y-4">
@@ -162,6 +168,8 @@ export default function ContentList({
                         onUpdateFolder={folderHandlers.handleUpdateFolder}
                         onDeleteFolder={folderHandlers.handleDeleteFolder}
                         onToggleFolder={folderHandlers.handleToggleFolder}
+                        onAddMaterials={(folderId) => navigateToAddMaterials('search', folderId)}
+                        newItemIds={newItemIds}
                         onRemoveItemFromFolder={(itemId) => removeItemFromFolder(id, itemId)}
                         onMoveItemInFolder={(folderId, itemId, direction) =>
                           moveItemInFolder(id, folderId, itemId, direction)
@@ -184,6 +192,7 @@ export default function ContentList({
                       <SortableItem
                         key={contentItem.item.id}
                         item={contentItem.item}
+                        isNew={addedMaterials.some((added) => added.id === contentItem.item!.id)}
                         index={index}
                         totalItems={totalDisplayedItems}
                         onEdit={itemHandlers.handleEditItem}

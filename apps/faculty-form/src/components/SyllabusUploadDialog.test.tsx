@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useState } from 'react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { CourseReserve } from '@/store/courseReservesStore';
 import SubmissionEditorContext, {
   type SubmissionEditorContextValue,
@@ -23,8 +23,7 @@ describe('SyllabusUploadDialog', () => {
     document.body.innerHTML = '';
   });
 
-  it('opens through the real Paste Citations entry point before paste, extraction, and add', () => {
-    const onItemsExtracted = vi.fn();
+  it('opens the add-materials search tab from the editor action bar', () => {
     const reserve: CourseReserve = {
       id: 'reserve-1',
       courseCode: 'BIO 220',
@@ -39,11 +38,11 @@ describe('SyllabusUploadDialog', () => {
     };
 
     const Harness = () => {
-      const [open, setOpen] = useState(false);
       const contextValue: SubmissionEditorContextValue = {
         id: reserve.id,
         reserve,
         isEditingSubmission: false,
+        hasPreviousOffering: false,
         isReadOnly: false,
         lockInfo: null,
         saveDraft: () => undefined,
@@ -56,7 +55,7 @@ describe('SyllabusUploadDialog', () => {
         handleOpenDuplicateDialog: () => undefined,
         handleOpenCloneDialog: () => undefined,
         setDiscoverySearchOpen: () => undefined,
-        setSyllabusUploadOpen: setOpen,
+        setSyllabusUploadOpen: () => undefined,
         itemHandlers: {},
         folderHandlers: {},
         courseHandlers: {},
@@ -70,17 +69,18 @@ describe('SyllabusUploadDialog', () => {
         user: null,
         updateReserve: () => undefined,
         addItem: () => true,
+        addItemsFromExternalSource: () => undefined,
+        addedMaterials: [],
+        undoAddedMaterial: () => undefined,
       };
 
       return (
-        <SubmissionEditorContext.Provider value={contextValue}>
-          <ActionBar />
-          <SyllabusUploadDialog
-            open={open}
-            onOpenChange={setOpen}
-            onItemsExtracted={onItemsExtracted}
-          />
-        </SubmissionEditorContext.Provider>
+        <MemoryRouter>
+          <SubmissionEditorContext.Provider value={contextValue}>
+            <ActionBar />
+            <LocationProbe />
+          </SubmissionEditorContext.Provider>
+        </MemoryRouter>
       );
     };
 
@@ -90,47 +90,14 @@ describe('SyllabusUploadDialog', () => {
 
     act(() => root!.render(<Harness />));
 
-    const pasteButton = Array.from(document.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Paste Citations')
+    const addMaterialsButton = Array.from(document.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add materials')
     );
-    expect(pasteButton).toBeTruthy();
+    expect(addMaterialsButton).toBeTruthy();
 
-    act(() => pasteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    act(() => addMaterialsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-    expect(document.body.textContent).toContain('Paste Syllabus Citations');
-
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-    const citation = 'Becker, Gary (1968) "Crime and Punishment: An Economics Analysis," Journal of Political Economy, Vol. 76, pp. 169-217.';
-
-    act(() => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      valueSetter?.call(textarea, citation);
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const extractButton = Array.from(document.querySelectorAll('button')).find((button) =>
-      button.textContent?.startsWith('Extract Citations')
-    );
-    expect(extractButton).toBeTruthy();
-
-    act(() => extractButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-
-    const addButton = Array.from(document.querySelectorAll('button')).find((button) =>
-      button.textContent?.startsWith('Add All to Course')
-    );
-    expect(addButton).toBeTruthy();
-
-    act(() => addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-
-    expect(onItemsExtracted).toHaveBeenCalledWith([
-      expect.objectContaining({
-        title: citation,
-        materialType: 'article',
-        status: 'draft',
-        notes: citation,
-      }),
-    ]);
+    expect(document.body.textContent).toContain('/submission/reserve-1/edit/add?tab=search');
   });
 
   it('keeps paste, extraction, and add-all reachable after upload controls are removed elsewhere', () => {
@@ -183,3 +150,8 @@ describe('SyllabusUploadDialog', () => {
     ]);
   });
 });
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output>{location.pathname}{location.search}</output>;
+}

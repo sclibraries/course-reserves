@@ -76,7 +76,8 @@ describe('useReserveStore.addItem duplicate handling', () => {
       },
     });
 
-    const addedItem = useReserveStore.getState().getReserveById('reserve-1')?.items[0];
+    // Added materials now append to the end; locate the new item instead of depending on prepend order.
+    const addedItem = useReserveStore.getState().getReserveById('reserve-1')?.items.find((item) => item.title === 'New Book');
     expect(addedItem).toMatchObject({
       barcode: '39099087654321',
       callNumber: 'QA 76 .N49',
@@ -88,5 +89,36 @@ describe('useReserveStore.addItem duplicate handling', () => {
         holdingsId: 'holdings-1',
       }),
     });
+  });
+
+  it('appends new items after existing items in the order they are added', () => {
+    useReserveStore.getState().addItem('reserve-1', {
+      title: 'First new item', materialType: 'book', status: 'draft',
+    });
+    useReserveStore.getState().addItem('reserve-1', {
+      title: 'Second new item', materialType: 'book', status: 'draft',
+    });
+
+    expect(useReserveStore.getState().getReserveById('reserve-1')?.items.map((item) => item.title))
+      .toEqual(['Climate Change and Society', 'First new item', 'Second new item']);
+  });
+
+  it('preserves a selected folder while appending an item', () => {
+    useReserveStore.setState({
+      reserves: [{
+        ...reserve,
+        folders: [{ id: 'folder-1', title: 'Week 1', isOpen: true, items: [] }],
+      }],
+    });
+
+    useReserveStore.getState().addItem('reserve-1', {
+      title: 'Folder item', materialType: 'article', status: 'draft', folderId: 'folder-1',
+    });
+
+    const items = useReserveStore.getState().getReserveById('reserve-1')?.items;
+    expect(items?.map((item) => ({ title: item.title, folderId: item.folderId }))).toEqual([
+      { title: 'Climate Change and Society', folderId: undefined },
+      { title: 'Folder item', folderId: 'folder-1' },
+    ]);
   });
 });

@@ -13,7 +13,6 @@ import {
   FolderClosed,
   Edit2, 
   Trash2, 
-  Plus,
   Check,
   X,
   ArrowUp,
@@ -31,6 +30,8 @@ interface SortableFolderProps {
   onUpdateFolder: (folderId: string, updates: Partial<Pick<CourseFolder, 'title' | 'description' | 'isOpen'>>) => void;
   onDeleteFolder: (folderId: string) => void;
   onToggleFolder: (folderId: string) => void;
+  onAddMaterials?: (folderId: string) => void;
+  newItemIds?: string[];
   onRemoveItemFromFolder: (itemId: string) => void;
   onMoveItemInFolder?: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
   onMoveFolderUp?: () => void;
@@ -79,6 +80,8 @@ export const SortableFolder = ({
   onUpdateFolder,
   onDeleteFolder,
   onToggleFolder,
+  onAddMaterials,
+  newItemIds = [],
   onRemoveItemFromFolder,
   onMoveItemInFolder,
   onMoveFolderUp,
@@ -227,6 +230,19 @@ export const SortableFolder = ({
 
           {/* Action buttons */}
           <div className="flex gap-1">
+            {onAddMaterials && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddMaterials(folder.id);
+                }}
+              >
+                Add materials
+              </Button>
+            )}
             {/* Move folder up/down buttons */}
             {onMoveFolderUp && (
               <Button
@@ -310,6 +326,7 @@ export const SortableFolder = ({
                 <div key={item.id} className="relative">
                   <SortableItem
                     item={item}
+                    isNew={newItemIds.includes(item.id)}
                     index={itemIndex}
                     totalItems={folder.items.length}
                     onEdit={onEditItem}

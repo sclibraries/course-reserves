@@ -67,7 +67,7 @@ vi.mock('@/store/useReserveStore', () => ({
   useReserveStore: { getState: () => ({ fetchSubmissionDetails: mocks.fetchSubmissionDetails }) },
 }));
 // Silence side-effect hooks and heavy dialogs not under test.
-vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => {} }));
+vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
 vi.mock('@/hooks/useCourseCloning', () => ({ useCourseCloning: () => ({ fetchPreviousCourses: vi.fn() }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({
@@ -82,7 +82,10 @@ vi.mock('@/components/CourseModal', () => ({ CourseModal: () => null }));
 vi.mock('@/components/CloneDialog', () => ({ CloneDialog: () => null }));
 vi.mock('@/components/DiscoverySearchDialog', () => ({ DiscoverySearchDialog: () => null }));
 vi.mock('@/components/SyllabusUploadDialog', () => ({ SyllabusUploadDialog: () => null }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/submission/sub-1/edit', search: '', state: null }),
+}));
 
 import SubmissionEditor from './index';
 

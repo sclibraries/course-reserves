@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCourseCloning } from '@/hooks/useCourseCloning';
 import type { PhysicalReserve, ElectronicResource } from '@/hooks/useCourseCloning';
 import type { CourseReserve, CourseItem, FolioLocation, FolioCopiedItem } from '@/store/courseReservesStore';
@@ -27,7 +28,8 @@ interface DuplicateDialogProps {
   updateReserve: (id: string, updates: Partial<CourseReserve>) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   submissionHandlers: Record<string, (...args: any[]) => any>;
-  addItem: (reserveId: string, item: Omit<CourseItem, 'id'>) => boolean;
+  addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
+  addToCurrentReserve?: boolean;
   duplicateSourceCourse: {
     term: string;
     courseName: string;
@@ -47,14 +49,20 @@ export default function DuplicateDialog({
   setEmailConfirmation,
   updateReserve,
   submissionHandlers,
+  addItem,
   duplicateSourceCourse,
+  addToCurrentReserve = false,
 }: DuplicateDialogProps) {
   const [duplicateSubmitting, setDuplicateSubmitting] = React.useState(false);
   const { fetchPreviousCourses, fetchCourseResources } = useCourseCloning();
 
   const handleConfirm = async () => {
     if (!reserve?.courseCode || !user?.full_name) {
-      submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
+      if (addToCurrentReserve) {
+        toast.error('Unable to find a previous course list.');
+      } else {
+        submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
+      }
       setShowDuplicateDialog(false);
       return;
     }
@@ -62,13 +70,15 @@ export default function DuplicateDialog({
       setDuplicateSubmitting(true);
       const courses = await fetchPreviousCourses(reserve.courseCode, user.full_name, 'exact');
       if (!courses || courses.length === 0) {
-        submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
+        if (addToCurrentReserve) toast.error('No previous course list was found.');
+        else submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
         setShowDuplicateDialog(false);
         return;
       }
       const source = courses[0];
       if (!source.courseListingId) {
-        submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
+        if (addToCurrentReserve) toast.error('No previous course list was found.');
+        else submissionHandlers.confirmDuplicateSubmit(emailConfirmation);
         setShowDuplicateDialog(false);
         return;
       }
@@ -146,8 +156,16 @@ export default function DuplicateDialog({
         });
       });
 
-      updateReserve(id, { items: mapped });
-      submissionHandlers.confirmDuplicateSubmit(emailConfirmation, mapped);
+      if (addToCurrentReserve) {
+        let skippedCount = 0;
+        mapped.forEach((item) => {
+          if (!addItem(id, item)) skippedCount += 1;
+        });
+        if (skippedCount > 0) toast.error(`${skippedCount} duplicate item${skippedCount === 1 ? '' : 's'} skipped.`);
+      } else {
+        updateReserve(id, { items: mapped });
+        submissionHandlers.confirmDuplicateSubmit(emailConfirmation, mapped);
+      }
       setShowDuplicateDialog(false);
     } finally {
       setDuplicateSubmitting(false);
@@ -162,7 +180,7 @@ export default function DuplicateDialog({
           <AlertDialogDescription className="space-y-4">
             {duplicateSourceCourse ? (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                <p className="text-sm font-semibold text-blue-900 mb-1">Duplicating from:</p>
+                <p className="text-sm font-semibold text-blue-900 mb-1">{addToCurrentReserve ? 'Adding materials from:' : 'Duplicating from:'}</p>
                 <p className="text-sm text-blue-700">
                   <strong>{reserve.courseCode}</strong> · {duplicateSourceCourse.term}
                 </p>
@@ -176,39 +194,48 @@ export default function DuplicateDialog({
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-2">
                 <p className="text-sm text-yellow-800">
                   <AlertCircle className="h-4 w-4 inline mr-1" />
-                  No previous version of <strong>{reserve.courseCode}</strong> found. Library staff will
-                  be notified you want to reuse materials.
+                  No previous version of <strong>{reserve.courseCode}</strong> found.
+                  {addToCurrentReserve ? ' You can still add materials from the other tabs.' : ' Library staff will be notified you want to reuse materials.'}
                 </p>
               </div>
             )}
-            <div className="space-y-2 text-sm">
-              <p>
-                Submitting as <strong>Duplicate Previous Course</strong> tells library staff you are
-                reusing the exact same materials from a prior offering of this course. You do{' '}
-                <em>not</em> need to add items here.
-              </p>
-              <p>
-                If you intend to make any changes or add new materials, cancel and use the standard
-                submission or copy tools instead.
-              </p>
-              <p className="text-amber-600 font-medium flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-                This action submits immediately with a duplicate flag for staff triage.
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="dup-email"
-                checked={emailConfirmation}
-                onCheckedChange={(checked) => setEmailConfirmation(checked as boolean)}
-              />
-              <label
-                htmlFor="dup-email"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Email me a confirmation
-              </label>
-            </div>
+            {addToCurrentReserve ? (
+              <div className="space-y-2 text-sm">
+                <p>Add the materials from a previous offering to your current list. Items already in your list are skipped.</p>
+                <p>You can review, edit, or undo the added materials before submitting.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Submitting as <strong>Duplicate Previous Course</strong> tells library staff you are
+                    reusing the exact same materials from a prior offering of this course. You do{' '}
+                    <em>not</em> need to add items here.
+                  </p>
+                  <p>
+                    If you intend to make any changes or add new materials, cancel and use the standard
+                    submission or copy tools instead.
+                  </p>
+                  <p className="text-amber-600 font-medium flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5" />
+                    This action submits immediately with a duplicate flag for staff triage.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="dup-email"
+                    checked={emailConfirmation}
+                    onCheckedChange={(checked) => setEmailConfirmation(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="dup-email"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Email me a confirmation
+                  </label>
+                </div>
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -218,7 +245,7 @@ export default function DuplicateDialog({
             disabled={duplicateSubmitting}
             onClick={handleConfirm}
           >
-            {duplicateSubmitting ? 'Submitting…' : 'Submit as Duplicate'}
+            {duplicateSubmitting ? 'Adding…' : addToCurrentReserve ? 'Add previous course materials' : 'Submit as Duplicate'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -61,6 +61,16 @@ const App = () => (
               <SubmissionEditor />
             </ProtectedRoute>
           } />
+          <Route path={STICKY_HEADER_ROUTES.addMaterialsRecord} element={
+            <ProtectedRoute>
+              <SubmissionEditor />
+            </ProtectedRoute>
+          } />
+          <Route path={STICKY_HEADER_ROUTES.addMaterials} element={
+            <ProtectedRoute>
+              <SubmissionEditor />
+            </ProtectedRoute>
+          } />
           <Route path={STICKY_HEADER_ROUTES.submissionDetail} element={
             <ProtectedRoute>
               <SubmissionDetail />

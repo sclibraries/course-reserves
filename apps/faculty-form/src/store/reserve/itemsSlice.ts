@@ -20,7 +20,7 @@ export const createItemsSlice: ReserveSlice<'addItem' | 'updateItem' | 'deleteIt
         reserve.id === reserveId
           ? {
               ...reserve,
-              items: [newItem, ...(reserve.items || [])],
+              items: [...(reserve.items || []), newItem],
               lastUpdated: new Date().toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",

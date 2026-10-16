@@ -8,7 +8,8 @@ import type { CourseReserve, CourseItem, FolioLocation, FolioCopiedItem } from "
 export const createCloneResourceHandler = (
   reserve: CourseReserve | undefined,
   reserveId: string | undefined,
-  addItem: (id: string, item: Partial<CourseItem>) => boolean
+  addItem: (id: string, item: Partial<CourseItem>) => boolean,
+  showSuccessToast = true
 ) => {
   const handleAddSingleResource = (resource: PreviewResource) => {
     if (!reserve || !reserveId) {
@@ -74,7 +75,7 @@ export const createCloneResourceHandler = (
         
         console.log('Adding physical item with FOLIO metadata:', newItem);
         if (addItem(reserveId, newItem)) {
-          toast.success(`Added "${resource.title}"`);
+          if (showSuccessToast) toast.success(`Added "${resource.title}"`);
         } else {
           toast.error('This item is already in your reserve list.');
         }
@@ -107,7 +108,7 @@ export const createCloneResourceHandler = (
         
         console.log('Adding electronic item:', newItem);
         if (addItem(reserveId, newItem)) {
-          toast.success(`Added "${resource.title}"`);
+          if (showSuccessToast) toast.success(`Added "${resource.title}"`);
         } else {
           toast.error('This item is already in your reserve list.');
         }
