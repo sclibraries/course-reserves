@@ -103,6 +103,25 @@ services:
       - app_network
 
   # ─────────────────────────────────────────────
+  # Synthetic FOLIO search service (local dev only)
+  # ─────────────────────────────────────────────
+  fake-folio:
+    build:
+      context: ./tools/fake-folio
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      FAKE_FOLIO_RUNTIME_FILE: /app/runtime/state.json
+    volumes:
+      - fake_folio_data:/app/runtime
+    expose:
+      - "3000"
+    networks:
+      - app_network
+
+  # ─────────────────────────────────────────────
   # nginx  (reverse proxy — unifies all services)
   # ─────────────────────────────────────────────
   proxy:
@@ -115,6 +134,10 @@ services:
       - backend
       - frontend
       - faculty-form
+      - fake-folio
+    environment:
+      FOLIO_UPSTREAM: ${FOLIO_UPSTREAM:-real}
+      NGINX_ENVSUBST_FILTER: ^FOLIO_UPSTREAM$
     ports:
       # Single entry point matching production path structure
       - "8080:80"
@@ -123,6 +146,7 @@ services:
 
 volumes:
   db_data:
+  fake_folio_data:
 
 networks:
   app_network:

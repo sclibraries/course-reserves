@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fake FOLIO control</title>
+  <style>
+    body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#17202a}
+    h1,h2{color:#17365d}section{border-top:1px solid #ccd3da;padding:1rem 0}
+    li{margin:.45rem 0}button{margin-left:.4rem;padding:.35rem .6rem}
+    select,input{padding:.4rem;margin:.2rem}.muted{color:#53616f}
+  </style>
+</head>
+<body>
+  <h1>Fake FOLIO</h1>
+  <p class="muted">Changes stay in this development service. Reset restores seed.json.</p>
+  <button id="reset">Reset to seed</button>
+  <section><h2>Courses</h2><ul id="courses"></ul>
+    <h3>Create a test course</h3>
+    <form id="create-course">
+      <label>Course number <input name="courseNumber" value="TST 199" required></label>
+      <label>Name <input name="name" value="TST 199 Test Course"></label>
+      <label>Section <input name="sectionName" value="01"></label>
+      <label>Instructors <input name="instructors" value="Test Faculty A"></label>
+      <label>Term <select name="termId" id="terms"></select></label>
+      <button>Create course</button>
+    </form>
+    <p id="missing"></p>
+  </section>
+  <section><h2>Reserves</h2><ul id="reserves"></ul>
+    <form id="add-reserve">
+      <label>Course <select name="courseListingId" id="reserve-courses"></select></label>
+      <label>Item <select name="itemId" id="reserve-items"></select></label>
+      <button>Add to reserve</button>
+    </form>
+  </section>
+  <section><h2>Items</h2><ul id="items"></ul></section>
+  <p id="message" role="status"></p>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const message = (text) => { $('#message').textContent = text; };
+    async function send(path, method, body) {
+      const response = await fetch('/_fake-folio/api/' + path, {
+        method, headers: {'content-type':'application/json'},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Request failed');
+      return result.data;
+    }
+    function option(label, value) {
+      const element = document.createElement('option');
+      element.textContent = label;
+      element.value = value;
+      return element;
+    }
+    function button(label, action, id, extra) {
+      const element = document.createElement('button');
+      element.textContent = label;
+      element.dataset.action = action;
+      element.dataset.id = id;
+      if (extra) element.dataset.extra = extra;
+      return element;
+    }
+    function row(label, buttons) {
+      const element = document.createElement('li');
+      element.append(document.createTextNode(label), ...buttons);
+      return element;
+    }
+    async function refresh() {
+      const state = await send('state', 'GET');
+      $('#courses').replaceChildren(...state.courses.map((course) =>
+        row(course.courseNumber + '-' + course.sectionName + ' · ' + course.name, [])));
+      $('#terms').replaceChildren(...state.terms.map((term) => option(term.name, term.id)));
+      $('#reserve-courses').replaceChildren(...state.courses.map((course) =>
+        option(course.courseNumber + '-' + course.sectionName, course.courseListingId)));
+      $('#reserve-items').replaceChildren(...state.items.map((item) =>
+        option(item.title, item.id)));
+      $('#reserves').replaceChildren(...state.reserves.map((reserve) => {
+        const item = state.items.find((candidate) => candidate.id === reserve.itemId);
+        const course = state.courses.find((candidate) =>
+          candidate.courseListingId === reserve.courseListingId);
+        return row((course?.courseNumber || reserve.courseListingId) + ' · ' +
+          (item?.title || reserve.itemId), [
+          button('Take off reserve', 'remove-reserve', reserve.courseListingId, reserve.itemId)
+        ]);
+      }));
+      $('#items').replaceChildren(...state.items.map((item) => row(
+        item.title + ' · ' + item.status,
+        ['available', 'checked out', 'lost'].filter((status) => status !== item.status)
+          .map((status) => button(status, 'status', item.id, status))
+      )));
+      $('#missing').replaceChildren(...state.missingCourses.map((entry) =>
+        button('Create ' + entry.course.courseNumber, 'create-scenario', entry.scenarioId)));
+    }
+    document.addEventListener('click', async (event) => {
+      const target = event.target.closest('button[data-action]');
+      if (!target) return;
+      try {
+        if (target.dataset.action === 'create-scenario') {
+          await send('courses', 'POST', {scenarioId: target.dataset.id});
+        } else if (target.dataset.action === 'remove-reserve') {
+          await send('reserves', 'DELETE', {
+            courseListingId: target.dataset.id, itemId: target.dataset.extra
+          });
+        } else if (target.dataset.action === 'status') {
+          await send('items/' + target.dataset.id + '/status', 'PATCH', {
+            status: target.dataset.extra
+          });
+        }
+        await refresh();
+        message('Fake FOLIO updated.');
+      } catch (error) { message(error.message); }
+    });
+    $('#create-course').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fields = Object.fromEntries(new FormData(event.currentTarget));
+      try {
+        await send('courses', 'POST', fields);
+        await refresh();
+        message('Course created.');
+      } catch (error) { message(error.message); }
+    });
+    $('#add-reserve').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fields = Object.fromEntries(new FormData(event.currentTarget));
+      try {
+        await send('reserves', 'POST', fields);
+        await refresh();
+        message('Item added to reserve.');
+      } catch (error) { message(error.message); }
+    });
+    $('#reset').addEventListener('click', async () => {
+      try {
+        await send('reset', 'POST');
+        await refresh();
+        message('Reset to seed.');
+      } catch (error) { message(error.message); }
+    });
+    refresh().catch((error) => message(error.message));
+  </script>
+</body>
+</html>

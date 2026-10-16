@@ -45,6 +45,25 @@ API tests run in an isolated Docker stack (`docker-compose.test.yml`) with a syn
 After installing `apps/api` Composer dependencies, run `docker/test/run-api-tests.sh [project-name]`
 from the repository root.
 
+## Fake FOLIO data
+
+The local stack uses the read-only FOLIO middleware by default. To switch both nginx and the API
+to the synthetic service, start with:
+
+    docker/start.sh --fake-folio
+
+The switch sets nginx's FOLIO_UPSTREAM=fake and the backend's
+FOLIO_SEARCH_BASE_URL=http://fake-folio:3000/folio/web/search together. Open
+http://localhost:8080/_fake-folio/ to create the missing TST 102 course, add or remove reserves,
+change item status, or reset the data to tools/fake-folio/data/seed.json. The same reset action
+is available with:
+
+    curl -X POST http://localhost:8080/_fake-folio/api/reset
+
+Run docker/start.sh without --fake-folio to return to the real read-only middleware. The fake has
+Fall 2026 data for AP_202609 through AP_202612 and Spring 2027 data for AP_202701 through
+AP_202705.
+
 ## Licence
 
 Course Reserves is available under the [PolyForm Noncommercial License 1.0.0](LICENSE), which

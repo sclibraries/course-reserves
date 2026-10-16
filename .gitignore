@@ -44,6 +44,7 @@ apps/faculty-form/.env.local
 
 # Yii runtime output can include debug dumps, request headers, SQL, and tokens.
 apps/api/runtime/
+tools/fake-folio/runtime/
 
 # Production SQL snapshots and local-only database copies
 packages/database/*_20*.sql
