@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { config } from '../config';
+import { authFetch } from '../services/http/authFetch';
 
 /**
  * Zustand store for Tracking Report state management
@@ -152,10 +153,7 @@ export const useTrackingReportStore = create((set, get) => ({
       const queryString = state.buildQueryString(params);
       const url = `${config.api.urls.courseReserves}${config.api.endpoints.admin.reports}?${queryString}`;
       
-      // Log API call for debugging
-      console.debug('Fetching raw data:', url);
-      
-      const response = await fetch(url);
+      const response = await authFetch(url);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -202,10 +200,7 @@ export const useTrackingReportStore = create((set, get) => ({
       const queryString = state.buildQueryString(params);
       const url = `${config.api.urls.courseReserves}${config.api.endpoints.admin.reports}/analytics?${queryString}`;
       
-      // Log API call for debugging
-      console.debug('Fetching analytics:', url, 'Term filter:', state.termFilter);
-      
-      const response = await fetch(url);
+      const response = await authFetch(url);
       
       if (!response.ok) {
         const errorText = await response.text();

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { 
   Modal, 
@@ -22,75 +22,21 @@ import {
   TabPane
 } from 'reactstrap';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { config } from '../../../config';
 import { COLORS } from '../constants';
 import { exportEventsToCSV, generateTimestampedFilename } from '../utils/csvExportUtils';
 import EventTypeBadge from '../common/EventTypeBadge';
 import MetadataDisplay from '../common/MetadataDisplay';
+import { useCourseDetailData } from './useCourseDetailData';
 
 /**
  * Course Detail Modal component for displaying comprehensive course analytics
  */
 const CourseDetailModal = ({ isOpen, toggle, course }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [courseData, setCourseData] = useState(null);
+  const { loading, error, courseData, fetchCourseDetail } = useCourseDetailData(isOpen, course);
   const [activeTab, setActiveTab] = useState('overview');
 
-  /**
-   * Fetch detailed course data
-   */
-  const fetchCourseDetail = useCallback(async () => {
-    if (!course?.name) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        'course-name': course.name
-      });
-
-      if (course.college) {
-        params.append('college', course.college);
-      }
-
-      const url = `${config.api.urls.courseReserves}${config.api.endpoints.admin.reports}/course-detail?${params}`;
-      
-      console.debug('Fetching course detail:', url);
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! Status: ${response.status}, ${errorText || 'No error details'}`);
-      }
-      
-      const data = await response.json();
-      setCourseData(data);
-      
-    } catch (err) {
-      console.error('Error fetching course detail:', err);
-      setError(err.message || 'Failed to fetch course details');
-    } finally {
-      setLoading(false);
-    }
-  }, [course]);
-
-  // Fetch data when modal opens or course changes
   useEffect(() => {
-    if (isOpen && course) {
-      fetchCourseDetail();
-    }
-  }, [isOpen, course, fetchCourseDetail]);
-
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setCourseData(null);
-      setError(null);
-      setActiveTab('overview');
-    }
+    if (!isOpen) setActiveTab('overview');
   }, [isOpen]);
 
   /**

@@ -6,6 +6,7 @@ vi.mock('../../config', () => ({
   config: {
     api: {
       urls: { courseReserves: 'https://configured-api.example/course-reserves' },
+      getAuthToken: () => 'Bearer synthetic-aw048-token',
       endpoints: {
         courseReserves: {
           materialTypes: { all: '/material-type/all', fields: '/material-type/fields' },
@@ -34,7 +35,8 @@ describe('adminMaterialTypeService', () => {
     await expect(adminMaterialTypeService.getMaterialTypes()).resolves.toBe(materialTypes);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${config.api.urls.courseReserves}${config.api.endpoints.courseReserves.materialTypes.all}`
+      `${config.api.urls.courseReserves}${config.api.endpoints.courseReserves.materialTypes.all}`,
+      { headers: { Authorization: 'Bearer synthetic-aw048-token' } },
     );
   });
 
@@ -45,7 +47,19 @@ describe('adminMaterialTypeService', () => {
     await expect(adminMaterialTypeService.getMaterialTypeFields(42)).resolves.toBe(fields);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${config.api.urls.courseReserves}${config.api.endpoints.courseReserves.materialTypes.fields}?material_type_id=42`
+      `${config.api.urls.courseReserves}${config.api.endpoints.courseReserves.materialTypes.fields}?material_type_id=42`,
+      { headers: { Authorization: 'Bearer synthetic-aw048-token' } },
+    );
+  });
+
+  it('encodes material type IDs in the exact authenticated request URL', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue([]) });
+
+    await adminMaterialTypeService.getMaterialTypeFields('42 & 43');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://configured-api.example/course-reserves/material-type/fields?material_type_id=42%20%26%2043',
+      { headers: { Authorization: 'Bearer synthetic-aw048-token' } },
     );
   });
 
