@@ -22,8 +22,6 @@ import { createDragHandlers } from '@/handlers/dragHandlers';
 import { createSubmissionHandlers } from '@/handlers/submissionHandlers';
 import { ItemModal } from '@/components/ItemModal';
 import { CourseModal } from '@/components/CourseModal';
-import { DiscoverySearchDialog } from '@/components/DiscoverySearchDialog';
-import { SyllabusUploadDialog } from '@/components/SyllabusUploadDialog';
 import CorrectionRequiredDialog from '@/components/Communications/CorrectionRequiredDialog';
 import SubmissionEditorContext from './SubmissionEditorContext';
 import StickyStack from './StickyStack';
@@ -51,8 +49,6 @@ const SubmissionEditor = () => {
   const firstName = user?.full_name?.split(' ')[0] || '';
   const previousCourseDetection = usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
 
-  const [discoverySearchOpen, setDiscoverySearchOpen] = React.useState(false);
-  const [syllabusUploadOpen, setSyllabusUploadOpen] = React.useState(false);
 
   const [hasRemoteItemsChanged, setHasRemoteItemsChanged] = React.useState(false);
   const serverReserveSnapshotRef = React.useRef<CourseReserve | undefined>(undefined);
@@ -167,7 +163,6 @@ const SubmissionEditor = () => {
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
     saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
-    setDiscoverySearchOpen, setSyllabusUploadOpen,
     itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers,
     markChanged,
     removeItemFromFolder: (...a: Parameters<typeof removeItemFromFolder>) => { removeItemFromFolder(...a); markChanged(); },
@@ -235,8 +230,6 @@ const SubmissionEditor = () => {
         <ItemModal open={modalOpen} onOpenChange={setModalOpen} onSave={(data) => itemHandlers.handleSaveItem(data, editingItem)} initialData={editingItem} showSuccessToast={!isAddMaterialsPage} />
         <SubmitDialog showSubmitDialog={showSubmitDialog} setShowSubmitDialog={setShowSubmitDialog} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} />
         <CourseModal open={courseModalOpen} onOpenChange={setCourseModalOpen} onSave={courseHandlers.handleSaveCourse} initialData={{ courseCode: reserve.courseCode, courseTitle: reserve.courseTitle, section: reserve.section, instructors: reserve.instructors, term: reserve.term }} isEditing={true} />
-        <DiscoverySearchDialog open={discoverySearchOpen} onOpenChange={setDiscoverySearchOpen} onItemsSelected={handleItemsFromExternalSource} />
-        <SyllabusUploadDialog open={syllabusUploadOpen} onOpenChange={setSyllabusUploadOpen} onItemsExtracted={handleItemsFromExternalSource} />
         <CorrectionRequiredDialog />
       </div>
     </SubmissionEditorContext.Provider>

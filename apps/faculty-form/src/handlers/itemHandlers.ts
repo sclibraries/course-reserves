@@ -29,17 +29,18 @@ export const createItemHandlers = (
     setModalOpen(true);
   };
 
-  const handleSaveItem = (itemData: ItemData, editingItem?: ItemData & { id: string }) => {
+  const handleSaveItem = (itemData: ItemData, editingItem?: ItemData & { id: string }): boolean => {
     const courseItemData = transformItemForSaving(itemData);
 
     if (editingItem) {
       updateItem(reserveId, editingItem.id, courseItemData);
     } else if (!addItem(reserveId, courseItemData)) {
       toast.error('This item is already in your reserve list.');
-      return;
+      return false;
     }
     setModalOpen(false);
     setEditingItem(undefined);
+    return true;
   };
 
   const handleMoveUp = (itemId: string) => {

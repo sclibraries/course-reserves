@@ -1,4 +1,4 @@
-import type { ItemData } from '../index';
+import type { ItemData } from '../itemFormData';
 import type React from 'react';
 import BookFields from './BookFields';
 import BookChapterFields from './BookChapterFields';

@@ -58,8 +58,6 @@ vi.mock('./ContentList', async () => {
 vi.mock('./SubmitDialog', () => ({ default: () => null }));
 vi.mock('@/components/ItemModal', () => ({ ItemModal: () => null }));
 vi.mock('@/components/CourseModal', () => ({ CourseModal: () => null }));
-vi.mock('@/components/DiscoverySearchDialog', () => ({ DiscoverySearchDialog: () => null }));
-vi.mock('@/components/SyllabusUploadDialog', () => ({ SyllabusUploadDialog: () => null }));
 vi.mock('@/components/Communications/CorrectionRequiredDialog', () => ({ default: () => null }));
 
 import SubmissionEditor from './index';

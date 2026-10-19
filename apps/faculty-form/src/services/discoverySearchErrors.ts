@@ -2,6 +2,15 @@ const UNAVAILABLE_MESSAGE = 'Library search is temporarily unavailable. Please t
 const RATE_LIMIT_MESSAGE = 'There are too many searches right now. Please wait a moment and try again.';
 const GENERIC_MESSAGE = 'Unable to search the library right now. Please try again.';
 
+export class DiscoveryRateLimitError extends Error {
+  readonly status = 429;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DiscoveryRateLimitError';
+  }
+}
+
 export async function getDiscoverySearchErrorMessage(response: Response): Promise<string> {
   if (response.status === 429) {
     return RATE_LIMIT_MESSAGE;

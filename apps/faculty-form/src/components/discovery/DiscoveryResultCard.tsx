@@ -8,6 +8,7 @@ interface DiscoveryResultCardProps {
   isSelected?: boolean;
   onOpenRecord?: () => void;
   onAdd?: () => void;
+  addLabel?: string;
   onToggleSelection?: () => void;
 }
 
@@ -17,6 +18,7 @@ export default function DiscoveryResultCard({
   isSelected = false,
   onOpenRecord,
   onAdd,
+  addLabel = 'Add',
   onToggleSelection,
 }: DiscoveryResultCardProps) {
   const activate = onOpenRecord || onToggleSelection;
@@ -50,7 +52,7 @@ export default function DiscoveryResultCard({
         </div>
         {onAdd && (
           <Button size="sm" onClick={onAdd} disabled={isDuplicate}>
-            Add
+          {addLabel}
           </Button>
         )}
       </div>

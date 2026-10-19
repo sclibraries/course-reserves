@@ -77,8 +77,6 @@ vi.mock('./ContentList', () => ({ default: () => null }));
 vi.mock('./SubmitDialog', () => ({ default: () => null }));
 vi.mock('@/components/ItemModal', () => ({ ItemModal: () => null }));
 vi.mock('@/components/CourseModal', () => ({ CourseModal: () => null }));
-vi.mock('@/components/DiscoverySearchDialog', () => ({ DiscoverySearchDialog: () => null }));
-vi.mock('@/components/SyllabusUploadDialog', () => ({ SyllabusUploadDialog: () => null }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/submission/sub-1/edit', search: '', state: null }),

@@ -1,6 +1,6 @@
 import { API_ENDPOINTS, DEFAULT_CONFIG } from '@/config/endpoints';
 import { getAuthHeaders } from '@/store/authStore';
-import { getDiscoverySearchErrorMessage } from './discoverySearchErrors';
+import { DiscoveryRateLimitError, getDiscoverySearchErrorMessage } from './discoverySearchErrors';
 import { parseDiscoveryFacets, parseEBSCORecord, parseEBSCORecords } from './discoveryRecordParser';
 import type {
   DiscoverySearchResponse,
@@ -41,7 +41,7 @@ export async function searchDiscovery(
   const searchUrl = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.EBSCO_SEARCH}?${params.toString().replace(/\+/g, '%20')}`;
   try {
     const response = await fetch(searchUrl, requestOptions());
-    if (!response.ok) throw new Error(await getDiscoverySearchErrorMessage(response));
+    if (!response.ok) throw await discoveryHttpError(response);
     const data: EBSCOSearchResponse = await response.json();
     if (data.status !== 'success' || data.code !== 200) throw new Error('Unable to search the library right now. Please try again.');
 
@@ -63,7 +63,7 @@ export async function retrieveDiscoveryRecord(dbId: string, an: string): Promise
   const params = new URLSearchParams({ dbId, an });
   const url = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.EBSCO_RETRIEVE}?${params.toString().replace(/\+/g, '%20')}`;
   const response = await fetch(url, requestOptions());
-  if (!response.ok) throw new Error(await getDiscoverySearchErrorMessage(response));
+  if (!response.ok) throw await discoveryHttpError(response);
 
   const payload = await response.json();
   if (payload?.status !== 'success' || payload?.code !== 200 || !payload?.data?.record) {
@@ -107,6 +107,11 @@ function requestOptions(): RequestInit {
     mode: 'cors',
     credentials: 'omit',
   };
+}
+
+async function discoveryHttpError(response: Response): Promise<Error> {
+  const message = await getDiscoverySearchErrorMessage(response);
+  return response.status === 429 ? new DiscoveryRateLimitError(message) : new Error(message);
 }
 
 function emptySearchResponse(): DiscoverySearchResponse {

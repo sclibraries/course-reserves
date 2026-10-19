@@ -69,6 +69,7 @@ describe('searchDiscovery', () => {
 
     await expect(searchDiscovery('typed query')).rejects.toMatchObject({
       message: 'There are too many searches right now. Please wait a moment and try again.',
+      status: 429,
     });
   });
 

@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ItemData } from "../index";
+import type { ItemData } from "../itemFormData";
 
 interface FieldsProps {
   formData: ItemData;

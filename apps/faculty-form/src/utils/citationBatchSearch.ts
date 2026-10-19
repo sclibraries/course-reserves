@@ -32,6 +32,14 @@ export interface CitationBatchSearchGroup extends PreparedCitationSearch {
   error?: string;
 }
 
+export interface CitationBatchSearchOptions {
+  onProgress?: (completed: number, total: number) => void;
+  wait?: (milliseconds: number) => Promise<void>;
+}
+
+const MAX_CONCURRENT_CITATIONS = 3;
+const RATE_LIMIT_BACKOFF_MS = [250, 500];
+
 type SearchDiscoveryLike = (
   query: string | FieldQuery[],
   page?: number,
@@ -47,15 +55,17 @@ type SearchDiscoveryLike = (
 }>;
 
 export function prepareCitationBatchSearches(rawText: string): PreparedCitationSearch[] {
-  const citations = extractCitationsFromSyllabus(rawText);
+  return prepareCitationSearches(extractCitationsFromSyllabus(rawText));
+}
 
+export function prepareCitationSearches(citations: string[], ids?: string[]): PreparedCitationSearch[] {
   return citations.map((rawCitation, index) => {
     const parsedCitation = parseCitation(rawCitation);
     const queryStrategies = buildCitationQueryStrategies(parsedCitation, rawCitation);
     const primaryStrategy = queryStrategies[0];
 
     return {
-      id: `citation-${index + 1}`,
+      id: ids?.[index] || `citation-${index + 1}`,
       rawCitation,
       parsedCitation,
       fieldQueries: primaryStrategy.fieldQueries,
@@ -69,50 +79,103 @@ export function prepareCitationBatchSearches(rawText: string): PreparedCitationS
 export async function executeCitationBatchSearch(
   searches: PreparedCitationSearch[],
   searchFn: SearchDiscoveryLike,
-  limiters?: SearchLimiters
+  limiters?: SearchLimiters,
+  options: CitationBatchSearchOptions = {}
 ): Promise<CitationBatchSearchGroup[]> {
-  const groups: CitationBatchSearchGroup[] = [];
+  const groups = new Array<CitationBatchSearchGroup>(searches.length);
+  let nextSearchIndex = 0;
+  let completed = 0;
+  const wait = options.wait || delay;
 
-  for (const search of searches) {
-    const attemptedQueries: string[] = [];
-
-    try {
-      for (const strategy of search.queryStrategies) {
-        attemptedQueries.push(strategy.builtQuery);
-
-        const response = await searchFn(strategy.queryToSearch, 1, undefined, limiters, undefined);
-        const hasMatches = response.totalHits > 0 || response.results.length > 0;
-        const isLastStrategy = strategy === search.queryStrategies[search.queryStrategies.length - 1];
-
-        if (hasMatches || isLastStrategy) {
-          groups.push({
-            ...search,
-            fieldQueries: strategy.fieldQueries,
-            builtQuery: search.queryStrategies[0]?.builtQuery || search.builtQuery,
-            queryToSearch: strategy.queryToSearch,
-            results: response.results,
-            totalHits: response.totalHits,
-            searchTime: response.searchTime,
-            attemptedQueries,
-            matchedQuery: strategy.builtQuery,
-          });
-          break;
-        }
-      }
-    } catch (error) {
-      groups.push({
-        ...search,
-        results: [],
-        totalHits: 0,
-        searchTime: 0,
-        attemptedQueries,
-        matchedQuery: search.queryStrategies[0]?.builtQuery || search.builtQuery,
-        error: error instanceof Error ? error.message : 'Search failed',
-      });
+  const worker = async () => {
+    while (nextSearchIndex < searches.length) {
+      const index = nextSearchIndex;
+      nextSearchIndex += 1;
+      groups[index] = await executeOneCitationSearch(searches[index], searchFn, limiters, wait);
+      completed += 1;
+      options.onProgress?.(completed, searches.length);
     }
+  };
+
+  await Promise.all(Array.from(
+    { length: Math.min(MAX_CONCURRENT_CITATIONS, searches.length) },
+    () => worker()
+  ));
+  return groups;
+}
+
+async function executeOneCitationSearch(
+  search: PreparedCitationSearch,
+  searchFn: SearchDiscoveryLike,
+  limiters: SearchLimiters | undefined,
+  wait: (milliseconds: number) => Promise<void>
+): Promise<CitationBatchSearchGroup> {
+  const attemptedQueries: string[] = [];
+
+  try {
+    for (const strategy of search.queryStrategies) {
+      attemptedQueries.push(strategy.builtQuery);
+      const response = await searchWithRateLimitBackoff(strategy, searchFn, limiters, wait);
+      const hasMatches = response.totalHits > 0 || response.results.length > 0;
+      const isLastStrategy = strategy === search.queryStrategies[search.queryStrategies.length - 1];
+
+      if (hasMatches || isLastStrategy) {
+        return {
+          ...search,
+          fieldQueries: strategy.fieldQueries,
+          builtQuery: search.queryStrategies[0]?.builtQuery || search.builtQuery,
+          queryToSearch: strategy.queryToSearch,
+          results: response.results,
+          totalHits: response.totalHits,
+          searchTime: response.searchTime,
+          attemptedQueries,
+          matchedQuery: strategy.builtQuery,
+        };
+      }
+    }
+  } catch (error) {
+    return {
+      ...search,
+      results: [],
+      totalHits: 0,
+      searchTime: 0,
+      attemptedQueries,
+      matchedQuery: search.queryStrategies[0]?.builtQuery || search.builtQuery,
+      error: error instanceof Error ? error.message : 'Search failed',
+    };
   }
 
-  return groups;
+  return {
+    ...search,
+    results: [],
+    totalHits: 0,
+    searchTime: 0,
+    attemptedQueries,
+    matchedQuery: search.queryStrategies[0]?.builtQuery || search.builtQuery,
+  };
+}
+
+async function searchWithRateLimitBackoff(
+  strategy: CitationSearchStrategy,
+  searchFn: SearchDiscoveryLike,
+  limiters: SearchLimiters | undefined,
+  wait: (milliseconds: number) => Promise<void>
+) {
+  let retries = 0;
+  while (true) {
+    try {
+      return await searchFn(strategy.queryToSearch, 1, undefined, limiters, undefined);
+    } catch (error) {
+      const isRateLimited = typeof error === 'object' && error !== null && 'status' in error && error.status === 429;
+      if (!isRateLimited || retries >= RATE_LIMIT_BACKOFF_MS.length) throw error;
+      await wait(RATE_LIMIT_BACKOFF_MS[retries]);
+      retries += 1;
+    }
+  }
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function buildCitationQueryStrategies(parsedCitation: ParsedCitation, rawCitation: string): CitationSearchStrategy[] {

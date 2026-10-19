@@ -5,13 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AddedMaterialsTray from '@/components/AddedMaterialsTray';
 import SearchTab from './SearchTab';
 import ReuseTab from './ReuseTab';
+import PasteTab from './PasteTab';
+import TypeTab from './TypeTab';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 
 const tabs = ['search', 'paste', 'reuse', 'type'] as const;
 type TabName = typeof tabs[number];
 
 export default function AddMaterialsPage() {
-  const { id, reserve, isReadOnly, addedMaterials, undoAddedMaterial, setDiscoverySearchOpen, setSyllabusUploadOpen, itemHandlers } = useSubmissionEditorContext();
+  const { id, reserve, isReadOnly, addedMaterials, undoAddedMaterial } = useSubmissionEditorContext();
   const navigate = useNavigate();
   const { dbId, an } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,8 +23,8 @@ export default function AddMaterialsPage() {
   const navigateBack = () => {
     if (isRecordRoute) {
       const params = new URLSearchParams(searchParams);
-      params.set('tab', 'search');
-      navigate(`/submission/${id}/edit/add?${params.toString()}`);
+      params.set('tab', tab);
+      navigate(`/submission/${id}/edit/add?${params.toString()}`, { state: location.state });
       return;
     }
     navigate(`/submission/${id}/edit`);
@@ -49,7 +51,7 @@ export default function AddMaterialsPage() {
           Add materials is unavailable while this submission is locked.
         </div>
       ) : isRecordRoute ? (
-        <SearchTab isRecordRoute dbId={dbId} an={an} />
+        tab === 'paste' ? <PasteTab isRecordRoute dbId={dbId} an={an} /> : <SearchTab isRecordRoute dbId={dbId} an={an} />
       ) : (
         <Tabs value={tab} onValueChange={changeTab} className="space-y-5">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
@@ -59,15 +61,11 @@ export default function AddMaterialsPage() {
             <TabsTrigger value="type">Type it in</TabsTrigger>
           </TabsList>
           <TabsContent value="search"><SearchTab /></TabsContent>
-          <TabsContent value="paste">
-            <Placeholder title="Paste a list" description="Use the current syllabus paste flow, or search citations against the library." primaryLabel="Open paste dialog" onPrimary={() => setSyllabusUploadOpen(true)} secondaryLabel="Search citations in the library" onSecondary={() => setDiscoverySearchOpen(true)} />
-          </TabsContent>
+          <TabsContent value="paste" forceMount><PasteTab /></TabsContent>
           <TabsContent value="reuse">
             <ReuseTab />
           </TabsContent>
-          <TabsContent value="type">
-            <Placeholder title="Type it in" description="Add a material that is not in the library search." primaryLabel="Add an item" onPrimary={itemHandlers.handleAddItem} />
-          </TabsContent>
+          <TabsContent value="type" forceMount><TypeTab /></TabsContent>
         </Tabs>
       )}
 

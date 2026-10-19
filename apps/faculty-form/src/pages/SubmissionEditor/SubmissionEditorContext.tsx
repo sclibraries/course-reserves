@@ -20,9 +20,6 @@ export interface SubmissionEditorContextValue {
   hasUnsavedChanges: boolean;
   lastSaveTime: Date | null;
   saveError: string | null;
-  // Dialog open state setters
-  setDiscoverySearchOpen: (open: boolean) => void;
-  setSyllabusUploadOpen: (open: boolean) => void;
   // Handlers
   itemHandlers: AnyHandlers;
   folderHandlers: AnyHandlers;

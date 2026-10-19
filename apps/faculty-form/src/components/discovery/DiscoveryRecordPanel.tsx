@@ -8,9 +8,10 @@ interface DiscoveryRecordPanelProps {
   isRoute?: boolean;
   onBack?: () => void;
   onAdd?: () => void;
+  addLabel?: string;
 }
 
-export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, onAdd }: DiscoveryRecordPanelProps) {
+export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
   if (loading) return <div className="rounded-md border p-6 text-sm text-muted-foreground" role="status">Loading full record…</div>;
   if (error) {
     return (
@@ -29,7 +30,7 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
   ].filter(Boolean);
 
   return (
-    <article className="space-y-4 rounded-md border bg-background p-5">
+    <article aria-label="Full record" className="space-y-4 rounded-md border bg-background p-5">
       {isRoute && <Button variant="ghost" className="px-0" onClick={onBack}>Back to results</Button>}
       {!isRoute && onBack && <Button variant="ghost" className="px-0" onClick={onBack}>Close record</Button>}
       <div>
@@ -54,7 +55,7 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
         </section>
       )}
       {record.pLink && <a className="block text-sm text-primary underline" href={record.pLink} target="_blank" rel="noreferrer">View at EBSCO</a>}
-      {onAdd && <Button className="w-full" onClick={onAdd}>Add to my list</Button>}
+      {onAdd && <Button className="w-full" onClick={onAdd}>{addLabel}</Button>}
     </article>
   );
 }
