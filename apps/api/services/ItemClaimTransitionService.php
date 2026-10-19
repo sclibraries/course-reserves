@@ -50,7 +50,7 @@ class ItemClaimTransitionService
                 $this->expiry->notify($notification);
                 return $this->result(409, ['error_code' => 'not_claimed']);
             }
-            if ($operation !== 'takeover' && $previousHolder !== $actorUsername) {
+            if ($operation !== 'takeover' && !$this->isClaimedBy($item, $actor)) {
                 $transaction->commit();
                 $this->expiry->notify($notification);
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
@@ -126,6 +126,12 @@ class ItemClaimTransitionService
     private function notify($eventType, array $context)
     {
         $this->notifier->notify($eventType, $context);
+    }
+
+    public function isClaimedBy(array $item, array $actor)
+    {
+        $username = (string)($actor['username'] ?? $actor['id'] ?? '');
+        return $item['claimed_by'] !== null && $item['claimed_by'] === $username;
     }
 
     private function result($status, array $body)

@@ -30,7 +30,9 @@ class ItemClaimRepository
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
             . 'i.assigned_group_id, i.item_status AS status, i.display_order AS position, '
-            . $resourceData . ' AS resource_data, source.name AS source_resource_title, mt.name AS material_type, '
+            . $resourceData . ' AS resource_data, source.name AS source_resource_title, '
+            . 'mt.name AS material_type, mt.material_type_id, flow_run.current_step_key, '
+            . 'flow_run.finish_state AS flow_finish_state, flow_version.steps_json AS flow_steps_json, '
             . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, s.submitted_at, '
             . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
@@ -39,6 +41,10 @@ class ItemClaimRepository
             . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
             . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
+            . 'LEFT JOIN item_flow_runs flow_run ON flow_run.id = (SELECT MAX(run.id) FROM item_flow_runs run '
+            . 'WHERE run.item_kind = "' . $kind . '" AND run.item_id = i.id) '
+            . 'LEFT JOIN flow_versions flow_version ON flow_version.flow_id = flow_run.flow_id '
+            . 'AND flow_version.version = flow_run.version '
             . 'WHERE i.id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
         $row = Yii::$app->db->createCommand($sql, [':id' => $id])->queryOne();
         if ($row) {

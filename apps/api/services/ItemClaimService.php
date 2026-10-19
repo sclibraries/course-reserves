@@ -209,6 +209,31 @@ class ItemClaimService
         $this->activityService->recordActivity($kind, $id);
     }
 
+    public function claimActorMatches(array $item, array $actor)
+    {
+        return $this->transitionService->isClaimedBy($item, $actor);
+    }
+
+    public function expireClaimLocked($kind, array $item, $now)
+    {
+        return $this->expiry->expireLocked($kind, $item, $now);
+    }
+
+    public function claimNow()
+    {
+        return $this->expiry->now();
+    }
+
+    public function renewClaimLocked($kind, $id, $now)
+    {
+        return $this->repository->touchActivity($kind, $id, $now);
+    }
+
+    public function notifyClaimExpiry($notification)
+    {
+        $this->expiry->notify($notification);
+    }
+
     public function completeLegacyChecklistItem($kind, $id, array $actor)
     {
         $this->activityService->completeLegacyChecklistItem($kind, $id, $actor);

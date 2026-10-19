@@ -40,6 +40,25 @@ class ItemClaimPresenter
                 'id' => $assignedGroupId,
                 'name' => $row['assigned_group_name'] ?? null,
             ],
+            'current_step_label' => $this->currentStepLabel($row),
+            'finish_state' => $row['flow_finish_state'] ?? null,
         ];
+    }
+
+    private function currentStepLabel(array $row)
+    {
+        if (empty($row['current_step_key']) || empty($row['flow_steps_json'])) {
+            return null;
+        }
+        $steps = json_decode($row['flow_steps_json'], true);
+        if (!is_array($steps)) {
+            return null;
+        }
+        foreach ($steps as $step) {
+            if (($step['key'] ?? null) === $row['current_step_key']) {
+                return $step['label'] ?? null;
+            }
+        }
+        return null;
     }
 }

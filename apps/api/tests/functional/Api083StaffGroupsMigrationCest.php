@@ -6,17 +6,26 @@ use PHPUnit\Framework\Assert;
 class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000002_add_staff_groups';
+    private $api084MigrationVersion = 'm261019_000003_add_staff_workflow_flows';
 
     public function createsGroupSchemaWithoutSeedingAcquisitions(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
+        $api084MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int)$db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
             )->queryScalar());
 
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api084MigrationVersion]
+            )->queryScalar(), 'API-084 migration must be applied by test-stack setup.');
+
+            $this->runMigration('down');
+            $api084MigrationIsDown = true;
             $this->runMigration('down');
             $migrationIsDown = true;
             $db->schema->refresh();
@@ -25,6 +34,8 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
 
             $this->runMigration('up');
             $migrationIsDown = false;
+            $this->runMigration('up');
+            $api084MigrationIsDown = false;
             $db->schema->refresh();
             Assert::assertNotNull($db->schema->getTableSchema('staff_groups', true));
             Assert::assertNotNull($db->schema->getTableSchema('staff_group_members', true));
@@ -52,6 +63,10 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
             Assert::assertNotEmpty($uniqueIndexes, 'Group membership must be unique.');
         } finally {
             if ($migrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refresh();
+            }
+            if ($api084MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refresh();
             }

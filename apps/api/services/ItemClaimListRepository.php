@@ -120,12 +120,18 @@ class ItemClaimListRepository
             . 's.course_code, s.section, s.term_code, ' . $title . ' AS title, source.name AS source_resource_title, '
             . $resourceData . ' AS resource_data, mt.name AS material_type, i.display_order AS position, '
             . 'i.item_status AS status, i.claimed_by, i.claimed_at, i.last_activity_at, i.assigned_group_id, '
+            . 'mt.material_type_id, flow_run.current_step_key, flow_run.finish_state AS flow_finish_state, '
+            . 'flow_version.steps_json AS flow_steps_json, '
             . 's.submitted_at, COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
             . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
-            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id WHERE ' . $condition;
+            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
+            . 'LEFT JOIN item_flow_runs flow_run ON flow_run.id = (SELECT MAX(run.id) FROM item_flow_runs run '
+            . 'WHERE run.item_kind = "' . $kind . '" AND run.item_id = i.id) '
+            . 'LEFT JOIN flow_versions flow_version ON flow_version.flow_id = flow_run.flow_id '
+            . 'AND flow_version.version = flow_run.version WHERE ' . $condition;
     }
 }

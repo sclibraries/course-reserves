@@ -70,13 +70,37 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/options',
             'OPTIONS workflow/admin/groups/<id:\\d+>/members/<username:[^/]+>' => 'workflow-group/options',
         ];
+        $flowRules = [
+            'GET workflow/flows' => 'workflow-flow/flows',
+            'OPTIONS workflow/flows' => 'workflow-flow/options',
+            'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/flow' => 'workflow-flow/item-flow',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/step-result' => 'workflow-flow/step-result',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/switch-flow' => 'workflow-flow/switch-flow',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/flow' => 'workflow-flow/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/step-result' => 'workflow-flow/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/switch-flow' => 'workflow-flow/options',
+            'GET workflow/admin/flows' => 'workflow-flow-admin/flows',
+            'POST workflow/admin/flows' => 'workflow-flow-admin/flows',
+            'GET workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/flow',
+            'PUT workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/flow',
+            'DELETE workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/flow',
+            'POST workflow/admin/flows/<id:\\d+>/versions' => 'workflow-flow-admin/versions',
+            'GET workflow/admin/flow-mapping' => 'workflow-flow-admin/mapping',
+            'PUT workflow/admin/flow-mapping' => 'workflow-flow-admin/mapping',
+            'OPTIONS workflow/admin/flows' => 'workflow-flow-admin/options',
+            'OPTIONS workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/options',
+            'OPTIONS workflow/admin/flows/<id:\\d+>/versions' => 'workflow-flow-admin/options',
+            'OPTIONS workflow/admin/flow-mapping' => 'workflow-flow-admin/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
-        $declaredWorkflowRules = array_merge($claimRules, $groupRules);
+        $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
+        $declaredWorkflowRules = array_merge($claimRules, $groupRules, $flowRules);
         $existingRules = array_diff_key($mergedRules, $declaredWorkflowRules);
-        $this->assertCount(200, $mergedRules);
+        $this->assertCount(220, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
+        $this->assertSame($flowRules, $expectedFlowRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -112,6 +136,24 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['DELETE', 'workflow/admin/groups/999007210/members/test-api083-staff', [
                 'workflow-group/admin-group-member', ['id' => '999007210', 'username' => 'test-api083-staff'],
             ]],
+            ['GET', 'workflow/flows', ['workflow-flow/flows', []]],
+            ['GET', 'workflow/item/new/999007211/flow', [
+                'workflow-flow/item-flow', ['kind' => 'new', 'id' => '999007211'],
+            ]],
+            ['POST', 'workflow/item/reuse/999007212/step-result', [
+                'workflow-flow/step-result', ['kind' => 'reuse', 'id' => '999007212'],
+            ]],
+            ['POST', 'workflow/item/new/999007213/switch-flow', [
+                'workflow-flow/switch-flow', ['kind' => 'new', 'id' => '999007213'],
+            ]],
+            ['POST', 'workflow/admin/flows', ['workflow-flow-admin/flows', []]],
+            ['GET', 'workflow/admin/flows/999007214', [
+                'workflow-flow-admin/flow', ['id' => '999007214'],
+            ]],
+            ['POST', 'workflow/admin/flows/999007214/versions', [
+                'workflow-flow-admin/versions', ['id' => '999007214'],
+            ]],
+            ['PUT', 'workflow/admin/flow-mapping', ['workflow-flow-admin/mapping', []]],
             ['POST', 'workflow/item/new/999007207/claim', [
                 'workflow-claim/claim', ['kind' => 'new', 'id' => '999007207'],
             ]],

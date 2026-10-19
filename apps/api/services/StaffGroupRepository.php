@@ -13,6 +13,13 @@ class StaffGroupRepository
         return Yii::$app->db->createCommand($sql, [':id' => (int)$id])->queryOne() ?: null;
     }
 
+    public function findByName($name)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT * FROM staff_groups WHERE name = :name LIMIT 1', [':name' => $name]
+        )->queryOne() ?: null;
+    }
+
     public function allGroups()
     {
         return Yii::$app->db->createCommand($this->groupListSql(false), [])->queryAll();

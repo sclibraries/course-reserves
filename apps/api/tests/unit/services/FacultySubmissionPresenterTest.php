@@ -24,6 +24,11 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'claimed_by_staff_id' => 'test-api077-staff',
                 'materialized_resource_id' => 82,
                 'future_staff_flag' => true,
+                'current_step_label' => 'test-api084-private-step',
+                'finish_state' => 'unavailable',
+                'notes' => 'test-api084-private-note',
+                'reason' => 'test-api084-private-reason',
+                'actor_display' => 'test-api084-private-staff',
             ]],
             'workflowAssignment' => ['staff_notes' => 'test-internal-assignment-note'],
             'metadata' => [
