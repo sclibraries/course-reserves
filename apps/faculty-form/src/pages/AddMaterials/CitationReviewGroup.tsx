@@ -4,21 +4,26 @@ import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
 import type { CitationBatchSearchGroup } from '@/utils/citationBatchSearch';
 import type { CitationChoice, EditableCitation } from './pasteCitationTypes';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import type { CourseItem } from '@/store/courseReservesStore';
 
 interface CitationReviewGroupProps {
   citation: EditableCitation;
   index: number;
   group?: CitationBatchSearchGroup;
   choice?: CitationChoice;
+  addedItem?: CourseItem;
+  writtenDuplicate?: boolean;
+  isResultDuplicate: (result: DiscoverySearchResult) => boolean;
   disabled?: boolean;
   onEdit: (id: string, text: string) => void;
   onRemove: (id: string) => void;
   onAddAsWritten: (citation: EditableCitation) => void;
-  onClearChoice: (id: string) => void;
   onOpenRecord: (citationId: string, result: DiscoverySearchResult) => void;
+  onAddMatch: (citationId: string, result: DiscoverySearchResult) => void;
+  onUndo: (itemId: string) => void;
 }
 
-export default function CitationReviewGroup({ citation, index, group, choice, disabled = false, onEdit, onRemove, onAddAsWritten, onClearChoice, onOpenRecord }: CitationReviewGroupProps) {
+export default function CitationReviewGroup({ citation, index, group, choice, addedItem, writtenDuplicate, isResultDuplicate, disabled = false, onEdit, onRemove, onAddAsWritten, onOpenRecord, onAddMatch, onUndo }: CitationReviewGroupProps) {
   return (
     <section data-citation-id={citation.id} className="space-y-3 rounded-lg border p-4">
       <div className="flex items-start gap-2">
@@ -33,11 +38,16 @@ export default function CitationReviewGroup({ citation, index, group, choice, di
         <Button aria-label={`Remove citation ${index + 1}`} variant="ghost" size="sm" disabled={disabled} onClick={() => onRemove(citation.id)}>Remove</Button>
       </div>
 
-      {choice ? (
+      {choice && addedItem ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
-          <span>{choice.source === 'written' ? 'Selected as written' : `Selected match: ${choice.label}`}</span>
-          <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onClearChoice(citation.id)}>Clear selection</Button>
+          <span>
+            {choice.source === 'written' ? 'Added as written ✓' : 'Added to your list ✓'}
+            {choice.source === 'match' && <span className="ml-2 text-muted-foreground">{addedItem.title}</span>}
+          </span>
+          <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onUndo(addedItem.id)}>Undo</Button>
         </div>
+      ) : writtenDuplicate ? (
+        <p className="text-sm text-muted-foreground">In your list ✓</p>
       ) : (
         <Button variant="outline" size="sm" disabled={disabled} onClick={() => onAddAsWritten(citation)}>Add as written</Button>
       )}
@@ -47,16 +57,19 @@ export default function CitationReviewGroup({ citation, index, group, choice, di
       {group && group.results.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Best matches</h3>
-          {group.results.map((result) => (
-            <DiscoveryResultCard
-              key={`${citation.id}:${result.dbId}:${result.id}`}
-              result={result}
-              isSelected={choice?.resultId === result.id}
-              onOpenRecord={() => onOpenRecord(citation.id, result)}
-              onAdd={() => onOpenRecord(citation.id, result)}
-              addLabel="Use this match"
-            />
-          ))}
+          {group.results.map((result) => {
+            const selectedChoice = Boolean(addedItem && choice?.resultId === result.id);
+            return (
+              <DiscoveryResultCard
+                key={`${citation.id}:${result.dbId}:${result.id}`}
+                result={result}
+                isDuplicate={!selectedChoice && isResultDuplicate(result)}
+                onOpenRecord={() => onOpenRecord(citation.id, result)}
+                onAdd={addedItem ? undefined : () => onAddMatch(citation.id, result)}
+                addLabel="Use this match"
+              />
+            );
+          })}
         </div>
       )}
     </section>

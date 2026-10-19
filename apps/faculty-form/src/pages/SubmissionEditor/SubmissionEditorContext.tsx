@@ -35,7 +35,6 @@ export interface SubmissionEditorContextValue {
   user: { full_name?: string } | null;
   addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
   createFolder: (reserveId: string, title: string) => string;
-  addItemsFromExternalSource: (items: Partial<CourseItem>[]) => void;
   addedMaterials: AddedMaterialVisitItem[];
   undoAddedMaterial: (itemId: string) => void;
 }

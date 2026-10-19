@@ -9,8 +9,8 @@ export interface EditableCitation {
 export interface CitationChoice {
   item: Partial<CourseItem>;
   source: 'written' | 'match';
-  label: string;
   resultId?: string;
+  addedItemId?: string;
 }
 
 export interface PasteWorkspace {

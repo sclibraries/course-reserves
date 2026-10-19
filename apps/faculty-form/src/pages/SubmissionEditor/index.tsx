@@ -143,25 +143,6 @@ const SubmissionEditor = () => {
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, wrappedMoveTo, isSearching);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
-  const handleItemsFromExternalSource = (items: Partial<CourseItem>[]) => {
-    let skippedCount = 0;
-
-    items.forEach((item) => {
-      const added = wrappedAddItem(id!, {
-        ...item,
-        status: item.status || 'draft',
-        materialType: item.materialType || 'other',
-        title: item.title || 'Untitled',
-      });
-
-      if (!added) skippedCount += 1;
-    });
-
-    if (skippedCount > 0) {
-      toast.error(`${skippedCount} duplicate item${skippedCount === 1 ? '' : 's'} skipped.`);
-    }
-  };
-
   const ctxValue = {
     id: id!, reserve, isEditingSubmission,
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
@@ -174,7 +155,6 @@ const SubmissionEditor = () => {
     addItemToFolder: (...a: Parameters<typeof addItemToFolder>) => { addItemToFolder(...a); markChanged(); },
     moveFolderPosition: (...a: Parameters<typeof moveFolderPosition>) => { moveFolderPosition(...a); markChanged(); },
     user, addItem: wrappedAddItem, createFolder: wrappedCreateFolder,
-    addItemsFromExternalSource: handleItemsFromExternalSource,
     addedMaterials, undoAddedMaterial,
   };
 

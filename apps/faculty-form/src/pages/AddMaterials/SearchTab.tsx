@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input';
 import DiscoveryFilterBar from '@/components/discovery/DiscoveryFilterBar';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
+import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { useDiscoverySearch } from '@/hooks/useDiscoverySearch';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useSelection } from '@/hooks/useSelection';
-import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
-import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem';
-import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { useOnEscape } from './useOnEscape';
+import { useDiscoveryResultActions } from './useDiscoveryResultActions';
 
 interface SearchTabProps {
   isRecordRoute?: boolean;
@@ -20,7 +19,7 @@ interface SearchTabProps {
 }
 
 export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTabProps) {
-  const { id, reserve, addItem } = useSubmissionEditorContext();
+  const { id, isDuplicate, addResult } = useDiscoveryResultActions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const route = useParams();
@@ -92,13 +91,11 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     event.preventDefault();
     search.setQuery(draftQuery);
   };
-  const isDuplicate = (result: Parameters<typeof discoveryResultToCourseItem>[0]) =>
-    Boolean(findDuplicateCourseItem(reserve.items, discoveryResultToCourseItem(result)));
   const selectRecord = (dbId: string, an: string) => {
     if (recordPaneRef.current) recordPaneRef.current.scrollTop = 0;
     void loadRecord(dbId, an);
   };
-  const openRecord = (result: Parameters<typeof discoveryResultToCourseItem>[0]) => {
+  const openRecord = (result: DiscoverySearchResult) => {
     if (window.innerWidth < 768) {
       const params = new URLSearchParams(searchParams);
       params.set('tab', 'search');
@@ -107,11 +104,8 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     }
     selectRecord(result.dbId, result.id);
   };
-  const addResult = (result: Parameters<typeof discoveryResultToCourseItem>[0]) => {
-    if (!isDuplicate(result)) addItem(id, discoveryResultToCourseItem(result));
-  };
   const addFullRecord = () => {
-    if (record && !isDuplicate(record)) addItem(id, discoveryResultToCourseItem(record));
+    if (record) addResult(record);
   };
   const backToSearch = () => {
     const params = new URLSearchParams(searchParams);

@@ -64,7 +64,6 @@ const editorContext: SubmissionEditorContextValue = {
   user: null,
   addItem: vi.fn(),
   createFolder: vi.fn(),
-  addItemsFromExternalSource: vi.fn(),
   addedMaterials: [],
   undoAddedMaterial: vi.fn(),
 };

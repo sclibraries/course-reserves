@@ -1,8 +1,10 @@
-import { act } from 'react';
+import { act, useRef, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CourseReserve } from '@/store/courseReservesStore';
+import type { CourseItem, CourseReserve } from '@/store/courseReservesStore';
+import { createAddMaterialHandler } from '@/handlers/addMaterialHandler';
+import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
 import SubmissionEditorContext, { type SubmissionEditorContextValue } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { retrieveDiscoveryRecord, searchDiscovery } from '@/services/discoverySearchService';
 import AddMaterialsPage from './AddMaterialsPage';
@@ -31,6 +33,7 @@ const fullRecord = {
   isbn: '9780000000000', issn: '1234-5678', location: 'Neilson', callNumber: 'QA 1',
   fullTextLinks: [{ Category: 'Full Text', Name: 'PDF', Url: 'https://example.edu/full-text' }],
 };
+const validCitation = 'Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28';
 const reserve: CourseReserve = {
   id: 'reserve-test', courseCode: 'BIO 220', courseTitle: 'Ecology', section: '01', instructors: 'Test Faculty',
   term: 'Fall 2026', status: 'draft', items: [{ id: 'existing', title: 'Existing', materialType: 'article', status: 'draft', doi: '10.1000/synthetic' }],
@@ -42,6 +45,48 @@ const LocationProbe = () => {
   return <output data-testid="location">{location.pathname}{location.search}</output>;
 };
 
+function LiveEditorProvider({
+  context,
+  folderId,
+  children,
+}: {
+  context: SubmissionEditorContextValue;
+  folderId?: string;
+  children: ReactNode;
+}) {
+  const [reserveState, setReserveState] = useState(context.reserve);
+  const [addedMaterials, setAddedMaterials] = useState(context.addedMaterials);
+  const lastAdded = useRef<CourseItem | undefined>(undefined);
+  const itemSequence = useRef(0);
+  const addItem = createAddMaterialHandler({
+    reserveId: context.id,
+    defaultFolderId: folderId,
+    markChanged: context.markChanged,
+    getLastAddedItem: () => lastAdded.current,
+    onAdded: (item) => setAddedMaterials((current) => [...current, { id: item.id, title: item.title }]),
+    addItem: (reserveId, item) => {
+      if (findDuplicateCourseItem(reserveState.items, item)) return false;
+      const accepted = context.addItem(reserveId, item);
+      if (!accepted) return false;
+      const addedItem = { ...item, id: `added-${++itemSequence.current}` } as CourseItem;
+      lastAdded.current = addedItem;
+      setReserveState((current) => ({ ...current, items: [...current.items, addedItem] }));
+      return true;
+    },
+  });
+  const undoAddedMaterial = (itemId: string) => {
+    context.undoAddedMaterial(itemId);
+    setReserveState((current) => ({ ...current, items: current.items.filter((item) => item.id !== itemId) }));
+    setAddedMaterials((current) => current.filter((item) => item.id !== itemId));
+  };
+
+  return (
+    <SubmissionEditorContext.Provider value={{ ...context, reserve: reserveState, addItem, undoAddedMaterial, addedMaterials }}>
+      {children}
+    </SubmissionEditorContext.Provider>
+  );
+}
+
 function createContext(overrides: Partial<SubmissionEditorContextValue> = {}) {
   return {
     id: reserve.id, reserve, isEditingSubmission: false, hasPreviousOffering: true,
@@ -50,10 +95,27 @@ function createContext(overrides: Partial<SubmissionEditorContextValue> = {}) {
     itemHandlers: { handleAddItem: vi.fn() }, folderHandlers: {}, courseHandlers: {},
     dragHandlers: {}, submissionHandlers: {}, markChanged: vi.fn(), removeItemFromFolder: vi.fn(),
     moveItemInFolder: vi.fn(), addItemToFolder: vi.fn(), moveFolderPosition: vi.fn(), user: null,
-    addItem: vi.fn(() => true), createFolder: vi.fn(() => 'target-folder'), addItemsFromExternalSource: vi.fn(),
+    addItem: vi.fn(() => true), createFolder: vi.fn(() => 'target-folder'),
     addedMaterials: [], undoAddedMaterial: vi.fn(),
     ...overrides,
   } as unknown as SubmissionEditorContextValue;
+}
+
+async function enterCitation(view: HTMLElement, text: string) {
+  const pasteBox = view.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(pasteBox, text);
+    pasteBox.dispatchEvent(new Event('input', { bubbles: true }));
+    pasteBox.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const extract = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Extract citations'));
+  await act(async () => extract?.click());
+}
+
+async function findPasteMatches(view: HTMLElement) {
+  const findMatches = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Find matches'));
+  await act(async () => { findMatches?.click(); await Promise.resolve(); });
 }
 
 describe('AddMaterialsPage', () => {
@@ -82,19 +144,21 @@ describe('AddMaterialsPage', () => {
   });
 
   const renderAt = async (entry: string, context = createContext()) => {
+    const requestedFolderId = new URL(entry, window.location.origin).searchParams.get('folder') || undefined;
+    const defaultFolderId = context.reserve.folders.some((folder) => folder.id === requestedFolderId) ? requestedFolderId : undefined;
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => {
       root?.render(
-        <SubmissionEditorContext.Provider value={context}>
+        <LiveEditorProvider context={context} folderId={defaultFolderId}>
           <MemoryRouter initialEntries={[entry]}>
             <Routes>
               <Route path="/submission/:id/edit/add" element={<><AddMaterialsPage /><LocationProbe /></>} />
               <Route path="/submission/:id/edit/add/record/:dbId/:an" element={<><AddMaterialsPage /><LocationProbe /></>} />
             </Routes>
           </MemoryRouter>
-        </SubmissionEditorContext.Provider>
+        </LiveEditorProvider>
       );
       await Promise.resolve();
     });
@@ -390,102 +454,161 @@ describe('AddMaterialsPage', () => {
     expect(Array.isArray(searchedQuery) && searchedQuery.some((query) => query.field === 'TI' && query.term === 'Edited citation title')).toBe(true);
   });
 
-  it('selects citations from different paths and adds them in citation order', async () => {
-    const context = createContext({ reserve: { ...reserve, items: [] } });
-    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
-    const pasteBox = view.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement | null;
-    expect(pasteBox).toBeTruthy();
-    if (!pasteBox) return;
+  it('adds a citation as written in one click and applies its target folder', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [], folders: [{ id: 'folder-42', title: 'Unit One', itemIds: [] }] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste&folder=folder-42', context);
+    await enterCitation(view, validCitation);
 
-    const writtenCitation = 'Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28';
-    const matchedCitation = 'Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.';
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter?.call(pasteBox, `${writtenCitation}\n\n${matchedCitation}`);
-      pasteBox.dispatchEvent(new Event('input', { bubbles: true }));
-      pasteBox.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const extract = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Extract citations'));
-    await act(async () => extract?.click());
-    const findMatches = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Find matches'));
-    expect(findMatches).toBeTruthy();
-    await act(async () => {
-      findMatches?.click();
-      await Promise.resolve();
-    });
-
-    const secondCitation = view.querySelector('[data-citation-id="citation-2"]');
-    expect(secondCitation).toBeTruthy();
-    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
-    const openRecord = Array.from(secondCitation?.querySelectorAll('button') || [])
-      .find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement | undefined;
-    expect(openRecord).toBeTruthy();
-    if (!openRecord || !secondCitation) return;
-
-    await act(async () => {
-      openRecord.click();
-      await Promise.resolve();
-    });
-    expect(view.querySelector('[aria-label="Full record"]')).not.toBeNull();
-    expect(view.querySelector('[aria-label="Close full record"]')).not.toBeNull();
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
-    await act(async () => { openRecord.click(); await Promise.resolve(); });
-    const useMatch = Array.from(view.querySelectorAll('[aria-label="Full record"] button')).find((button) => button.textContent?.includes('Use this match'));
-    expect(useMatch).toBeTruthy();
-    await act(async () => useMatch?.click());
-
-    const firstCitation = view.querySelector('[data-citation-id="citation-1"]');
-    const addAsWritten = firstCitation && Array.from(firstCitation.querySelectorAll('button')).find((button) => button.textContent?.includes('Add as written'));
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const addAsWritten = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.includes('Add as written')) as HTMLButtonElement;
     expect(addAsWritten).toBeTruthy();
-    await act(async () => addAsWritten?.click());
+    await act(async () => addAsWritten.click());
 
-    const addSelected = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Add selected'));
-    expect(addSelected).toBeTruthy();
-    await act(async () => addSelected?.click());
-
-    expect(context.addItemsFromExternalSource).toHaveBeenCalledWith([
-      expect.objectContaining({ title: writtenCitation, notes: writtenCitation, status: 'draft' }),
-      expect.objectContaining({ title: 'Synthetic Article', doi: '10.1000/synthetic', eds: expect.objectContaining({ an: 'synthetic-an' }) }),
-    ]);
+    expect(context.addItem).toHaveBeenCalledTimes(1);
+    expect(context.addItem).toHaveBeenCalledWith('reserve-test', expect.objectContaining({
+      title: validCitation, notes: validCitation, folderId: 'folder-42', status: 'draft',
+    }));
+    expect(card.textContent).toContain('Added as written ✓');
+    expect(Array.from(card.querySelectorAll('button')).some((button) => button.textContent?.includes('Add as written'))).toBe(false);
+    expect(Array.from(view.querySelectorAll('button')).some((button) => button.textContent?.includes('Add selected'))).toBe(false);
   });
 
-  it('opens Paste matches on the full-record route and keeps the selected citation when returning', async () => {
+  it('keeps added items in the list when citations are edited and re-extracted', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    const addAsWritten = Array.from(view.querySelectorAll('[data-citation-id="citation-1"] button'))
+      .find((button) => button.textContent?.includes('Add as written')) as HTMLButtonElement;
+    await act(async () => addAsWritten.click());
+
+    const edit = view.querySelector('textarea[aria-label="Edit citation 1"]') as HTMLTextAreaElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(edit, 'Edited citation text after adding the original.');
+      edit.dispatchEvent(new Event('input', { bubbles: true }));
+      edit.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const reextract = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Re-extract citations'));
+    await act(async () => reextract?.click());
+    const trayToggle = Array.from(view.querySelectorAll('aside[aria-label="Added materials"] button'))
+      .find((button) => button.textContent?.includes('Added (1)')) as HTMLButtonElement;
+    await act(async () => trayToggle.click());
+
+    expect(view.querySelector('[aria-label="Materials added this visit"]')?.textContent).toContain(validCitation);
+    expect(context.undoAddedMaterial).not.toHaveBeenCalled();
+  });
+
+  it('adds a match directly from its card without opening the record panel', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const useMatch = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use this match') as HTMLButtonElement;
+
+    expect(useMatch).toBeTruthy();
+    await act(async () => useMatch.click());
+
+    expect(context.addItem).toHaveBeenCalledTimes(1);
+    expect(context.addItem).toHaveBeenCalledWith('reserve-test', expect.objectContaining({
+      title: 'Synthetic Article', doi: '10.1000/synthetic', eds: expect.objectContaining({ an: 'synthetic-an' }),
+    }));
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    expect(card.textContent).toContain('Added to your list ✓');
+    expect(card.textContent).toContain('Synthetic Article');
+    expect(Array.from(card.querySelectorAll('button')).some((button) => button.textContent?.includes('Use this match'))).toBe(false);
+  });
+
+  it('adds from the full-record panel and closes it', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const openRecord = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
+    const useMatch = Array.from(view.querySelectorAll('[aria-label="Full record"] button')).find((button) => button.textContent?.includes('Use this match')) as HTMLButtonElement;
+
+    expect(useMatch).toBeTruthy();
+    await act(async () => useMatch.click());
+
+    expect(context.addItem).toHaveBeenCalledTimes(1);
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    expect(card.textContent).toContain('Added to your list ✓');
+  });
+
+  it('returns citation choices when its item is undone from the citation state', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const useMatch = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use this match') as HTMLButtonElement;
+    await act(async () => useMatch.click());
+    const undo = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Undo') as HTMLButtonElement;
+
+    expect(undo).toBeTruthy();
+    await act(async () => undo.click());
+
+    expect(context.undoAddedMaterial).toHaveBeenCalledWith('added-1');
+    expect(card.textContent).not.toContain('Added to your list ✓');
+    expect(Array.from(card.querySelectorAll('button')).some((button) => button.textContent?.trim() === 'Use this match')).toBe(true);
+  });
+
+  it('returns citation choices when the added item is undone from the tray', async () => {
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const useMatch = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use this match') as HTMLButtonElement;
+    await act(async () => useMatch.click());
+    const trayToggle = Array.from(view.querySelectorAll('aside[aria-label="Added materials"] button'))
+      .find((button) => button.textContent?.includes('Added (1)')) as HTMLButtonElement;
+    await act(async () => trayToggle.click());
+    const trayUndo = Array.from(view.querySelectorAll('[aria-label="Materials added this visit"] button'))
+      .find((button) => button.textContent?.trim() === 'Undo') as HTMLButtonElement;
+
+    await act(async () => trayUndo.click());
+
+    expect(context.undoAddedMaterial).toHaveBeenCalledWith('added-1');
+    expect(card.textContent).not.toContain('Added to your list ✓');
+    expect(Array.from(card.querySelectorAll('button')).some((button) => button.textContent?.trim() === 'Use this match')).toBe(true);
+  });
+
+  it('keeps a match already in the list disabled', async () => {
+    const context = createContext();
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const useMatch = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use this match') as HTMLButtonElement;
+
+    expect(card.textContent).toContain('In your list ✓');
+    expect(useMatch.disabled).toBe(true);
+    expect(context.addItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the added state and citation workspace after using a match on the phone record route', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     const context = createContext({ reserve: { ...reserve, items: [] } });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
-    const pasteBox = view.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement | null;
-    expect(pasteBox).toBeTruthy();
-    if (!pasteBox) return;
-
-    const citation = 'Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28';
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter?.call(pasteBox, citation);
-      pasteBox.dispatchEvent(new Event('input', { bubbles: true }));
-      pasteBox.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    const extract = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Extract citations'));
-    await act(async () => extract?.click());
-    const findMatches = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Find matches'));
-    await act(async () => { findMatches?.click(); await Promise.resolve(); });
+    const citation = validCitation;
+    await enterCitation(view, citation);
+    await findPasteMatches(view);
     const citationCard = view.querySelector('[data-citation-id="citation-1"]');
-    const useMatch = citationCard && Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record');
-    await act(async () => useMatch?.click());
+    const openRecord = citationCard && Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record');
+    await act(async () => openRecord?.click());
 
     expect(view.querySelector('[data-testid="location"]')?.textContent).toContain('/submission/reserve-test/edit/add/record/synthetic-database/synthetic-an');
     expect(view.textContent).toContain('Full synthetic abstract for faculty review.');
     const useFullRecord = Array.from(view.querySelectorAll('[aria-label="Full record"] button')).find((button) => button.textContent?.includes('Use this match'));
     await act(async () => useFullRecord?.click());
 
-    expect(view.querySelector('[data-citation-id="citation-1"]')?.textContent).toContain('Selected match: Synthetic Article');
+    expect(context.addItem).toHaveBeenCalledTimes(1);
+    expect(view.querySelector('[data-citation-id="citation-1"]')?.textContent).toContain('Added to your list ✓');
     expect((view.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement).value).toBe(citation);
-    const addSelected = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Add selected'));
-    await act(async () => addSelected?.click());
-    expect(context.addItemsFromExternalSource).toHaveBeenCalledWith([
-      expect.objectContaining({ doi: '10.1000/synthetic', eds: expect.objectContaining({ an: 'synthetic-an' }) }),
-    ]);
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
   });
 
   it('uses the same item form for inline typing and the existing item modal', async () => {

@@ -6,14 +6,12 @@ import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
 import { useSelection } from '@/hooks/useSelection';
 import { searchDiscovery } from '@/services/discoverySearchService';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
-import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { extractCitationsFromSyllabus } from '@/utils/syllabusCitationExtractor';
-import { citationToCourseItem } from '@/utils/citationToCourseItem';
-import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem';
 import { executeCitationBatchSearch, prepareCitationSearches } from '@/utils/citationBatchSearch';
 import CitationReviewGroup from './CitationReviewGroup';
-import { EMPTY_PASTE_WORKSPACE, type CitationChoice, type EditableCitation, type PasteWorkspace } from './pasteCitationTypes';
+import { EMPTY_PASTE_WORKSPACE, type PasteWorkspace } from './pasteCitationTypes';
 import { useOnEscape } from './useOnEscape';
+import { usePasteCitationActions } from './usePasteCitationActions';
 
 interface PasteTabProps {
   isRecordRoute?: boolean;
@@ -22,7 +20,6 @@ interface PasteTabProps {
 }
 
 export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabProps) {
-  const { id, addItemsFromExternalSource } = useSubmissionEditorContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,6 +30,8 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const [searchProgress, setSearchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [searching, setSearching] = useState(false);
   const [activeCitationId, setActiveCitationId] = useState<string>();
+  const { id, addedItemsByCitation, isWrittenDuplicate, isResultDuplicate, addAsWritten, addMatch, undoAddedMaterial } =
+    usePasteCitationActions(workspace, setWorkspace);
   const { record, loading, error: recordError, loadRecord, clearSelection } = useSelection();
   const routeCitationId = searchParams.get('citation') || undefined;
   const selectedCitationId = isRecordRoute ? routeCitationId : activeCitationId;
@@ -53,7 +52,16 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const extractCitations = () => {
     setHasAttemptedExtraction(true);
     const citations = extractCitationsFromSyllabus(pasteText).map((text, index) => ({ id: 'citation-' + (index + 1), text }));
-    setWorkspace({ citations, groups: [], choices: {} });
+    setWorkspace((current) => ({
+      citations,
+      groups: [],
+      choices: citations.reduce<PasteWorkspace['choices']>((choices, citation) => {
+        const previousCitation = current.citations.find((entry) => entry.id === citation.id);
+        const choice = previousCitation?.text === citation.text ? current.choices[citation.id] : undefined;
+        if (choice) choices[citation.id] = choice;
+        return choices;
+      }, {}),
+    }));
     setError(citations.length ? null : 'No citations were detected. Paste a reading list with citation details and try again.');
   };
 
@@ -61,7 +69,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     setWorkspace((current) => ({
       citations: current.citations.map((citation) => citation.id === idToEdit ? { ...citation, text } : citation),
       groups: [],
-      choices: {},
+      choices: current.choices,
     }));
   };
 
@@ -69,33 +77,11 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     setWorkspace((current) => ({
       citations: current.citations.filter((citation) => citation.id !== idToRemove),
       groups: [],
-      choices: {},
+      choices: Object.fromEntries(Object.entries(current.choices).filter(([id]) => id !== idToRemove)),
     }));
   };
 
-  const addAsWritten = (citation: EditableCitation) => {
-    setWorkspace((current) => ({
-      ...current,
-      choices: { ...current.choices, [citation.id]: { item: citationToCourseItem(citation.text), source: 'written', label: citation.text } },
-    }));
-  };
-
-  const clearChoice = (citationId: string) => {
-    setWorkspace((current) => {
-      const choices = { ...current.choices };
-      delete choices[citationId];
-      return { ...current, choices };
-    });
-  };
-
-  const chooseMatch = (citationId: string, result: DiscoverySearchResult) => {
-    const choice: CitationChoice = {
-      item: discoveryResultToCourseItem(result),
-      source: 'match',
-      label: result.title,
-      resultId: result.id,
-    };
-    setWorkspace((current) => withChoice(current, citationId, choice));
+  const closeAfterAdd = () => {
     setActiveCitationId(undefined);
     clearSelection();
   };
@@ -123,14 +109,10 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const useFullRecord = () => {
     const citationId = selectedCitationId;
     if (!record || !citationId) return;
-    const nextWorkspace = withChoice(workspace, citationId, {
-      item: discoveryResultToCourseItem(record),
-      source: 'match',
-      label: record.title,
-      resultId: record.id,
-    });
+    const nextWorkspace = addMatch(citationId, record);
+    if (!nextWorkspace) return;
     if (isRecordRoute) backToPaste(nextWorkspace);
-    else chooseMatch(citationId, record);
+    else closeAfterAdd();
   };
 
   const findMatches = async () => {
@@ -143,7 +125,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     setSearching(true);
     setError(null);
     setSearchProgress({ completed: 0, total: searches.length });
-    setWorkspace((current) => ({ ...current, groups: [], choices: {} }));
+    setWorkspace((current) => ({ ...current, groups: [] }));
     try {
       const groups = await executeCitationBatchSearch(searches, searchDiscovery, undefined, {
         onProgress: (completed, total) => setSearchProgress({ completed, total }),
@@ -156,16 +138,6 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     }
   };
 
-  const addSelected = () => {
-    const items = workspace.citations.flatMap((citation) => {
-      const choice = workspace.choices[citation.id];
-      return choice ? [choice.item] : [];
-    });
-    if (items.length === 0) return;
-    addItemsFromExternalSource(items);
-    setWorkspace((current) => ({ ...current, choices: {} }));
-  };
-
   if (isRecordRoute) {
     return (
       <section aria-label="Paste a list record" className="space-y-4">
@@ -175,20 +147,19 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
           error={recordError}
           isRoute
           onBack={() => backToPaste()}
-          onAdd={record && selectedCitationId ? useFullRecord : undefined}
+          onAdd={record && selectedCitationId && !addedItemsByCitation.has(selectedCitationId) && !isResultDuplicate(record) ? useFullRecord : undefined}
           addLabel="Use this match"
         />
       </section>
     );
   }
 
-  const selectedCount = Object.keys(workspace.choices).length;
   return (
     <section aria-label="Paste a list" className="space-y-4">
       <div className="space-y-3 rounded-lg border p-4">
         <div>
           <h2 className="text-lg font-semibold">Paste a reading list</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Paste citations, review the extracted lines, then search for library matches or add citations as written.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Paste citations, review the lines, then find library matches. Each one you add goes straight to your list.</p>
         </div>
         <Textarea
           aria-label="Paste a reading list"
@@ -219,13 +190,17 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
                   citation={citation}
                   index={index}
                   group={groupsById.get(citation.id)}
-                  choice={workspace.choices[citation.id]}
+                  choice={addedItemsByCitation.has(citation.id) ? workspace.choices[citation.id] : undefined}
+                  addedItem={addedItemsByCitation.get(citation.id)}
+                  writtenDuplicate={isWrittenDuplicate(citation)}
+                  isResultDuplicate={isResultDuplicate}
                   disabled={searching}
                   onEdit={editCitation}
                   onRemove={removeCitation}
                   onAddAsWritten={addAsWritten}
-                  onClearChoice={clearChoice}
                   onOpenRecord={openRecord}
+                  onAddMatch={(citationId, result) => { if (addMatch(citationId, result)) closeAfterAdd(); }}
+                  onUndo={undoAddedMaterial}
                 />
               ))}
             </div>
@@ -235,25 +210,20 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
                 loading={loading}
                 error={recordError}
                 onBack={closeRecordPanel}
-                onAdd={record && selectedCitationId ? useFullRecord : undefined}
+                onAdd={record && selectedCitationId && !addedItemsByCitation.has(selectedCitationId) && !isResultDuplicate(record) ? useFullRecord : undefined}
                 addLabel="Use this match"
               />
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <div className="flex flex-wrap items-center gap-3 border-t pt-4">
             <Button onClick={() => void findMatches()} disabled={searching || workspace.citations.length === 0}>
               {searching ? 'Finding matches…' : 'Find matches'}
             </Button>
-            <Button onClick={addSelected} disabled={searching || selectedCount === 0}>Add selected ({selectedCount})</Button>
           </div>
         </>
       )}
     </section>
   );
-}
-
-function withChoice(workspace: PasteWorkspace, citationId: string, choice: CitationChoice): PasteWorkspace {
-  return { ...workspace, choices: { ...workspace.choices, [citationId]: choice } };
 }
 
 function restoreWorkspace(locationState: unknown): PasteWorkspace {
