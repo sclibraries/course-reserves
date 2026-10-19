@@ -56,7 +56,7 @@ describe('claims formatters', () => {
     const submission = { id: 54, uuid: 'synthetic-api078-submission', courseCode: 'TST 101', section: '01', term: '2026FA' };
     const items = [
       { id: 99907812, isReuse: true, title: 'Later item', materialType: 'book', displayOrder: 2, status: 'pending' },
-      { id: 99907811, isReuse: false, title: 'First item', materialType: 'article', displayOrder: 1, status: 'pending' },
+      { id: 99907811, isReuse: false, title: 'First item', materialType: 'article', displayOrder: 1, status: 'pending', current_step_label: 'Check ownership' },
     ];
 
     expect(formatSubmissionClaimItems(items, submission)).toEqual([
@@ -64,8 +64,20 @@ describe('claims formatters', () => {
         kind: 'new', id: 99907811, submission_id: 54, submission_uuid: 'synthetic-api078-submission',
         course_code: 'TST 101', section: '01', term_code: '2026FA', title: 'First item',
         material_type: 'article', position: 1, claimed_by: null, assigned_group: null,
+        current_step_label: 'Check ownership', finish_state: null,
       }),
       expect.objectContaining({ kind: 'reuse', id: 99907812, position: 2, title: 'Later item' }),
     ]);
+  });
+
+  it('preserves flow status fields returned on a submission item', () => {
+    const items = [
+      { id: 99907813, isReuse: true, displayOrder: 1, current_step_label: null, finish_state: 'on_reserve' },
+    ];
+
+    expect(formatSubmissionClaimItems(items)[0]).toEqual(expect.objectContaining({
+      current_step_label: null,
+      finish_state: 'on_reserve',
+    }));
   });
 });

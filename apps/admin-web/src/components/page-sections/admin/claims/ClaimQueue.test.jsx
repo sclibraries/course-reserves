@@ -12,8 +12,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const items = [
   { kind: 'new', id: 3, submission_id: 55, position: 1, title: 'Later submission', course_code: 'BIO 110', term_code: '2026FA', material_type: 'book' },
-  { kind: 'reuse', id: 2, submission_id: 54, position: 2, title: 'Second item', course_code: 'TST 101', term_code: '2026FA', material_type: 'article' },
-  { kind: 'new', id: 1, submission_id: 54, position: 1, title: 'First item', course_code: 'TST 101', term_code: '2026FA', material_type: 'article' },
+  { kind: 'reuse', id: 2, submission_id: 54, position: 2, title: 'Second item', course_code: 'TST 101', term_code: '2026FA', material_type: 'article', finish_state: 'available_online' },
+  { kind: 'new', id: 1, submission_id: 54, position: 1, title: 'First item', course_code: 'TST 101', term_code: '2026FA', material_type: 'article', current_step_label: 'Check ownership' },
 ];
 
 let root;
@@ -45,6 +45,8 @@ describe('ClaimQueue', () => {
     expect(Array.from(container.querySelectorAll('[data-item-id]')).map((row) => row.dataset.itemId))
       .toEqual(['1', '2', '3']);
     expect(container.textContent).toContain('3 unclaimed items');
+    expect(container.textContent).toContain('Current step: Check ownership');
+    expect(container.textContent).toContain('Finished: Available online');
   });
 
   it('applies term and type filters to the queue request', async () => {

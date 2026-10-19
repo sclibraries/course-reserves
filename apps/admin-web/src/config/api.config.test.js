@@ -7,6 +7,15 @@ describe('apiConfig submission workflow endpoints', () => {
       '/submission-workflow/item/:itemId'
     );
   });
+
+  it('configures the staff item flow endpoints', () => {
+    expect(apiConfig.endpoints.workflowFlows).toEqual({
+      itemFlow: '/workflow/item/:kind/:id/flow',
+      stepResult: '/workflow/item/:kind/:id/step-result',
+      switchFlow: '/workflow/item/:kind/:id/switch-flow',
+      flows: '/workflow/flows',
+    });
+  });
 });
 
 describe('apiConfig search endpoints', () => {

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { formatFinishState } from '../../../../services/admin/workflowFlows/flowFormatters';
 
 function ClaimItemSummary({ item, children }) {
   const course = `${item.course_code || 'Course'}${item.section ? `-${item.section}` : ''}`;
@@ -13,6 +14,8 @@ function ClaimItemSummary({ item, children }) {
           <h2 className="h5 mb-1">{item.title || 'Untitled item'}</h2>
           <p className="text-muted mb-1">{course} · {item.term_code || 'Term unavailable'}</p>
           <p className="small mb-0">{item.material_type || 'Material type unavailable'} · {claimState}</p>
+          {item.current_step_label && <p className="small mb-0">Current step: {item.current_step_label}</p>}
+          {!item.current_step_label && item.finish_state && <p className="small mb-0">Finished: {formatFinishState(item.finish_state)}</p>}
           {item.assigned_group?.name && <p className="small text-muted mb-0">Group queue: {item.assigned_group.name}</p>}
         </div>
         {children}
@@ -31,6 +34,8 @@ ClaimItemSummary.propTypes = {
     material_type: PropTypes.string,
     claimed_by: PropTypes.string,
     claimed_by_display: PropTypes.string,
+    current_step_label: PropTypes.string,
+    finish_state: PropTypes.string,
     assigned_group: PropTypes.shape({ name: PropTypes.string }),
   }).isRequired,
   children: PropTypes.node,

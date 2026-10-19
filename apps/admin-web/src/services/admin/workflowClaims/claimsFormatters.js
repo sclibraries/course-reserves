@@ -68,6 +68,8 @@ export function formatSubmissionClaimItems(items = [], submission = {}) {
       last_activity_at: item.lastActivityAt || item.last_activity_at || null,
       expires_at: item.expiresAt || item.expires_at || null,
       assigned_group: item.assignedGroup || item.assigned_group || null,
+      current_step_label: item.current_step_label ?? item.currentStepLabel ?? null,
+      finish_state: item.finish_state ?? item.finishState ?? null,
     };
   }).sort((left, right) => left.position - right.position);
 }

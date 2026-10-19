@@ -6,6 +6,7 @@ import { getClaimsErrorMessage } from '../../../../services/admin/workflowClaims
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
 import WorkflowTimeline from '../linking/WorkflowTimeline';
 import ClaimItemSummary from './ClaimItemSummary';
+import ItemFlowPanel from './ItemFlowPanel';
 
 function ClaimItemCard({ item, currentUsername = '', onChanged }) {
   const [pending, setPending] = useState('');
@@ -25,6 +26,7 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [timelineError, setTimelineError] = useState('');
+  const [flowOpen, setFlowOpen] = useState(false);
 
   const isClaimed = Boolean(item.claimed_by);
   const isMine = Boolean(currentUsername && item.claimed_by === currentUsername);
@@ -127,8 +129,13 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
               Take over
             </Button>
           )}
+          <Button color="outline-secondary" aria-label={`${flowOpen ? 'Hide' : 'Show'} item flow for ${item.title}`} onClick={() => setFlowOpen((open) => !open)}>
+            {flowOpen ? 'Hide item flow' : 'Item flow'}
+          </Button>
         </div>
       </ClaimItemSummary>
+
+      {flowOpen && <ItemFlowPanel item={item} onChanged={onChanged} />}
 
       {error && <Alert color="danger" role="alert">{error}</Alert>}
 

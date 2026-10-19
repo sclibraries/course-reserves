@@ -151,6 +151,12 @@ export const apiConfig = {
       groupMembers: '/workflow/admin/groups/:id/members',
       groupMember: '/workflow/admin/groups/:id/members/:username',
     },
+    workflowFlows: {
+      itemFlow: '/workflow/item/:kind/:id/flow',
+      stepResult: '/workflow/item/:kind/:id/step-result',
+      switchFlow: '/workflow/item/:kind/:id/switch-flow',
+      flows: '/workflow/flows',
+    },
     workflow: {
       // Template Management
       listTemplates: '/workflow-admin/templates',

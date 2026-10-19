@@ -10,10 +10,15 @@ const mocks = vi.hoisted(() => ({
   getStaff: vi.fn(),
   getGroupsForHandoff: vi.fn(),
   getItemTimeline: vi.fn(),
+  getItemFlow: vi.fn(),
+  getFlows: vi.fn(),
+  submitStepResult: vi.fn(),
+  switchFlow: vi.fn(),
 }));
 
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
 vi.mock('../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
+vi.mock('../../../../services/admin/workflowFlows/workflowFlowsApi', () => ({ workflowFlowsApi: mocks }));
 
 import ClaimItemCard from './ClaimItemCard';
 
@@ -46,6 +51,7 @@ beforeEach(() => {
   mocks.getStaff.mockResolvedValue({ items: [{ username: 'test-api078-handler', display_name: 'Test Handler' }] });
   mocks.getGroupsForHandoff.mockResolvedValue({ groups: [{ id: 7, name: 'Synthetic acquisitions' }] });
   mocks.getItemTimeline.mockResolvedValue({ items: [{ event_type: 'claimed', actor: 'test-api078-staff', created_at: '2026-10-19T12:00:00Z' }] });
+  mocks.getItemFlow.mockResolvedValue({ flow: null, current_step: null, finished: null, history: [], can_act: true });
   onChanged.mockReset();
 });
 
@@ -118,5 +124,19 @@ describe('ClaimItemCard', () => {
     expect(mocks.getItemTimeline).toHaveBeenCalledWith('new', 99907801);
     expect(container.textContent).toContain('Item timeline: Synthetic item');
     expect(container.textContent).toContain('claimed');
+  });
+
+  it('shows the current flow step in the item claim card', async () => {
+    await renderCard({ ...item, current_step_label: 'Pull it from the shelf' });
+
+    expect(container.textContent).toContain('Current step: Pull it from the shelf');
+  });
+
+  it('opens the item flow from its claim card', async () => {
+    await renderCard();
+    await act(async () => container.querySelector('button[aria-label="Show item flow for Synthetic item"]').click());
+
+    expect(mocks.getItemFlow).toHaveBeenCalledWith('new', 99907801);
+    expect(container.textContent).toContain('No flow is set for this material type');
   });
 });
