@@ -22,12 +22,10 @@ describe('EmptyState start choices', () => {
     root = createRoot(container);
     act(() => root?.render(
       <EmptyState
-        hasItems={false}
-        hasFolders={false}
+        searchQuery=""
         hasPreviousCourse
         onAddItem={vi.fn()}
-        onCreateFolder={vi.fn()}
-        onClearFilters={vi.fn()}
+        onClearSearch={vi.fn()}
         onSearchLibrary={vi.fn()}
         onPasteCitations={vi.fn()}
         onUsePrevious={vi.fn()}
@@ -38,5 +36,26 @@ describe('EmptyState start choices', () => {
     expect(container.textContent).toContain('Paste a list from your syllabus');
     expect(container.textContent).toContain('Reuse what you used last time');
     expect(container.textContent).toContain('or type an item in');
+  });
+
+  it('shows the exact no-match message and clears the search', () => {
+    const onClearSearch = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root?.render(
+      <EmptyState
+        searchQuery="ocean"
+        onAddItem={vi.fn()}
+        onClearSearch={onClearSearch}
+      />
+    ));
+
+    expect(container.textContent).toContain('No materials match "ocean".');
+    const clearButton = Array.from(container.querySelectorAll('button'))
+      .find((button) => button.textContent === 'Clear search');
+    expect(clearButton).toBeDefined();
+    act(() => clearButton?.click());
+    expect(onClearSearch).toHaveBeenCalledOnce();
   });
 });

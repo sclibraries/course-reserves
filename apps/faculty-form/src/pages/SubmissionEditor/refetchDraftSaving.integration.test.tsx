@@ -28,8 +28,8 @@ vi.mock('react-router-dom', () => ({
 vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({
-  useOrganizedContent: () => ({ ungroupedItems: [], folders: [] }),
-  useFilteredAndSortedContent: () => ({ ungroupedItems: [], folders: [] }),
+  useOrganizedContent: () => ({ ungroupedItems: [], folders: [], mixedContent: [] }),
+  useFilteredContent: () => ({ ungroupedItems: [], folders: [], mixedContent: [] }),
 }));
 vi.mock('./Header', () => ({ default: () => null }));
 vi.mock('./ActionBar', async () => {

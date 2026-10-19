@@ -13,7 +13,7 @@ export const createItemHandlers = (
   deleteItem: (id: string, itemId: string) => void,
   moveItemInList: (id: string, itemId: string, direction: 'up' | 'down') => boolean,
   updateReserve: (id: string, updates: Partial<CourseReserve>) => void,
-  hasActiveFiltersOrSort: boolean,
+  isSearching: boolean,
   setEditingItem: (item: (ItemData & { id: string }) | undefined) => void,
   setModalOpen: (open: boolean) => void
 ) => {
@@ -43,8 +43,8 @@ export const createItemHandlers = (
   };
 
   const handleMoveUp = (itemId: string) => {
-    if (hasActiveFiltersOrSort) {
-      toast.error("Manual reordering is disabled when filters or sorting are applied. Clear filters to reorder items.");
+    if (isSearching) {
+      toast.error('Clear the search to reorder.');
       return;
     }
 
@@ -54,8 +54,8 @@ export const createItemHandlers = (
   };
 
   const handleMoveDown = (itemId: string) => {
-    if (hasActiveFiltersOrSort) {
-      toast.error("Manual reordering is disabled when filters or sorting are applied. Clear filters to reorder items.");
+    if (isSearching) {
+      toast.error('Clear the search to reorder.');
       return;
     }
 

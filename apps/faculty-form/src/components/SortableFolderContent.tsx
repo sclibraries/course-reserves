@@ -15,6 +15,7 @@ interface SortableFolderContentProps {
   onMoveItemInFolder: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
   canMoveItemUp: (itemId: string) => boolean;
   canMoveItemDown: (itemId: string) => boolean;
+  itemPositionById?: Map<string, number>;
   isDragDisabled?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function SortableFolderContent({
   onMoveItemInFolder,
   canMoveItemUp,
   canMoveItemDown,
+  itemPositionById,
   isDragDisabled = false,
 }: SortableFolderContentProps) {
   if (!folder.isOpen) return null;
@@ -37,35 +39,38 @@ export function SortableFolderContent({
       {folder.items.length > 0 ? (
         <SortableContext items={folder.items.map((item) => item.id)} strategy={noSortingStrategy}>
           <div className="space-y-2 ml-4 border-l border-muted pl-4">
-            {folder.items.map((item, itemIndex) => (
-              <div key={item.id} className="relative">
-                <SortableItem
-                  item={item}
-                  isNew={newItemIds.includes(item.id)}
-                  isDragDisabled={isDragDisabled}
-                  index={itemIndex}
-                  positionLabel={`${folder.title} · ${itemIndex + 1}`}
-                  totalItems={folder.items.length}
-                  canMoveUp={canMoveItemUp(item.id)}
-                  canMoveDown={canMoveItemDown(item.id)}
-                  onEdit={onEditItem}
-                  onDelete={onDeleteItem}
-                  onMoveUp={() => onMoveItemInFolder(folder.id, item.id, 'up')}
-                  onMoveDown={() => onMoveItemInFolder(folder.id, item.id, 'down')}
-                  availableFolders={[]}
-                  onRemoveFromFolder={onRemoveItemFromFolder}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2 z-30 h-6 w-6 p-0 opacity-0 hover:opacity-100 focus:opacity-100 bg-background/80 hover:bg-background"
-                  onClick={() => onRemoveItemFromFolder(item.id)}
-                  title="Remove from folder"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+            {folder.items.map((item, itemIndex) => {
+              const itemPosition = itemPositionById?.get(item.id) ?? itemIndex;
+              return (
+                <div key={item.id} className="relative">
+                  <SortableItem
+                    item={item}
+                    isNew={newItemIds.includes(item.id)}
+                    isDragDisabled={isDragDisabled}
+                    index={itemPosition}
+                    positionLabel={`${folder.title} · ${itemPosition + 1}`}
+                    totalItems={folder.items.length}
+                    canMoveUp={canMoveItemUp(item.id)}
+                    canMoveDown={canMoveItemDown(item.id)}
+                    onEdit={onEditItem}
+                    onDelete={onDeleteItem}
+                    onMoveUp={() => onMoveItemInFolder(folder.id, item.id, 'up')}
+                    onMoveDown={() => onMoveItemInFolder(folder.id, item.id, 'down')}
+                    availableFolders={[]}
+                    onRemoveFromFolder={onRemoveItemFromFolder}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2 z-30 h-6 w-6 p-0 opacity-0 hover:opacity-100 focus:opacity-100 bg-background/80 hover:bg-background"
+                    onClick={() => onRemoveItemFromFolder(item.id)}
+                    title="Remove from folder"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </SortableContext>
       ) : (

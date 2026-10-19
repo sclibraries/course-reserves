@@ -12,14 +12,14 @@ type DragData = {
 export const createDragHandlers = (
   reserveId: string,
   moveTo: (reserveId: string, id: string, target: MoveTarget) => void,
-  hasActiveFiltersOrSort: boolean
+  isSearching: boolean
 ) => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
 
-    if (hasActiveFiltersOrSort) {
-      toast.error('Drag and drop is disabled when filters or sorting are applied. Clear filters to reorder items.');
+    if (isSearching) {
+      toast.error('Clear the search to reorder.');
       return;
     }
 

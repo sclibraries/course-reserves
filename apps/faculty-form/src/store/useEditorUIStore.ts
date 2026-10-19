@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { SortOption, FilterOption } from '@/components/ItemSortingToolbar';
 import type { ItemData } from '@/components/ItemModal';
 import type { CorrectionRequiredDetail } from '@/services/submissionUpdateErrors';
 
@@ -12,9 +11,6 @@ interface EditorUIState {
   showInstructions: boolean;
   correctionRequiredDialogOpen: boolean;
   correctionRequiredDetail: CorrectionRequiredDetail | null;
-  sortBy: SortOption;
-  searchQuery: string;
-  filters: FilterOption;
 
   setModalOpen: (open: boolean) => void;
   setEditingItem: (item: (ItemData & { id: string }) | undefined) => void;
@@ -24,14 +20,9 @@ interface EditorUIState {
   setShowInstructions: (v: boolean) => void;
   openCorrectionRequiredDialog: (detail: CorrectionRequiredDetail) => void;
   closeCorrectionRequiredDialog: () => void;
-  setSortBy: (sort: SortOption) => void;
-  setSearchQuery: (q: string) => void;
-  setFilters: (filters: FilterOption) => void;
-  resetFilters: () => void;
-  hasActiveFiltersOrSort: () => boolean;
 }
 
-export const useEditorUIStore = create<EditorUIState>()((set, get) => ({
+export const useEditorUIStore = create<EditorUIState>()((set) => ({
   modalOpen: false,
   editingItem: undefined,
   showSubmitDialog: false,
@@ -40,9 +31,6 @@ export const useEditorUIStore = create<EditorUIState>()((set, get) => ({
   showInstructions: false,
   correctionRequiredDialogOpen: false,
   correctionRequiredDetail: null,
-  sortBy: 'position' as SortOption,
-  searchQuery: '',
-  filters: { materialTypes: [], statuses: [] },
 
   setModalOpen: (open) => set({ modalOpen: open }),
   setEditingItem: (item) => set({ editingItem: item }),
@@ -52,18 +40,4 @@ export const useEditorUIStore = create<EditorUIState>()((set, get) => ({
   setShowInstructions: (v) => set({ showInstructions: v }),
   openCorrectionRequiredDialog: (detail) => set({ correctionRequiredDialogOpen: true, correctionRequiredDetail: detail }),
   closeCorrectionRequiredDialog: () => set({ correctionRequiredDialogOpen: false, correctionRequiredDetail: null }),
-  setSortBy: (sort) => set({ sortBy: sort }),
-  setSearchQuery: (q) => set({ searchQuery: q }),
-  setFilters: (filters) => set({ filters }),
-  resetFilters: () =>
-    set({ sortBy: 'position' as SortOption, searchQuery: '', filters: { materialTypes: [], statuses: [] } }),
-  hasActiveFiltersOrSort: () => {
-    const { sortBy, searchQuery, filters } = get();
-    return (
-      sortBy !== 'position' ||
-      searchQuery.trim() !== '' ||
-      filters.materialTypes.length > 0 ||
-      filters.statuses.length > 0
-    );
-  },
 }));

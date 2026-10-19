@@ -49,8 +49,7 @@ vi.mock('@/hooks/useSubmissionEditor', () => ({
     showSubmitDialog: false, setShowSubmitDialog: () => {},
     emailConfirmation: false, setEmailConfirmation: () => {},
     courseModalOpen: false, setCourseModalOpen: () => {},
-    sortBy: 'manual', setSortBy: () => {}, searchQuery: '', setSearchQuery: () => {},
-    filters: {}, setFilters: () => {}, resetFilters: () => {}, hasActiveFiltersOrSort: false,
+    searchQuery: '', setSearchQuery: () => {}, isSearching: false,
     addItem: () => {}, updateItem: () => {}, deleteItem: () => {},
     moveItemInList: () => true, updateReserve: () => {}, createFolder: () => {}, updateFolder: () => {},
     deleteFolder: () => {}, toggleFolder: () => {}, addItemToFolder: () => {}, removeItemFromFolder: () => {},
@@ -70,8 +69,8 @@ vi.mock('@/store/useReserveStore', () => ({
 vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({
-  useOrganizedContent: () => ({ ungroupedItems: [], folders: [] }),
-  useFilteredAndSortedContent: () => ({ ungroupedItems: [], folders: [] }),
+  useOrganizedContent: () => ({ ungroupedItems: [], folders: [], mixedContent: [] }),
+  useFilteredContent: () => ({ ungroupedItems: [], folders: [], mixedContent: [] }),
 }));
 vi.mock('./ContentList', () => ({ default: () => null }));
 vi.mock('./SubmitDialog', () => ({ default: () => null }));

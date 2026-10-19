@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import { createDragHandlers } from './dragHandlers';
+
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 describe('createDragHandlers', () => {
   it('applies the target zone once when an item drops into a folder', () => {
@@ -45,8 +48,9 @@ describe('createDragHandlers', () => {
     expect(moveTo).toHaveBeenCalledWith('reserve-1', 'item-1', { after: 'folder-1' });
   });
 
-  it('does not move when sorting or filtering is active', () => {
+  it('blocks drag while searching with the reorder message', () => {
     const moveTo = vi.fn();
+    vi.mocked(toast.error).mockClear();
     const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, true);
 
     handleDragEnd({
@@ -55,5 +59,6 @@ describe('createDragHandlers', () => {
     } as never);
 
     expect(moveTo).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Clear the search to reorder.');
   });
 });

@@ -95,6 +95,7 @@ export const SortableItem = ({
             <button
               {...attributes}
               {...(!isDragDisabled ? listeners : {})}
+              aria-label="Reorder item"
               className={`p-1 transition-colors ${
                 isDragDisabled 
                   ? 'cursor-not-allowed text-muted-foreground/50' 

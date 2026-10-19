@@ -4,11 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Copy, FileText, Search } from 'lucide-react';
 
 interface EmptyStateProps {
-  hasItems: boolean;
-  hasFolders: boolean;
+  searchQuery: string;
   onAddItem: () => void;
-  onCreateFolder: () => void;
-  onClearFilters: () => void;
+  onClearSearch: () => void;
   onSearchLibrary?: () => void;
   onPasteCitations?: () => void;
   onUsePrevious?: () => void;
@@ -16,21 +14,20 @@ interface EmptyStateProps {
 }
 
 export const EmptyState = ({
-  hasItems,
-  hasFolders,
+  searchQuery,
   onAddItem,
-  onClearFilters,
+  onClearSearch,
   onSearchLibrary,
   onPasteCitations,
   onUsePrevious,
   hasPreviousCourse = false,
 }: EmptyStateProps) => {
-  if (hasItems || hasFolders) {
+  if (searchQuery.trim()) {
     return (
       <Card>
         <CardContent className="py-16 text-center">
-          <p className="mb-4 text-muted-foreground">No materials match your current filters.</p>
-          <Button variant="outline" onClick={onClearFilters}>Clear Filters</Button>
+          <p className="mb-4 text-muted-foreground">No materials match &quot;{searchQuery.trim()}&quot;.</p>
+          <Button variant="outline" onClick={onClearSearch}>Clear search</Button>
         </CardContent>
       </Card>
     );

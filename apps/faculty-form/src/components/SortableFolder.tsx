@@ -40,6 +40,7 @@ interface SortableFolderProps {
   canMoveFolderDown: boolean;
   canMoveItemUp: (itemId: string) => boolean;
   canMoveItemDown: (itemId: string) => boolean;
+  itemPositionById?: Map<string, number>;
   isDragDisabled?: boolean;
 }
 
@@ -61,6 +62,7 @@ export const SortableFolder = ({
   canMoveFolderDown,
   canMoveItemUp,
   canMoveItemDown,
+  itemPositionById,
   isDragDisabled = false
 }: SortableFolderProps) => {
   const {
@@ -129,6 +131,7 @@ export const SortableFolder = ({
             <button
               {...attributes}
               {...(!isDragDisabled ? listeners : {})}
+              aria-label="Reorder folder"
               className={`p-1 transition-colors ${
                 isDragDisabled 
                   ? 'cursor-not-allowed text-muted-foreground/50' 
@@ -271,6 +274,7 @@ export const SortableFolder = ({
         onMoveItemInFolder={onMoveItemInFolder}
         canMoveItemUp={canMoveItemUp}
         canMoveItemDown={canMoveItemDown}
+        itemPositionById={itemPositionById}
         isDragDisabled={isDragDisabled}
       />
     </Card>

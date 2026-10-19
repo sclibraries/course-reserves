@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
-import { useOrganizedContent, useFilteredAndSortedContent } from '@/hooks/useContentOrganization';
+import { useOrganizedContent, useFilteredContent } from '@/hooks/useContentOrganization';
 import { useDraftSaving } from '@/hooks/useDraftSaving';
 import { useSubmissionLock } from '@/hooks/useSubmissionLock';
 import { hasLocalMaterialEdits } from '@/store/reserve/submissionRefetchMerge';
@@ -39,8 +39,7 @@ const SubmissionEditor = () => {
     showSubmitDialog, setShowSubmitDialog,
     emailConfirmation, setEmailConfirmation,
     courseModalOpen, setCourseModalOpen,
-    sortBy, setSortBy, searchQuery, setSearchQuery,
-    filters, setFilters, resetFilters, hasActiveFiltersOrSort,
+    searchQuery, setSearchQuery, isSearching,
     addItem, updateItem, deleteItem, moveTo, moveItemInList, updateReserve,
     createFolder, updateFolder, deleteFolder, toggleFolder,
     addItemToFolder, removeItemFromFolder, moveItemInFolder, moveFolderPosition,
@@ -106,7 +105,7 @@ const SubmissionEditor = () => {
 
   useUnsavedChangesWarning(true, hasUnsavedChanges);
   const organizedContent = useOrganizedContent(reserve);
-  const filteredAndSortedContent = useFilteredAndSortedContent(organizedContent, searchQuery, filters, sortBy);
+  const filteredContent = useFilteredContent(organizedContent, searchQuery);
 
   if (!reserve) {
     return (
@@ -139,10 +138,10 @@ const SubmissionEditor = () => {
   };
   const wrappedMoveTo = (...a: Parameters<typeof moveTo>) => { moveTo(...a); markChanged(); };
 
-  const itemHandlers = createItemHandlers(id!, wrappedAddItem, wrappedUpdateItem, wrappedDeleteItem, wrappedMoveItemInList, wrappedUpdateReserve, hasActiveFiltersOrSort, setEditingItem, setModalOpen);
+  const itemHandlers = createItemHandlers(id!, wrappedAddItem, wrappedUpdateItem, wrappedDeleteItem, wrappedMoveItemInList, wrappedUpdateReserve, isSearching, setEditingItem, setModalOpen);
   const folderHandlers = createFolderHandlers(id!, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
-  const dragHandlers = createDragHandlers(id!, wrappedMoveTo, hasActiveFiltersOrSort);
+  const dragHandlers = createDragHandlers(id!, wrappedMoveTo, isSearching);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
   const handleItemsFromExternalSource = (items: Partial<CourseItem>[]) => {
     let skippedCount = 0;
@@ -223,11 +222,10 @@ const SubmissionEditor = () => {
           <fieldset disabled={isReadOnly} className="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-70">
             <ContentList
               organizedContent={organizedContent}
-              filteredAndSortedContent={filteredAndSortedContent}
-              sortBy={sortBy} setSortBy={setSortBy}
-              searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-              filters={filters} setFilters={setFilters}
-              resetFilters={resetFilters} hasActiveFiltersOrSort={hasActiveFiltersOrSort}
+              filteredContent={filteredContent}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              isSearching={isSearching}
             />
           </fieldset>
         </main>

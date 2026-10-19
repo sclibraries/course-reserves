@@ -6,7 +6,6 @@ import { useAuthStore } from "../store/authStore";
 import { API_ENDPOINTS } from "@/config/endpoints";
 import type { ItemData } from "@/components/ItemModal";
 import type { CourseData } from "@/components/CourseModal";
-import type { SortOption, FilterOption } from "@/components/ItemSortingToolbar";
 
 /**
  * Main hook for managing submission editor state and operations
@@ -61,24 +60,9 @@ export const useSubmissionEditor = () => {
   // UI states
   const [showInstructions, setShowInstructions] = useState(false);
   
-  // Sorting and filtering
-  const [sortBy, setSortBy] = useState<SortOption>('position');
+  // Search only narrows the list while preserving its stored order.
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<FilterOption>({
-    materialTypes: [],
-    statuses: []
-  });
-  
-  const resetFilters = () => {
-    setFilters({ materialTypes: [], statuses: [] });
-    setSearchQuery('');
-    setSortBy('position');
-  };
-  
-  const hasActiveFiltersOrSort = sortBy !== 'position' || 
-                                 filters.materialTypes.length > 0 || 
-                                 filters.statuses.length > 0 || 
-                                 !!searchQuery;
+  const isSearching = searchQuery.trim().length > 0;
   
   return {
     id,
@@ -100,14 +84,9 @@ export const useSubmissionEditor = () => {
     showInstructions,
     setShowInstructions,
     // Filtering
-    sortBy,
-    setSortBy,
     searchQuery,
     setSearchQuery,
-    filters,
-    setFilters,
-    resetFilters,
-    hasActiveFiltersOrSort,
+    isSearching,
     // Store actions
     addItem,
     updateItem,

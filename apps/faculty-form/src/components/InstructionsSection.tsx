@@ -38,16 +38,15 @@ export const InstructionsSection: React.FC<InstructionsSectionProps> = ({
                 <li>• <strong>Drag & drop</strong> to reorder materials</li>
                 <li>• Use <strong>arrow buttons</strong> for precise positioning</li>
                 <li>• <strong>Position numbers</strong> show the final order</li>
-                <li>• <strong>Sort options</strong> help organize large lists</li>
+                <li>• The displayed order is the order students see</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-medium mb-2">🔍 Filtering & Search</h4>
+              <h4 className="font-medium mb-2">🔍 Search</h4>
               <ul className="space-y-1 text-blue-700">
-                <li>• <strong>Search</strong> by title, author, or type</li>
-                <li>• <strong>Filter</strong> by material type, status, or priority</li>
-                <li>• <strong>Custom order</strong> preserves your arrangement</li>
-                <li>• <strong>Clear filters</strong> to see all materials</li>
+                <li>• Search by title, author, or material type</li>
+                <li>• Search also finds materials inside folders</li>
+                <li>• Clear the search to reorder materials</li>
               </ul>
             </div>
           </div>
