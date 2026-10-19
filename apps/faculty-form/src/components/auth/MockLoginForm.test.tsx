@@ -97,4 +97,24 @@ describe('MockLoginForm', () => {
     expect(fetchCourseAssignments).toHaveBeenCalledOnce();
     expect(fetchCourseAssignments).toHaveBeenCalledWith();
   });
+
+  it('lists the dev-seed test accounts and signs in with one click', async () => {
+    setMockUser.mockResolvedValue(undefined);
+    fetchCourseAssignments.mockResolvedValue(undefined);
+    render();
+
+    const section = container!.querySelector('section[aria-label="Test accounts"]')!;
+    expect(section.textContent).toContain('Test Faculty A');
+    expect(section.textContent).toContain('999078001');
+    expect(section.textContent).toContain('Test Faculty B');
+    expect(section.textContent).toContain('999078002');
+
+    const buttons = section.querySelectorAll<HTMLButtonElement>('button');
+    await act(async () => {
+      buttons[0].click();
+    });
+
+    expect(setMockUser).toHaveBeenCalledWith('Test Faculty A', '999078001');
+    expect(navigate).toHaveBeenCalledWith('/');
+  });
 });

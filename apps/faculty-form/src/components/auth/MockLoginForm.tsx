@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, LogIn } from "lucide-react";
+import { DevTestAccounts } from "./DevTestAccounts";
 
 interface MockLoginFormProps {
   /** Called after successful login */
@@ -22,14 +23,14 @@ export const MockLoginForm = ({ onLoginSuccess }: MockLoginFormProps) => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
 
-  const handleLogin = async () => {
-    if (customName.trim() && internalId.trim()) {
+  const handleLogin = async (name = customName, id = internalId) => {
+    if (name.trim() && id.trim()) {
       setLoginError(null);
       setLoginSuccess(null);
       
       try {
-        await setMockUser(customName.trim(), internalId.trim());
-        setLoginSuccess(`Successfully logged in as ${customName.trim()}!`);
+        await setMockUser(name.trim(), id.trim());
+        setLoginSuccess(`Successfully logged in as ${name.trim()}!`);
         
         // Auto-fetch course assignments after successful login
         try {
@@ -95,7 +96,7 @@ export const MockLoginForm = ({ onLoginSuccess }: MockLoginFormProps) => {
       </div>
       
       <Button
-        onClick={handleLogin}
+        onClick={() => handleLogin()}
         disabled={!customName.trim() || !internalId.trim() || authLoading}
         className="w-full flex items-center justify-center gap-2"
       >
@@ -107,6 +108,11 @@ export const MockLoginForm = ({ onLoginSuccess }: MockLoginFormProps) => {
         {authLoading ? 'Logging in...' : 'Login as Mock User'}
       </Button>
       
+      <DevTestAccounts
+        disabled={authLoading}
+        onSelect={(account) => handleLogin(account.fullName, account.internalId)}
+      />
+
       {loginError && (
         <div className="p-3 border border-red-200 bg-red-50 rounded-md text-red-700 text-sm">
           <strong>Error:</strong> {loginError}
