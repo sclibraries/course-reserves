@@ -11,6 +11,7 @@ import { useSelection } from '@/hooks/useSelection';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
 import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
+import { useOnEscape } from './useOnEscape';
 
 interface SearchTabProps {
   isRecordRoute?: boolean;
@@ -33,6 +34,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
   const sectionRef = useRef<HTMLElement>(null);
   const resultsPaneRef = useRef<HTMLDivElement>(null);
   const recordPaneRef = useRef<HTMLDivElement>(null);
+  const isSplitView = !showRecordRoute && Boolean(selectedId) && search.results.length > 0;
 
   useEffect(() => setDraftQuery(search.query), [search.query]);
   useEffect(() => {
@@ -40,8 +42,10 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     else clearSelection();
   }, [recordDbId, recordAn, clearSelection, loadRecord]);
 
+  useOnEscape(isSplitView && window.innerWidth >= 768, clearSelection);
+
   useLayoutEffect(() => {
-    if (showRecordRoute) {
+    if (!isSplitView) {
       setSectionHeight(undefined);
       return undefined;
     }
@@ -77,12 +81,12 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [showRecordRoute]);
+  }, [isSplitView]);
 
   const sentinelRef = useInfiniteScroll(
     search.loadMore,
     search.hasMore && !search.loading && !search.loadingMore,
-    resultsPaneRef,
+    isSplitView ? resultsPaneRef : undefined,
   );
   const searchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,7 +121,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
   return (
     <section
       ref={sectionRef}
-      className="space-y-4 md:flex md:min-h-0 md:flex-col"
+      className={isSplitView ? 'space-y-4 md:flex md:min-h-0 md:flex-col' : 'space-y-4'}
       aria-label="Search the library"
       style={sectionHeight === undefined ? undefined : { height: `${sectionHeight}px` }}
     >
@@ -131,11 +135,11 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
         </>
       )}
 
-      <div className={showRecordRoute ? 'block' : 'grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] md:grid-rows-[minmax(0,1fr)]'}>
+      <div className={showRecordRoute ? 'block' : isSplitView ? 'grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] md:grid-rows-[minmax(0,1fr)]' : 'space-y-3'}>
         {!showRecordRoute && (
           <div
             ref={resultsPaneRef}
-            className="min-w-0 space-y-3 md:min-h-0 md:overflow-y-auto md:overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={`min-w-0 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSplitView ? 'md:min-h-0 md:overflow-y-auto' : ''}`}
             role="region"
             aria-label="Search results"
             tabIndex={0}
@@ -161,10 +165,10 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
             {search.hasMore && <div className="text-center"><Button variant="outline" onClick={() => void search.loadMore()} disabled={search.loadingMore}>Load more</Button></div>}
           </div>
         )}
-        {(showRecordRoute || window.innerWidth >= 768) && (
+        {(showRecordRoute || (isSplitView && window.innerWidth >= 768)) && (
           <div
             ref={recordPaneRef}
-            className="md:min-h-0 md:overflow-y-auto md:overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="md:min-h-0 md:overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             role="region"
             aria-label="Full record"
             tabIndex={0}

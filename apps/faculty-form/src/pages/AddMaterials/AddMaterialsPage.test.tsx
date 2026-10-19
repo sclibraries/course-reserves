@@ -109,16 +109,73 @@ describe('AddMaterialsPage', () => {
     expect(view.textContent).toContain('In your list ✓');
   });
 
-  it('shows the retrieved full record beside results and adds structured fields', async () => {
+  it('hides inactive Paste and Type tabs while preserving their entered state', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search');
+    const panelFor = (label: string) => {
+      const trigger = Array.from(view.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent?.includes(label));
+      const panelId = trigger?.getAttribute('aria-controls');
+      return panelId ? view.querySelector(`[id="${panelId}"]`) as HTMLElement | null : null;
+    };
+    const clickTab = async (label: string) => {
+      const trigger = Array.from(view.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent?.includes(label)) as HTMLButtonElement;
+      await act(async () => {
+        trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+        await Promise.resolve();
+      });
+    };
+    const pastePanel = () => panelFor('Paste a list');
+    const typePanel = () => panelFor('Type it in');
+    expect(pastePanel()).not.toBeNull();
+    expect(typePanel()).not.toBeNull();
+    expect(pastePanel()?.hidden).toBe(true);
+    expect(pastePanel()?.getAttribute('aria-hidden')).toBe('true');
+    expect(typePanel()?.hidden).toBe(true);
+    expect(typePanel()?.getAttribute('aria-hidden')).toBe('true');
+
+    await clickTab('Paste a list');
+    expect(view.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('Paste a list');
+    expect(pastePanel()?.hidden).toBe(false);
+    expect(typePanel()?.hidden).toBe(true);
+    const pasteBox = pastePanel()?.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(pasteBox, 'Synthetic citation retained while switching tabs');
+      pasteBox.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    await clickTab('Type it in');
+    expect(pastePanel()?.hidden).toBe(true);
+    expect(typePanel()?.hidden).toBe(false);
+    const title = typePanel()?.querySelector('#title') as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(title, 'Synthetic item retained while switching tabs');
+      title.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await clickTab('Search the library');
+    expect(pastePanel()?.hidden).toBe(true);
+    expect(typePanel()?.hidden).toBe(true);
+    await clickTab('Paste a list');
+    expect((pastePanel()?.querySelector('textarea[aria-label="Paste a reading list"]') as HTMLTextAreaElement).value)
+      .toBe('Synthetic citation retained while switching tabs');
+    await clickTab('Type it in');
+    expect((typePanel()?.querySelector('#title') as HTMLInputElement).value)
+      .toBe('Synthetic item retained while switching tabs');
+  });
+
+  it('shows a retrieved full record after the explicit button is clicked and adds structured fields', async () => {
     const context = createContext({ reserve: { ...reserve, items: [] } });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change', context);
-    const openRecord = view.querySelector('[aria-label="Open full record for Synthetic Article"]') as HTMLButtonElement;
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    expect(openRecord).toBeTruthy();
 
     await act(async () => {
       openRecord.click();
       await Promise.resolve();
     });
     expect(retrieveDiscoveryRecord).toHaveBeenCalledWith('synthetic-database', 'synthetic-an');
+    expect(view.querySelector('[aria-label="Close full record"]')).not.toBeNull();
     expect(view.textContent).toContain(fullAbstract);
     expect(view.textContent).toContain('Synthetic subject');
 
@@ -132,16 +189,43 @@ describe('AddMaterialsPage', () => {
   it('renders independently scrollable, keyboard-focusable panes on desktop', async () => {
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
     const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
+    expect(results).not.toBeNull();
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    expect(results.className).not.toContain('md:overflow-y-auto');
+    expect(results.parentElement?.className).not.toContain('md:grid-cols-');
+    expect(view.querySelector('[aria-label="Search the library"]')?.getAttribute('style')).toBeNull();
+
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
     const record = view.querySelector('[aria-label="Full record"]') as HTMLElement;
 
-    expect(results).not.toBeNull();
     expect(record).not.toBeNull();
     expect(results.tabIndex).toBe(0);
     expect(record.tabIndex).toBe(0);
+    expect(results.parentElement?.className).toContain('md:grid-cols-');
     expect(results.className).toContain('md:overflow-y-auto');
     expect(record.className).toContain('md:overflow-y-auto');
     expect(results.className).toContain('md:min-h-0');
     expect(record.className).toContain('md:min-h-0');
+    expect(results.className).not.toContain('overscroll-contain');
+    expect(record.className).not.toContain('overscroll-contain');
+    expect(view.querySelector('[aria-label="Search the library"]')?.className).toContain('md:flex');
+  });
+
+  it('keeps an empty search in normal page flow without a record rail', async () => {
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [], totalHits: 0, searchTime: 5, queryString: 'no matches',
+      appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=no%20matches');
+    const section = view.querySelector('[aria-label="Search the library"]') as HTMLElement;
+    const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
+
+    expect(section.style.height).toBe('');
+    expect(section.className).not.toContain('md:flex');
+    expect(results.className).not.toContain('md:overflow-y-auto');
+    expect(results.parentElement?.className).not.toContain('md:grid-cols-');
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
   });
 
   it('keeps the results scroll position and resets the record pane for each selection', async () => {
@@ -154,28 +238,59 @@ describe('AddMaterialsPage', () => {
     }));
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
     const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
-    const recordPane = view.querySelector('[aria-label="Full record"]') as HTMLElement;
     results.scrollTop = 240;
-    recordPane.scrollTop = 320;
 
     await act(async () => {
-      (view.querySelector('[aria-label="Open full record for Synthetic Article"]') as HTMLButtonElement).click();
+      (Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement).click();
       await Promise.resolve();
     });
 
+    const recordPane = view.querySelector('[aria-label="Full record"]') as HTMLElement;
     expect(results.scrollTop).toBe(240);
     expect(recordPane.scrollTop).toBe(0);
     expect(view.textContent).toContain('Selected');
 
     recordPane.scrollTop = 280;
     await act(async () => {
-      (view.querySelector('[aria-label="Open full record for Second Synthetic Article"]') as HTMLButtonElement).click();
+      (view.querySelector('[aria-label="View full record for Second Synthetic Article"]') as HTMLButtonElement).click();
       await Promise.resolve();
     });
 
     expect(results.scrollTop).toBe(240);
     expect(recordPane.scrollTop).toBe(0);
     expect(retrieveDiscoveryRecord).toHaveBeenLastCalledWith('second-database', 'second-an');
+
+    await act(async () => view.querySelector('[aria-label="Close full record"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    expect(results.scrollTop).toBe(240);
+    expect(results.parentElement?.className).not.toContain('md:grid-cols-');
+    expect(view.querySelector('[aria-label="Search the library"]')?.className).not.toContain('md:flex');
+  });
+
+  it('closes the desktop record panel with Escape', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
+    expect(view.querySelector('[aria-label="Full record"]')).not.toBeNull();
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    expect(view.querySelector('[aria-label="Search results"]')?.parentElement?.className).not.toContain('md:grid-cols-');
+  });
+
+  it('keeps the close button available while the full record is loading', async () => {
+    let resolveRecord: (record: typeof fullRecord) => void = () => undefined;
+    vi.mocked(retrieveDiscoveryRecord).mockImplementation(() => new Promise((resolve) => { resolveRecord = resolve; }));
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
+
+    expect(view.querySelector('[role="status"]')?.textContent).toContain('Loading full record');
+    const close = view.querySelector('[aria-label="Close full record"]') as HTMLButtonElement | null;
+    expect(close).not.toBeNull();
+    await act(async () => close?.click());
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    await act(async () => { resolveRecord(fullRecord); await Promise.resolve(); });
   });
 
   it('uses the results pane as the infinite-scroll root', async () => {
@@ -200,9 +315,12 @@ describe('AddMaterialsPage', () => {
     const results = view.querySelector('[aria-label="Search results"]');
 
     expect(instances.length).toBeGreaterThan(0);
-    expect(instances[0].options.root).toBe(results);
+    expect(instances[0].options.root).toBeNull();
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
+    expect(instances[instances.length - 1].options.root).toBe(results);
     await act(async () => {
-      instances[0].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      instances[instances.length - 1].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
       await Promise.resolve();
     });
     expect(searchDiscovery).toHaveBeenCalledWith('climate change', 2, 'climate change', expect.any(Object), expect.any(Array));
@@ -211,7 +329,7 @@ describe('AddMaterialsPage', () => {
   it('opens the record on its own phone route so Back returns to the URL state', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
-    const openRecord = view.querySelector('[aria-label="Open full record for Synthetic Article"]') as HTMLButtonElement;
+    const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
 
     await act(async () => {
       openRecord.click();
@@ -299,7 +417,9 @@ describe('AddMaterialsPage', () => {
 
     const secondCitation = view.querySelector('[data-citation-id="citation-2"]');
     expect(secondCitation).toBeTruthy();
-    const openRecord = secondCitation.querySelector('[aria-label="Open full record for Synthetic Article"]') as HTMLButtonElement | null;
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    const openRecord = Array.from(secondCitation?.querySelectorAll('button') || [])
+      .find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement | undefined;
     expect(openRecord).toBeTruthy();
     if (!openRecord || !secondCitation) return;
 
@@ -307,6 +427,11 @@ describe('AddMaterialsPage', () => {
       openRecord.click();
       await Promise.resolve();
     });
+    expect(view.querySelector('[aria-label="Full record"]')).not.toBeNull();
+    expect(view.querySelector('[aria-label="Close full record"]')).not.toBeNull();
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
+    await act(async () => { openRecord.click(); await Promise.resolve(); });
     const useMatch = Array.from(view.querySelectorAll('[aria-label="Full record"] button')).find((button) => button.textContent?.includes('Use this match'));
     expect(useMatch).toBeTruthy();
     await act(async () => useMatch?.click());
@@ -346,7 +471,7 @@ describe('AddMaterialsPage', () => {
     const findMatches = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Find matches'));
     await act(async () => { findMatches?.click(); await Promise.resolve(); });
     const citationCard = view.querySelector('[data-citation-id="citation-1"]');
-    const useMatch = citationCard && Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.includes('Use this match'));
+    const useMatch = citationCard && Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record');
     await act(async () => useMatch?.click());
 
     expect(view.querySelector('[data-testid="location"]')?.textContent).toContain('/submission/reserve-test/edit/add/record/synthetic-database/synthetic-an');

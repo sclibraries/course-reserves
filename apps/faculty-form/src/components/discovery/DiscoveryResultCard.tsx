@@ -50,11 +50,19 @@ export default function DiscoveryResultCard({
           <Badge variant="outline">{result.hasFullText ? 'Full text available' : 'Check availability'}</Badge>
           {isDuplicate && <Badge variant="secondary">In your list ✓</Badge>}
         </div>
-        {onAdd && (
-          <Button size="sm" onClick={onAdd} disabled={isDuplicate}>
-          {addLabel}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenRecord && (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={`View full record for ${result.title}`}
+              onClick={onOpenRecord}
+            >
+              View full record
+            </Button>
+          )}
+          {onAdd && <Button size="sm" onClick={onAdd} disabled={isDuplicate}>{addLabel}</Button>}
+        </div>
       </div>
     </article>
   );

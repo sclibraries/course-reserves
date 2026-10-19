@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 
 interface DiscoveryRecordPanelProps {
@@ -12,16 +13,39 @@ interface DiscoveryRecordPanelProps {
 }
 
 export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
-  if (loading) return <div className="rounded-md border p-6 text-sm text-muted-foreground" role="status">Loading full record…</div>;
+  const closeButton = !isRoute && onBack && (
+    <div className="flex justify-end">
+      <Button variant="ghost" size="icon" aria-label="Close full record" onClick={onBack}>
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-4 rounded-md border p-6">
+        {closeButton}
+        <div className="text-sm text-muted-foreground" role="status">Loading full record…</div>
+      </div>
+    );
+  }
   if (error) {
     return (
-      <div className="rounded-md border border-destructive/40 p-6">
+      <div className="space-y-4 rounded-md border border-destructive/40 p-6">
         {isRoute && <Button variant="ghost" className="mb-4 px-0" onClick={onBack}>Back to results</Button>}
+        {closeButton}
         <p className="whitespace-pre-line text-sm text-destructive">{error}</p>
       </div>
     );
   }
-  if (!record) return <div className="rounded-md border p-6 text-sm text-muted-foreground">Select a result to view its full record.</div>;
+  if (!record) {
+    return (
+      <div className="space-y-4 rounded-md border p-6">
+        {closeButton}
+        <p className="text-sm text-muted-foreground">Select a result to view its full record.</p>
+      </div>
+    );
+  }
 
   const identifiers = [
     record.isbn && `ISBN: ${record.isbn}`,
@@ -32,7 +56,7 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
   return (
     <article aria-label="Full record" className="space-y-4 rounded-md border bg-background p-5">
       {isRoute && <Button variant="ghost" className="px-0" onClick={onBack}>Back to results</Button>}
-      {!isRoute && onBack && <Button variant="ghost" className="px-0" onClick={onBack}>Close record</Button>}
+      {closeButton}
       <div>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{record.publicationType}</p>
         <h2 className="mt-1 text-xl font-semibold">{record.title}</h2>

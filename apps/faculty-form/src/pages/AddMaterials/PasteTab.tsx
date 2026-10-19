@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,7 @@ import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem
 import { executeCitationBatchSearch, prepareCitationSearches } from '@/utils/citationBatchSearch';
 import CitationReviewGroup from './CitationReviewGroup';
 import { EMPTY_PASTE_WORKSPACE, type CitationChoice, type EditableCitation, type PasteWorkspace } from './pasteCitationTypes';
+import { useOnEscape } from './useOnEscape';
 
 interface PasteTabProps {
   isRecordRoute?: boolean;
@@ -35,12 +36,19 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const { record, loading, error: recordError, loadRecord, clearSelection } = useSelection();
   const routeCitationId = searchParams.get('citation') || undefined;
   const selectedCitationId = isRecordRoute ? routeCitationId : activeCitationId;
+  const hasRecordPanel = !isRecordRoute && Boolean(activeCitationId) && window.innerWidth >= 768;
+  const closeRecordPanel = useCallback(() => {
+    setActiveCitationId(undefined);
+    clearSelection();
+  }, [clearSelection]);
   const groupsById = useMemo(() => new Map(workspace.groups.map((group) => [group.id, group])), [workspace.groups]);
 
   useEffect(() => {
     if (isRecordRoute && dbId && an) void loadRecord(dbId, an);
     else clearSelection();
   }, [an, clearSelection, dbId, isRecordRoute, loadRecord]);
+
+  useOnEscape(hasRecordPanel, closeRecordPanel);
 
   const extractCitations = () => {
     setHasAttemptedExtraction(true);
@@ -203,7 +211,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
 
       {workspace.citations.length > 0 && (
         <>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)]">
+          <div className={hasRecordPanel ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)]' : 'space-y-3'}>
             <div className="min-w-0 space-y-3">
               {workspace.citations.map((citation, index) => (
                 <CitationReviewGroup
@@ -221,12 +229,12 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
                 />
               ))}
             </div>
-            {window.innerWidth >= 768 && (
+            {hasRecordPanel && (
               <DiscoveryRecordPanel
                 record={record}
                 loading={loading}
                 error={recordError}
-                onBack={() => { clearSelection(); setActiveCitationId(undefined); }}
+                onBack={closeRecordPanel}
                 onAdd={record && selectedCitationId ? useFullRecord : undefined}
                 addLabel="Use this match"
               />

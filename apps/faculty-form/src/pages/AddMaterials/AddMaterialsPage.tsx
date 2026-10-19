@@ -61,11 +61,11 @@ export default function AddMaterialsPage() {
             <TabsTrigger value="type">Type it in</TabsTrigger>
           </TabsList>
           <TabsContent value="search"><SearchTab /></TabsContent>
-          <TabsContent value="paste" forceMount><PasteTab /></TabsContent>
+          <TabsContent value="paste" forceMount hidden={tab !== 'paste'} aria-hidden={tab !== 'paste'}><PasteTab /></TabsContent>
           <TabsContent value="reuse">
             <ReuseTab />
           </TabsContent>
-          <TabsContent value="type" forceMount><TypeTab /></TabsContent>
+          <TabsContent value="type" forceMount hidden={tab !== 'type'} aria-hidden={tab !== 'type'}><TypeTab /></TabsContent>
         </Tabs>
       )}
 
