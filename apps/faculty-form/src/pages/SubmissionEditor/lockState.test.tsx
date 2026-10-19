@@ -68,7 +68,6 @@ vi.mock('@/store/useReserveStore', () => ({
 }));
 // Silence side-effect hooks and heavy dialogs not under test.
 vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
-vi.mock('@/hooks/useCourseCloning', () => ({ useCourseCloning: () => ({ fetchPreviousCourses: vi.fn() }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({
   useOrganizedContent: () => ({ ungroupedItems: [], folders: [] }),
@@ -76,10 +75,8 @@ vi.mock('@/hooks/useContentOrganization', () => ({
 }));
 vi.mock('./ContentList', () => ({ default: () => null }));
 vi.mock('./SubmitDialog', () => ({ default: () => null }));
-vi.mock('./DuplicateDialog', () => ({ default: () => null }));
 vi.mock('@/components/ItemModal', () => ({ ItemModal: () => null }));
 vi.mock('@/components/CourseModal', () => ({ CourseModal: () => null }));
-vi.mock('@/components/CloneDialog', () => ({ CloneDialog: () => null }));
 vi.mock('@/components/DiscoverySearchDialog', () => ({ DiscoverySearchDialog: () => null }));
 vi.mock('@/components/SyllabusUploadDialog', () => ({ SyllabusUploadDialog: () => null }));
 vi.mock('react-router-dom', () => ({

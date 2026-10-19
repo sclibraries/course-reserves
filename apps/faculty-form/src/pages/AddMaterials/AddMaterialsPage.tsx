@@ -1,31 +1,22 @@
-import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AddedMaterialsTray from '@/components/AddedMaterialsTray';
 import SearchTab from './SearchTab';
+import ReuseTab from './ReuseTab';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 
 const tabs = ['search', 'paste', 'reuse', 'type'] as const;
 type TabName = typeof tabs[number];
 
 export default function AddMaterialsPage() {
-  const { id, reserve, isReadOnly, addedMaterials, undoAddedMaterial, setDiscoverySearchOpen, setSyllabusUploadOpen, handleOpenCloneDialog, handleOpenDuplicateDialog, itemHandlers } = useSubmissionEditorContext();
+  const { id, reserve, isReadOnly, addedMaterials, undoAddedMaterial, setDiscoverySearchOpen, setSyllabusUploadOpen, itemHandlers } = useSubmissionEditorContext();
   const navigate = useNavigate();
-  const location = useLocation();
   const { dbId, an } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const isRecordRoute = Boolean(dbId && an);
   const tab = validTab(searchParams.get('tab'));
-  const hasOpenedDuplicateFlow = useRef(false);
-
-  useEffect(() => {
-    if (tab !== 'reuse' || !location.state?.openDuplicateFlow || hasOpenedDuplicateFlow.current) return;
-    hasOpenedDuplicateFlow.current = true;
-    void handleOpenDuplicateDialog();
-    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [handleOpenDuplicateDialog, location.pathname, location.search, location.state, navigate, tab]);
 
   const navigateBack = () => {
     if (isRecordRoute) {
@@ -72,7 +63,7 @@ export default function AddMaterialsPage() {
             <Placeholder title="Paste a list" description="Use the current syllabus paste flow, or search citations against the library." primaryLabel="Open paste dialog" onPrimary={() => setSyllabusUploadOpen(true)} secondaryLabel="Search citations in the library" onSecondary={() => setDiscoverySearchOpen(true)} />
           </TabsContent>
           <TabsContent value="reuse">
-            <Placeholder title="Reuse a past course" description="Choose items from another course. You can review the list before adding it." primaryLabel="Browse past courses" onPrimary={() => handleOpenCloneDialog('all', false)} />
+            <ReuseTab />
           </TabsContent>
           <TabsContent value="type">
             <Placeholder title="Type it in" description="Add a material that is not in the library search." primaryLabel="Add an item" onPrimary={itemHandlers.handleAddItem} />

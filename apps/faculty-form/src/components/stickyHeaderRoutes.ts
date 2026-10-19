@@ -7,8 +7,6 @@ export const STICKY_HEADER_ROUTES = {
   addMaterials: '/submission/:id/edit/add',
   addMaterialsRecord: '/submission/:id/edit/add/record/:dbId/:an',
   submissionDetail: '/submission/:id',
-  cloneEditor: '/clone-editor',
-  cloneMatchingTest: '/clone-matching-test',
 } as const;
 
 export const hasStickyHeader = (pathname: string) =>

@@ -26,7 +26,6 @@ vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'submission-1' }),
 }));
 vi.mock('@/hooks/usePreviousCourseDetection', () => ({ usePreviousCourseDetection: () => ({ hasExactMatchCourses: false }) }));
-vi.mock('@/hooks/useCourseCloning', () => ({ useCourseCloning: () => ({ fetchPreviousCourses: vi.fn() }) }));
 vi.mock('@/hooks/useUnsavedChangesWarning', () => ({ useUnsavedChangesWarning: () => {} }));
 vi.mock('@/hooks/useContentOrganization', () => ({
   useOrganizedContent: () => ({ ungroupedItems: [], folders: [] }),
@@ -57,10 +56,8 @@ vi.mock('./ContentList', async () => {
   };
 });
 vi.mock('./SubmitDialog', () => ({ default: () => null }));
-vi.mock('./DuplicateDialog', () => ({ default: () => null }));
 vi.mock('@/components/ItemModal', () => ({ ItemModal: () => null }));
 vi.mock('@/components/CourseModal', () => ({ CourseModal: () => null }));
-vi.mock('@/components/CloneDialog', () => ({ CloneDialog: () => null }));
 vi.mock('@/components/DiscoverySearchDialog', () => ({ DiscoverySearchDialog: () => null }));
 vi.mock('@/components/SyllabusUploadDialog', () => ({ SyllabusUploadDialog: () => null }));
 vi.mock('@/components/Communications/CorrectionRequiredDialog', () => ({ default: () => null }));

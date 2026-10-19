@@ -46,12 +46,11 @@ function createContext(overrides: Partial<SubmissionEditorContextValue> = {}) {
   return {
     id: reserve.id, reserve, isEditingSubmission: false, hasPreviousOffering: true,
     isReadOnly: false, lockInfo: null, saveDraft: vi.fn(), isSaving: false, hasUnsavedChanges: false,
-    lastSaveTime: null, saveError: null, duplicateSourceCourse: null, loadingDuplicateSource: false,
-    handleOpenDuplicateDialog: vi.fn(), handleOpenCloneDialog: vi.fn(), setDiscoverySearchOpen: vi.fn(),
+    lastSaveTime: null, saveError: null, setDiscoverySearchOpen: vi.fn(),
     setSyllabusUploadOpen: vi.fn(), itemHandlers: { handleAddItem: vi.fn() }, folderHandlers: {}, courseHandlers: {},
     dragHandlers: {}, submissionHandlers: {}, markChanged: vi.fn(), removeItemFromFolder: vi.fn(),
     moveItemInFolder: vi.fn(), addItemToFolder: vi.fn(), moveFolderPosition: vi.fn(), user: null,
-    updateReserve: vi.fn(), addItem: vi.fn(() => true), addItemsFromExternalSource: vi.fn(),
+    addItem: vi.fn(() => true), createFolder: vi.fn(() => 'target-folder'), addItemsFromExternalSource: vi.fn(),
     addedMaterials: [], undoAddedMaterial: vi.fn(),
     ...overrides,
   } as unknown as SubmissionEditorContextValue;

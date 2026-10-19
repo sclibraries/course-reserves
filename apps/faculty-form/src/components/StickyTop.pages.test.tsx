@@ -4,8 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { NewSubmissionHeader } from '@/components/pageHeaders/NewSubmissionHeader';
 import { SubmissionDetailHeader } from '@/components/pageHeaders/SubmissionDetailHeader';
-import { CloneEditorHeader } from '@/components/pageHeaders/CloneEditorHeader';
-import { CloneMatchingTestHeader } from '@/components/pageHeaders/CloneMatchingTestHeader';
 import type { CourseReserve } from '@/store/courseReservesStore';
 
 const bannerMock = vi.hoisted(() => ({ visible: true }));
@@ -34,11 +32,6 @@ const pageHeaders = [
     name: 'submission detail',
     render: <SubmissionDetailHeader reserve={reserve} canEdit={false} onBack={noOp} onEdit={noOp} onDelete={noOp} />,
   },
-  {
-    name: 'clone editor',
-    render: <CloneEditorHeader originalTerm="Spring 2026" courseCode="BIO 220" term="Fall 2026" isEditingCourse={false} onBack={noOp} onSaveDraft={noOp} onSubmit={noOp} />,
-  },
-  { name: 'clone matching test', render: <CloneMatchingTestHeader onBack={noOp} /> },
 ];
 
 describe.each(pageHeaders)('StickyTop layout for $name', ({ render }) => {

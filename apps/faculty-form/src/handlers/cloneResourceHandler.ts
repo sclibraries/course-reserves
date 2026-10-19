@@ -53,6 +53,7 @@ export const createCloneResourceHandler = (
           materialType: 'book' as const,
           status: 'draft' as const,
           isbn: '',
+          folderId: resource.folderId,
           publisher: pubInfo?.publisher || '',
           publicationYear: pubInfo?.dateOfPublication || '',
           notes: resource.notes || `Call Number: ${callNumber || 'N/A'}${barcode ? ` | Barcode: ${barcode}` : ''}`,
@@ -103,6 +104,7 @@ export const createCloneResourceHandler = (
           materialType,
           status: 'draft' as const,
           url: url,
+          folderId: resource.folderId,
           notes: resource.notes || '',
         };
         

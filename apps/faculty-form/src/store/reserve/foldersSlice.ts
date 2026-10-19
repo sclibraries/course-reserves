@@ -2,7 +2,11 @@ import type { ReserveSlice } from './types';
 
 export const createFoldersSlice: ReserveSlice<'createFolder' | 'updateFolder' | 'deleteFolder' | 'addItemToFolder' | 'removeItemFromFolder' | 'toggleFolder' | 'moveItemInFolder' | 'moveFolderPosition'> = (set, get, store) => ({
   createFolder: (reserveId, title, description) => {
-    const folderId = `folder-${Date.now()}`;
+    const timestamp = Date.now();
+    const existingIds = new Set((get().getReserveById(reserveId)?.folders || []).map(folder => folder.id));
+    let folderId = `folder-${timestamp}`;
+    let suffix = 1;
+    while (existingIds.has(folderId)) folderId = `folder-${timestamp}-${suffix++}`;
     set((state) => ({
       reserves: state.reserves.map(reserve => {
         if (reserve.id === reserveId) {

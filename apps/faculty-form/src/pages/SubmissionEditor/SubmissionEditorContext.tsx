@@ -20,17 +20,6 @@ export interface SubmissionEditorContextValue {
   hasUnsavedChanges: boolean;
   lastSaveTime: Date | null;
   saveError: string | null;
-  // Clone/duplicate state
-  duplicateSourceCourse: {
-    term: string;
-    courseName: string;
-    resourceCount: number;
-    electronicCount: number;
-    physicalCount: number;
-  } | null;
-  loadingDuplicateSource: boolean;
-  handleOpenDuplicateDialog: () => void;
-  handleOpenCloneDialog: (mode?: 'exact' | 'all', directToResources?: boolean) => void;
   // Dialog open state setters
   setDiscoverySearchOpen: (open: boolean) => void;
   setSyllabusUploadOpen: (open: boolean) => void;
@@ -46,10 +35,9 @@ export interface SubmissionEditorContextValue {
   moveItemInFolder: (reserveId: string, folderId: string, itemId: string, direction: 'up' | 'down') => void;
   addItemToFolder: (reserveId: string, folderId: string, itemId: string) => void;
   moveFolderPosition: (reserveId: string, folderId: string, direction: 'up' | 'down') => void;
-  // Extra state for DuplicateDialog
   user: { full_name?: string; [key: string]: unknown } | null;
-  updateReserve: (id: string, updates: Partial<CourseReserve>) => void;
   addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
+  createFolder: (reserveId: string, title: string) => string;
   addItemsFromExternalSource: (items: Partial<CourseItem>[]) => void;
   addedMaterials: AddedMaterialVisitItem[];
   undoAddedMaterial: (itemId: string) => void;

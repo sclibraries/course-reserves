@@ -407,7 +407,7 @@ describe('createSubmissionHandlers', () => {
     ]);
   });
 
-  it.each(['normal', 'clone'] as const)('adds acting_for_faculty_id to a new %s submission only at the top level', async (flow) => {
+  it('adds acting_for_faculty_id to a new submission only at the top level', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
     const { useActingForStore } = await import('@/store/actingForStore');
     const { useAuthStore } = await import('@/store/authStore');
@@ -429,8 +429,7 @@ describe('createSubmissionHandlers', () => {
     vi.mocked(fetch).mockResolvedValue(successfulSubmissionResponse('created-uuid'));
 
     const handlers = createSubmissionHandlers(vi.fn(), reserve, organizedContent, vi.fn());
-    if (flow === 'normal') handlers.confirmSubmit(false);
-    else handlers.confirmDuplicateSubmit(false);
+    handlers.confirmSubmit(false);
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     const [, request] = vi.mocked(fetch).mock.calls[0];

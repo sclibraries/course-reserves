@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
-import { useCourseCloning } from '@/hooks/useCourseCloning';
 import { useOrganizedContent, useFilteredAndSortedContent } from '@/hooks/useContentOrganization';
 import { useDraftSaving } from '@/hooks/useDraftSaving';
 import { useSubmissionLock } from '@/hooks/useSubmissionLock';
@@ -21,10 +20,8 @@ import { createAddMaterialHandler } from '@/handlers/addMaterialHandler';
 import { createFolderHandlers, createCourseHandlers } from '@/handlers/folderHandlers';
 import { createDragHandlers } from '@/handlers/dragHandlers';
 import { createSubmissionHandlers } from '@/handlers/submissionHandlers';
-import { createCloneResourceHandler } from '@/handlers/cloneResourceHandler';
 import { ItemModal } from '@/components/ItemModal';
 import { CourseModal } from '@/components/CourseModal';
-import { CloneDialog } from '@/components/CloneDialog';
 import { DiscoverySearchDialog } from '@/components/DiscoverySearchDialog';
 import { SyllabusUploadDialog } from '@/components/SyllabusUploadDialog';
 import CorrectionRequiredDialog from '@/components/Communications/CorrectionRequiredDialog';
@@ -32,7 +29,6 @@ import SubmissionEditorContext from './SubmissionEditorContext';
 import StickyStack from './StickyStack';
 import ContentList from './ContentList';
 import SubmitDialog from './SubmitDialog';
-import DuplicateDialog from './DuplicateDialog';
 import AddMaterialsPage from '../AddMaterials/AddMaterialsPage';
 
 const SubmissionEditor = () => {
@@ -55,16 +51,8 @@ const SubmissionEditor = () => {
   const firstName = user?.full_name?.split(' ')[0] || '';
   const previousCourseDetection = usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
 
-  const [cloneDialogOpen, setCloneDialogOpen] = React.useState(false);
-  const [cloneDialogMode, setCloneDialogMode] = React.useState<'exact' | 'all'>('exact');
-  const [cloneDialogDirectToResources, setCloneDialogDirectToResources] = React.useState(false);
-  const [showDuplicateDialog, setShowDuplicateDialog] = React.useState(false);
-  const [duplicateSourceCourse, setDuplicateSourceCourse] = React.useState<{ term: string; courseName: string; resourceCount: number; electronicCount: number; physicalCount: number } | null>(null);
-  const [loadingDuplicateSource, setLoadingDuplicateSource] = React.useState(false);
   const [discoverySearchOpen, setDiscoverySearchOpen] = React.useState(false);
   const [syllabusUploadOpen, setSyllabusUploadOpen] = React.useState(false);
-
-  const { fetchPreviousCourses } = useCourseCloning();
 
   const [hasRemoteItemsChanged, setHasRemoteItemsChanged] = React.useState(false);
   const serverReserveSnapshotRef = React.useRef<CourseReserve | undefined>(undefined);
@@ -155,19 +143,6 @@ const SubmissionEditor = () => {
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, reserve.items, wrappedReorderItems, wrappedAddItemToFolder, hasActiveFiltersOrSort);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
-  const cloneResourceHandler = createCloneResourceHandler(reserve, id, wrappedAddItem, !isAddMaterialsPage);
-
-  const handleOpenCloneDialog = (mode: 'exact' | 'all' = 'exact', directToResources = false) => { setCloneDialogMode(mode); setCloneDialogDirectToResources(directToResources); setCloneDialogOpen(true); };
-
-  const handleOpenDuplicateDialog = async () => {
-    if (!reserve?.courseCode || !user?.full_name) { setShowDuplicateDialog(true); return; }
-    setLoadingDuplicateSource(true);
-    try {
-      const courses = await fetchPreviousCourses(reserve.courseCode, user.full_name, 'exact');
-      setDuplicateSourceCourse(courses?.[0] ? { term: courses[0].term, courseName: courses[0].courseName, resourceCount: courses[0].resourceCount, electronicCount: courses[0].electronicCount, physicalCount: courses[0].physicalCount } : null);
-    } catch { setDuplicateSourceCourse(null); } finally { setLoadingDuplicateSource(false); setShowDuplicateDialog(true); }
-  };
-
   const handleItemsFromExternalSource = (items: Partial<CourseItem>[]) => {
     let skippedCount = 0;
 
@@ -192,7 +167,6 @@ const SubmissionEditor = () => {
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
     saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
-    duplicateSourceCourse, loadingDuplicateSource, handleOpenDuplicateDialog, handleOpenCloneDialog,
     setDiscoverySearchOpen, setSyllabusUploadOpen,
     itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers,
     markChanged,
@@ -200,7 +174,7 @@ const SubmissionEditor = () => {
     moveItemInFolder: (...a: Parameters<typeof moveItemInFolder>) => { moveItemInFolder(...a); markChanged(); },
     addItemToFolder: (...a: Parameters<typeof addItemToFolder>) => { addItemToFolder(...a); markChanged(); },
     moveFolderPosition: (...a: Parameters<typeof moveFolderPosition>) => { moveFolderPosition(...a); markChanged(); },
-    user, updateReserve: wrappedUpdateReserve, addItem: wrappedAddItem,
+    user, addItem: wrappedAddItem, createFolder: wrappedCreateFolder,
     addItemsFromExternalSource: handleItemsFromExternalSource,
     addedMaterials, undoAddedMaterial,
   };
@@ -260,9 +234,7 @@ const SubmissionEditor = () => {
         )}
         <ItemModal open={modalOpen} onOpenChange={setModalOpen} onSave={(data) => itemHandlers.handleSaveItem(data, editingItem)} initialData={editingItem} showSuccessToast={!isAddMaterialsPage} />
         <SubmitDialog showSubmitDialog={showSubmitDialog} setShowSubmitDialog={setShowSubmitDialog} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} />
-        <DuplicateDialog showDuplicateDialog={showDuplicateDialog} setShowDuplicateDialog={setShowDuplicateDialog} reserve={reserve} user={user} id={id!} emailConfirmation={emailConfirmation} setEmailConfirmation={setEmailConfirmation} updateReserve={wrappedUpdateReserve} submissionHandlers={submissionHandlers} addItem={wrappedAddItem} duplicateSourceCourse={duplicateSourceCourse} addToCurrentReserve={isAddMaterialsPage} />
         <CourseModal open={courseModalOpen} onOpenChange={setCourseModalOpen} onSave={courseHandlers.handleSaveCourse} initialData={{ courseCode: reserve.courseCode, courseTitle: reserve.courseTitle, section: reserve.section, instructors: reserve.instructors, term: reserve.term }} isEditing={true} />
-        <CloneDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} reserveId={id!} courseCode={reserve.courseCode} userName={user?.full_name || ''} currentItemsCount={reserve.items.length} onAddResource={cloneResourceHandler.handleAddSingleResource} initialMode={cloneDialogMode} directToResources={cloneDialogDirectToResources} />
         <DiscoverySearchDialog open={discoverySearchOpen} onOpenChange={setDiscoverySearchOpen} onItemsSelected={handleItemsFromExternalSource} />
         <SyllabusUploadDialog open={syllabusUploadOpen} onOpenChange={setSyllabusUploadOpen} onItemsExtracted={handleItemsFromExternalSource} />
         <CorrectionRequiredDialog />

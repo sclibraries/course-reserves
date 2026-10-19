@@ -79,9 +79,9 @@ export default function Header() {
               <Button
                 variant="secondary"
                 className="bg-amber-500/90 hover:bg-amber-500 text-white"
-                onClick={() => navigate(`/submission/${id}/edit/add?tab=reuse`, { state: { openDuplicateFlow: true } })}
+                onClick={() => navigate(`/submission/${id}/edit/add?tab=reuse&course=last`)}
                 disabled={isReadOnly}
-                title="Submit indicating you're reusing all previous materials"
+                title="Choose the materials from your previous course"
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Reuse last time’s list

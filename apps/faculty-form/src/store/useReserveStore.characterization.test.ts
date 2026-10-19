@@ -60,6 +60,19 @@ describe('useReserveStore characterization', () => {
     expect(store.getState().getReserveById('reserve-source')?.courseTitle).toBe('Source course');
   });
 
+  it('generates distinct IDs for source folders copied in the same millisecond', () => {
+    store.setState({ reserves: [buildReserve()] });
+
+    const firstId = store.getState().createFolder('reserve-source', 'Week 3');
+    const secondId = store.getState().createFolder('reserve-source', 'Week 4');
+
+    expect(firstId).not.toBe(secondId);
+    expect(store.getState().getReserveById('reserve-source')?.folders.map((folder) => folder.title))
+      .toContain('Week 3');
+    expect(store.getState().getReserveById('reserve-source')?.folders.map((folder) => folder.title))
+      .toContain('Week 4');
+  });
+
   it('maps submission index and detail responses into the exact reserve state', async () => {
     const updatedAt = '2026-06-17T12:00:00.000Z';
     const responseBody = {

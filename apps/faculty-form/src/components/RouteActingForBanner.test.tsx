@@ -17,8 +17,6 @@ const stickyHeaderRoutes = [
   '/submission/reserve-test/edit/add',
   '/submission/reserve-test/edit/add/record/synthetic-db/synthetic-an',
   '/submission/reserve-test',
-  '/clone-editor',
-  '/clone-matching-test',
 ];
 
 describe('RouteActingForBanner', () => {
@@ -45,7 +43,7 @@ describe('RouteActingForBanner', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    act(() => root?.render(<MemoryRouter initialEntries={['/clone-previous']}><RouteActingForBanner /></MemoryRouter>));
+    act(() => root?.render(<MemoryRouter initialEntries={['/unmatched']}><RouteActingForBanner /></MemoryRouter>));
 
     const banner = container.querySelector('[data-testid="acting-for-banner"]');
     expect(banner).not.toBeNull();

@@ -10,8 +10,8 @@ export interface PreviousCourse {
   term: string;
   instructor: string;
   resourceCount: number;
-  electronicCount: number; // Separate count for display
-  physicalCount: number;   // Separate count for display
+  electronicCount: number;
+  physicalCount: number;
   isExactMatch: boolean;
 }
 
@@ -66,6 +66,8 @@ export interface PreviewResource {
   description?: string; // Rich description from electronic resources
   _originalReserve?: PhysicalReserve;
   _originalResource?: ElectronicResource;
+  folderName?: string;
+  folderId?: string;
 }
 
 export const useCourseCloning = () => {
@@ -81,7 +83,6 @@ export const useCourseCloning = () => {
     instructorName: string,
     mode: 'exact' | 'all'
   ) => {
-    // Extract first name from full name (e.g., "Marney C. Pratt" -> "Marney")
     const firstName = instructorName.split(' ')[0];
 
     let query: string;
@@ -247,16 +248,16 @@ export const useCourseCloning = () => {
     try {
       let physicalReserves: PhysicalReserve[] = [];
       let electronicResources: ElectronicResource[] = [];
+      let orderedResources: Record<string, unknown>[] = [];
       
-      // Fetch merged resources (includes both electronic and physical references)
       try {
         const mergedRes = await fetchMergedCourseResources(courseListingId);
         
         if (mergedRes.ok) {
           const mergedData = await mergedRes.json();
           const resources = mergedData.resources || [];
+          orderedResources = resources;
           
-          // Separate electronic and physical resources
           electronicResources = resources
             .filter((r: { resource_type?: string }) => r.resource_type === 'electronic')
             .map((r: { order?: string | number; [key: string]: unknown }) => ({
@@ -280,10 +281,10 @@ export const useCourseCloning = () => {
         console.log('Physical reserves unavailable:', error);
       }
       
-      return { physicalReserves, electronicResources };
+      return { physicalReserves, electronicResources, orderedResources };
     } catch (error) {
       console.error('Failed to fetch course resources:', error);
-      return { physicalReserves: [], electronicResources: [] };
+      return { physicalReserves: [], electronicResources: [], orderedResources: [] };
     }
   }, []);
   return {

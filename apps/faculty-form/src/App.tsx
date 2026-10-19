@@ -9,9 +9,6 @@ import Index from "./pages/Index";
 import NewSubmission from "./pages/NewSubmission";
 import SubmissionEditor from "./pages/SubmissionEditor"
 import SubmissionDetail from "./pages/SubmissionDetail";
-import ClonePrevious from "./pages/ClonePrevious";
-import CloneEditor from "./pages/CloneEditor";
-import CloneMatchingTest from "./pages/CloneMatchingTest";
 import NotFound from "./pages/NotFound";
 import ManageDesignees from "./pages/ManageDesignees";
 import AcceptProxyInvitation from "./pages/AcceptProxyInvitation";
@@ -76,22 +73,6 @@ const App = () => (
               <SubmissionDetail />
             </ProtectedRoute>
           } />
-          <Route path="/clone-previous" element={
-            <ProtectedRoute>
-              <ClonePrevious />
-            </ProtectedRoute>
-          } />
-          <Route path={STICKY_HEADER_ROUTES.cloneEditor} element={
-            <ProtectedRoute>
-              <CloneEditor />
-            </ProtectedRoute>
-          } />
-          <Route path={STICKY_HEADER_ROUTES.cloneMatchingTest} element={
-            <ProtectedRoute>
-              <CloneMatchingTest />
-            </ProtectedRoute>
-          } />
-          
           {/* 404 - public */}
           <Route path="*" element={<NotFound />} />
         </Routes>
