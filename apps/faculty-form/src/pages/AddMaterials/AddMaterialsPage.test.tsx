@@ -454,6 +454,32 @@ describe('AddMaterialsPage', () => {
     expect(Array.isArray(searchedQuery) && searchedQuery.some((query) => query.field === 'TI' && query.term === 'Edited citation title')).toBe(true);
   });
 
+  it('shows skipped blocks and lets faculty add one to the editable citation list', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste');
+    const paste = `Week 3
+
+Read before class
+
+Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28`;
+    await enterCitation(view, paste);
+
+    expect(view.textContent).toContain("2 lines weren't recognised as citations.");
+    const review = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Review it');
+    expect(review).toBeTruthy();
+    await act(async () => review?.click());
+
+    const skippedLine = Array.from(view.querySelectorAll('[data-skipped-citation]'))
+      .find((line) => line.textContent?.includes('Read before class')) as HTMLElement | undefined;
+    expect(skippedLine).toBeTruthy();
+    const addToList = skippedLine && Array.from(skippedLine.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === 'Add to the list');
+    await act(async () => addToList?.click());
+
+    expect(Array.from(view.querySelectorAll('textarea[aria-label^="Edit citation"]'))
+      .some((textarea) => (textarea as HTMLTextAreaElement).value === 'Read before class')).toBe(true);
+    expect(view.querySelector('[data-skipped-citation]')?.textContent).not.toContain('Read before class');
+  });
+
   it('adds a citation as written in one click and applies its target folder', async () => {
     const context = createContext({ reserve: { ...reserve, items: [], folders: [{ id: 'folder-42', title: 'Unit One', itemIds: [] }] } });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=paste&folder=folder-42', context);

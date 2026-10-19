@@ -6,6 +6,11 @@ export interface EditableCitation {
   text: string;
 }
 
+export interface SkippedCitationBlock {
+  id: string;
+  text: string;
+}
+
 export interface CitationChoice {
   item: Partial<CourseItem>;
   source: 'written' | 'match';
@@ -15,8 +20,9 @@ export interface CitationChoice {
 
 export interface PasteWorkspace {
   citations: EditableCitation[];
+  skipped: SkippedCitationBlock[];
   groups: CitationBatchSearchGroup[];
   choices: Record<string, CitationChoice>;
 }
 
-export const EMPTY_PASTE_WORKSPACE: PasteWorkspace = { citations: [], groups: [], choices: {} };
+export const EMPTY_PASTE_WORKSPACE: PasteWorkspace = { citations: [], skipped: [], groups: [], choices: {} };

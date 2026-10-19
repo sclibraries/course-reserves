@@ -9,6 +9,7 @@ import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { extractCitationsFromSyllabus } from '@/utils/syllabusCitationExtractor';
 import { executeCitationBatchSearch, prepareCitationSearches } from '@/utils/citationBatchSearch';
 import CitationReviewGroup from './CitationReviewGroup';
+import PasteSkippedNotice from './PasteSkippedNotice';
 import { EMPTY_PASTE_WORKSPACE, type PasteWorkspace } from './pasteCitationTypes';
 import { useOnEscape } from './useOnEscape';
 import { usePasteCitationActions } from './usePasteCitationActions';
@@ -51,9 +52,12 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
 
   const extractCitations = () => {
     setHasAttemptedExtraction(true);
-    const citations = extractCitationsFromSyllabus(pasteText).map((text, index) => ({ id: 'citation-' + (index + 1), text }));
+    const extraction = extractCitationsFromSyllabus(pasteText);
+    const citations = extraction.citations.map((text, index) => ({ id: 'citation-' + (index + 1), text }));
+    const skipped = extraction.skipped.map((text, index) => ({ id: 'skipped-' + (index + 1), text }));
     setWorkspace((current) => ({
       citations,
+      skipped,
       groups: [],
       choices: citations.reduce<PasteWorkspace['choices']>((choices, citation) => {
         const previousCitation = current.citations.find((entry) => entry.id === citation.id);
@@ -65,9 +69,23 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     setError(citations.length ? null : 'No citations were detected. Paste a reading list with citation details and try again.');
   };
 
+  const addSkippedToList = (idToAdd: string) => {
+    setError(null);
+    setWorkspace((current) => {
+      const skipped = current.skipped.find((block) => block.id === idToAdd);
+      if (!skipped) return current;
+      return {
+        ...current,
+        citations: [...current.citations, { id: `citation-from-${skipped.id}`, text: skipped.text }],
+        skipped: current.skipped.filter((block) => block.id !== idToAdd),
+      };
+    });
+  };
+
   const editCitation = (idToEdit: string, text: string) => {
     setWorkspace((current) => ({
       citations: current.citations.map((citation) => citation.id === idToEdit ? { ...citation, text } : citation),
+      skipped: current.skipped,
       groups: [],
       choices: current.choices,
     }));
@@ -76,6 +94,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const removeCitation = (idToRemove: string) => {
     setWorkspace((current) => ({
       citations: current.citations.filter((citation) => citation.id !== idToRemove),
+      skipped: current.skipped,
       groups: [],
       choices: Object.fromEntries(Object.entries(current.choices).filter(([id]) => id !== idToRemove)),
     }));
@@ -222,6 +241,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
           </div>
         </>
       )}
+      <PasteSkippedNotice skipped={workspace.skipped} onAddToList={addSkippedToList} />
     </section>
   );
 }
@@ -230,7 +250,10 @@ function restoreWorkspace(locationState: unknown): PasteWorkspace {
   if (!locationState || typeof locationState !== 'object' || !('pasteWorkspace' in locationState)) return EMPTY_PASTE_WORKSPACE;
   const workspace = locationState.pasteWorkspace;
   if (!workspace || typeof workspace !== 'object' || !('citations' in workspace) || !Array.isArray(workspace.citations)) return EMPTY_PASTE_WORKSPACE;
-  return workspace as PasteWorkspace;
+  return {
+    ...workspace,
+    skipped: Array.isArray(workspace.skipped) ? workspace.skipped : [],
+  } as PasteWorkspace;
 }
 
 function restorePasteText(locationState: unknown): string {

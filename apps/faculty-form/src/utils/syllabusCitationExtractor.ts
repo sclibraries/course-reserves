@@ -7,59 +7,73 @@ const AUTHOR_FIRST_PATTERN = /^[\p{L}][\p{L}\p{M}'’.-]+(?:\s+[\p{L}][\p{L}\p{M
 const AUTHOR_FIRST_QUOTED_PATTERN = /^[\p{L}][\p{L}\p{M}'’.-]+(?:\s+[\p{L}][\p{L}\p{M}'’.-]+)+,\s*["“”]/u;
 const INVERTED_AUTHOR_PATTERN = /^[\p{L}][\p{L}\p{M}'’-]+,\s+[\p{L}][\p{L}\p{M}'’.-]*(?:\s+[\p{L}][\p{L}\p{M}'’.-]*)*/u;
 const QUOTED_TITLE_PATTERN = /["“”][^"“”]+["“”]/u;
+const EDITOR_PATTERN = /(?:\bedited\s+by\b|\beds?\.(?=[\s,;:]|$))/iu;
+const PUBLISHER_PATTERN = /\b(?:university\s+press|press|publishing)\b/iu;
+const PAGE_RANGE_PATTERN = /\b(?:pp?\.?\s*)?\d+\s*[-–—]\s*\d+\b/iu;
 
-export function extractCitationsFromSyllabus(syllabusText: string): string[] {
+export interface CitationExtractionResult {
+  citations: string[];
+  skipped: string[];
+}
+
+export function extractCitationsFromSyllabus(syllabusText: string): CitationExtractionResult {
   const rawText = syllabusText.trim();
 
   if (!rawText) {
-    return [];
+    return { citations: [], skipped: [] };
   }
 
-  let potentialCitations = extractLineBasedCitations(rawText);
+  let candidateBlocks = extractLineBasedBlocks(rawText);
 
-  if (potentialCitations.length <= 1 && rawText.length > 100) {
+  if (candidateBlocks.length <= 1 && rawText.length > 100) {
     const inlineSplitCitations = extractInlineCitations(rawText);
 
-    if (inlineSplitCitations.length > potentialCitations.length) {
-      potentialCitations = inlineSplitCitations;
+    if (inlineSplitCitations.length > candidateBlocks.length) {
+      candidateBlocks = inlineSplitCitations;
     }
   }
 
-  return potentialCitations
-    .map(cleanCitationText)
-    .filter((text) => text.length >= 15 && looksLikeCitation(text));
+  return candidateBlocks.reduce<CitationExtractionResult>((result, block) => {
+    const text = cleanCitationText(block);
+    if (looksLikeCitation(text)) result.citations.push(text);
+    else if (block.trim()) result.skipped.push(text || block.trim());
+    return result;
+  }, { citations: [], skipped: [] });
 }
 
-function extractLineBasedCitations(rawText: string): string[] {
+function extractLineBasedBlocks(rawText: string): string[] {
   const lines = rawText.split('\n');
-  const citations: string[] = [];
+  const blocks: string[] = [];
   let currentCitation = '';
+
+  const pushCurrent = () => {
+    if (!currentCitation) return;
+    blocks.push(currentCitation.trim());
+    currentCitation = '';
+  };
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
 
     if (!line) {
-      if (currentCitation) {
-        citations.push(currentCitation.trim());
-        currentCitation = '';
-      }
+      pushCurrent();
       continue;
     }
 
     if (HEADER_PATTERN.test(line)) {
-      if (currentCitation) {
-        citations.push(currentCitation.trim());
-        currentCitation = '';
-      }
+      pushCurrent();
+      blocks.push(line);
       continue;
     }
 
     if (COPYRIGHT_PATTERN.test(line)) {
+      pushCurrent();
+      blocks.push(line);
       continue;
     }
 
-    if (currentCitation && startsNewCitation(line) && !isContinuation(line) && looksLikeCitation(currentCitation)) {
-      citations.push(currentCitation.trim());
+    if (currentCitation && startsNewCitation(line) && !isContinuation(line) && looksLikeCitation(cleanCitationText(currentCitation))) {
+      pushCurrent();
       currentCitation = line;
       continue;
     }
@@ -67,11 +81,9 @@ function extractLineBasedCitations(rawText: string): string[] {
     currentCitation = currentCitation ? `${currentCitation} ${line}` : line;
   }
 
-  if (currentCitation) {
-    citations.push(currentCitation.trim());
-  }
+  pushCurrent();
 
-  return citations;
+  return blocks;
 }
 
 function extractInlineCitations(rawText: string): string[] {
@@ -112,25 +124,38 @@ function shouldMergeContributorSegment(previousSegment: string, currentSegment: 
 }
 
 function looksLikeCitation(text: string): boolean {
-  if (!text || text.length < 15) {
+  if (!text || text.length < 15 || HEADER_PATTERN.test(text)) {
     return false;
   }
 
+  return isLegalCitation(text) || hasYearDatedAcademicEvidence(text) || hasYearlessBibliographicEvidence(text);
+}
+
+function isLegalCitation(text: string): boolean {
   const hasLegalCase = /\bv\.\s+[A-Z]/iu.test(text);
+  const hasLegalReporter = /\b\d+\s+[A-Z][a-zA-Z.]+\s+\d+\b/u.test(text);
+  return hasLegalCase || hasLegalReporter;
+}
+
+function hasYearDatedAcademicEvidence(text: string): boolean {
   const hasYear = /\b[12]\d{3}\b/u.test(text);
   const hasYearInParens = /\([12]\d{3}\)/u.test(text);
-  const hasLegalReporter = /\b\d+\s+[A-Z][a-zA-Z.]+\s+\d+\b/u.test(text);
-  const hasAcademicMarkers = ACADEMIC_MARKER_PATTERN.test(text);
-  const hasAuthorPattern = INVERTED_AUTHOR_PATTERN.test(text);
-  const hasAuthorFirstPattern = AUTHOR_FIRST_PATTERN.test(text);
-  const hasQuotedTitle = QUOTED_TITLE_PATTERN.test(text);
+  if (hasYearInParens) return true;
+  if (!hasYear) return false;
 
-  return hasLegalCase ||
-    hasYearInParens ||
-    hasLegalReporter ||
-    (hasAcademicMarkers && hasYear) ||
-    (hasAuthorPattern && hasYear) ||
-    (hasAuthorFirstPattern && hasQuotedTitle && hasYear);
+  return ACADEMIC_MARKER_PATTERN.test(text) ||
+    INVERTED_AUTHOR_PATTERN.test(text) ||
+    (AUTHOR_FIRST_PATTERN.test(text) && QUOTED_TITLE_PATTERN.test(text));
+}
+
+function hasYearlessBibliographicEvidence(text: string): boolean {
+  const hasAuthor = INVERTED_AUTHOR_PATTERN.test(text) || AUTHOR_FIRST_PATTERN.test(text);
+  const hasBibliographicSignal = QUOTED_TITLE_PATTERN.test(text) ||
+    EDITOR_PATTERN.test(text) ||
+    PUBLISHER_PATTERN.test(text) ||
+    PAGE_RANGE_PATTERN.test(text);
+
+  return hasAuthor && hasBibliographicSignal;
 }
 
 function startsNewCitation(line: string): boolean {

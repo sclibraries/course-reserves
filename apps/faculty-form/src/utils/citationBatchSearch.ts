@@ -55,7 +55,7 @@ type SearchDiscoveryLike = (
 }>;
 
 export function prepareCitationBatchSearches(rawText: string): PreparedCitationSearch[] {
-  return prepareCitationSearches(extractCitationsFromSyllabus(rawText));
+  return prepareCitationSearches(extractCitationsFromSyllabus(rawText).citations);
 }
 
 export function prepareCitationSearches(citations: string[], ids?: string[]): PreparedCitationSearch[] {
