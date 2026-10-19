@@ -20,10 +20,14 @@ const searchResult = {
   pLink: 'https://search.ebscohost.com/record/synthetic', doi: '10.1000/synthetic',
   hasFullText: true, fullTextUrl: 'https://example.edu/full-text',
 };
+const secondSearchResult = {
+  ...searchResult, id: 'second-an', dbId: 'second-database', title: 'Second Synthetic Article',
+};
+const fullAbstract = `Full synthetic abstract for faculty review. ${'Additional untruncated synthetic detail. '.repeat(18)}`;
 const fullRecord = {
   ...searchResult,
   edition: 'Second edition', publisher: 'Synthetic Publisher', publicationDate: { year: '2025' },
-  subjects: ['Synthetic subject'], abstract: 'Full synthetic abstract for faculty review.',
+  subjects: ['Synthetic subject'], abstract: fullAbstract,
   isbn: '9780000000000', issn: '1234-5678', location: 'Neilson', callNumber: 'QA 1',
   fullTextLinks: [{ Category: 'Full Text', Name: 'PDF', Url: 'https://example.edu/full-text' }],
 };
@@ -69,6 +73,7 @@ describe('AddMaterialsPage', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     act(() => root?.unmount());
     container?.remove();
     container = null;
@@ -113,7 +118,8 @@ describe('AddMaterialsPage', () => {
       openRecord.click();
       await Promise.resolve();
     });
-    expect(view.textContent).toContain('Full synthetic abstract for faculty review.');
+    expect(retrieveDiscoveryRecord).toHaveBeenCalledWith('synthetic-database', 'synthetic-an');
+    expect(view.textContent).toContain(fullAbstract);
     expect(view.textContent).toContain('Synthetic subject');
 
     const add = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Add to my list'));
@@ -121,6 +127,85 @@ describe('AddMaterialsPage', () => {
     expect(context.addItem).toHaveBeenCalledWith('reserve-test', expect.objectContaining({
       doi: '10.1000/synthetic', issn: '1234-5678', eds: expect.objectContaining({ an: 'synthetic-an' }),
     }));
+  });
+
+  it('renders independently scrollable, keyboard-focusable panes on desktop', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
+    const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
+    const record = view.querySelector('[aria-label="Full record"]') as HTMLElement;
+
+    expect(results).not.toBeNull();
+    expect(record).not.toBeNull();
+    expect(results.tabIndex).toBe(0);
+    expect(record.tabIndex).toBe(0);
+    expect(results.className).toContain('md:overflow-y-auto');
+    expect(record.className).toContain('md:overflow-y-auto');
+    expect(results.className).toContain('md:min-h-0');
+    expect(record.className).toContain('md:min-h-0');
+  });
+
+  it('keeps the results scroll position and resets the record pane for each selection', async () => {
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [searchResult, secondSearchResult], totalHits: 2, searchTime: 5, queryString: 'climate change',
+      appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
+    vi.mocked(retrieveDiscoveryRecord).mockImplementation(async (dbId, an) => ({
+      ...fullRecord, dbId, id: an, title: an === 'second-an' ? 'Second Synthetic Article' : fullRecord.title,
+    }));
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
+    const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
+    const recordPane = view.querySelector('[aria-label="Full record"]') as HTMLElement;
+    results.scrollTop = 240;
+    recordPane.scrollTop = 320;
+
+    await act(async () => {
+      (view.querySelector('[aria-label="Open full record for Synthetic Article"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+
+    expect(results.scrollTop).toBe(240);
+    expect(recordPane.scrollTop).toBe(0);
+    expect(view.textContent).toContain('Selected');
+
+    recordPane.scrollTop = 280;
+    await act(async () => {
+      (view.querySelector('[aria-label="Open full record for Second Synthetic Article"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+
+    expect(results.scrollTop).toBe(240);
+    expect(recordPane.scrollTop).toBe(0);
+    expect(retrieveDiscoveryRecord).toHaveBeenLastCalledWith('second-database', 'second-an');
+  });
+
+  it('uses the results pane as the infinite-scroll root', async () => {
+    const instances: Array<{ options: IntersectionObserverInit; callback: IntersectionObserverCallback }> = [];
+    class TestIntersectionObserver {
+      readonly root: Element | Document | null;
+      constructor(callback: IntersectionObserverCallback, readonly options: IntersectionObserverInit) {
+        this.root = options.root ?? null;
+        instances.push({ options, callback });
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords(): IntersectionObserverEntry[] { return []; }
+    }
+    vi.stubGlobal('IntersectionObserver', TestIntersectionObserver);
+    vi.mocked(searchDiscovery).mockImplementation(async (_query, page) => ({
+      results: [page === 1 ? searchResult : secondSearchResult], totalHits: 2, searchTime: 5, queryString: 'climate change',
+      appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    }));
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
+    const results = view.querySelector('[aria-label="Search results"]');
+
+    expect(instances.length).toBeGreaterThan(0);
+    expect(instances[0].options.root).toBe(results);
+    await act(async () => {
+      instances[0].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      await Promise.resolve();
+    });
+    expect(searchDiscovery).toHaveBeenCalledWith('climate change', 2, 'climate change', expect.any(Object), expect.any(Array));
   });
 
   it('opens the record on its own phone route so Back returns to the URL state', async () => {
@@ -135,5 +220,11 @@ describe('AddMaterialsPage', () => {
 
     expect(view.querySelector('[data-testid="location"]')?.textContent).toContain('/submission/reserve-test/edit/add/record/synthetic-database/synthetic-an');
     expect(view.textContent).toContain('Back to results');
+    const back = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.includes('Back to results'));
+    await act(async () => {
+      back?.click();
+      await Promise.resolve();
+    });
+    expect(view.querySelector('[data-testid="location"]')?.textContent).toContain('/submission/reserve-test/edit/add?tab=search&q=climate+change');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,9 +25,14 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
   const route = useParams();
   const recordDbId = dbId || route.dbId;
   const recordAn = an || route.an;
+  const showRecordRoute = isRecordRoute || Boolean(recordDbId && recordAn);
   const search = useDiscoverySearch({ enabled: !isRecordRoute });
-  const { record, loading, error, loadRecord, clearSelection } = useSelection();
+  const { record, selectedId, loading, error, loadRecord, clearSelection } = useSelection();
   const [draftQuery, setDraftQuery] = useState(search.query);
+  const [sectionHeight, setSectionHeight] = useState<number>();
+  const sectionRef = useRef<HTMLElement>(null);
+  const resultsPaneRef = useRef<HTMLDivElement>(null);
+  const recordPaneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setDraftQuery(search.query), [search.query]);
   useEffect(() => {
@@ -35,13 +40,60 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     else clearSelection();
   }, [recordDbId, recordAn, clearSelection, loadRecord]);
 
-  const sentinelRef = useInfiniteScroll(search.loadMore, search.hasMore && !search.loading && !search.loadingMore);
+  useLayoutEffect(() => {
+    if (showRecordRoute) {
+      setSectionHeight(undefined);
+      return undefined;
+    }
+
+    const section = sectionRef.current;
+    if (!section) return undefined;
+    const tray = (section.closest('main') || document).querySelector<HTMLElement>('aside[aria-label="Added materials"]');
+    const stickyTop = document.querySelector<HTMLElement>('[data-testid="page-sticky-top"]');
+    let frame = 0;
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      if (window.innerWidth < 768) {
+        setSectionHeight(undefined);
+        return;
+      }
+      frame = window.requestAnimationFrame(() => {
+        const sectionTop = section.getBoundingClientRect().top;
+        const trayTop = tray?.getBoundingClientRect().top ?? window.innerHeight;
+        const availableBottom = Math.min(window.innerHeight, trayTop);
+        setSectionHeight(Math.max(0, availableBottom - sectionTop));
+      });
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(section);
+    if (tray) observer?.observe(tray);
+    if (stickyTop) observer?.observe(stickyTop);
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    measure();
+    return () => {
+      observer?.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [showRecordRoute]);
+
+  const sentinelRef = useInfiniteScroll(
+    search.loadMore,
+    search.hasMore && !search.loading && !search.loadingMore,
+    resultsPaneRef,
+  );
   const searchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     search.setQuery(draftQuery);
   };
   const isDuplicate = (result: Parameters<typeof discoveryResultToCourseItem>[0]) =>
     Boolean(findDuplicateCourseItem(reserve.items, discoveryResultToCourseItem(result)));
+  const selectRecord = (dbId: string, an: string) => {
+    if (recordPaneRef.current) recordPaneRef.current.scrollTop = 0;
+    void loadRecord(dbId, an);
+  };
   const openRecord = (result: Parameters<typeof discoveryResultToCourseItem>[0]) => {
     if (window.innerWidth < 768) {
       const params = new URLSearchParams(searchParams);
@@ -49,7 +101,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
       navigate(`/submission/${id}/edit/add/record/${encodeURIComponent(result.dbId)}/${encodeURIComponent(result.id)}?${params.toString()}`);
       return;
     }
-    void loadRecord(result.dbId, result.id);
+    selectRecord(result.dbId, result.id);
   };
   const addResult = (result: Parameters<typeof discoveryResultToCourseItem>[0]) => {
     if (!isDuplicate(result)) addItem(id, discoveryResultToCourseItem(result));
@@ -62,10 +114,13 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     params.set('tab', 'search');
     navigate(`/submission/${id}/edit/add?${params.toString()}`);
   };
-  const showRecordRoute = isRecordRoute || Boolean(recordDbId && recordAn);
-
   return (
-    <section className="space-y-4" aria-label="Search the library">
+    <section
+      ref={sectionRef}
+      className="space-y-4 md:flex md:min-h-0 md:flex-col"
+      aria-label="Search the library"
+      style={sectionHeight === undefined ? undefined : { height: `${sectionHeight}px` }}
+    >
       {!showRecordRoute && (
         <>
           <form onSubmit={searchSubmit} className="flex gap-2">
@@ -76,9 +131,15 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
         </>
       )}
 
-      <div className={showRecordRoute ? 'block' : 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)]'}>
+      <div className={showRecordRoute ? 'block' : 'grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] md:grid-rows-[minmax(0,1fr)]'}>
         {!showRecordRoute && (
-          <div className="min-w-0 space-y-3">
+          <div
+            ref={resultsPaneRef}
+            className="min-w-0 space-y-3 md:min-h-0 md:overflow-y-auto md:overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            role="region"
+            aria-label="Search results"
+            tabIndex={0}
+          >
             {search.query && <p className="text-sm text-muted-foreground">Found {search.totalHits.toLocaleString()} results{search.results.length > 0 ? ` · showing ${search.results.length}` : ''}{search.searchTime ? ` · ${search.searchTime}ms` : ''}</p>}
             {search.error && <div role="alert" className="whitespace-pre-line rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{search.error}</div>}
             {search.loading && search.results.length === 0 && <p role="status" className="py-10 text-center text-sm text-muted-foreground">Searching the library…</p>}
@@ -89,6 +150,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
                   key={`${result.dbId}:${result.id}`}
                   result={result}
                   isDuplicate={isDuplicate(result)}
+                  isSelected={selectedId === result.id}
                   onOpenRecord={() => openRecord(result)}
                   onAdd={() => addResult(result)}
                 />
@@ -100,14 +162,22 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
           </div>
         )}
         {(showRecordRoute || window.innerWidth >= 768) && (
-          <DiscoveryRecordPanel
-            record={record}
-            loading={loading}
-            error={error}
-            isRoute={showRecordRoute}
-            onBack={showRecordRoute ? backToSearch : clearSelection}
-            onAdd={record && !isDuplicate(record) ? addFullRecord : undefined}
-          />
+          <div
+            ref={recordPaneRef}
+            className="md:min-h-0 md:overflow-y-auto md:overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            role="region"
+            aria-label="Full record"
+            tabIndex={0}
+          >
+            <DiscoveryRecordPanel
+              record={record}
+              loading={loading}
+              error={error}
+              isRoute={showRecordRoute}
+              onBack={showRecordRoute ? backToSearch : clearSelection}
+              onAdd={record && !isDuplicate(record) ? addFullRecord : undefined}
+            />
+          </div>
         )}
       </div>
     </section>
