@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Form, FormGroup, Input, Label, Spinner } from 'reactstrap';
+import { Button, Form, FormGroup, Input, Label } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage, sortQueueItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
-import ClaimItemSummary from './ClaimItemSummary';
+import QueueItemList from './QueueItemList';
 
 function ClaimQueue() {
   const [items, setItems] = useState([]);
@@ -59,7 +59,6 @@ function ClaimQueue() {
           <p className="text-muted mb-0">{count} unclaimed item{count === 1 ? '' : 's'}</p>
         </div>
         <div className="d-flex gap-2">
-          <Button color="outline-secondary" disabled title="My groups are added in AW-051">My groups</Button>
           <Button color="outline-primary" onClick={() => loadQueue(filters)} disabled={loading}>Refresh</Button>
         </div>
       </div>
@@ -76,28 +75,14 @@ function ClaimQueue() {
         <div className="col-sm-4"><Button type="submit" color="primary" disabled={loading}>Apply filters</Button></div>
       </Form>
 
-      {error && <Alert color="danger" role="alert">{error}</Alert>}
-      {loading && <div className="text-center py-4"><Spinner /><p className="mt-2">Loading item queue...</p></div>}
-      {!loading && !items.length && <Alert color="success">No unclaimed items match these filters.</Alert>}
-      {!loading && items.length > 0 && (
-        <div className="d-grid gap-2">
-          {items.map((item) => {
-            const key = `${item.kind}/${item.id}`;
-            return (
-              <ClaimItemSummary item={item} key={key}>
-                <Button
-                  color="primary"
-                  aria-label={`Claim ${item.title}`}
-                  disabled={Boolean(claiming)}
-                  onClick={() => handleClaim(item)}
-                >
-                  {claiming === key ? 'Claiming...' : 'Claim'}
-                </Button>
-              </ClaimItemSummary>
-            );
-          })}
-        </div>
-      )}
+      <QueueItemList
+        items={items}
+        loading={loading}
+        error={error}
+        emptyMessage="No unclaimed items match these filters."
+        claimingKey={claiming}
+        onClaim={handleClaim}
+      />
     </section>
   );
 }

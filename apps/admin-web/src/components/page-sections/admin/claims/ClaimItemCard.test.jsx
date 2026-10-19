@@ -8,10 +8,12 @@ const mocks = vi.hoisted(() => ({
   handoffItem: vi.fn(),
   takeoverItem: vi.fn(),
   getStaff: vi.fn(),
+  getGroupsForHandoff: vi.fn(),
   getItemTimeline: vi.fn(),
 }));
 
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
+vi.mock('../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
 
 import ClaimItemCard from './ClaimItemCard';
 
@@ -42,6 +44,7 @@ beforeEach(() => {
   mocks.handoffItem.mockResolvedValue({ item });
   mocks.takeoverItem.mockResolvedValue({ item });
   mocks.getStaff.mockResolvedValue({ items: [{ username: 'test-api078-handler', display_name: 'Test Handler' }] });
+  mocks.getGroupsForHandoff.mockResolvedValue({ groups: [{ id: 7, name: 'Synthetic acquisitions' }] });
   mocks.getItemTimeline.mockResolvedValue({ items: [{ event_type: 'claimed', actor: 'test-api078-staff', created_at: '2026-10-19T12:00:00Z' }] });
   onChanged.mockReset();
 });
@@ -86,8 +89,26 @@ describe('ClaimItemCard', () => {
     await act(async () => container.querySelector('button[type="submit"][data-action="handoff"]').click());
 
     expect(mocks.handoffItem).toHaveBeenCalledWith('new', 99907801, { to_username: 'test-api078-handler' });
-    expect(container.textContent).toContain('Hand off to a group');
-    expect(container.querySelector('button[aria-label="Hand off to a group"]').disabled).toBe(true);
+  });
+
+  it('hands an item off to a selected group', async () => {
+    await renderCard();
+    await act(async () => container.querySelector('button[aria-label="Hand off Synthetic item"]').click());
+    const targetType = container.querySelector('select[name="handoff-target-type"]');
+    await act(async () => {
+      targetType.value = 'group';
+      targetType.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(mocks.getGroupsForHandoff).toHaveBeenCalled();
+    const groupPicker = container.querySelector('select[name="to_group_id"]');
+    await act(async () => {
+      groupPicker.value = '7';
+      groupPicker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => container.querySelector('button[type="submit"][data-action="handoff"]').click());
+
+    expect(mocks.handoffItem).toHaveBeenCalledWith('new', 99907801, { to_group_id: 7 });
   });
 
   it('loads and displays the item timeline using the shared timeline component', async () => {

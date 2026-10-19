@@ -4,7 +4,8 @@ const errorMessages = {
   not_claimed_by_you: 'You can release only items claimed by you.',
   not_claimed: 'This item is no longer claimed. Refresh and try again.',
   reason_required: 'Enter a reason to take over this item.',
-  not_group_member: 'You are not a member of this item’s group.',
+  not_group_member: 'Only group members can claim this; use Take over with a reason.',
+  group_has_items: 'Move or finish its items first.',
   unknown_staff: 'The selected staff member could not be found.',
   submission_not_linked: 'Link this submission before managing its item claims.',
 };

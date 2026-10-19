@@ -79,9 +79,4 @@ describe('ClaimQueue', () => {
     expect(container.querySelector('[data-item-id="3"]')).toBeNull();
   });
 
-  it('leaves a visible My groups slot for AW-051', async () => {
-    await renderQueue();
-
-    expect(container.textContent).toContain('My groups');
-  });
 });

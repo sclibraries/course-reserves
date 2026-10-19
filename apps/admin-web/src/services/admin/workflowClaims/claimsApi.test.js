@@ -70,6 +70,15 @@ describe('claimsApi contract', () => {
     }));
   });
 
+  it('hands an item to a group id', async () => {
+    await claimsApi.handoffItem('new', 99907804, { to_group_id: 7 });
+
+    expect(mocks.authFetch).toHaveBeenCalledWith(`${baseUrl}/workflow/item/new/99907804/handoff`, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ to_group_id: 7 }),
+    }));
+  });
+
   it('takes over an item with a reason', async () => {
     await claimsApi.takeoverItem('reuse', 99907805, { reason: 'Urgent course deadline' });
 

@@ -14,6 +14,8 @@ import FacultyProxyAccess from '../components/page-sections/admin/proxy-access/F
 import NeedsLinkingList from '../components/page-sections/admin/linking/NeedsLinkingList';
 import ClaimQueue from '../components/page-sections/admin/claims/ClaimQueue';
 import MyClaimedItems from '../components/page-sections/admin/claims/MyClaimedItems';
+import MyGroups from '../components/page-sections/admin/groups/MyGroups';
+import AdminGroups from '../components/page-sections/admin/groups/AdminGroups';
 import { isStaffOrAdminRole } from '../util/roles';
 
 export const canAccessProxyTab = (role) => isStaffOrAdminRole(role);
@@ -33,7 +35,7 @@ export function createAdminTabRegistry({
     workflowVisible: isDevelopment && canManageSubmissions,
     navigationOrder: [
       'courses', 'resources', 'workflow', 'tracking', 'workflow-templates',
-      'customizations', 'users', 'proxy-access',
+      'customizations', 'users', 'groups', 'proxy-access',
     ],
     tabs: [
       {
@@ -106,6 +108,13 @@ export function createAdminTabRegistry({
         renderContent: () => <div className="fade-in"><MyClaimedItems /></div>,
       },
       {
+        key: 'my-groups',
+        label: 'My Groups',
+        navigationGroup: 'workflow',
+        canAccess: canManageSubmissions,
+        renderContent: () => <div className="fade-in"><MyGroups /></div>,
+      },
+      {
         key: 'submissions',
         label: 'Submissions Queue',
         navigationGroup: 'workflow',
@@ -158,6 +167,13 @@ export function createAdminTabRegistry({
         ariaLabel: 'User Management Tab',
         canAccess: isAdmin,
         renderContent: () => <div className="fade-in"><UserManagement /></div>,
+      },
+      {
+        key: 'groups',
+        label: 'Groups',
+        ariaLabel: 'Staff Groups Tab',
+        canAccess: isAdmin,
+        renderContent: () => <div className="fade-in"><AdminGroups /></div>,
       },
       {
         key: 'proxy-access',

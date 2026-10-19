@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Alert, Button, Form, FormGroup, Input, Label, Spinner } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
 import WorkflowTimeline from '../linking/WorkflowTimeline';
 import ClaimItemSummary from './ClaimItemSummary';
 
@@ -13,6 +14,10 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
   const [staff, setStaff] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [toUsername, setToUsername] = useState('');
+  const [handoffTargetType, setHandoffTargetType] = useState('person');
+  const [groups, setGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [toGroupId, setToGroupId] = useState('');
   const [takeoverOpen, setTakeoverOpen] = useState(false);
   const [takeoverReason, setTakeoverReason] = useState('');
   const [timelineOpen, setTimelineOpen] = useState(false);
@@ -54,8 +59,25 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
 
   const submitHandoff = (event) => {
     event.preventDefault();
-    if (!toUsername) return;
-    runAction('handoff', () => claimsApi.handoffItem(item.kind, item.id, { to_username: toUsername }));
+    if (handoffTargetType === 'person' && !toUsername) return;
+    if (handoffTargetType === 'group' && !toGroupId) return;
+    const body = handoffTargetType === 'group' ? { to_group_id: Number(toGroupId) } : { to_username: toUsername };
+    runAction('handoff', () => claimsApi.handoffItem(item.kind, item.id, body));
+  };
+
+  const changeHandoffTargetType = async (event) => {
+    const targetType = event.target.value;
+    setHandoffTargetType(targetType);
+    if (targetType !== 'group' || groups.length || groupsLoading) return;
+    setGroupsLoading(true);
+    try {
+      const result = await staffGroupsApi.getGroupsForHandoff();
+      setGroups(result?.groups || []);
+    } catch (requestError) {
+      setError(getClaimsErrorMessage(requestError));
+    } finally {
+      setGroupsLoading(false);
+    }
   };
 
   const submitTakeover = (event) => {
@@ -105,9 +127,6 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
               Take over
             </Button>
           )}
-          <Button color="outline-secondary" aria-label="Hand off to a group" disabled title="Group handoff is added in AW-051">
-            Hand off to a group
-          </Button>
         </div>
       </ClaimItemSummary>
 
@@ -116,21 +135,55 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
       {handoffOpen && (
         <Form className="border rounded p-3" onSubmit={submitHandoff}>
           <FormGroup>
-            <Label for={`handoff-staff-${item.kind}-${item.id}`}>Hand off to staff member</Label>
-            {staffLoading ? <Spinner size="sm" /> : (
-              <Input
-                id={`handoff-staff-${item.kind}-${item.id}`}
-                type="select"
-                name="to_username"
-                value={toUsername}
-                onChange={(event) => setToUsername(event.target.value)}
-              >
-                <option value="">Choose staff</option>
-                {staff.map((person) => <option key={person.username} value={person.username}>{person.display_name}</option>)}
-              </Input>
-            )}
+            <Label for={`handoff-target-type-${item.kind}-${item.id}`}>Hand off to</Label>
+            <Input
+              id={`handoff-target-type-${item.kind}-${item.id}`}
+              type="select"
+              name="handoff-target-type"
+              value={handoffTargetType}
+              onChange={changeHandoffTargetType}
+            >
+              <option value="person">A person</option>
+              <option value="group">A group</option>
+            </Input>
           </FormGroup>
-          <Button type="submit" data-action="handoff" disabled={!toUsername || Boolean(pending)}>Send handoff</Button>
+          {handoffTargetType === 'person' && (
+            <FormGroup>
+              <Label for={`handoff-staff-${item.kind}-${item.id}`}>Staff member</Label>
+              {staffLoading ? <Spinner size="sm" /> : (
+                <Input
+                  id={`handoff-staff-${item.kind}-${item.id}`}
+                  type="select"
+                  name="to_username"
+                  value={toUsername}
+                  onChange={(event) => setToUsername(event.target.value)}
+                >
+                  <option value="">Choose staff</option>
+                  {staff.map((person) => <option key={person.username} value={person.username}>{person.display_name}</option>)}
+                </Input>
+              )}
+            </FormGroup>
+          )}
+          {handoffTargetType === 'group' && (
+            <FormGroup>
+              <Label for={`handoff-group-${item.kind}-${item.id}`}>Staff group</Label>
+              {groupsLoading ? <Spinner size="sm" /> : (
+              <Input
+                id={`handoff-group-${item.kind}-${item.id}`}
+                type="select"
+                name="to_group_id"
+                value={toGroupId}
+                onChange={(event) => setToGroupId(event.target.value)}
+              >
+                <option value="">Choose group</option>
+                {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </Input>
+              )}
+            </FormGroup>
+          )}
+          <Button type="submit" data-action="handoff" disabled={!(handoffTargetType === 'group' ? toGroupId : toUsername) || Boolean(pending)}>
+            Send handoff
+          </Button>
           <Button type="button" color="link" onClick={() => setHandoffOpen(false)}>Cancel</Button>
         </Form>
       )}

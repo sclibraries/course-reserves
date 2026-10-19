@@ -142,6 +142,15 @@ export const apiConfig = {
       itemTakeover: '/workflow/item/:kind/:id/takeover',
       submissionClaimAll: '/workflow/submission/:uuid/claim-all',
     },
+    workflowGroups: {
+      allGroups: '/workflow/groups',
+      myGroups: '/workflow/my-groups',
+      groupQueue: '/workflow/group/:id/queue',
+      adminGroups: '/workflow/admin/groups',
+      adminGroup: '/workflow/admin/groups/:id',
+      groupMembers: '/workflow/admin/groups/:id/members',
+      groupMember: '/workflow/admin/groups/:id/members/:username',
+    },
     workflow: {
       // Template Management
       listTemplates: '/workflow-admin/templates',

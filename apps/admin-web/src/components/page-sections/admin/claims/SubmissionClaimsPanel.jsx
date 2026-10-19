@@ -45,7 +45,6 @@ function SubmissionClaimsPanel({ submission, items, currentUsername = '', onChan
           <Button color="primary" aria-label="Claim all items" onClick={handleClaimAll} disabled={claimingAll || !claimItems.length}>
             {claimingAll ? <Spinner size="sm" /> : 'Claim all items'}
           </Button>
-          <Button color="outline-secondary" disabled title="My groups are added in AW-051">My groups</Button>
         </div>
       </div>
 
