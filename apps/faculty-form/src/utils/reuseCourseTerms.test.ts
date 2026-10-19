@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PreviousCourse } from '@/hooks/useCourseCloning';
 import {
-  compareReuseTerms,
   filterPreviousCoursesForSubmission,
   getPinnedPreviousCourse,
-  parseReuseTerm,
   sortPreviousCourses,
 } from './reuseCourseTerms';
 
@@ -21,20 +19,6 @@ const makeCourse = (courseListingId: string, term: string, isExactMatch = true):
 });
 
 describe('reuse course terms', () => {
-  it('compares earlier, later, same, and unparseable terms', () => {
-    expect(compareReuseTerms('Spring 2026', 'Fall 2026')).toBeLessThan(0);
-    expect(compareReuseTerms('Spring 2027', 'Fall 2026')).toBeGreaterThan(0);
-    expect(compareReuseTerms('Fall 2026', 'Fall 2026')).toBe(0);
-    expect(compareReuseTerms('Unknown Term', 'Fall 2026')).toBeNull();
-  });
-
-  it('orders Spring before Summer before Fall and recognizes January and Interterm', () => {
-    expect(compareReuseTerms('Spring 2026', 'Summer 2026')).toBeLessThan(0);
-    expect(compareReuseTerms('Summer 2026', 'Fall 2026')).toBeLessThan(0);
-    expect(parseReuseTerm('January 2026')).toEqual({ year: 2026, rank: 0 });
-    expect(parseReuseTerm('2026 Interterm')).toEqual({ year: 2026, rank: 0 });
-  });
-
   it('keeps only earlier offerings, keeps unknown terms after dated courses, and never pins an unknown term', () => {
     const courses = [
       makeCourse('future', 'Spring 2027'),

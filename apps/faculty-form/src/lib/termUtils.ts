@@ -1,19 +1,35 @@
-import { Term } from '@/store/termsStore';
+import type { Term } from '@/store/termsStore';
 
 // Utility functions for working with terms
+
+type TermSeason = 'Winter' | 'Spring' | 'Summer' | 'Fall';
+
+const SEASON_ORDER: Record<string, number> = {
+  january: 0,
+  jan: 0,
+  interterm: 0,
+  winter: 0,
+  spring: 1,
+  summer: 2,
+  fall: 3,
+};
 
 /**
  * Parse term name to extract year and season information
  */
 export const parseTermName = (termName: string) => {
-  const match = termName.match(/(\d{4})\s+(Winter|Spring|Summer|Fall)/i);
-  if (!match) {
-    return null;
-  }
-  
+  const year = termName.match(/\b(\d{4})\b/)?.[1];
+  const seasonName = termName.match(/\b(January|Jan|Interterm|Winter|Spring|Summer|Fall)\b/i)?.[1];
+  if (!year || !seasonName) return null;
+
+  const normalizedSeason = seasonName.toLowerCase();
+  const season: TermSeason = SEASON_ORDER[normalizedSeason] === 0
+    ? 'Winter'
+    : `${normalizedSeason[0].toUpperCase()}${normalizedSeason.slice(1)}` as TermSeason;
+
   return {
-    year: parseInt(match[1]),
-    season: match[2] as 'Winter' | 'Spring' | 'Summer' | 'Fall',
+    year: Number(year),
+    season,
     full: termName
   };
 };
@@ -22,34 +38,23 @@ export const parseTermName = (termName: string) => {
  * Get the seasonal order for sorting (Winter=0, Spring=1, Summer=2, Fall=3)
  */
 export const getSeasonOrder = (season: string): number => {
-  const seasonOrder: Record<string, number> = {
-    'Winter': 0,
-    'Spring': 1, 
-    'Summer': 2,
-    'Fall': 3
-  };
-  
-  return seasonOrder[season] ?? 999;
+  return SEASON_ORDER[season.trim().toLowerCase()] ?? 999;
+};
+
+/** Compare term names chronologically, returning null if either name is unknown. */
+export const compareTermNames = (a: string, b: string): number | null => {
+  const aInfo = parseTermName(a);
+  const bInfo = parseTermName(b);
+  if (!aInfo || !bInfo) return null;
+
+  return aInfo.year - bInfo.year || getSeasonOrder(aInfo.season) - getSeasonOrder(bInfo.season);
 };
 
 /**
  * Compare two terms for sorting (chronological order)
  */
 export const compareTerms = (a: Term, b: Term): number => {
-  const aInfo = parseTermName(a.name);
-  const bInfo = parseTermName(b.name);
-  
-  if (!aInfo || !bInfo) {
-    return a.name.localeCompare(b.name);
-  }
-  
-  // Compare by year first
-  if (aInfo.year !== bInfo.year) {
-    return aInfo.year - bInfo.year;
-  }
-  
-  // Then by season order
-  return getSeasonOrder(aInfo.season) - getSeasonOrder(bInfo.season);
+  return compareTermNames(a.name, b.name) ?? a.name.localeCompare(b.name);
 };
 
 /**
