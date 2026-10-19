@@ -1,6 +1,11 @@
 import { useDroppable } from '@dnd-kit/core';
 import type { CourseFolder, CourseItem } from '@/store/courseReservesStore';
 import type { MoveTarget } from '@/utils/listLayout';
+import { FOLDER_DROP_EDGE_RATIO, ITEM_DROP_BEFORE_RATIO } from '@/utils/listDropZone';
+
+const itemZoneHeight = `${ITEM_DROP_BEFORE_RATIO * 100}%`;
+const folderMiddleHeight = `${(1 - 2 * FOLDER_DROP_EDGE_RATIO) * 100}%`;
+const folderEdgeHeight = `${FOLDER_DROP_EDGE_RATIO * 100}%`;
 
 function DropZone({
   id,
@@ -9,6 +14,7 @@ function DropZone({
   className,
   targetKind,
   targetFolderId,
+  style,
 }: {
   id: string;
   target: MoveTarget;
@@ -16,6 +22,7 @@ function DropZone({
   className: string;
   targetKind: 'folder' | 'item';
   targetFolderId?: string;
+  style?: { height?: string };
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -26,6 +33,7 @@ function DropZone({
       ref={setNodeRef}
       className={`${className} ${isOver ? 'border-blue-600 bg-blue-500/20 text-blue-900' : ''}`}
       aria-label={label}
+      style={style}
     >
       {isOver && label}
     </div>
@@ -40,14 +48,16 @@ export function ItemDropZones({ item }: { item: CourseItem }) {
         target={{ before: item.id }}
         targetKind="item"
         targetFolderId={item.folderId}
-        className="h-1/2 border-t-2 border-transparent pointer-events-auto"
+        className="border-t-2 border-transparent pointer-events-auto"
+        style={{ height: itemZoneHeight }}
       />
       <DropZone
         id={`drop-item-${item.id}-after`}
         target={{ after: item.id }}
         targetKind="item"
         targetFolderId={item.folderId}
-        className="h-1/2 border-b-2 border-transparent pointer-events-auto"
+        className="border-b-2 border-transparent pointer-events-auto"
+        style={{ height: itemZoneHeight }}
       />
     </div>
   );
@@ -55,7 +65,10 @@ export function ItemDropZones({ item }: { item: CourseItem }) {
 
 export function FolderDropZones({ folder }: { folder: CourseFolder }) {
   return (
-    <div className="absolute inset-0 z-20 grid pointer-events-none" style={{ gridTemplateRows: '25% 50% 25%' }}>
+    <div
+      className="absolute inset-0 z-20 grid pointer-events-none"
+      style={{ gridTemplateRows: `${folderEdgeHeight} ${folderMiddleHeight} ${folderEdgeHeight}` }}
+    >
       <DropZone
         id={`drop-folder-${folder.id}-before`}
         target={{ before: folder.id }}

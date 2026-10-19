@@ -2,12 +2,14 @@ import type { CourseReserve, CourseReservesState } from './types';
 import { fromLegacy, type ListLayoutState } from '@/utils/listLayout';
 
 export function getLayoutState(reserve: CourseReserve): ListLayoutState {
-  if (reserve.layout && reserve.folders.every((folder) => Array.isArray(folder.itemIds))) {
-    return reserve;
+  const folders = reserve.folders || [];
+  const items = reserve.items || [];
+  if (reserve.layout && folders.every((folder) => Array.isArray(folder.itemIds))) {
+    return { ...reserve, folders, items };
   }
   return fromLegacy(
-    reserve.folders as unknown as Parameters<typeof fromLegacy>[0],
-    reserve.items || []
+    folders as unknown as Parameters<typeof fromLegacy>[0],
+    items
   );
 }
 

@@ -44,6 +44,7 @@ export function SortableFolderContent({
                   isNew={newItemIds.includes(item.id)}
                   isDragDisabled={isDragDisabled}
                   index={itemIndex}
+                  positionLabel={`${folder.title} · ${itemIndex + 1}`}
                   totalItems={folder.items.length}
                   canMoveUp={canMoveItemUp(item.id)}
                   canMoveDown={canMoveItemDown(item.id)}

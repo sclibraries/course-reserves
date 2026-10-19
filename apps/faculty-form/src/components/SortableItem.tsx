@@ -20,6 +20,7 @@ interface SortableItemProps {
   item: CourseItem;
   isNew?: boolean;
   index: number;
+  positionLabel?: string;
   totalItems: number;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
@@ -37,6 +38,7 @@ export const SortableItem = ({
   item, 
   isNew = false,
   index, 
+  positionLabel,
   totalItems, 
   canMoveUp,
   canMoveDown,
@@ -85,8 +87,8 @@ export const SortableItem = ({
           {/* Position indicator and drag handle */}
           <div className="flex items-center gap-3 flex-shrink-0">
             {/* Position number */}
-            <div className="bg-primary/10 text-primary text-sm font-semibold rounded-full w-8 h-8 flex items-center justify-center">
-              {index + 1}
+            <div className="bg-primary/10 text-primary text-sm font-semibold rounded-full min-w-8 h-8 w-fit px-2 whitespace-nowrap flex items-center justify-center">
+              {positionLabel ?? index + 1}
             </div>
             
             {/* Drag handle */}

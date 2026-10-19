@@ -6,9 +6,12 @@ describe('getDropZone', () => {
 
   it('splits a folder row into before, into, and after zones', () => {
     expect(getDropZone(rect, 124, 'folder')).toBe('before');
-    expect(getDropZone(rect, 125, 'folder')).toBe('before');
     expect(getDropZone(rect, 126, 'folder')).toBe('into');
     expect(getDropZone(rect, 174, 'folder')).toBe('into');
+  });
+
+  it('assigns exact folder edge ratios to before and after', () => {
+    expect(getDropZone(rect, 125, 'folder')).toBe('before');
     expect(getDropZone(rect, 175, 'folder')).toBe('after');
   });
 

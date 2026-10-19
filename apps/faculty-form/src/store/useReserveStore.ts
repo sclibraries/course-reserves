@@ -49,7 +49,7 @@ export const useReserveStore = create<CourseReservesState>()(
             reserves: (persisted.reserves || []).map((reserve) => ({
               ...reserve,
               ...fromLegacy(
-                reserve.folders as unknown as Parameters<typeof fromLegacy>[0],
+                (reserve.folders || []) as unknown as Parameters<typeof fromLegacy>[0],
                 reserve.items || []
               ),
             })),
