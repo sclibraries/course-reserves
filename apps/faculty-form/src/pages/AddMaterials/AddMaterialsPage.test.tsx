@@ -545,6 +545,104 @@ Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenou
     expect(Array.from(card.querySelectorAll('button')).some((button) => button.textContent?.includes('Use this match'))).toBe(false);
   });
 
+  it('shows the closest title first and collapses the remaining citation matches', async () => {
+    const closeMatch = {
+      ...searchResult,
+      id: 'close-match',
+      title: 'The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean',
+    };
+    const otherMatches = [
+      { ...searchResult, id: 'first-match', title: 'Synthetic Article' },
+      { ...searchResult, id: 'third-match', title: 'Race, Narrative, and Caribbean History' },
+    ];
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [otherMatches[0], closeMatch, otherMatches[1]], totalHits: 3, searchTime: 5,
+      queryString: 'citation search', appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', createContext({ reserve: { ...reserve, items: [] } }));
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const citationCard = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const toggle = Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.includes('Show')) as HTMLButtonElement;
+    const othersId = toggle?.getAttribute('aria-controls');
+    const others = othersId ? citationCard.querySelector(`#${othersId}`) as HTMLElement | null : null;
+
+    expect(citationCard.textContent).toContain('Best match');
+    expect(citationCard.textContent).toContain(closeMatch.title);
+    expect(toggle?.textContent).toBe('Show 2 more matches');
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(othersId).toBeTruthy();
+    expect(others?.hidden).toBe(true);
+
+    await act(async () => toggle.click());
+
+    expect(toggle.textContent).toBe('Hide other matches');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(others?.hidden).toBe(false);
+    expect(Array.from(others?.querySelectorAll('article') || []).map((card) => card.textContent)).toEqual([
+      expect.stringContaining('Synthetic Article'),
+      expect.stringContaining('Race, Narrative, and Caribbean History'),
+    ]);
+
+    await act(async () => toggle.click());
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(others?.hidden).toBe(true);
+  });
+
+  it('keeps each citation match toggle collapsed independently', async () => {
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [searchResult, secondSearchResult], totalHits: 2, searchTime: 5,
+      queryString: 'citation search', appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', createContext({ reserve: { ...reserve, items: [] } }));
+    await enterCitation(view, `${validCitation}\n\n${validCitation.replace('The Race Leapt', 'A Different Study')}`);
+    await findPasteMatches(view);
+    const firstCard = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const secondCard = view.querySelector('[data-citation-id="citation-2"]') as HTMLElement;
+    const firstToggle = Array.from(firstCard.querySelectorAll('button')).find((button) => button.textContent?.includes('Show')) as HTMLButtonElement;
+    const secondToggle = Array.from(secondCard.querySelectorAll('button')).find((button) => button.textContent?.includes('Show')) as HTMLButtonElement;
+    const secondRegion = secondCard.querySelector(`#${secondToggle.getAttribute('aria-controls')}`) as HTMLElement;
+
+    expect(firstToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(secondToggle.getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => firstToggle.click());
+
+    expect(firstToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(secondToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(secondRegion.hidden).toBe(true);
+  });
+
+  it('adds an expanded citation match and replaces its choices with the added state', async () => {
+    const secondMatch = { ...secondSearchResult, title: 'Second Citation Match' };
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [searchResult, secondMatch], totalHits: 2, searchTime: 5,
+      queryString: 'citation search', appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
+    const context = createContext({ reserve: { ...reserve, items: [] } });
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
+    await enterCitation(view, validCitation);
+    await findPasteMatches(view);
+    const citationCard = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
+    const toggle = Array.from(citationCard.querySelectorAll('button')).find((button) => button.textContent?.includes('more matches')) as HTMLButtonElement;
+    expect(toggle).toBeTruthy();
+    if (!toggle) return;
+    await act(async () => toggle.click());
+    const secondCard = Array.from(citationCard.querySelectorAll('article')).find((card) => card.textContent?.includes(secondMatch.title)) as HTMLElement;
+
+    expect(secondCard.textContent).toContain('View full record');
+
+    const useMatch = Array.from(secondCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use this match') as HTMLButtonElement;
+    await act(async () => useMatch.click());
+
+    expect(context.addItem).toHaveBeenCalledWith('reserve-test', expect.objectContaining({ title: secondMatch.title }));
+    expect(citationCard.textContent).toContain('Added to your list ✓');
+    expect(citationCard.textContent).not.toContain('Best match');
+    expect(citationCard.textContent).not.toContain('Show 1 more matches');
+    expect(citationCard.textContent).not.toContain('Hide other matches');
+  });
+
   it('adds from the full-record panel and closes it', async () => {
     const context = createContext({ reserve: { ...reserve, items: [] } });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);

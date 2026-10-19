@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
 import type { CitationBatchSearchGroup } from '@/utils/citationBatchSearch';
+import { findCitationBestMatch } from '@/utils/citationBestMatch';
 import type { CitationChoice, EditableCitation } from './pasteCitationTypes';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { CourseItem } from '@/store/courseReservesStore';
@@ -24,6 +26,25 @@ interface CitationReviewGroupProps {
 }
 
 export default function CitationReviewGroup({ citation, index, group, choice, addedItem, writtenDuplicate, isResultDuplicate, disabled = false, onEdit, onRemove, onAddAsWritten, onOpenRecord, onAddMatch, onUndo }: CitationReviewGroupProps) {
+  const [showOtherMatches, setShowOtherMatches] = useState(false);
+  const { best, others } = group ? findCitationBestMatch(citation.text, group.results) : { best: undefined, others: [] };
+  const hasAddedChoice = Boolean(choice && addedItem);
+  const otherMatchesId = `other-matches-${citation.id}`;
+
+  const renderMatch = (result: DiscoverySearchResult) => {
+    const selectedChoice = Boolean(addedItem && choice?.resultId === result.id);
+    return (
+      <DiscoveryResultCard
+        key={`${citation.id}:${result.dbId}:${result.id}`}
+        result={result}
+        isDuplicate={!selectedChoice && isResultDuplicate(result)}
+        onOpenRecord={() => onOpenRecord(citation.id, result)}
+        onAdd={addedItem ? undefined : () => onAddMatch(citation.id, result)}
+        addLabel="Use this match"
+      />
+    );
+  };
+
   return (
     <section data-citation-id={citation.id} className="space-y-3 rounded-lg border p-4">
       <div className="flex items-start gap-2">
@@ -54,22 +75,28 @@ export default function CitationReviewGroup({ citation, index, group, choice, ad
 
       {group?.error && <p role="alert" className="whitespace-pre-line text-sm text-destructive">{group.error}</p>}
       {group && !group.error && group.results.length === 0 && <p className="text-sm text-muted-foreground">No matches found. You can add this citation as written.</p>}
-      {group && group.results.length > 0 && (
+      {group && !group.error && best && !hasAddedChoice && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Best matches</h3>
-          {group.results.map((result) => {
-            const selectedChoice = Boolean(addedItem && choice?.resultId === result.id);
-            return (
-              <DiscoveryResultCard
-                key={`${citation.id}:${result.dbId}:${result.id}`}
-                result={result}
-                isDuplicate={!selectedChoice && isResultDuplicate(result)}
-                onOpenRecord={() => onOpenRecord(citation.id, result)}
-                onAdd={addedItem ? undefined : () => onAddMatch(citation.id, result)}
-                addLabel="Use this match"
-              />
-            );
-          })}
+          <h3 className="text-sm font-medium">Best match</h3>
+          {renderMatch(best)}
+          {others.length > 0 && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-expanded={showOtherMatches}
+                aria-controls={otherMatchesId}
+                disabled={disabled}
+                onClick={() => setShowOtherMatches((current) => !current)}
+              >
+                {showOtherMatches ? 'Hide other matches' : `Show ${others.length} more matches`}
+              </Button>
+              <div id={otherMatchesId} className="space-y-2" hidden={!showOtherMatches}>
+                {others.map(renderMatch)}
+              </div>
+            </>
+          )}
         </div>
       )}
     </section>
