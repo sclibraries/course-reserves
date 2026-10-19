@@ -51,7 +51,7 @@ vi.mock('@/hooks/useSubmissionEditor', () => ({
     courseModalOpen: false, setCourseModalOpen: () => {},
     sortBy: 'manual', setSortBy: () => {}, searchQuery: '', setSearchQuery: () => {},
     filters: {}, setFilters: () => {}, resetFilters: () => {}, hasActiveFiltersOrSort: false,
-    addItem: () => {}, updateItem: () => {}, deleteItem: () => {}, reorderItems: () => {},
+    addItem: () => {}, updateItem: () => {}, deleteItem: () => {},
     moveItemInList: () => true, updateReserve: () => {}, createFolder: () => {}, updateFolder: () => {},
     deleteFolder: () => {}, toggleFolder: () => {}, addItemToFolder: () => {}, removeItemFromFolder: () => {},
     moveItemInFolder: () => {}, moveFolderToPosition: () => {}, moveFolderPosition: () => {},

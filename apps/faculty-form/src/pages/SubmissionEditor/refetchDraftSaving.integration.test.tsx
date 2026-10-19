@@ -158,12 +158,17 @@ describe('SubmissionEditor refetch after the draft autosave stub resolves', () =
 });
 
 function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
-  return {
+  const reserve: CourseReserve = {
     id: 'submission-1', courseCode: 'BIO 101', courseTitle: 'Biology', section: '01',
     instructors: 'Faculty One', term: '2026FA', status: 'submitted',
     items: [{ id: 'material-1', title: 'Original server title', materialType: 'book', status: 'draft' }],
-    folders: [], lastUpdated: 'Jun 17, 2026', isLocked: false, canEdit: true,
+    folders: [], layout: [], lastUpdated: 'Jun 17, 2026', isLocked: false, canEdit: true,
     ...overrides,
+  };
+  return {
+    ...reserve,
+    layout: overrides.layout || reserve.items.filter((item) => !item.folderId)
+      .map((item) => ({ kind: 'item' as const, id: item.id })),
   };
 }
 

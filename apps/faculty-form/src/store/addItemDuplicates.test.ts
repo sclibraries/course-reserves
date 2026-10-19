@@ -32,6 +32,7 @@ const reserve = {
   status: 'draft',
   lastUpdated: '2026-06-24',
   folders: [],
+  layout: [{ kind: 'item', id: 'item-1' }],
   items: [
     {
       id: 'item-1',
@@ -107,7 +108,8 @@ describe('useReserveStore.addItem duplicate handling', () => {
     useReserveStore.setState({
       reserves: [{
         ...reserve,
-        folders: [{ id: 'folder-1', title: 'Week 1', isOpen: true, items: [] }],
+        folders: [{ id: 'folder-1', title: 'Week 1', isOpen: true, itemIds: [] }],
+        layout: [{ kind: 'folder', id: 'folder-1' }, { kind: 'item', id: 'item-1' }],
       }],
     });
 

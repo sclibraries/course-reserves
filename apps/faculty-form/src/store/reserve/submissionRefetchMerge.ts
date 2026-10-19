@@ -41,6 +41,7 @@ export function hasLocalMaterialEdits(
 
 function materialsDiffer(local: CourseReserve, server: CourseReserve): boolean {
   if (JSON.stringify(local.items) !== JSON.stringify(server.items)) return true;
+  if (JSON.stringify(local.layout) !== JSON.stringify(server.layout)) return true;
 
   const localFolders = local.folders.map(({ isOpen: _isOpen, ...folder }) => folder);
   const serverFolders = server.folders.map(({ isOpen: _isOpen, ...folder }) => folder);

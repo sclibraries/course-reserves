@@ -50,6 +50,7 @@ describe('C1 submission payload characterization', () => {
       lastUpdated: 'Jun 20, 2026',
       items: [item],
       folders: [],
+      layout: [{ kind: 'item' as const, id: item.id }],
     };
     useReserveStore.setState({ reserves: [reserve] });
     useAuthStore.setState({ user: null, isAuthenticated: false });

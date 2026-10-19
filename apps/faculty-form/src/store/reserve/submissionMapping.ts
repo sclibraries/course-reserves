@@ -1,4 +1,5 @@
 import type { CourseFolder, CourseItem, CourseReserve } from './types';
+import { fromServer } from '@/utils/listLayout';
 
 type MaterialResourceData = Partial<Pick<
   CourseItem,
@@ -12,6 +13,7 @@ interface BackendMaterial {
   material_type: string;
   status: string;
   display_order: number;
+  position_in_folder?: number;
   barcode?: string;
   call_number?: string;
   folder_name?: string;
@@ -97,27 +99,32 @@ const mapMaterial = (
 };
 
 const mapSubmissionItems = (submission: BackendSubmission, includeBackendIds: boolean) => {
-  const folders: CourseFolder[] = (submission.folders || []).map((folder) => {
+  const folders = (submission.folders || []).map((folder) => {
     const folderId = `folder-${folder.id}`;
-    const items = (folder.items || [])
-      .map((material) => mapMaterial(material, folderId, includeBackendIds))
-      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    const folderItems = (folder.items || []).map((material, index) => ({
+      item: mapMaterial(material, folderId, includeBackendIds),
+      order: material.position_in_folder ?? index,
+    })).sort((left, right) => left.order - right.order);
 
     return {
       id: folderId,
       ...(includeBackendIds ? { backendFolderId: String(folder.id) } : {}),
       title: folder.name,
       isOpen: false,
-      items,
-      position: folder.display_order,
+      itemIds: folderItems.map(({ item }) => item.id),
+      displayOrder: folder.display_order,
+      folderItems: folderItems.map(({ item }) => item),
     };
-  }).sort((a, b) => (a.position || 0) - (b.position || 0));
+  });
 
   const unfolderedItems = (submission.unfoldered_items || [])
     .map((material) => mapMaterial(material, undefined, includeBackendIds))
     .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-  return { folders, items: [...folders.flatMap((folder) => folder.items), ...unfolderedItems] };
+  const items = [...folders.flatMap((folder) => folder.folderItems), ...unfolderedItems];
+  const mappedFolders = folders.map(({ folderItems: _folderItems, ...folder }) => folder);
+  const layout = fromServer(mappedFolders, items);
+  return layout;
 };
 
 const mapLockFields = (submission: BackendSubmission): Pick<
@@ -151,7 +158,7 @@ const formatLastUpdated = (updatedAt: string) => new Date(updatedAt).toLocaleDat
 });
 
 export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseReserve => {
-  const { folders, items } = mapSubmissionItems(submission, false);
+  const { folders, items, layout } = mapSubmissionItems(submission, false);
   const legacyCourseAssignmentId = submission.section
     ? `${submission.course_code}-${submission.section}-${submission.term_code}`
     : submission.course_code;
@@ -166,6 +173,7 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
     status: submission.status as CourseReserve['status'],
     items,
     folders,
+    layout,
     lastUpdated: formatLastUpdated(submission.updated_at),
     isTestData: false,
     courseAssignmentId: submission.its_course_id || legacyCourseAssignmentId,
@@ -176,7 +184,7 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
 };
 
 export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseReserve => {
-  const { folders, items } = mapSubmissionItems(submission, true);
+  const { folders, items, layout } = mapSubmissionItems(submission, true);
 
   return {
     id: submission.submission_uuid,
@@ -188,6 +196,7 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
     status: submission.status as CourseReserve['status'],
     items,
     folders,
+    layout,
     lastUpdated: formatLastUpdated(submission.updated_at),
     isTestData: false,
     ...(submission.its_course_id ? { courseAssignmentId: submission.its_course_id } : {}),

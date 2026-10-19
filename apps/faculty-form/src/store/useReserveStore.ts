@@ -7,6 +7,7 @@ import { createPollingSlice } from './reserve/pollingSlice';
 import { createReservesSlice } from './reserve/reservesSlice';
 import { createSubmissionFetchSlice } from './reserve/submissionFetchSlice';
 import { createSubmissionLifecycleSlice } from './reserve/submissionLifecycleSlice';
+import { fromLegacy } from '@/utils/listLayout';
 
 export type {
   CourseFolder,
@@ -35,10 +36,25 @@ export const useReserveStore = create<CourseReservesState>()(
       }),
       {
         name: 'course-reserves-storage',
+        version: 1,
         partialize: (state) => ({
           reserves: state.reserves,
           _initialized: state._initialized,
         }),
+        migrate: (persistedState, version) => {
+          if (version >= 1) return persistedState as CourseReservesState;
+          const persisted = persistedState as Partial<CourseReservesState>;
+          return {
+            ...persisted,
+            reserves: (persisted.reserves || []).map((reserve) => ({
+              ...reserve,
+              ...fromLegacy(
+                reserve.folders as unknown as Parameters<typeof fromLegacy>[0],
+                reserve.items || []
+              ),
+            })),
+          } as CourseReservesState;
+        },
       }
     ),
     { name: 'CourseReservesStore' }

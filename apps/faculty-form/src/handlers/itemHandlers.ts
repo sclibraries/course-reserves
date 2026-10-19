@@ -78,7 +78,7 @@ export const createItemHandlers = (
     
     if (confirmed) {
       // One atomic update: clear both items and folders
-      updateReserve(reserveId, { items: [], folders: [] });
+      updateReserve(reserveId, { items: [], folders: [], layout: [] });
       toast.success(
         foldersCount > 0 
           ? `Cleared ${itemsCount} item${itemsCount !== 1 ? 's' : ''} and ${foldersCount} folder${foldersCount !== 1 ? 's' : ''}`

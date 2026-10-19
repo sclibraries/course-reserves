@@ -1,4 +1,6 @@
 import type { ReserveSlice, CourseReserve } from './types';
+import { fromLegacy } from '@/utils/listLayout';
+import { getLayoutState } from './layoutState';
 
 export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'findReserveByAssignmentId' | 'updateReserve' | 'deleteReserve' | 'getReserveById' | 'getUserReserves' | 'getTestReserves' | 'cloneReserve' | 'getReserveStats' | 'clearDuplicates'> = (set, get, store) => ({
   initialize: () => {
@@ -6,10 +8,9 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
     // Just ensure structure is valid
     const state = get();
     if (!state._initialized) {
-      const migratedReserves = state.reserves.map(reserve => ({
+      const migratedReserves = state.reserves.map((reserve) => ({
         ...reserve,
-        folders: reserve.folders || [],
-        items: reserve.items || []
+        ...getLayoutState(reserve),
       }));
 
       set({
@@ -21,11 +22,13 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
 
   addReserve: (reserve) => {
     const id = `reserve-${Date.now()}`;
+    const layoutState = reserve.layout
+      ? { layout: reserve.layout, folders: reserve.folders || [], items: reserve.items || [] }
+      : fromLegacy(reserve.folders || [], reserve.items || []);
     const newReserve: CourseReserve = {
       ...reserve,
       id,
-      items: reserve.items || [],
-      folders: reserve.folders || [],
+      ...layoutState,
       lastUpdated: new Date().toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -80,11 +83,7 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
     if (!reserve) return undefined;
 
     // Ensure folders property exists (backwards compatibility)
-    return {
-      ...reserve,
-      folders: reserve.folders || [],
-      items: reserve.items || []
-    };
+    return { ...reserve, ...getLayoutState(reserve) };
   },
 
   getUserReserves: () => {
@@ -102,8 +101,15 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
     const newId = `reserve-${Date.now()}`;
     const timestamp = Date.now();
 
-    // Create folder mapping for updating item folderIds
+    const source = getLayoutState(originalReserve);
     const folderIdMapping: { [oldId: string]: string } = {};
+    const itemIdMapping: { [oldId: string]: string } = {};
+    source.folders.forEach((folder, index) => {
+      folderIdMapping[folder.id] = `folder-${timestamp}-${index}`;
+    });
+    source.items.forEach((item, index) => {
+      itemIdMapping[item.id] = `item-${timestamp}-${index}`;
+    });
 
     const clonedReserve: CourseReserve = {
       ...originalReserve,
@@ -111,20 +117,22 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
       id: newId,
       status: 'draft',
       isTestData: false,
-      folders: (originalReserve.folders || []).map((folder, index) => {
-        const newFolderId = `folder-${timestamp}-${index}`;
-        folderIdMapping[folder.id] = newFolderId;
+      folders: source.folders.map((folder) => {
         return {
           ...folder,
-          id: newFolderId,
-          items: [] // Items will be populated separately
+          id: folderIdMapping[folder.id],
+          itemIds: folder.itemIds.map((itemId) => itemIdMapping[itemId]),
         };
       }),
-      items: (originalReserve.items || []).map((item, index) => ({
+      items: source.items.map((item) => ({
         ...item,
-        id: `item-${timestamp}-${index}`,
+        id: itemIdMapping[item.id],
         folderId: item.folderId ? folderIdMapping[item.folderId] : undefined,
         status: 'draft'
+      })),
+      layout: source.layout.map((entry) => ({
+        ...entry,
+        id: entry.kind === 'folder' ? folderIdMapping[entry.id] : itemIdMapping[entry.id],
       })),
       lastUpdated: new Date().toLocaleDateString("en-US", {
         month: "short",

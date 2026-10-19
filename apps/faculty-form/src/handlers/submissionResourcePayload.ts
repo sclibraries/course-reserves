@@ -1,0 +1,52 @@
+import type { CourseItem } from '@/store/courseReservesStore';
+
+export const transformItemForBackend = (item: CourseItem, displayOrder: number, folderName?: string) => {
+  const isReuse = !!(item.barcode || item.callNumber || item.holdingsId);
+
+  return {
+    is_reuse: isReuse,
+    source_barcode: item.barcode || null,
+    source_call_number: item.callNumber || null,
+    source_resource_id: item.holdingsId || null,
+    source_folio_instance_id: item.instanceId || null,
+    display_order: displayOrder,
+    folder_name: folderName || null,
+    faculty_notes: item.notes || null,
+    priority: item.status === 'needs-review' ? 'high' : 'medium',
+    resource_data: {
+      id: item.id,
+      title: item.title,
+      authors: item.authors,
+      materialType: item.materialType,
+      status: item.status,
+      isbn: item.isbn,
+      publisher: item.publisher,
+      publicationYear: item.publicationYear,
+      edition: item.edition,
+      pages: item.pages,
+      chapterTitle: item.chapterTitle,
+      copy: item.copy,
+      journalTitle: item.journalTitle,
+      volume: item.volume,
+      issue: item.issue,
+      doi: item.doi,
+      issn: item.issn,
+      eds: item.eds,
+      url: item.url,
+      notes: item.notes,
+      libraryNotes: item.libraryNotes,
+      displayStartDate: item.displayStartDate,
+      displayEndDate: item.displayEndDate,
+      barcode: item.barcode,
+      callNumber: item.callNumber,
+      instanceId: item.instanceId,
+      instanceHrid: item.instanceHrid,
+      holdingsId: item.holdingsId,
+      temporaryLocationId: item.temporaryLocationId,
+      temporaryLocationObject: item.temporaryLocationObject,
+      permanentLocationId: item.permanentLocationId,
+      permanentLocationObject: item.permanentLocationObject,
+      copiedItem: item.copiedItem,
+    },
+  };
+};

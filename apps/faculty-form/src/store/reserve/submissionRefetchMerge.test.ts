@@ -9,12 +9,12 @@ describe('mergeRefetchedSubmission', () => {
     });
     const local = buildReserve({
       items: [{ id: 'local-item', title: 'Unsaved title', materialType: 'book', status: 'draft' }],
-      folders: [{ id: 'local-folder', title: 'Unsaved folder', isOpen: true, items: [], position: 0 }],
+      folders: [{ id: 'local-folder', title: 'Unsaved folder', isOpen: true, itemIds: [] }],
     });
     const server = buildReserve({
       status: 'complete', isLocked: true, canEdit: false, lockedBy: 'Library staff',
       items: [{ id: 'server-item', title: 'Server title', materialType: 'book', status: 'complete' }],
-      folders: [{ id: 'server-folder', title: 'Server folder', isOpen: false, items: [], position: 0 }],
+      folders: [{ id: 'server-folder', title: 'Server folder', isOpen: false, itemIds: [] }],
     });
 
     const result = mergeRefetchedSubmission(local, server, previousServer);
@@ -56,23 +56,30 @@ describe('mergeRefetchedSubmission', () => {
 
   it('ignores folder expansion state when deciding whether server materials changed', () => {
     const local = buildReserve({
-      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: true, items: [], position: 0 }],
+      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: true, itemIds: [] }],
     });
     const server = buildReserve({
-      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, items: [], position: 0 }],
+      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, itemIds: [] }],
     });
 
     expect(mergeRefetchedSubmission(local, server, buildReserve({
-      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, items: [], position: 0 }],
+      folders: [{ id: 'folder-1', title: 'Week 1', isOpen: false, itemIds: [] }],
     })).hasRemoteItemsChanged).toBe(false);
   });
 });
 
 function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
-  return {
+  const reserve: CourseReserve = {
     id: 'submission-1', courseCode: 'BIO 101', courseTitle: 'Biology', section: '01',
-    instructors: 'Faculty One', term: '2026FA', status: 'submitted', items: [], folders: [],
+    instructors: 'Faculty One', term: '2026FA', status: 'submitted', items: [], folders: [], layout: [],
     lastUpdated: 'Jun 17, 2026', isLocked: false, canEdit: true,
     ...overrides,
+  };
+  return {
+    ...reserve,
+    layout: overrides.layout || [
+      ...reserve.folders.map((folder) => ({ kind: 'folder' as const, id: folder.id })),
+      ...reserve.items.filter((item) => !item.folderId).map((item) => ({ kind: 'item' as const, id: item.id })),
+    ],
   };
 }

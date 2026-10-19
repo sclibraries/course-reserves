@@ -34,7 +34,7 @@ const fullRecord = {
 const reserve: CourseReserve = {
   id: 'reserve-test', courseCode: 'BIO 220', courseTitle: 'Ecology', section: '01', instructors: 'Test Faculty',
   term: 'Fall 2026', status: 'draft', items: [{ id: 'existing', title: 'Existing', materialType: 'article', status: 'draft', doi: '10.1000/synthetic' }],
-  folders: [], lastUpdated: '2026-10-01',
+  folders: [], layout: [{ kind: 'item', id: 'existing' }], lastUpdated: '2026-10-01',
 };
 
 const LocationProbe = () => {

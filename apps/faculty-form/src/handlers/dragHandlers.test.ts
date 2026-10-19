@@ -1,109 +1,59 @@
 import { describe, expect, it, vi } from 'vitest';
-
 import { createDragHandlers } from './dragHandlers';
 
 describe('createDragHandlers', () => {
-  it('moves a folder from the first position to the last position', () => {
-    const moveFolderToPosition = vi.fn();
-    const { handleDragEnd } = createDragHandlers(
-      'reserve-1',
-      [],
-      vi.fn(),
-      vi.fn(),
-      false,
-      moveFolderToPosition
-    );
+  it('applies the target zone once when an item drops into a folder', () => {
+    const moveTo = vi.fn();
+    const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, false);
 
     handleDragEnd({
-      active: {
-        id: 'folder-first',
-        data: { current: { type: 'Folder', folder: { id: 'folder-first' } } },
-      },
-      over: {
-        id: 'folder-last',
-        data: { current: { type: 'Folder', folder: { id: 'folder-last' } } },
-      },
+      active: { id: 'item-1', data: { current: { type: 'Item' } } },
+      over: { id: 'folder-zone', data: { current: {
+        type: 'drop-zone', dropTarget: { intoFolder: 'folder-1' },
+      } } },
     } as never);
 
-    expect(moveFolderToPosition).toHaveBeenCalledWith('reserve-1', 'folder-first', 'folder-last');
+    expect(moveTo).toHaveBeenCalledTimes(1);
+    expect(moveTo).toHaveBeenCalledWith('reserve-1', 'item-1', { intoFolder: 'folder-1' });
   });
 
-  it('moves a folder from the last position to the first position', () => {
-    const moveFolderToPosition = vi.fn();
-    const { handleDragEnd } = createDragHandlers(
-      'reserve-1',
-      [],
-      vi.fn(),
-      vi.fn(),
-      false,
-      moveFolderToPosition
-    );
+  it('moves an item before a folder when the pointer is in its before zone', () => {
+    const moveTo = vi.fn();
+    const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, false);
 
     handleDragEnd({
-      active: {
-        id: 'folder-last',
-        data: { current: { type: 'Folder', folder: { id: 'folder-last' } } },
-      },
-      over: {
-        id: 'folder-first',
-        data: { current: { type: 'Folder', folder: { id: 'folder-first' } } },
-      },
+      active: { id: 'item-4', data: { current: { type: 'Item' } } },
+      over: { id: 'folder-before', data: { current: {
+        type: 'drop-zone', dropTarget: { before: 'folder-3' },
+      } } },
     } as never);
 
-    expect(moveFolderToPosition).toHaveBeenCalledWith('reserve-1', 'folder-last', 'folder-first');
+    expect(moveTo).toHaveBeenCalledWith('reserve-1', 'item-4', { before: 'folder-3' });
   });
 
-  it('adds an item to a folder when dropped on an explicit folder dropzone', () => {
-    const reorderItems = vi.fn();
-    const addItemToFolder = vi.fn();
-
-    const { handleDragEnd } = createDragHandlers(
-      'reserve-1',
-      [{ id: 'item-1' }, { id: 'item-2' }] as never,
-      reorderItems,
-      addItemToFolder,
-      false
-    );
+  it('moves an item after a folder when the pointer is in its after zone', () => {
+    const moveTo = vi.fn();
+    const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, false);
 
     handleDragEnd({
-      active: {
-        id: 'item-1',
-        data: { current: { type: 'Item', item: { id: 'item-1' } } },
-      },
-      over: {
-        id: 'folder-dropzone-folder-1-top',
-        data: { current: { type: 'FolderDropzone', folder: { id: 'folder-1' } } },
-      },
+      active: { id: 'item-1', data: { current: { type: 'Item' } } },
+      over: { id: 'folder-after', data: { current: {
+        type: 'drop-zone', dropTarget: { after: 'folder-1' },
+      } } },
     } as never);
 
-    expect(addItemToFolder).toHaveBeenCalledWith('reserve-1', 'folder-1', 'item-1');
-    expect(reorderItems).not.toHaveBeenCalled();
+    expect(moveTo).toHaveBeenCalledWith('reserve-1', 'item-1', { after: 'folder-1' });
   });
 
-  it('adds an item to the containing folder when dropped on an item already inside that folder', () => {
-    const reorderItems = vi.fn();
-    const addItemToFolder = vi.fn();
-
-    const { handleDragEnd } = createDragHandlers(
-      'reserve-1',
-      [{ id: 'item-1' }, { id: 'item-2' }] as never,
-      reorderItems,
-      addItemToFolder,
-      false
-    );
+  it('does not move when sorting or filtering is active', () => {
+    const moveTo = vi.fn();
+    const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, true);
 
     handleDragEnd({
-      active: {
-        id: 'item-1',
-        data: { current: { type: 'Item', item: { id: 'item-1' } } },
-      },
-      over: {
-        id: 'folder-item-1',
-        data: { current: { type: 'Item', item: { id: 'folder-item-1', folderId: 'folder-1' } } },
-      },
+      active: { id: 'item-1', data: { current: { type: 'Item' } } },
+      over: { id: 'item-2', data: { current: { type: 'Item' } } },
     } as never);
 
-    expect(addItemToFolder).toHaveBeenCalledWith('reserve-1', 'folder-1', 'item-1');
-    expect(reorderItems).not.toHaveBeenCalled();
+    expect(moveTo).not.toHaveBeenCalled();
   });
 });

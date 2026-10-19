@@ -20,16 +20,16 @@ describe('useReserveStore characterization', () => {
     const source = buildReserve();
     store.setState({ reserves: [source] });
 
-    store.getState().reorderItems('reserve-source', ['item-2', 'item-1']);
-    store.getState().moveItemInFolder('reserve-source', 'folder-a', 'item-2', 'down');
+    store.getState().moveItemInFolder('reserve-source', 'folder-a', 'item-2', 'up');
     store.getState().moveFolderPosition('reserve-source', 'folder-a', 'down');
 
     const updated = store.getState().getReserveById('reserve-source')!;
     expect(updated.items.map((item) => item.id)).toEqual(['item-1', 'item-2']);
-    expect(updated.folders.map(({ id, position }) => ({ id, position }))).toEqual([
-      { id: 'folder-a', position: 1 },
-      { id: 'folder-b', position: 0 },
+    expect(updated.layout).toEqual([
+      { kind: 'folder', id: 'folder-b' },
+      { kind: 'folder', id: 'folder-a' },
     ]);
+    expect(updated.folders[0].itemIds).toEqual(['item-2', 'item-1']);
 
     const cloneId = store.getState().cloneReserve('reserve-source', {
       courseCode: 'BIO 220',
@@ -45,8 +45,12 @@ describe('useReserveStore characterization', () => {
       status: 'draft',
       isTestData: false,
       folders: [
-        { id: 'folder-1782388800000-0', title: 'Week 1', items: [] },
-        { id: 'folder-1782388800000-1', title: 'Week 2', items: [] },
+        { id: 'folder-1782388800000-0', title: 'Week 1', itemIds: ['item-1782388800000-1', 'item-1782388800000-0'] },
+        { id: 'folder-1782388800000-1', title: 'Week 2', itemIds: [] },
+      ],
+      layout: [
+        { kind: 'folder', id: 'folder-1782388800000-1' },
+        { kind: 'folder', id: 'folder-1782388800000-0' },
       ],
       items: [
         { id: 'item-1782388800000-0', title: 'First', folderId: 'folder-1782388800000-0', status: 'draft' },
@@ -143,10 +147,13 @@ describe('useReserveStore characterization', () => {
         { id: 'material-9', title: 'Climate Book', authors: 'Author One', materialType: 'book', status: 'complete', barcode: 'BC123', callNumber: 'QC 903 .C55', folderId: 'folder-7', displayOrder: 3 },
         { id: 'material-10', title: 'Journal Article', authors: 'Author Two', materialType: 'article', status: 'needs-review', barcode: undefined, callNumber: undefined, displayOrder: 1 },
       ],
+      layout: [
+        { kind: 'item', id: 'material-10' },
+        { kind: 'folder', id: 'folder-7' },
+      ],
       folders: [{
         id: 'folder-7', title: 'Week 1', isOpen: false,
-        items: [{ id: 'material-9', title: 'Climate Book', authors: 'Author One', materialType: 'book', status: 'complete', barcode: 'BC123', callNumber: 'QC 903 .C55', folderId: 'folder-7', displayOrder: 3 }],
-        position: 2,
+        itemIds: ['material-9'],
       }],
       lastUpdated: dateLabel,
       isTestData: false,
@@ -173,10 +180,13 @@ describe('useReserveStore characterization', () => {
         { id: 'material-9', backendItemId: '9', title: 'Climate Book', authors: 'Author One', materialType: 'book', status: 'complete', barcode: 'BC123', callNumber: 'QC 903 .C55', folderId: 'folder-7', displayOrder: 3 },
         { id: 'material-10', backendItemId: '10', title: 'Journal Article', authors: 'Author Two', materialType: 'article', status: 'needs-review', barcode: undefined, callNumber: undefined, displayOrder: 1 },
       ],
+      layout: [
+        { kind: 'item', id: 'material-10' },
+        { kind: 'folder', id: 'folder-7' },
+      ],
       folders: [{
         id: 'folder-7', backendFolderId: '7', title: 'Week 1', isOpen: false,
-        items: [{ id: 'material-9', backendItemId: '9', title: 'Climate Book', authors: 'Author One', materialType: 'book', status: 'complete', barcode: 'BC123', callNumber: 'QC 903 .C55', folderId: 'folder-7', displayOrder: 3 }],
-        position: 2,
+        itemIds: ['material-9'],
       }],
       lastUpdated: dateLabel,
       isTestData: false,
@@ -198,8 +208,39 @@ describe('useReserveStore characterization', () => {
 
     expect(localStorage.getItem('course-reserves-storage')).toBe(JSON.stringify({
       state: { reserves: [reserve], _initialized: false },
+      version: 1,
+    }));
+  });
+
+  it('migrates a legacy persisted reserve without changing its mixed order', async () => {
+    const legacyReserve = {
+      id: 'reserve-legacy', courseCode: 'ENG 101', courseTitle: 'Source course',
+      section: '01', instructors: 'Faculty One', term: '2026SP', status: 'draft',
+      lastUpdated: 'Jun 17, 2026',
+      folders: [{
+        id: 'folder-legacy', title: 'Week 1', isOpen: true, position: 0.5,
+        items: [{ id: 'nested-item', title: 'Nested', materialType: 'book', status: 'draft', folderId: 'folder-legacy' }],
+      }],
+      items: [
+        { id: 'loose-1', title: 'First', materialType: 'book', status: 'draft' },
+        { id: 'nested-item', title: 'Nested', materialType: 'book', status: 'draft', folderId: 'folder-legacy' },
+        { id: 'loose-2', title: 'Last', materialType: 'article', status: 'draft' },
+      ],
+    };
+    localStorage.setItem('course-reserves-storage', JSON.stringify({
+      state: { reserves: [legacyReserve], _initialized: true },
       version: 0,
     }));
+
+    await store.persist.rehydrate();
+
+    const migrated = store.getState().getReserveById('reserve-legacy')!;
+    expect(migrated.layout).toEqual([
+      { kind: 'item', id: 'loose-1' },
+      { kind: 'folder', id: 'folder-legacy' },
+      { kind: 'item', id: 'loose-2' },
+    ]);
+    expect(migrated.folders[0].itemIds).toEqual(['nested-item']);
   });
 });
 
@@ -221,9 +262,10 @@ function buildReserve(): CourseReserve {
     section: '01', instructors: 'Faculty One', term: '2026SP', status: 'complete',
     lastUpdated: 'Jun 17, 2026',
     folders: [
-      { id: 'folder-a', title: 'Week 1', isOpen: true, position: 0, items: [] },
-      { id: 'folder-b', title: 'Week 2', isOpen: false, position: 1, items: [] },
+      { id: 'folder-a', title: 'Week 1', isOpen: true, itemIds: ['item-1', 'item-2'] },
+      { id: 'folder-b', title: 'Week 2', isOpen: false, itemIds: [] },
     ],
+    layout: [{ kind: 'folder', id: 'folder-a' }, { kind: 'folder', id: 'folder-b' }],
     items: [
       { id: 'item-1', title: 'First', materialType: 'book', status: 'complete', folderId: 'folder-a' },
       { id: 'item-2', title: 'Second', materialType: 'article', status: 'needs-review', folderId: 'folder-a' },

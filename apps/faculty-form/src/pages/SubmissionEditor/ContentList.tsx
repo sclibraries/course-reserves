@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus } from 'lucide-react';
 import {
   DndContext,
-  closestCenter,
-  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -13,19 +11,23 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import type { SortingStrategy } from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableFolder } from '@/components/SortableFolder';
 import { SortableItem } from '@/components/SortableItem';
 import { EmptyState } from '@/components/EmptyState';
 import { ItemSortingToolbar } from '@/components/ItemSortingToolbar';
 import type { SortOption, FilterOption } from '@/components/ItemSortingToolbar';
 import { useSubmissionEditorContext } from './SubmissionEditorContext';
+import { canMoveDown, canMoveUp } from '@/utils/listLayout';
+import { getLayoutState } from '@/store/reserve/layoutState';
+import { listCollisionDetection } from '@/utils/listCollisionDetection';
 
 // Use ReturnType helpers to avoid duplicating type definitions
 type OrgContent = ReturnType<typeof import('@/hooks/useContentOrganization').useOrganizedContent>;
 type FilteredContent = ReturnType<typeof import('@/hooks/useContentOrganization').useFilteredAndSortedContent>;
+const noSortingStrategy: SortingStrategy = () => null;
 
 interface ContentListProps {
   organizedContent: OrgContent;
@@ -67,6 +69,7 @@ export default function ContentList({
   } = useSubmissionEditorContext();
   const navigate = useNavigate();
   const newItemIds = addedMaterials.map((item) => item.id);
+  const layout = getLayoutState(reserve);
   const navigateToAddMaterials = (tab: string, folderId?: string) => {
     const params = new URLSearchParams({ tab });
     if (folderId) params.set('folder', folderId);
@@ -113,7 +116,7 @@ export default function ContentList({
       {totalDisplayedItems === 0 ? (
         <EmptyState
           hasItems={hasActiveFiltersOrSort && reserve.items.length > 0}
-          hasFolders={hasActiveFiltersOrSort && reserve.folders.some((folder) => folder.items.length > 0)}
+          hasFolders={hasActiveFiltersOrSort && reserve.folders.some((folder) => folder.itemIds.length > 0)}
           onAddItem={() => navigateToAddMaterials('type')}
           onCreateFolder={folderHandlers.handleCreateFolder}
           onClearFilters={resetFilters}
@@ -137,34 +140,15 @@ export default function ContentList({
 
           <DndContext
             sensors={sensors}
-            collisionDetection={(args) => {
-              const isDraggingFolder = args.active.data.current?.type === 'Folder';
-              const keepValidFolderTargets = (collisions: ReturnType<typeof pointerWithin>) => {
-                if (!isDraggingFolder) return collisions;
-                return collisions.filter((collision) => {
-                  const droppable = args.droppableContainers.find((entry) => entry.id === collision.id);
-                  const data = droppable?.data.current as {
-                    type?: string;
-                    item?: { folderId?: string };
-                  } | undefined;
-                  return data?.type === 'Folder' || (data?.type === 'Item' && !data.item?.folderId);
-                });
-              };
-              const pointerCollisions = keepValidFolderTargets(pointerWithin(args));
-              if (pointerCollisions.length > 0) {
-                return pointerCollisions;
-              }
-
-              return keepValidFolderTargets(closestCenter(args));
-            }}
+            collisionDetection={listCollisionDetection}
             onDragEnd={dragHandlers.handleDragEnd}
-            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            modifiers={[restrictToVerticalAxis]}
           >
             <SortableContext
               items={filteredAndSortedContent.mixedContent.map((item) =>
                 item.type === 'folder' ? item.folder!.id : item.item!.id
               )}
-              strategy={verticalListSortingStrategy}
+              strategy={noSortingStrategy}
             >
               <div className="space-y-3">
                 {filteredAndSortedContent.mixedContent.map((contentItem, index) => {
@@ -174,7 +158,6 @@ export default function ContentList({
                         key={contentItem.folder.id}
                         folder={contentItem.folder}
                         index={index}
-                        totalFolders={filteredAndSortedContent.folders.length}
                         onEditItem={itemHandlers.handleEditItem}
                         onDeleteItem={itemHandlers.handleDeleteItem}
                         onUpdateFolder={folderHandlers.handleUpdateFolder}
@@ -186,22 +169,16 @@ export default function ContentList({
                         onMoveItemInFolder={(folderId, itemId, direction) =>
                           moveItemInFolder(id, folderId, itemId, direction)
                         }
-                        onMoveFolderUp={
-                          index > 0
-                            ? () => moveFolderPosition(id, contentItem.folder!.id, 'up')
-                            : undefined
-                        }
-                        onMoveFolderDown={
-                          index < filteredAndSortedContent.mixedContent.length - 1
-                            ? () => moveFolderPosition(id, contentItem.folder!.id, 'down')
-                            : undefined
-                        }
+                        canMoveFolderUp={canMoveUp(layout, contentItem.folder.id)}
+                        canMoveFolderDown={canMoveDown(layout, contentItem.folder.id)}
+                        canMoveItemUp={(itemId) => canMoveUp(layout, itemId)}
+                        canMoveItemDown={(itemId) => canMoveDown(layout, itemId)}
+                        onMoveFolderUp={() => moveFolderPosition(id, contentItem.folder!.id, 'up')}
+                        onMoveFolderDown={() => moveFolderPosition(id, contentItem.folder!.id, 'down')}
                         isDragDisabled={hasActiveFiltersOrSort}
                       />
                     );
                   } else if (contentItem.type === 'item' && contentItem.item) {
-                    const ungroupedIndex = filteredAndSortedContent.ungroupedItems
-                      .findIndex((item) => item.id === contentItem.item!.id);
                     return (
                       <SortableItem
                         key={contentItem.item.id}
@@ -209,8 +186,8 @@ export default function ContentList({
                         isNew={addedMaterials.some((added) => added.id === contentItem.item!.id)}
                         index={index}
                         totalItems={totalDisplayedItems}
-                        canMoveUp={ungroupedIndex > 0}
-                        canMoveDown={ungroupedIndex < filteredAndSortedContent.ungroupedItems.length - 1}
+                        canMoveUp={canMoveUp(layout, contentItem.item.id)}
+                        canMoveDown={canMoveDown(layout, contentItem.item.id)}
                         onEdit={itemHandlers.handleEditItem}
                         onMoveUp={() => itemHandlers.handleMoveUp(contentItem.item!.id)}
                         onMoveDown={() => itemHandlers.handleMoveDown(contentItem.item!.id)}

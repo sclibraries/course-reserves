@@ -19,7 +19,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const noOp = () => undefined;
 const reserve: CourseReserve = {
   id: 'reserve-test', courseCode: 'BIO 220', courseTitle: 'Ecology', section: '01', instructors: 'Test Faculty',
-  term: 'Fall 2026', status: 'submitted', items: [], folders: [], lastUpdated: '2026-10-01',
+  term: 'Fall 2026', status: 'submitted', items: [], folders: [], layout: [], lastUpdated: '2026-10-01',
 };
 
 const pageHeaders = [

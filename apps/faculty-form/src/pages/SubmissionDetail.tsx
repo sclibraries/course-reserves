@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,14 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { useCourseReservesStore } from "../store/courseReservesStore";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Folder } from "lucide-react";
 import CommunicationsContainer from "@/components/Communications/CommunicationsContainer";
-import ItemMessageDialog from "@/components/Communications/ItemMessageDialog";
 import { CommunicationsAPI, CreateMessageRequest, Message } from "@/services/api/communications";
 import { toast } from "sonner";
 import { SubmissionDetailHeader } from "@/components/pageHeaders/SubmissionDetailHeader";
+import { SubmissionDetailItemsTable } from "@/components/SubmissionDetailItemsTable";
 
 const SubmissionDetail = () => {
   const navigate = useNavigate();
@@ -55,40 +46,6 @@ const SubmissionDetail = () => {
   // Helper function to get unread message count for a specific item
   const getItemUnreadCount = (resourceId: number) => {
     return messages.filter(msg => msg.resource_id === resourceId && !msg.is_read).length;
-  };
-
-  // Build organized content structure respecting display_order
-  // This creates a unified list of folders and unfoldered items in proper order
-  const getOrganizedContent = () => {
-    if (!reserve) return [];
-    
-    type ContentItem = 
-      | { type: 'folder'; folder: typeof reserve.folders[0]; order: number }
-      | { type: 'item'; item: typeof reserve.items[0]; order: number };
-    
-    const content: ContentItem[] = [];
-    
-    // Add folders with their display_order (already sorted in store)
-    reserve.folders.forEach(folder => {
-      content.push({
-        type: 'folder',
-        folder: folder,
-        order: folder.position || 0
-      });
-    });
-    
-    // Add unfoldered items with their display_order (already sorted in store)
-    const unfolderedItems = reserve.items.filter(item => !item.folderId);
-    unfolderedItems.forEach(item => {
-      content.push({
-        type: 'item',
-        item: item,
-        order: item.displayOrder || 0
-      });
-    });
-    
-    // Sort by display order to interleave folders and items correctly
-    return content.sort((a, b) => a.order - b.order);
   };
 
   // Load messages with smart caching to update badge counts
@@ -275,150 +232,13 @@ const SubmissionDetail = () => {
           </CardContent>
         </Card>
 
-        {/* Items Table */}
-        <Card>
-          <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-4">Requested Items</h3>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">
-                      <div className="flex items-center gap-1">
-                        #
-                        <span className="text-xs text-muted-foreground" title="Order can be changed in edit mode">
-                          (Order)
-                        </span>
-                      </div>
-                    </TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Material Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Needed By</TableHead>
-                    <TableHead className="text-center">Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reserve.items.length > 0 || reserve.folders.length > 0 ? (
-                    <>
-                      {getOrganizedContent().map((content, globalIndex) => {
-                        if (content.type === 'folder') {
-                          // Render folder header and its items
-                          const folder = content.folder;
-                          return (
-                            <Fragment key={folder.id}>
-                              {/* Folder header row */}
-                              <TableRow className="bg-blue-50 dark:bg-blue-950 border-t-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900">
-                                <TableCell className="font-semibold text-blue-900 dark:text-blue-100">
-                                  {globalIndex + 1}
-                                </TableCell>
-                                <TableCell colSpan={5} className="font-semibold py-3">
-                                  <div className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                                    <Folder className="h-5 w-5 fill-blue-200 dark:fill-blue-800" />
-                                    <span className="text-base">{folder.title}</span>
-                                    <Badge variant="secondary" className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100 border-blue-300 dark:border-blue-700">
-                                      {folder.items.length} {folder.items.length === 1 ? 'item' : 'items'}
-                                    </Badge>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              {/* Items in this folder (already sorted by display_order in store) */}
-                              {folder.items.map((item, itemIndex) => {
-                                const resourceId = parseInt(item.id.replace('material-', ''));
-                                const totalCount = getItemMessageCount(resourceId);
-                                const unreadCount = getItemUnreadCount(resourceId);
-                                
-                                return (
-                                  <TableRow key={item.id} className="hover:bg-muted/50 bg-blue-50/30 dark:bg-blue-950/30 border-l-4 border-l-blue-300 dark:border-l-blue-700">
-                                    <TableCell className="font-medium pl-8 text-muted-foreground text-sm">
-                                      {globalIndex + 1}.{itemIndex + 1}
-                                    </TableCell>
-                                    <TableCell className="font-medium">{item.title}</TableCell>
-                                    <TableCell className="capitalize">{item.materialType}</TableCell>
-                                    <TableCell>
-                                      <StatusBadge 
-                                        status={item.status === 'in-progress' ? 'partial' : item.status === 'needs-review' ? 'in-review' : item.status === 'complete' ? 'complete' : 'draft'} 
-                                        className="text-xs"
-                                      />
-                                    </TableCell>
-                                    <TableCell>-</TableCell>
-                                    <TableCell className="text-center">
-                                      <div className="flex items-center justify-center gap-2">
-                                        <ItemMessageDialog
-                                          itemTitle={item.title}
-                                          itemId={item.id}
-                                          resourceId={resourceId}
-                                          onSubmit={handleItemMessage}
-                                        />
-                                        {totalCount > 0 && (
-                                          <Badge 
-                                            variant={unreadCount > 0 ? "default" : "secondary"}
-                                            className="text-xs"
-                                          >
-                                            {unreadCount > 0 ? `${unreadCount} new` : totalCount}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </Fragment>
-                          );
-                        } else {
-                          // Render standalone item (not in folder)
-                          const item = content.item;
-                          const resourceId = parseInt(item.id.replace('material-', ''));
-                          const totalCount = getItemMessageCount(resourceId);
-                          const unreadCount = getItemUnreadCount(resourceId);
-                          
-                          return (
-                            <TableRow key={item.id} className="hover:bg-muted/50">
-                              <TableCell className="font-medium">{globalIndex + 1}</TableCell>
-                              <TableCell className="font-medium">{item.title}</TableCell>
-                              <TableCell className="capitalize">{item.materialType}</TableCell>
-                              <TableCell>
-                                <StatusBadge 
-                                  status={item.status === 'in-progress' ? 'partial' : item.status === 'needs-review' ? 'in-review' : item.status === 'complete' ? 'complete' : 'draft'} 
-                                  className="text-xs"
-                                />
-                              </TableCell>
-                              <TableCell>-</TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <ItemMessageDialog
-                                    itemTitle={item.title}
-                                    itemId={item.id}
-                                    resourceId={resourceId}
-                                    onSubmit={handleItemMessage}
-                                  />
-                                  {totalCount > 0 && (
-                                    <Badge 
-                                      variant={unreadCount > 0 ? "default" : "secondary"}
-                                      className="text-xs"
-                                    >
-                                      {unreadCount > 0 ? `${unreadCount} new` : totalCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-                      })}
-                    </>
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No materials added yet. <Button variant="link" onClick={() => navigate(`/submission/${reserve.id}/edit`)}>Add materials</Button>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <SubmissionDetailItemsTable
+          reserve={reserve}
+          onItemMessage={handleItemMessage}
+          getItemMessageCount={getItemMessageCount}
+          getItemUnreadCount={getItemUnreadCount}
+          onAddMaterials={() => navigate(`/submission/${reserve.id}/edit`)}
+        />
 
         {/* Communications Section */}
         <Card>

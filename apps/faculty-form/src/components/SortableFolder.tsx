@@ -19,12 +19,12 @@ import {
   ArrowDown
 } from "lucide-react";
 import { SortableFolderContent } from './SortableFolderContent';
+import { FolderDropZones } from './ListDropZones';
 import type { CourseFolder, CourseItem } from "../store/courseReservesStore";
 
 interface SortableFolderProps {
-  folder: CourseFolder;
+  folder: CourseFolder & { items: CourseItem[] };
   index: number;
-  totalFolders: number;
   onEditItem: (item: CourseItem) => void;
   onDeleteItem: (itemId: string) => void;
   onUpdateFolder: (folderId: string, updates: Partial<Pick<CourseFolder, 'title' | 'description' | 'isOpen'>>) => void;
@@ -33,16 +33,19 @@ interface SortableFolderProps {
   onAddMaterials?: (folderId: string) => void;
   newItemIds?: string[];
   onRemoveItemFromFolder: (itemId: string) => void;
-  onMoveItemInFolder?: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
-  onMoveFolderUp?: () => void;
-  onMoveFolderDown?: () => void;
+  onMoveItemInFolder: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
+  onMoveFolderUp: () => void;
+  onMoveFolderDown: () => void;
+  canMoveFolderUp: boolean;
+  canMoveFolderDown: boolean;
+  canMoveItemUp: (itemId: string) => boolean;
+  canMoveItemDown: (itemId: string) => boolean;
   isDragDisabled?: boolean;
 }
 
 export const SortableFolder = ({ 
   folder,
   index,
-  totalFolders,
   onEditItem,
   onDeleteItem,
   onUpdateFolder,
@@ -54,6 +57,10 @@ export const SortableFolder = ({
   onMoveItemInFolder,
   onMoveFolderUp,
   onMoveFolderDown,
+  canMoveFolderUp,
+  canMoveFolderDown,
+  canMoveItemUp,
+  canMoveItemDown,
   isDragDisabled = false
 }: SortableFolderProps) => {
   const {
@@ -71,21 +78,10 @@ export const SortableFolder = ({
       folder,
     }
   });
-  const { active, over } = useDndContext();
+  const { active } = useDndContext();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState(folder.title);
-
-  const isDraggingItem = active?.data.current?.type === 'Item';
-  const overData = over?.data.current as {
-    type?: string;
-    folder?: { id: string };
-    item?: { folderId?: string };
-  } | undefined;
-  const isDropOver = isDraggingItem && (
-    overData?.folder?.id === folder.id ||
-    overData?.item?.folderId === folder.id
-  );
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -113,17 +109,14 @@ export const SortableFolder = ({
 
   return (
     <Card
-      ref={setNodeRef}
       style={style}
       className={`group relative border-l-4 border-l-blue-500 ${
         isDragging 
           ? 'shadow-lg ring-2 ring-primary' 
-          : isDropOver 
-            ? 'shadow-lg ring-2 ring-blue-500 bg-blue-50' 
-            : 'hover:shadow-md'
+          : 'hover:shadow-md'
       }`}
     >
-      <CardHeader className="pb-3">
+      <CardHeader ref={setNodeRef} className="relative pb-3">
         <div className="flex items-center gap-3">
           {/* Position indicator and drag handle */}
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -208,34 +201,32 @@ export const SortableFolder = ({
               </Button>
             )}
             {/* Move folder up/down buttons */}
-            {onMoveFolderUp && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveFolderUp();
-                }}
-                title="Move folder up"
-              >
-                <ArrowUp className="h-3 w-3" />
-              </Button>
-            )}
-            {onMoveFolderDown && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveFolderDown();
-                }}
-                title="Move folder down"
-              >
-                <ArrowDown className="h-3 w-3" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 disabled:opacity-40"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveFolderUp();
+              }}
+              disabled={!canMoveFolderUp}
+              title="Move folder up"
+            >
+              <ArrowUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 disabled:opacity-40"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveFolderDown();
+              }}
+              disabled={!canMoveFolderDown}
+              title="Move folder down"
+            >
+              <ArrowDown className="h-3 w-3" />
+            </Button>
             
             {/* Edit title button */}
             <Button
@@ -268,16 +259,19 @@ export const SortableFolder = ({
             </Button>
           </div>
         </div>
+        {active && <FolderDropZones folder={folder} />}
       </CardHeader>
 
       <SortableFolderContent
         folder={folder}
-        isDraggingItem={isDraggingItem}
         newItemIds={newItemIds}
         onEditItem={onEditItem}
         onDeleteItem={onDeleteItem}
         onRemoveItemFromFolder={onRemoveItemFromFolder}
         onMoveItemInFolder={onMoveItemInFolder}
+        canMoveItemUp={canMoveItemUp}
+        canMoveItemDown={canMoveItemDown}
+        isDragDisabled={isDragDisabled}
       />
     </Card>
   );

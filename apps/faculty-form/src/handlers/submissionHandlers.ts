@@ -9,90 +9,15 @@ import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submiss
 import { withActingForFaculty } from "./actingForPayload";
 import { withRosterCourse } from "./rosterSubmissionPayload";
 import { getSubmissionErrorMessage } from "./submissionErrorMessage";
+import { transformItemForBackend } from './submissionResourcePayload';
+import { toPayloadOrder } from '@/utils/listLayout';
+import { getLayoutState } from '@/store/reserve/layoutState';
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
   folder?: CourseFolder & { items: CourseItem[] }; 
   item?: CourseItem; 
   position: number 
-};
-
-/**
- * Transform a CourseItem into the backend submission_new_resources format
- */
-const transformItemForBackend = (item: CourseItem, displayOrder: number, folderName?: string) => {
-  // Determine if this is a reuse item (has barcode/call number from FOLIO)
-  const isReuse = !!(item.barcode || item.callNumber || item.holdingsId);
-  
-  return {
-    // Reuse metadata
-    is_reuse: isReuse,
-    source_barcode: item.barcode || null,
-    source_call_number: item.callNumber || null,
-    source_resource_id: item.holdingsId || null,
-    source_folio_instance_id: item.instanceId || null,
-    // Display/organization
-    display_order: displayOrder,
-    folder_name: folderName || null,
-    // position_in_folder will be set externally based on actual folder position
-    
-    // Faculty notes
-    faculty_notes: item.notes || null,
-    
-    // Priority (can be derived from status or default to medium)
-    priority: item.status === 'needs-review' ? 'high' : 'medium',
-    
-    // Full resource data (JSON)
-    resource_data: {
-      // Core fields
-      id: item.id,
-      title: item.title,
-      authors: item.authors,
-      materialType: item.materialType,
-      status: item.status,
-      
-      // Book/Chapter fields
-      isbn: item.isbn,
-      publisher: item.publisher,
-      publicationYear: item.publicationYear,
-      edition: item.edition,
-      pages: item.pages,
-      chapterTitle: item.chapterTitle,
-      copy: item.copy,
-      
-      // Article fields
-      journalTitle: item.journalTitle,
-      volume: item.volume,
-      issue: item.issue,
-      doi: item.doi,
-      issn: item.issn,
-      eds: item.eds,
-      // Electronic fields
-      url: item.url,
-      
-      // Notes
-      notes: item.notes,
-      libraryNotes: item.libraryNotes,
-
-      // Display window
-      displayStartDate: item.displayStartDate,
-      displayEndDate: item.displayEndDate,
-      
-      // FOLIO metadata (preserve everything for staff processing)
-      barcode: item.barcode,
-      callNumber: item.callNumber,
-      instanceId: item.instanceId,
-      instanceHrid: item.instanceHrid,
-      holdingsId: item.holdingsId,
-      temporaryLocationId: item.temporaryLocationId,
-      temporaryLocationObject: item.temporaryLocationObject,
-      permanentLocationId: item.permanentLocationId,
-      permanentLocationObject: item.permanentLocationObject,
-      
-      // Full copiedItem data if available (contains all FOLIO details)
-      copiedItem: item.copiedItem,
-    }
-  };
 };
 
 export const createSubmissionHandlers = (
@@ -120,65 +45,32 @@ export const createSubmissionHandlers = (
       return;
     }
 
-    // Use organizedContent to get folders with their items properly populated
+    const order = toPayloadOrder(getLayoutState(reserve));
     const foldersWithItems = organizedContent.folders.map((folder) => {
-      const displayIndex = organizedContent.mixedContent.findIndex(
-        (m) => m.type === 'folder' && m.folder?.id === folder.id
-      );
       return {
         id: folder.id,
         backendFolderId: folder.backendFolderId, // Preserve backend folder ID
         title: folder.title,
         description: folder.description,
-        position: displayIndex >= 0 ? displayIndex : 0,
+        position: order.folderOrder[folder.id] ?? 0,
         isOpen: folder.isOpen,
         items: folder.items,
       };
     });
 
-    // Get the actual display order from mixedContent
-    // Use the index as the clean display position (0, 1, 2, 3...)
-    const displayOrder = organizedContent.mixedContent.map((item, index) => ({
-      type: item.type,
-      id: item.type === 'folder' ? item.folder!.id : item.item!.id,
-      displayPosition: index, // Clean sequential position for backend
-    }));
+    const displayOrder = order.displayOrder;
 
     // Resolve items to submit from current reserve (no override in this path)
     const submittedItems = reserve.items;
 
-    // Calculate proper display order for each item based on mixedContent position
-    // Track position within folders separately
-    const itemPositionMap = new Map<string, { displayOrder: number; positionInFolder?: number }>();
-    let globalPosition = 0;
-    
-    organizedContent.mixedContent.forEach((content) => {
-      if (content.type === 'folder' && content.folder) {
-        // Folder items get the folder's global position, plus their index within the folder
-        content.folder.items.forEach((item, idx) => {
-          itemPositionMap.set(item.id, {
-            displayOrder: globalPosition,
-            positionInFolder: idx
-          });
-        });
-        globalPosition++; // Folder takes up one position
-      } else if (content.type === 'item' && content.item) {
-        // Ungrouped items just get the global position
-        itemPositionMap.set(content.item.id, {
-          displayOrder: globalPosition
-        });
-        globalPosition++;
-      }
-    });
-
     // Transform items to backend format with proper display order and folder mapping
     const transformedResources = submittedItems.map((item) => {
       const folder = foldersWithItems.find(f => f.id === item.folderId);
-      const positionInfo = itemPositionMap.get(item.id) || { displayOrder: 0 };
+      const positionInfo = order.resourceOrder[item.id] || { displayOrder: 0, positionInFolder: null };
       
       return {
         ...transformItemForBackend(item, positionInfo.displayOrder, folder?.title),
-        position_in_folder: positionInfo.positionInFolder ?? null
+        position_in_folder: positionInfo.positionInFolder
       };
     });
 
@@ -241,10 +133,10 @@ export const createSubmissionHandlers = (
           payload = {
             submission_notes: reserve.submissionNotes || null,
             needed_by_date: reserve.neededByDate || null,
-            folders: foldersWithItems.map((folder, index) => ({
+            folders: foldersWithItems.map((folder) => ({
               folder_uuid: folder.backendFolderId || folder.id.replace('folder-', ''), // Use backend ID
               folder_name: folder.title,
-              display_order: index,
+              display_order: folder.position,
             })),
             items: transformedResources.map((resource) => {
               const sourceItem = submittedItems.find(i => resource.resource_data.id === i.id);

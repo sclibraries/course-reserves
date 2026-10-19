@@ -1,4 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable';
+import { useDndContext } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { GripVertical, Edit2, ArrowUp, ArrowDown, FolderPlus, FolderMinus } from "lucide-react";
 import { DeleteItemDialog } from './DeleteItemDialog';
+import { ItemDropZones } from './ListDropZones';
 import type { CourseItem, CourseFolder } from "../store/courseReservesStore";
 
 interface SortableItemProps {
@@ -62,6 +64,7 @@ export const SortableItem = ({
       item,
     }
   });
+  const { active } = useDndContext();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -254,6 +257,7 @@ export const SortableItem = ({
           </div>
         </div>
       </CardHeader>
+      {active && <ItemDropZones item={item} />}
     </Card>
   );
 };

@@ -76,7 +76,7 @@ describe('submission refocus refresh', () => {
 });
 
 function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
-  return {
+  const reserve: CourseReserve = {
     id: 'submission-1', courseCode: 'BIO 101', courseTitle: 'Biology', section: '01',
     instructors: 'Faculty One', term: '2026FA', status: 'submitted',
     items: [
@@ -84,11 +84,19 @@ function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
       { id: 'local-item-1', title: 'Unsaved first', materialType: 'book', status: 'draft', displayOrder: 0 },
     ],
     folders: [
-      { id: 'local-folder-b', title: 'Unsaved folder B', isOpen: false, items: [], position: 1 },
-      { id: 'local-folder-a', title: 'Unsaved folder A', isOpen: true, items: [], position: 0 },
+      { id: 'local-folder-b', title: 'Unsaved folder B', isOpen: false, itemIds: [] },
+      { id: 'local-folder-a', title: 'Unsaved folder A', isOpen: true, itemIds: [] },
     ],
+    layout: [],
     lastUpdated: 'Jun 17, 2026', isLocked: false, canEdit: true,
     ...overrides,
+  };
+  return {
+    ...reserve,
+    layout: overrides.layout || [
+      ...reserve.folders.map((folder) => ({ kind: 'folder' as const, id: folder.id })),
+      ...reserve.items.filter((item) => !item.folderId).map((item) => ({ kind: 'item' as const, id: item.id })),
+    ],
   };
 }
 

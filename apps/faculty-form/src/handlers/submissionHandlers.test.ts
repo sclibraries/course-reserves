@@ -471,6 +471,7 @@ function buildReserve() {
     status: 'draft' as const,
     lastUpdated: '2026-06-17T12:00:00.000Z',
     folders: [],
+    layout: [{ kind: 'item' as const, id: 'item-1' }],
     items: [
       {
         id: 'item-1',
@@ -549,6 +550,7 @@ function buildPayloadContractScenario(status: 'draft' | 'submitted') {
     title: 'Week 1',
     description: 'Opening week',
     isOpen: true,
+    itemIds: [reuseItem.id],
     items: [reuseItem],
   };
   const reserve = {
@@ -566,6 +568,7 @@ function buildPayloadContractScenario(status: 'draft' | 'submitted') {
     academicPeriod: 'AP_202701',
     items: [reuseItem, manualItem],
     folders: [folder],
+    layout: [{ kind: 'folder' as const, id: folder.id }, { kind: 'item' as const, id: manualItem.id }],
   };
 
   return {

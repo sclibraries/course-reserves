@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import type { MoveTarget } from '@/utils/listLayout';
 
 export interface FolioLocation {
   id: string;
@@ -106,8 +107,12 @@ export interface CourseFolder {
   title: string;
   description?: string;
   isOpen: boolean; // Whether folder is expanded in UI
-  items: CourseItem[];
-  position?: number; // Position in the overall list (for ordering with items)
+  itemIds: string[];
+}
+
+export interface ListLayoutEntry {
+  kind: 'folder' | 'item';
+  id: string;
 }
 
 export interface CourseReserveItem {
@@ -126,6 +131,7 @@ export interface CourseReserve {
   status: 'draft' | 'in-progress' | 'submitted' | 'complete';
   items: CourseItem[];
   folders: CourseFolder[];
+  layout: ListLayoutEntry[];
   lastUpdated: string;
   isTestData?: boolean; // Flag to distinguish test data from user-created
   courseAssignmentId?: string; // Link to course assignment (if created from assignment)
@@ -167,7 +173,7 @@ export interface CourseReservesState {
   startPolling: (intervalMs?: number) => void; // Start auto-refresh polling
   stopPolling: () => void; // Stop auto-refresh polling
   clearAllData: () => void; // Clear all reserves (for logout)
-  addReserve: (reserve: Omit<CourseReserve, 'id' | 'lastUpdated'>) => string;
+  addReserve: (reserve: Omit<CourseReserve, 'id' | 'lastUpdated' | 'layout'> & { layout?: ListLayoutEntry[] }) => string;
   findReserveByAssignmentId: (courseAssignmentId: string) => CourseReserve | undefined; // Find reserve by course assignment ID
   updateReserve: (id: string, updates: Partial<CourseReserve>) => void;
   deleteReserve: (id: string) => void;
@@ -176,8 +182,8 @@ export interface CourseReservesState {
   addItem: (reserveId: string, item: Omit<CourseItem, 'id'>) => boolean;
   updateItem: (reserveId: string, itemId: string, updates: Partial<CourseItem>) => void;
   deleteItem: (reserveId: string, itemId: string) => void;
-  reorderItems: (reserveId: string, itemIds: string[]) => void;
   moveItemInList: (reserveId: string, itemId: string, direction: 'up' | 'down') => boolean;
+  moveTo: (reserveId: string, id: string, target: MoveTarget) => void;
 
   // Folder actions
   createFolder: (reserveId: string, title: string, description?: string) => string;

@@ -32,7 +32,7 @@ export interface SubmissionEditorContextValue {
   moveItemInFolder: (reserveId: string, folderId: string, itemId: string, direction: 'up' | 'down') => void;
   addItemToFolder: (reserveId: string, folderId: string, itemId: string) => void;
   moveFolderPosition: (reserveId: string, folderId: string, direction: 'up' | 'down') => void;
-  user: { full_name?: string; [key: string]: unknown } | null;
+  user: { full_name?: string } | null;
   addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
   createFolder: (reserveId: string, title: string) => string;
   addItemsFromExternalSource: (items: Partial<CourseItem>[]) => void;

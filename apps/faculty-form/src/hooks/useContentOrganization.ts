@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { CourseReserve } from "../store/courseReservesStore";
 import type { SortOption, FilterOption } from "@/components/ItemSortingToolbar";
+import { getLayoutState } from '@/store/reserve/layoutState';
 
 /**
  * Organizes course content into folders and ungrouped items
@@ -9,38 +10,33 @@ export const useOrganizedContent = (reserve: CourseReserve | undefined) => {
   return useMemo(() => {
     if (!reserve) return { folders: [], ungroupedItems: [], mixedContent: [] };
     
-    const folders = reserve.folders || [];
-    const items = reserve.items || [];
-    
-    // Get items that belong to folders and populate folder items
-    const foldersWithItems = folders.map(folder => ({
+    const layout = getLayoutState(reserve);
+    const itemsById = new Map(layout.items.map((item) => [item.id, item]));
+    const foldersWithItems = layout.folders.map(folder => ({
       ...folder,
-      items: items.filter(item => item.folderId === folder.id)
+      items: folder.itemIds.map((id) => itemsById.get(id)).filter((item) => item !== undefined)
     }));
-    
-    // Get items that don't belong to any folder
-    const ungroupedItems = items.filter(item => !item.folderId);
-    
-    // Create mixed content array for unified ordering
-    const mixedContent: Array<{ 
+
+    const ungroupedItems = layout.layout.flatMap((entry) => {
+      const item = entry.kind === 'item' ? itemsById.get(entry.id) : undefined;
+      return item ? [item] : [];
+    });
+    const foldersById = new Map(foldersWithItems.map((folder) => [folder.id, folder]));
+    const mixedContent: Array<{
       type: 'folder' | 'item', 
       folder?: typeof foldersWithItems[0], 
       item?: typeof ungroupedItems[0], 
       position: number 
-    }> = [
-      ...foldersWithItems.map((folder, index) => ({
-        type: 'folder' as const,
-        folder,
-        position: folder.position ?? (1000 + index)
-      })),
-      ...ungroupedItems.map((item, index) => ({
-        type: 'item' as const,
-        item,
-        position: index
-      }))
-    ];
-    
-    mixedContent.sort((a, b) => a.position - b.position);
+    }> = [];
+    layout.layout.forEach((entry, position) => {
+      if (entry.kind === 'folder') {
+        const folder = foldersById.get(entry.id);
+        if (folder) mixedContent.push({ type: 'folder', folder, position });
+        return;
+      }
+      const item = itemsById.get(entry.id);
+      if (item) mixedContent.push({ type: 'item', item, position });
+    });
     
     return { folders: foldersWithItems, ungroupedItems, mixedContent };
   }, [reserve]);
