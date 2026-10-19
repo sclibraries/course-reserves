@@ -7,12 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createCloneResourceHandler } from '@/handlers/cloneResourceHandler';
 import { useCourseCloning, type PreviousCourse, type PreviewResource } from '@/hooks/useCourseCloning';
+import { useActingForStore } from '@/store/actingForStore';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
+import { filterPreviousCoursesForSubmission, getPinnedPreviousCourse, sortPreviousCourses } from '@/utils/reuseCourseTerms';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { mapReuseResources, toReuseDuplicateCandidate } from './reuseResourceMapper';
 
 export default function ReuseTab() {
   const { id, reserve, user, addItem, createFolder, moveFolderPosition } = useSubmissionEditorContext();
+  const selectedFaculty = useActingForStore((state) => state.selectedFaculty);
   const {
     loadingPreviousCourses, hasLoadedPreviousCourses, loadingOtherCourses,
     previousCourses, fetchPreviousCourses, fetchCourseResources,
@@ -24,13 +27,16 @@ export default function ReuseTab() {
   const folderIds = useRef<Record<string, string>>({});
   const requestId = useRef(0);
   const courseSelection = searchParams.get('course');
-  const orderedCourses = useMemo(() => [...previousCourses].sort(comparePreviousCourses), [previousCourses]);
+  const orderedCourses = useMemo(() => sortPreviousCourses(
+    filterPreviousCoursesForSubmission(previousCourses, reserve.term, reserve.courseCode),
+  ), [previousCourses, reserve.courseCode, reserve.term]);
+  const instructorName = selectedFaculty?.displayName || user?.full_name;
 
   useEffect(() => {
-    if (reserve.courseCode && user?.full_name) {
-      void fetchPreviousCourses(reserve.courseCode, user.full_name, 'all');
+    if (reserve.courseCode && instructorName) {
+      void fetchPreviousCourses(reserve.courseCode, instructorName, 'all');
     }
-  }, [fetchPreviousCourses, reserve.courseCode, user?.full_name]);
+  }, [fetchPreviousCourses, instructorName, reserve.courseCode]);
 
   const loadCourse = useCallback(async (course: PreviousCourse, updateUrl = true) => {
     const currentRequest = ++requestId.current;
@@ -93,7 +99,7 @@ export default function ReuseTab() {
   };
   const addAll = () => resources.filter((resource) => canAddResource(resource) && !isInList(resource)).forEach(addResource);
 
-  const pinnedCourse = orderedCourses.find((course) => course.isExactMatch);
+  const pinnedCourse = getPinnedPreviousCourse(orderedCourses);
   const otherCourses = orderedCourses.filter((course) => course.courseListingId !== pinnedCourse?.courseListingId);
   const groups = groupCoursesByTerm(otherCourses);
 
@@ -115,7 +121,7 @@ export default function ReuseTab() {
             <div className="space-y-2">{group.courses.map((course) => <CourseButton key={course.courseListingId} course={course} selectedId={selectedCourse?.courseListingId} onSelect={loadCourse} />)}</div>
           </div>
         ))}
-        {hasLoadedPreviousCourses && previousCourses.length === 0 && (
+        {hasLoadedPreviousCourses && orderedCourses.length === 0 && (
           <p className="text-sm text-muted-foreground">No previous courses were found for {reserve.courseCode}.</p>
         )}
       </Card>
@@ -208,20 +214,4 @@ function groupCoursesByTerm(courses: PreviousCourse[]) {
     groups.set(course.term, group);
   });
   return Array.from(groups, ([term, groupedCourses]) => ({ term, courses: groupedCourses }));
-}
-
-function comparePreviousCourses(left: PreviousCourse, right: PreviousCourse) {
-  if (left.isExactMatch !== right.isExactMatch) return left.isExactMatch ? -1 : 1;
-  const leftTerm = parseTerm(left.term);
-  const rightTerm = parseTerm(right.term);
-  if (leftTerm && rightTerm) return rightTerm.year - leftTerm.year || rightTerm.rank - leftTerm.rank;
-  return right.term.localeCompare(left.term);
-}
-
-function parseTerm(term: string) {
-  const year = term.match(/\d{4}/)?.[0];
-  if (!year) return undefined;
-  const normalizedTerm = term.toLowerCase();
-  const rank = normalizedTerm.startsWith('fall') ? 3 : normalizedTerm.startsWith('summer') ? 2 : normalizedTerm.startsWith('spring') ? 1 : 0;
-  return { year: Number(year), rank };
 }

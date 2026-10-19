@@ -9,6 +9,9 @@ const reuseMocks = vi.hoisted(() => ({
   moveFolderPosition: vi.fn(),
   fetchCourseResources: vi.fn(),
   fetchPreviousCourses: vi.fn(),
+  submissionCourseCode: 'BIO 026',
+  submissionTerm: 'Fall 2100',
+  selectedFaculty: null as { displayName: string } | null,
   courses: [
     {
       courseListingId: 'listing-bio-spring2099', courseNumber: 'BIO 026', courseName: 'Synthetic Biology',
@@ -29,7 +32,7 @@ vi.mock('@/pages/SubmissionEditor/SubmissionEditorContext', () => ({
   useSubmissionEditorContext: () => ({
     id: 'reserve-026',
     reserve: {
-      courseCode: 'BIO 026', courseTitle: 'Synthetic Biology',
+      courseCode: reuseMocks.submissionCourseCode, courseTitle: 'Synthetic Biology', term: reuseMocks.submissionTerm,
       items: [{ id: 'existing-item', title: 'Already in list', authors: '', materialType: 'website', status: 'draft', url: 'https://example.test/already' }],
       folders: [{ id: 'existing-folder', title: 'Existing week', isOpen: true, items: [], position: 0 }],
     },
@@ -49,6 +52,11 @@ vi.mock('@/hooks/useCourseCloning', () => ({
     fetchPreviousCourses: reuseMocks.fetchPreviousCourses,
     fetchCourseResources: reuseMocks.fetchCourseResources,
   }),
+}));
+
+vi.mock('@/store/actingForStore', () => ({
+  useActingForStore: (selector: (state: { selectedFaculty: typeof reuseMocks.selectedFaculty }) => unknown) =>
+    selector({ selectedFaculty: reuseMocks.selectedFaculty }),
 }));
 
 import ReuseTab from './ReuseTab';
@@ -80,6 +88,14 @@ describe('ReuseTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    reuseMocks.courses.splice(0, reuseMocks.courses.length,
+      { courseListingId: 'listing-bio-spring2099', courseNumber: 'BIO 026', courseName: 'Synthetic Biology', term: 'Spring 2099', instructor: 'Test Faculty', resourceCount: 1, electronicCount: 1, physicalCount: 0, isExactMatch: true },
+      { courseListingId: 'listing-bio-fall2099', courseNumber: 'BIO 026', courseName: 'Synthetic Biology', term: 'Fall 2099', instructor: 'Test Faculty', resourceCount: 3, electronicCount: 2, physicalCount: 1, isExactMatch: true },
+      { courseListingId: 'listing-chem-2099', courseNumber: 'CHEM 026', courseName: 'Synthetic Chemistry', term: 'Fall 2099', instructor: 'Test Faculty', resourceCount: 1, electronicCount: 1, physicalCount: 0, isExactMatch: false },
+    );
+    reuseMocks.submissionCourseCode = 'BIO 026';
+    reuseMocks.submissionTerm = 'Fall 2100';
+    reuseMocks.selectedFaculty = null;
     reuseMocks.fetchCourseResources.mockResolvedValue({
       orderedResources: sourceResources,
       physicalReserves: [{
@@ -126,6 +142,30 @@ describe('ReuseTab', () => {
     expect(courseRows[0].textContent).toContain('Last time you taught this course');
     expect(courseRows.map((button) => button.getAttribute('data-course-listing-id')))
       .toEqual(['listing-bio-fall2099', 'listing-bio-spring2099', 'listing-chem-2099']);
+  });
+
+  it('pins Spring 2026 for a Fall 2026 TST 101 submission and excludes its own and future listings', async () => {
+    reuseMocks.submissionCourseCode = 'TST 101';
+    reuseMocks.submissionTerm = 'Fall 2026';
+    reuseMocks.courses.splice(0, reuseMocks.courses.length,
+      { courseListingId: 'tst-spring-2027', courseNumber: 'TST 101', courseName: 'Test Course', term: 'Spring 2027', instructor: 'Test Faculty A', resourceCount: 1, electronicCount: 1, physicalCount: 0, isExactMatch: true },
+      { courseListingId: 'tst-fall-2026', courseNumber: 'TST 101', courseName: 'Test Course', term: 'Fall 2026', instructor: 'Test Faculty A', resourceCount: 1, electronicCount: 1, physicalCount: 0, isExactMatch: true },
+      { courseListingId: 'tst-spring-2026', courseNumber: 'TST 101', courseName: 'Test Course', term: 'Spring 2026', instructor: 'Test Faculty A', resourceCount: 1, electronicCount: 1, physicalCount: 0, isExactMatch: true },
+    );
+
+    await renderReuseTab();
+
+    const courseRows = Array.from(container!.querySelectorAll<HTMLButtonElement>('[data-course-listing-id]'));
+    expect(courseRows.map((button) => button.getAttribute('data-course-listing-id'))).toEqual(['tst-spring-2026']);
+    expect(courseRows[0].textContent).toContain('Last time you taught this course');
+  });
+
+  it('uses the selected faculty member name when the signed-in designee acts for them', async () => {
+    reuseMocks.selectedFaculty = { displayName: 'Test Faculty A' };
+
+    await renderReuseTab();
+
+    expect(reuseMocks.fetchPreviousCourses).toHaveBeenCalledWith('BIO 026', 'Test Faculty A', 'all');
   });
 
   it('preselects the last same-number course and shows existing items with an in-list badge', async () => {

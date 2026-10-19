@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/config/endpoints';
 import { fetchMergedCourseResources, fetchPhysicalCourseResources } from '@/services/courseResourceFetch';
+import { buildPreviousCoursesQuery, mapFolioCourseToPreviousCourse, type FolioPreviousCourse, type PreviousCourseSearchMode } from './courseCloningUtils';
 
 export interface PreviousCourse {
   courseListingId: string;
@@ -81,17 +82,9 @@ export const useCourseCloning = () => {
   const loadPreviousCoursesByMode = useCallback(async (
     courseCode: string,
     instructorName: string,
-    mode: 'exact' | 'all'
+    mode: PreviousCourseSearchMode
   ) => {
-    const firstName = instructorName.split(' ')[0];
-
-    let query: string;
-
-    if (mode === 'exact') {
-      query = `(courseNumber=="${courseCode}" and department.name=="SC*" and courseListing.instructorObjects="${firstName}*") sortby courseListing.termObject.name/sort.descending`;
-    } else {
-      query = `(department.name=="SC*" and courseListing.instructorObjects="${firstName}*") sortby name`;
-    }
+    const query = buildPreviousCoursesQuery(courseCode, instructorName, mode);
     const searchUrl = `${API_ENDPOINTS.FOLIO.BASE_URL}${API_ENDPOINTS.FOLIO.SEARCH_COURSES}?query=${encodeURIComponent(query)}`;
 
     const coursesRes = await fetch(searchUrl, {
@@ -106,22 +99,18 @@ export const useCourseCloning = () => {
     }
 
     const coursesData = await coursesRes.json();
-    const courses = coursesData.data?.courses || [];
+    const courses = (coursesData.data?.courses || []) as FolioPreviousCourse[];
+    const matchingCourses = courses
+      .map((course) => mapFolioCourseToPreviousCourse(course, courseCode, instructorName))
+      .filter((course): course is PreviousCourse => course !== null);
     const coursesWithCounts = await Promise.all(
-      courses.map(async (course: {
-        courseListingObject?: { id?: string; termObject?: { name?: string }; instructorObjects?: Array<{ name?: string }>; };
-        courseListingId?: string;
-        courseNumber?: string;
-        name?: string;
-      }) => {
+      matchingCourses.map(async (course) => {
         try {
-          const courseListingId = course.courseListingObject?.id || course.courseListingId;
-
           let electronicCount = 0;
           let physicalCount = 0;
 
           try {
-            const electronicRes = await fetchMergedCourseResources(courseListingId);
+            const electronicRes = await fetchMergedCourseResources(course.courseListingId);
 
             if (electronicRes.ok) {
               const electronicData = await electronicRes.json();
@@ -133,7 +122,7 @@ export const useCourseCloning = () => {
           }
 
           try {
-            const physicalRes = await fetchPhysicalCourseResources(courseListingId);
+            const physicalRes = await fetchPhysicalCourseResources(course.courseListingId);
 
             if (physicalRes.ok) {
               const physicalData = await physicalRes.json();
@@ -144,18 +133,11 @@ export const useCourseCloning = () => {
             console.log('Physical reserves fetch failed:', error);
           }
 
-          const normalizedCourseNumber = course.courseNumber || '';
-
           return {
-            courseListingId,
-            courseNumber: normalizedCourseNumber,
-            courseName: course.name || 'Unknown Course',
-            term: course.courseListingObject?.termObject?.name || 'Unknown Term',
-            instructor: course.courseListingObject?.instructorObjects?.[0]?.name || instructorName,
+            ...course,
             resourceCount: electronicCount + physicalCount,
             electronicCount,
             physicalCount,
-            isExactMatch: normalizedCourseNumber === courseCode,
           };
         } catch (error) {
           console.error('Failed to process course:', error);
