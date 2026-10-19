@@ -29,7 +29,6 @@ function renderItem(plink) {
           eds: { dbId: 'synthetic-database', an: 'synthetic-an', plink },
         }}
         displayNumber="1"
-        onClaim={() => undefined}
         onGoToWork={() => undefined}
         onReopen={() => undefined}
         currentUserId={1}
@@ -74,4 +73,11 @@ describe('ItemCard EDS record link', () => {
       expect(fullRecordLinks).toHaveLength(0);
     }
   );
+
+  it('directs unclaimed items to the contract-based claims controls', () => {
+    renderItem('https://search.ebscohost.com/record/synthetic-cx028');
+
+    expect(container.textContent).toContain('Use the item claims controls above to claim this item.');
+    expect(container.textContent).not.toContain('Claim This Item');
+  });
 });

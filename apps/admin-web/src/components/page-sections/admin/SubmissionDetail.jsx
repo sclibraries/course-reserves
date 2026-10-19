@@ -33,6 +33,7 @@ import '../../../css/SubmissionWorkflow.css';
 // Components
 import SubmissionHeader from './submission/SubmissionHeader';
 import LinkingPanel from './linking/LinkingPanel';
+import SubmissionClaimsPanel from './claims/SubmissionClaimsPanel';
 import ItemCard from './submission/ItemCard';
 import StatCard from './submission/shared/StatCard';
 
@@ -51,7 +52,6 @@ function SubmissionDetail() {
     lockSubmission,
     unlockSubmission,
     clearError,
-    claimItem,
     updateItemStatus
   } = useSubmissionWorkflowStore();
 
@@ -95,17 +95,6 @@ function SubmissionDetail() {
     if (selectedSubmission) {
       const result = await unlockSubmission(selectedSubmission.submission.uuid);
       if (result.success) await fetchSubmissionDetail(submissionId);
-    }
-  };
-  
-  const handleClaim = async (itemId) => {
-    const result = await claimItem(itemId);
-    if (result.success) {
-      toast.success('Item claimed!');
-      await fetchSubmissionDetail(submissionId);
-    } else {
-      toast.error(result.error || 'Failed to claim item');
-      await fetchSubmissionDetail(submissionId);
     }
   };
   
@@ -163,6 +152,7 @@ function SubmissionDetail() {
 
   const { submission, folders, unfolderedItems, statistics } = selectedSubmission;
   const isCourseLinked = submission.linkState === 'linked' || Boolean(submission.folioCourseListingId);
+  const currentUsername = currentUser?.username || currentUser?.user?.username || '';
   const submissionItems = [...folders.flatMap(folder => folder.items), ...unfolderedItems];
 
   // Helper for numbering items
@@ -195,7 +185,12 @@ function SubmissionDetail() {
       {/* Course processing dashboard is available only after linking. */}
       {isCourseLinked && (
         <>
-
+          <SubmissionClaimsPanel
+            submission={submission}
+            items={submissionItems}
+            currentUsername={currentUsername}
+            onChanged={() => fetchSubmissionDetail(submissionId)}
+          />
 
           <div className="statistics mb-4">
             <StatCard label="Total Items" value={statistics.totalItems} icon={FaBook} />
@@ -218,10 +213,10 @@ function SubmissionDetail() {
                       key={item.id} 
                       item={item} 
                       displayNumber={itemDisplayNumbers[item.id]} 
-                      onClaim={handleClaim} 
                       onGoToWork={handleGoToWork} 
                       onReopen={handleReopen} 
                       currentUserId={currentUser?.id || 0} 
+                      currentUsername={currentUsername}
                     />
                   ))}
                 </div>
@@ -238,10 +233,10 @@ function SubmissionDetail() {
                       key={item.id} 
                       item={item} 
                       displayNumber={itemDisplayNumbers[item.id]} 
-                      onClaim={handleClaim} 
                       onGoToWork={handleGoToWork} 
                       onReopen={handleReopen} 
                       currentUserId={currentUser?.id || 0} 
+                      currentUsername={currentUsername}
                     />
                   ))}
                 </div>

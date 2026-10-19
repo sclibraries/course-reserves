@@ -131,6 +131,17 @@ export const apiConfig = {
       submissionRecheck: '/workflow/submission/:uuid/recheck',
       submissionTimeline: '/workflow/submission/:uuid/timeline',
     },
+    workflowClaims: {
+      queue: '/workflow/queue',
+      myItems: '/workflow/my-items',
+      staff: '/workflow/staff',
+      itemTimeline: '/workflow/item/:kind/:id/timeline',
+      itemClaim: '/workflow/item/:kind/:id/claim',
+      itemRelease: '/workflow/item/:kind/:id/release',
+      itemHandoff: '/workflow/item/:kind/:id/handoff',
+      itemTakeover: '/workflow/item/:kind/:id/takeover',
+      submissionClaimAll: '/workflow/submission/:uuid/claim-all',
+    },
     workflow: {
       // Template Management
       listTemplates: '/workflow-admin/templates',

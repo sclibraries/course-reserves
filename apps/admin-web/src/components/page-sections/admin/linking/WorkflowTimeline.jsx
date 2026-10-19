@@ -2,10 +2,10 @@ import PropTypes from 'prop-types';
 
 const readableEvent = (eventType = '') => eventType.replace(/_/g, ' ');
 
-function WorkflowTimeline({ events, error = '' }) {
+function WorkflowTimeline({ events, error = '', title = 'Workflow timeline', id = 'workflow-timeline-title' }) {
   return (
-    <section className="workflow-timeline" aria-labelledby="workflow-timeline-title">
-      <h3 id="workflow-timeline-title" className="h5">Workflow timeline</h3>
+    <section className="workflow-timeline" aria-labelledby={id}>
+      <h3 id={id} className="h5">{title}</h3>
       {error && <p role="alert" className="text-danger">{error}</p>}
       {!error && events.length === 0 && <p className="text-muted">No workflow events recorded yet.</p>}
       <ol className="list-unstyled mb-0">
@@ -33,6 +33,8 @@ function WorkflowTimeline({ events, error = '' }) {
 WorkflowTimeline.propTypes = {
   events: PropTypes.arrayOf(PropTypes.object).isRequired,
   error: PropTypes.string,
+  title: PropTypes.string,
+  id: PropTypes.string,
 };
 
 export default WorkflowTimeline;

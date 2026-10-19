@@ -5,7 +5,6 @@ import {
   FaUser, 
   FaCheckCircle, 
   FaExclamationCircle, 
-  FaHandPointRight, 
   FaCog 
 } from 'react-icons/fa';
 import StatusBadge from './shared/StatusBadge';
@@ -27,13 +26,18 @@ const getHttpUrl = (value) => {
 const ItemCard = ({ 
   item, 
   displayNumber, 
-  onClaim,
   onGoToWork,
   onReopen,
-  currentUserId
+  currentUserId,
+  currentUsername = ''
 }) => {
   const processingBlockReason = getProcessingBlockReason(item);
   const fullRecordUrl = getHttpUrl(item.eds?.plink);
+  const claimedByUsername = item.claimedByUsername || item.claimedBy?.username;
+  const claimedByDisplay = item.claimedByDisplay || item.claimedBy?.display_name || claimedByUsername;
+  const isClaimed = Boolean(claimedByUsername || item.claimedBy);
+  const isClaimedByCurrentUser = Boolean(currentUsername && claimedByUsername === currentUsername)
+    || item.claimedBy?.id === currentUserId;
 
   return (
     <div className="item-card browse-mode">
@@ -50,12 +54,12 @@ const ItemCard = ({
         
         {/* Claim Status - READ ONLY */}
         <div>
-          {!item.claimedBy ? (
+          {!isClaimed ? (
             <Badge color="secondary">
               <FaClock className="me-1" />
               Unclaimed
             </Badge>
-          ) : item.claimedBy.id === currentUserId ? (
+          ) : isClaimedByCurrentUser ? (
             <Badge color="success">
               <FaUser className="me-1" />
               Claimed by You
@@ -63,7 +67,7 @@ const ItemCard = ({
           ) : (
             <Badge color="info">
               <FaUser className="me-1" />
-              {item.claimedBy.display_name || item.claimedBy.username}
+              {claimedByDisplay || 'Staff member'}
             </Badge>
           )}
         </div>
@@ -203,18 +207,9 @@ const ItemCard = ({
               Reopen for Processing
             </Button>
           </div>
-        ) : !item.claimedBy ? (
-          // Unclaimed and not complete - show claim button
-          <Button 
-            color="primary" 
-            size="sm" 
-            onClick={() => onClaim(item.id)}
-            className="w-100"
-          >
-            <FaHandPointRight className="me-1" />
-            Claim This Item
-          </Button>
-        ) : item.claimedBy.id === currentUserId ? (
+        ) : !isClaimed ? (
+          <small className="text-muted">Use the item claims controls above to claim this item.</small>
+        ) : isClaimedByCurrentUser ? (
           // Claimed by current user - show work button
           processingBlockReason ? (
             <Badge color="warning" className="w-100 p-2">
@@ -234,7 +229,7 @@ const ItemCard = ({
         ) : (
           // Claimed by someone else
           <Badge color="secondary" className="w-100 p-2">
-            Being handled by {item.claimedBy.display_name || item.claimedBy.username}
+            Being handled by {claimedByDisplay || 'another staff member'}
           </Badge>
         )}
       </div>
@@ -272,6 +267,8 @@ ItemCard.propTypes = {
     unreadCommunications: PropTypes.number,
     displayOrder: PropTypes.number,
     positionInFolder: PropTypes.number,
+    claimedByUsername: PropTypes.string,
+    claimedByDisplay: PropTypes.string,
     claimedBy: PropTypes.shape({
       id: PropTypes.number,
       username: PropTypes.string,
@@ -279,10 +276,10 @@ ItemCard.propTypes = {
     })
   }).isRequired,
   displayNumber: PropTypes.string.isRequired,
-  onClaim: PropTypes.func.isRequired,
   onGoToWork: PropTypes.func.isRequired,
   onReopen: PropTypes.func.isRequired,
-  currentUserId: PropTypes.number.isRequired
+  currentUserId: PropTypes.number.isRequired,
+  currentUsername: PropTypes.string,
 };
 
 export default ItemCard;

@@ -12,6 +12,8 @@ import MyMentions from '../components/page-sections/admin/MyMentions';
 import TrackingReport from './TrackingReport';
 import FacultyProxyAccess from '../components/page-sections/admin/proxy-access/FacultyProxyAccess';
 import NeedsLinkingList from '../components/page-sections/admin/linking/NeedsLinkingList';
+import ClaimQueue from '../components/page-sections/admin/claims/ClaimQueue';
+import MyClaimedItems from '../components/page-sections/admin/claims/MyClaimedItems';
 import { isStaffOrAdminRole } from '../util/roles';
 
 export const canAccessProxyTab = (role) => isStaffOrAdminRole(role);
@@ -88,6 +90,20 @@ export function createAdminTabRegistry({
         navigationGroup: 'workflow',
         canAccess: canManageSubmissions,
         renderContent: () => <div className="fade-in"><NeedsLinkingList /></div>,
+      },
+      {
+        key: 'item-queue',
+        label: 'Item Queue',
+        navigationGroup: 'workflow',
+        canAccess: canManageSubmissions,
+        renderContent: () => <div className="fade-in"><ClaimQueue /></div>,
+      },
+      {
+        key: 'my-items',
+        label: 'My Items',
+        navigationGroup: 'workflow',
+        canAccess: canManageSubmissions,
+        renderContent: () => <div className="fade-in"><MyClaimedItems /></div>,
       },
       {
         key: 'submissions',

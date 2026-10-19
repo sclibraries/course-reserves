@@ -22,7 +22,10 @@ export function formatSubmissionDetail(response) {
   }, {});
 
   // Parse all items
-  const allItems = [...newResources, ...reuseResources].map(resource => {
+  const allItems = [
+    ...newResources.map(resource => ({ ...resource, is_reuse: false })),
+    ...reuseResources.map(resource => ({ ...resource, is_reuse: true })),
+  ].map((resource) => {
     let data = {};
     try {
       if (resource.resource_data) {
@@ -79,6 +82,7 @@ export function formatSubmissionDetail(response) {
       status: resource.item_status || 'pending',
       folderName: resource.folder_name,
       displayOrder: resource.display_order || 0,
+      ...('position' in resource ? { claimPosition: resource.position } : {}),
       positionInFolder: resource.position_in_folder,
       facultyNotes: resource.faculty_notes,
       staffNotes: resource.staff_notes || '',
@@ -98,7 +102,12 @@ export function formatSubmissionDetail(response) {
       processingContext: formatProcessingContext(resource.processing_context),
       // Assignment information
       claimedBy: claimedBy,
+      ...('claimed_by' in resource ? { claimedByUsername: resource.claimed_by } : {}),
+      ...('claimed_by_display' in resource ? { claimedByDisplay: resource.claimed_by_display } : {}),
       claimedAt: resource.claimed_at || null,
+      ...('last_activity_at' in resource ? { lastActivityAt: resource.last_activity_at } : {}),
+      ...('expires_at' in resource ? { expiresAt: resource.expires_at } : {}),
+      ...('assigned_group' in resource ? { assignedGroup: resource.assigned_group } : {}),
       // Communications associated with this item
       communications: itemCommunications,
       unreadCommunications: unreadCount,

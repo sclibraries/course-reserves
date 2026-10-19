@@ -35,4 +35,45 @@ describe('formatSubmissionDetail EDS fields', () => {
       eds: resourceData.eds,
     });
   });
+
+  it('keeps claims contract state and faculty position on staff items', () => {
+    const result = formatSubmissionDetail({
+      submission_id: 54,
+      submission_uuid: 'synthetic-api078-submission',
+      newResources: [{
+        id: 99907811,
+        resource_data: JSON.stringify({ title: 'Synthetic item', materialType: 'book' }),
+        item_status: 'pending',
+        position: 2,
+        claimed_by: 'test-api078-owner',
+        claimed_by_display: 'Test Owner',
+        claimed_at: '2026-10-19T11:00:00Z',
+        last_activity_at: '2026-10-19T12:00:00Z',
+        expires_at: '2026-10-22T12:00:00Z',
+        assigned_group: { id: 4, name: 'Acquisitions' },
+      }],
+      communications: [],
+    });
+
+    expect(result.unfolderedItems[0]).toMatchObject({
+      claimPosition: 2,
+      claimedByUsername: 'test-api078-owner',
+      claimedByDisplay: 'Test Owner',
+      claimedAt: '2026-10-19T11:00:00Z',
+      lastActivityAt: '2026-10-19T12:00:00Z',
+      expiresAt: '2026-10-22T12:00:00Z',
+      assignedGroup: { id: 4, name: 'Acquisitions' },
+    });
+  });
+
+  it('derives the item reference kind from the detail resource collection', () => {
+    const result = formatSubmissionDetail({
+      newResources: [{ id: 99907821, resource_data: '{"title":"New item"}', display_order: 1 }],
+      reuseResources: [{ id: 99907822, resource_data: '{"title":"Reused item"}', display_order: 2 }],
+      communications: [],
+    });
+
+    expect(result.unfolderedItems.find((item) => item.id === 99907821).isReuse).toBe(false);
+    expect(result.unfolderedItems.find((item) => item.id === 99907822).isReuse).toBe(true);
+  });
 });

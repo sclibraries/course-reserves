@@ -25,4 +25,14 @@ describe('Needs linking workflow tab', () => {
   it('keeps the existing production workflow visibility gate', () => {
     expect(registryFor(false).workflowVisible).toBe(false);
   });
+
+  it('adds the item queue and My items to the dev-only Workflow area', () => {
+    const registry = registryFor(true);
+    const queue = registry.tabs.find((entry) => entry.key === 'item-queue');
+    const myItems = registry.tabs.find((entry) => entry.key === 'my-items');
+
+    expect(queue).toEqual(expect.objectContaining({ label: 'Item Queue', canAccess: true, navigationGroup: 'workflow' }));
+    expect(myItems).toEqual(expect.objectContaining({ label: 'My Items', canAccess: true, navigationGroup: 'workflow' }));
+    expect(registryFor(false).workflowVisible).toBe(false);
+  });
 });
