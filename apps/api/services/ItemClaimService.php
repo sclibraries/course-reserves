@@ -16,10 +16,12 @@ class ItemClaimService
     private $expiry;
     private $transitionService;
     private $activityService;
+    private $groups;
 
-    public function __construct($repository = null, $eventLog = null, $nowProvider = null, $notifier = null)
+    public function __construct($repository = null, $eventLog = null, $nowProvider = null, $notifier = null, $groups = null)
     {
         $this->repository = $repository ?: new ItemClaimRepository();
+        $this->groups = $groups ?: new StaffGroupRepository();
         $this->listRepository = new ItemClaimListRepository($this->repository);
         $this->eventLog = $eventLog ?: new WorkflowEventLog();
         $this->presenter = new ItemClaimPresenter();
@@ -33,7 +35,8 @@ class ItemClaimService
             $this->eventLog,
             $this->presenter,
             $this->expiry,
-            $notifier
+            $notifier,
+            $this->groups
         );
         $this->activityService = new ItemClaimActivityService($this->repository, $this->eventLog, $this->expiry);
     }
@@ -57,10 +60,20 @@ class ItemClaimService
             if ($notification) {
                 $item = $this->repository->find($kind, $id, true);
             }
-            $before = $this->snapshot($item);
-            if (!$this->repository->claimIfUnclaimed($kind, $id, $this->username($actor), $now)) {
+            $username = $this->username($actor);
+            if (!empty($item['assigned_group_id']) && !$this->groups->isMember($item['assigned_group_id'], $username)) {
                 $transaction->commit();
                 $this->expiry->notify($notification);
+                return $this->result(403, ['error_code' => 'not_group_member']);
+            }
+            $before = $this->snapshot($item);
+            if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
+                $current = $this->repository->find($kind, $id, true);
+                $transaction->commit();
+                $this->expiry->notify($notification);
+                if ($current && !empty($current['assigned_group_id']) && !$this->groups->isMember($current['assigned_group_id'], $username)) {
+                    return $this->result(403, ['error_code' => 'not_group_member']);
+                }
                 return $this->result(409, [
                     'error_code' => 'already_claimed',
                     'claimed_by_display' => $item['claimed_by_display'],
@@ -97,6 +110,15 @@ class ItemClaimService
             return $this->result(404, ['error_code' => 'unknown_staff']);
         }
         return $this->transitionService->transition('handoff', $kind, $id, $actor, $reason, $target);
+    }
+
+    public function handoffToGroup($kind, $id, $groupId, array $actor, $reason = null)
+    {
+        $group = $this->groups->find((int)$groupId);
+        if (!$group) {
+            return $this->result(404, ['error_code' => 'group_not_found']);
+        }
+        return $this->transitionService->transition('group_handoff', $kind, $id, $actor, $reason, $group);
     }
 
     public function takeover($kind, $id, array $actor, $reason)

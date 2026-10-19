@@ -7,6 +7,7 @@ class Api080WorkflowLinkMigrationCest
 {
     private $migrationVersion = 'm261016_000002_add_workflow_linking';
     private $api082MigrationVersion = 'm261019_000001_add_item_claims';
+    private $api083MigrationVersion = 'm261019_000002_add_staff_groups';
     private $facultyPrefix = 'test-api080-migration-';
 
     public function addsWorkflowLogAndBackfillsExistingLinkState(FunctionalTester $I)
@@ -15,7 +16,12 @@ class Api080WorkflowLinkMigrationCest
         $migrationIsDown = false;
         $api081MigrationIsDown = false;
         $api082MigrationIsDown = false;
+        $api083MigrationIsDown = false;
         try {
+            Assert::assertSame(1, (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api083MigrationVersion]
+            )->queryScalar(), 'API-083 migration must be applied by test-stack setup.');
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api082MigrationVersion]
@@ -25,6 +31,8 @@ class Api080WorkflowLinkMigrationCest
                 [':version' => $this->migrationVersion]
             )->queryScalar(), 'API-080 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api083MigrationIsDown = true;
             $this->runMigration('down');
             $api082MigrationIsDown = true;
             $this->runMigration('down');
@@ -79,6 +87,8 @@ class Api080WorkflowLinkMigrationCest
             $api081MigrationIsDown = false;
             $this->runMigration('up');
             $api082MigrationIsDown = false;
+            $this->runMigration('up');
+            $api083MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
         } finally {
             if ($migrationIsDown) {
@@ -90,6 +100,10 @@ class Api080WorkflowLinkMigrationCest
                 $db->schema->refreshTableSchema('faculty_submissions');
             }
             if ($api082MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api083MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
             }

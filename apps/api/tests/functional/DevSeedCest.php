@@ -51,6 +51,15 @@ class DevSeedCest extends BaseFunctionalCest
         $staff = (new \app\services\ApprovedUserLookup())->find('test-api078-staff');
         \PHPUnit\Framework\Assert::assertSame('staff', $staff['role']);
         \PHPUnit\Framework\Assert::assertSame('1', $staff['approved']);
+        $seededGroup = \Yii::$app->db->createCommand(
+            'SELECT g.name, m.username FROM staff_groups g '
+            . 'INNER JOIN staff_group_members m ON m.group_id = g.id WHERE g.name = :name',
+            [':name' => 'Acquisitions']
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertSame([
+            'name' => 'Acquisitions',
+            'username' => 'test-api078-staff',
+        ], $seededGroup);
     }
 
     public function rerunningSeedDoesNotCreateDuplicates(FunctionalTester $I)
@@ -61,6 +70,14 @@ class DevSeedCest extends BaseFunctionalCest
 
         \PHPUnit\Framework\Assert::assertSame(9, $this->countOwnedAssignments());
         \PHPUnit\Framework\Assert::assertSame(4, $this->countOwnedPeople());
+        \PHPUnit\Framework\Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM staff_groups WHERE name = :name', [':name' => 'Acquisitions']
+        )->queryScalar());
+        \PHPUnit\Framework\Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM staff_group_members m INNER JOIN staff_groups g ON g.id = m.group_id '
+            . 'WHERE g.name = :name AND m.username = :username',
+            [':name' => 'Acquisitions', ':username' => 'test-api078-staff']
+        )->queryScalar());
     }
 
     public function resetRemovesOnlyOwnedRows(FunctionalTester $I)
@@ -79,6 +96,9 @@ class DevSeedCest extends BaseFunctionalCest
 
         \PHPUnit\Framework\Assert::assertSame(0, $this->countOwnedAssignments());
         \PHPUnit\Framework\Assert::assertSame(0, $this->countOwnedPeople());
+        \PHPUnit\Framework\Assert::assertSame(0, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM staff_groups WHERE name = :name', [':name' => 'Acquisitions']
+        )->queryScalar());
         \PHPUnit\Framework\Assert::assertSame(1, (int) \Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM course_assignments WHERE smith_id = :smithId'
         )->bindValue(':smithId', '999000078')->queryScalar());

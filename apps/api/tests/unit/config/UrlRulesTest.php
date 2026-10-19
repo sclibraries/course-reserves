@@ -51,10 +51,32 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/timeline' => 'workflow-claim/options',
             'OPTIONS workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/claim-all' => 'workflow-claim/options',
         ];
+        $groupRules = [
+            'GET workflow/my-groups' => 'workflow-group/my-groups',
+            'GET workflow/group/<id:\\d+>/queue' => 'workflow-group/group-queue',
+            'GET workflow/groups' => 'workflow-group/groups',
+            'GET workflow/admin/groups' => 'workflow-group/admin-groups',
+            'POST workflow/admin/groups' => 'workflow-group/admin-groups',
+            'PUT workflow/admin/groups/<id:\\d+>' => 'workflow-group/admin-group',
+            'DELETE workflow/admin/groups/<id:\\d+>' => 'workflow-group/admin-group',
+            'GET workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/admin-group-members',
+            'POST workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/admin-group-members',
+            'DELETE workflow/admin/groups/<id:\\d+>/members/<username:[^/]+>' => 'workflow-group/admin-group-member',
+            'OPTIONS workflow/my-groups' => 'workflow-group/options',
+            'OPTIONS workflow/group/<id:\\d+>/queue' => 'workflow-group/options',
+            'OPTIONS workflow/groups' => 'workflow-group/options',
+            'OPTIONS workflow/admin/groups' => 'workflow-group/options',
+            'OPTIONS workflow/admin/groups/<id:\\d+>' => 'workflow-group/options',
+            'OPTIONS workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/options',
+            'OPTIONS workflow/admin/groups/<id:\\d+>/members/<username:[^/]+>' => 'workflow-group/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
-        $existingRules = array_diff_key($mergedRules, $claimRules);
-        $this->assertCount(183, $mergedRules);
+        $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
+        $declaredWorkflowRules = array_merge($claimRules, $groupRules);
+        $existingRules = array_diff_key($mergedRules, $declaredWorkflowRules);
+        $this->assertCount(200, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
+        $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -77,6 +99,19 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['GET', 'workflow/needs-linking', ['workflow-link/needs-linking', []]],
             ['OPTIONS', 'workflow/needs-linking', ['workflow-link/options', []]],
             ['GET', 'workflow/queue', ['workflow-claim/queue', []]],
+            ['GET', 'workflow/my-groups', ['workflow-group/my-groups', []]],
+            ['GET', 'workflow/groups', ['workflow-group/groups', []]],
+            ['OPTIONS', 'workflow/groups', ['workflow-group/options', []]],
+            ['OPTIONS', 'workflow/group/999007209/queue', [
+                'workflow-group/options', ['id' => '999007209'],
+            ]],
+            ['POST', 'workflow/admin/groups', ['workflow-group/admin-groups', []]],
+            ['PUT', 'workflow/admin/groups/999007210', [
+                'workflow-group/admin-group', ['id' => '999007210'],
+            ]],
+            ['DELETE', 'workflow/admin/groups/999007210/members/test-api083-staff', [
+                'workflow-group/admin-group-member', ['id' => '999007210', 'username' => 'test-api083-staff'],
+            ]],
             ['POST', 'workflow/item/new/999007207/claim', [
                 'workflow-claim/claim', ['kind' => 'new', 'id' => '999007207'],
             ]],

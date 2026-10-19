@@ -2,6 +2,23 @@
 
 // Staff workflow routes must precede the generic REST rule.
 return [
+    'GET workflow/my-groups' => 'workflow-group/my-groups',
+    'GET workflow/group/<id:\\d+>/queue' => 'workflow-group/group-queue',
+    'GET workflow/groups' => 'workflow-group/groups',
+    'GET workflow/admin/groups' => 'workflow-group/admin-groups',
+    'POST workflow/admin/groups' => 'workflow-group/admin-groups',
+    'PUT workflow/admin/groups/<id:\\d+>' => 'workflow-group/admin-group',
+    'DELETE workflow/admin/groups/<id:\\d+>' => 'workflow-group/admin-group',
+    'GET workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/admin-group-members',
+    'POST workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/admin-group-members',
+    'DELETE workflow/admin/groups/<id:\\d+>/members/<username:[^/]+>' => 'workflow-group/admin-group-member',
+    'OPTIONS workflow/my-groups' => 'workflow-group/options',
+    'OPTIONS workflow/group/<id:\\d+>/queue' => 'workflow-group/options',
+    'OPTIONS workflow/groups' => 'workflow-group/options',
+    'OPTIONS workflow/admin/groups' => 'workflow-group/options',
+    'OPTIONS workflow/admin/groups/<id:\\d+>' => 'workflow-group/options',
+    'OPTIONS workflow/admin/groups/<id:\\d+>/members' => 'workflow-group/options',
+    'OPTIONS workflow/admin/groups/<id:\\d+>/members/<username:[^/]+>' => 'workflow-group/options',
     'GET workflow/queue' => 'workflow-claim/queue',
     'GET workflow/my-items' => 'workflow-claim/my-items',
     'GET workflow/staff' => 'workflow-claim/staff',

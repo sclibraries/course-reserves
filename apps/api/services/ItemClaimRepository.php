@@ -32,11 +32,13 @@ class ItemClaimRepository
             . 'i.assigned_group_id, i.item_status AS status, i.display_order AS position, '
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, mt.name AS material_type, '
             . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, s.submitted_at, '
-            . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display '
+            . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
+            . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
             . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
+            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
             . 'WHERE i.id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
         $row = Yii::$app->db->createCommand($sql, [':id' => $id])->queryOne();
         if ($row) {
@@ -47,12 +49,14 @@ class ItemClaimRepository
 
     public function claimIfUnclaimed($kind, $id, $username, $now)
     {
-        return Yii::$app->db->createCommand()->update($this->table($kind), [
-            'claimed_by' => $username,
-            'claimed_at' => $now,
-            'last_activity_at' => $now,
-            'item_status' => 'in_progress',
-        ], ['and', ['id' => $id], ['claimed_by' => null]])->execute();
+        return Yii::$app->db->createCommand(
+            'UPDATE ' . $this->table($kind) . ' SET claimed_by = :username, claimed_at = :now, '
+            . 'last_activity_at = :now, item_status = "in_progress" '
+            . 'WHERE id = :id AND claimed_by IS NULL AND '
+            . '(assigned_group_id IS NULL OR EXISTS (SELECT 1 FROM staff_group_members m '
+            . 'WHERE m.group_id = ' . $this->table($kind) . '.assigned_group_id AND m.username = :username))',
+            [':username' => $username, ':now' => $now, ':id' => $id]
+        )->execute();
     }
 
     public function releaseIfOwned($kind, $id, $username, $now)
@@ -71,6 +75,16 @@ class ItemClaimRepository
             'claimed_at' => $now,
             'last_activity_at' => $now,
             'assigned_group_id' => null,
+        ], ['and', ['id' => $id], ['claimed_by' => $username]])->execute();
+    }
+
+    public function handoffToGroupIfOwned($kind, $id, $username, $groupId, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => null,
+            'claimed_at' => null,
+            'last_activity_at' => $now,
+            'assigned_group_id' => (int)$groupId,
         ], ['and', ['id' => $id], ['claimed_by' => $username]])->execute();
     }
 

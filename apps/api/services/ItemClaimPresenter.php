@@ -12,6 +12,7 @@ class ItemClaimPresenter
         $expiresAt = $claimedBy !== null && $lastActivity
             ? date('Y-m-d H:i:s', strtotime($lastActivity) + ((int)$expiryHours * 3600))
             : null;
+        $assignedGroupId = empty($row['assigned_group_id']) ? null : (int)$row['assigned_group_id'];
         $title = $row['title'] ?? null;
         if (!$title && !empty($row['resource_data'])) {
             $resourceData = json_decode($row['resource_data'], true);
@@ -35,7 +36,10 @@ class ItemClaimPresenter
             'claimed_at' => $row['claimed_at'],
             'last_activity_at' => $row['last_activity_at'],
             'expires_at' => $expiresAt,
-            'assigned_group' => null,
+            'assigned_group' => $assignedGroupId === null ? null : [
+                'id' => $assignedGroupId,
+                'name' => $row['assigned_group_name'] ?? null,
+            ],
         ];
     }
 }

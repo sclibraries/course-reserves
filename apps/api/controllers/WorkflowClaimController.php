@@ -73,7 +73,16 @@ class WorkflowClaimController extends Controller
     public function actionHandoff($kind, $id)
     {
         $body = Yii::$app->request->getBodyParams();
-        return $this->respond($this->service()->handoff($kind, $id, $body['to_username'] ?? '', $this->actor(), $body['reason'] ?? null));
+        $actor = $this->actor();
+        $reason = $body['reason'] ?? null;
+        if (array_key_exists('to_group_id', $body) && array_key_exists('to_username', $body)) {
+            Yii::$app->response->statusCode = 400;
+            return ['error_code' => 'handoff_target_conflict'];
+        }
+        if (array_key_exists('to_group_id', $body)) {
+            return $this->respond($this->service()->handoffToGroup($kind, $id, $body['to_group_id'], $actor, $reason));
+        }
+        return $this->respond($this->service()->handoff($kind, $id, $body['to_username'] ?? '', $actor, $reason));
     }
 
     public function actionTakeover($kind, $id)

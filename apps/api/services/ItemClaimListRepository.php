@@ -47,6 +47,21 @@ class ItemClaimListRepository
         )->queryAll();
     }
 
+    public function groupQueue($groupId)
+    {
+        list($sql, $params) = $this->unionRows(['new', 'reuse'], function ($kind, $suffix) use ($groupId) {
+            return [
+                'i.assigned_group_id = :group_' . $suffix . ' AND i.claimed_by IS NULL AND s.link_state = "linked"',
+                [':group_' . $suffix => (int)$groupId],
+            ];
+        });
+        return Yii::$app->db->createCommand(
+            'SELECT * FROM (' . $sql . ') claim_rows '
+            . 'ORDER BY submitted_at ASC, position ASC, kind ASC, id ASC',
+            $params
+        )->queryAll();
+    }
+
     public function staff($query)
     {
         $sql = 'SELECT username, COALESCE(NULLIF(full_name, ""), username) AS display_name '
@@ -105,10 +120,12 @@ class ItemClaimListRepository
             . 's.course_code, s.section, s.term_code, ' . $title . ' AS title, source.name AS source_resource_title, '
             . $resourceData . ' AS resource_data, mt.name AS material_type, i.display_order AS position, '
             . 'i.item_status AS status, i.claimed_by, i.claimed_at, i.last_activity_at, i.assigned_group_id, '
-            . 's.submitted_at, COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display '
+            . 's.submitted_at, COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
+            . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
             . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
-            . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by WHERE ' . $condition;
+            . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
+            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id WHERE ' . $condition;
     }
 }

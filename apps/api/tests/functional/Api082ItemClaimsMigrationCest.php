@@ -6,12 +6,14 @@ use PHPUnit\Framework\Assert;
 class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000001_add_item_claims';
+    private $api083MigrationVersion = 'm261019_000002_add_staff_groups';
     private $prefix = 'test-api082-migration-';
 
     public function addsClaimColumnsAndBackfillsLegacyClaimsAndEvents(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
+        $api083MigrationIsDown = false;
         $username = $this->prefix . 'staff';
         $uuid = '82000000-0000-4000-8000-000000000082';
         $submissionId = null;
@@ -23,7 +25,13 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
             )->queryScalar(), 'API-082 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api083MigrationVersion]
+            )->queryScalar(), 'API-083 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api083MigrationIsDown = true;
             $this->runMigration('down');
             $migrationIsDown = true;
             $db->schema->refreshTableSchema('submission_new_resources');
@@ -70,6 +78,8 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
 
             $this->runMigration('up');
             $migrationIsDown = false;
+            $this->runMigration('up');
+            $api083MigrationIsDown = false;
             $db->schema->refreshTableSchema('submission_new_resources');
             $db->schema->refreshTableSchema('submission_reuse_resources');
             $db->schema->refreshTableSchema('workflow_events');
@@ -104,6 +114,11 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
                 $db->schema->refreshTableSchema('submission_new_resources');
                 $db->schema->refreshTableSchema('submission_reuse_resources');
                 $db->schema->refreshTableSchema('workflow_events');
+            }
+            if ($api083MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('submission_new_resources');
+                $db->schema->refreshTableSchema('submission_reuse_resources');
             }
             if ($submissionId) {
                 $db->createCommand()->delete('workflow_events', ['submission_id' => $submissionId])->execute();

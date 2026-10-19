@@ -50,6 +50,7 @@ class DevSeedService
                     'approved' => $person['approved'],
                 ], true)->execute();
             }
+            (new DevSeedGroupService($this->db))->seed($people['staff']['username']);
 
             $assignments = $this->assignments($currentPeriod, $upcomingPeriod, $people);
             foreach ($assignments as $assignment) {
@@ -77,6 +78,7 @@ class DevSeedService
         $transaction = $this->db->beginTransaction();
         try {
             (new DevSeedPreviousCourseService())->reset();
+            (new DevSeedGroupService($this->db))->reset(self::USERNAME_PREFIX . 'staff');
             $this->db->createCommand(
                 'DELETE FROM course_assignments WHERE smith_id LIKE :prefix'
             )->bindValue(':prefix', self::SMITH_ID_PREFIX . '%')->execute();
