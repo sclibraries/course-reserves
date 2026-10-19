@@ -1,7 +1,8 @@
 import type { ReserveSlice, CourseItem } from './types';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
+import { moveItemInList as reorderItemInList } from '@/utils/moveItemInList';
 
-export const createItemsSlice: ReserveSlice<'addItem' | 'updateItem' | 'deleteItem' | 'reorderItems' | 'moveItemToPosition'> = (set, get, store) => ({
+export const createItemsSlice: ReserveSlice<'addItem' | 'updateItem' | 'deleteItem' | 'reorderItems' | 'moveItemInList'> = (set, get, store) => ({
   addItem: (reserveId, item) => {
     const reserve = get().getReserveById(reserveId);
     if (!reserve) {
@@ -90,28 +91,32 @@ export const createItemsSlice: ReserveSlice<'addItem' | 'updateItem' | 'deleteIt
     }));
   },
 
-  moveItemToPosition: (reserveId, itemId, position) => {
-    set((state) => ({
-      reserves: state.reserves.map((reserve) => {
-        if (reserve.id === reserveId) {
-          const items = [...(reserve.items || [])];
-          const itemIndex = items.findIndex((item) => item.id === itemId);
-          if (itemIndex !== -1) {
-            const [item] = items.splice(itemIndex, 1);
-            items.splice(position, 0, item);
-          }
-          return {
-            ...reserve,
-            items,
-            lastUpdated: new Date().toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric"
-            })
-          };
-        }
-        return reserve;
-      })
-    }));
+  moveItemInList: (reserveId, itemId, direction) => {
+    let didMove = false;
+    set((state) => {
+      const reserve = state.reserves.find((entry) => entry.id === reserveId);
+      const items = reserve?.items || [];
+      if (!reserve) return state;
+
+      const reorderedItems = reorderItemInList(items, itemId, direction);
+      if (reorderedItems === items) return state;
+      didMove = true;
+
+      return {
+        reserves: state.reserves.map((entry) => entry.id === reserveId
+          ? {
+              ...entry,
+              items: reorderedItems,
+              lastUpdated: new Date().toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              })
+            }
+          : entry
+        )
+      };
+    });
+    return didMove;
   }
 });

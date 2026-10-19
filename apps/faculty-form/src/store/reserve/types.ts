@@ -177,7 +177,7 @@ export interface CourseReservesState {
   updateItem: (reserveId: string, itemId: string, updates: Partial<CourseItem>) => void;
   deleteItem: (reserveId: string, itemId: string) => void;
   reorderItems: (reserveId: string, itemIds: string[]) => void;
-  moveItemToPosition: (reserveId: string, itemId: string, position: number) => void;
+  moveItemInList: (reserveId: string, itemId: string, direction: 'up' | 'down') => boolean;
 
   // Folder actions
   createFolder: (reserveId: string, title: string, description?: string) => string;
@@ -187,6 +187,7 @@ export interface CourseReservesState {
   removeItemFromFolder: (reserveId: string, itemId: string) => void;
   toggleFolder: (reserveId: string, folderId: string) => void;
   moveItemInFolder: (reserveId: string, folderId: string, itemId: string, direction: 'up' | 'down') => void;
+  moveFolderToPosition: (reserveId: string, folderId: string, targetContentId: string) => void;
   moveFolderPosition: (reserveId: string, folderId: string, direction: 'up' | 'down') => void;
 
   // Utility actions

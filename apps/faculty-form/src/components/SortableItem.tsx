@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -11,7 +10,8 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/StatusBadge";
-import { GripVertical, Edit2, ArrowUp, ArrowDown, Trash2, FolderPlus, FolderMinus } from "lucide-react";
+import { GripVertical, Edit2, ArrowUp, ArrowDown, FolderPlus, FolderMinus } from "lucide-react";
+import { DeleteItemDialog } from './DeleteItemDialog';
 import type { CourseItem, CourseFolder } from "../store/courseReservesStore";
 
 interface SortableItemProps {
@@ -19,6 +19,8 @@ interface SortableItemProps {
   isNew?: boolean;
   index: number;
   totalItems: number;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   onEdit: (item: CourseItem) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -34,6 +36,8 @@ export const SortableItem = ({
   isNew = false,
   index, 
   totalItems, 
+  canMoveUp,
+  canMoveDown,
   onEdit, 
   onMoveUp, 
   onMoveDown,
@@ -64,6 +68,8 @@ export const SortableItem = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+  const isMoveUpDisabled = canMoveUp === undefined ? index <= 0 : !canMoveUp;
+  const isMoveDownDisabled = canMoveDown === undefined ? index >= totalItems - 1 : !canMoveDown;
 
   return (
     <Card
@@ -198,23 +204,25 @@ export const SortableItem = ({
             
             {/* Precision ordering buttons */}
             <div className="flex gap-1">
-              {index > 0 && onMoveUp && (
+              {onMoveUp && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className="h-7 w-7 p-0 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={onMoveUp}
+                  disabled={isMoveUpDisabled}
                   title="Move up"
                 >
                   <ArrowUp className="h-3 w-3" />
                 </Button>
               )}
-              {index < totalItems - 1 && onMoveDown && (
+              {onMoveDown && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className="h-7 w-7 p-0 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={onMoveDown}
+                  disabled={isMoveDownDisabled}
                   title="Move down"
                 >
                   <ArrowDown className="h-3 w-3" />
@@ -235,15 +243,13 @@ export const SortableItem = ({
             
             {/* Delete button */}
             {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => onDelete(item.id)}
-                title="Delete item"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+              <DeleteItemDialog
+                itemTitle={item.title}
+                onDelete={() => onDelete(item.id)}
+                onMoveOutOfFolder={item.folderId && onRemoveFromFolder
+                  ? () => onRemoveFromFolder(item.id)
+                  : undefined}
+              />
             )}
           </div>
         </div>

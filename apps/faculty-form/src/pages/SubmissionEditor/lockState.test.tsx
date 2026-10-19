@@ -52,9 +52,9 @@ vi.mock('@/hooks/useSubmissionEditor', () => ({
     sortBy: 'manual', setSortBy: () => {}, searchQuery: '', setSearchQuery: () => {},
     filters: {}, setFilters: () => {}, resetFilters: () => {}, hasActiveFiltersOrSort: false,
     addItem: () => {}, updateItem: () => {}, deleteItem: () => {}, reorderItems: () => {},
-    moveItemToPosition: () => {}, updateReserve: () => {}, createFolder: () => {}, updateFolder: () => {},
+    moveItemInList: () => true, updateReserve: () => {}, createFolder: () => {}, updateFolder: () => {},
     deleteFolder: () => {}, toggleFolder: () => {}, addItemToFolder: () => {}, removeItemFromFolder: () => {},
-    moveItemInFolder: () => {}, moveFolderPosition: () => {},
+    moveItemInFolder: () => {}, moveFolderToPosition: () => {}, moveFolderPosition: () => {},
   }),
 }));
 vi.mock('@/hooks/useDraftSaving', () => ({

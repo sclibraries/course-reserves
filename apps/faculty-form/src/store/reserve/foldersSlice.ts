@@ -1,6 +1,9 @@
 import type { ReserveSlice } from './types';
+import { moveItemInList as reorderItemInList } from '@/utils/moveItemInList';
+import { createFolderDragSlice } from './folderDragSlice';
 
-export const createFoldersSlice: ReserveSlice<'createFolder' | 'updateFolder' | 'deleteFolder' | 'addItemToFolder' | 'removeItemFromFolder' | 'toggleFolder' | 'moveItemInFolder' | 'moveFolderPosition'> = (set, get, store) => ({
+export const createFoldersSlice: ReserveSlice<'createFolder' | 'updateFolder' | 'deleteFolder' | 'addItemToFolder' | 'removeItemFromFolder' | 'toggleFolder' | 'moveItemInFolder' | 'moveFolderToPosition' | 'moveFolderPosition'> = (set, get, store) => ({
+  ...createFolderDragSlice(set, get, store),
   createFolder: (reserveId, title, description) => {
     const timestamp = Date.now();
     const existingIds = new Set((get().getReserveById(reserveId)?.folders || []).map(folder => folder.id));
@@ -157,41 +160,31 @@ export const createFoldersSlice: ReserveSlice<'createFolder' | 'updateFolder' | 
   },
 
   moveItemInFolder: (reserveId, folderId, itemId, direction) => {
-    set((state) => ({
-      reserves: state.reserves.map(reserve => {
-        if (reserve.id === reserveId) {
-          const items = reserve.items || [];
+    set((state) => {
+      const reserve = state.reserves.find((entry) => entry.id === reserveId);
+      const items = reserve?.items || [];
+      if (!reserve || !items.some((item) => item.id === itemId && item.folderId === folderId)) {
+        return state;
+      }
 
-          // Get items in this folder
-          const folderItems = items.filter(item => item.folderId === folderId);
-          const currentIndex = folderItems.findIndex(item => item.id === itemId);
+      const reorderedItems = reorderItemInList(items, itemId, direction);
+      if (reorderedItems === items) return state;
 
-          if (currentIndex === -1) return reserve;
-
-          const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-          // Check bounds
-          if (newIndex < 0 || newIndex >= folderItems.length) return reserve;
-
-          // Create a new items array with reordered folder items
-          const otherItems = items.filter(item => item.folderId !== folderId);
-          const reorderedFolderItems = [...folderItems];
-          [reorderedFolderItems[currentIndex], reorderedFolderItems[newIndex]] =
-          [reorderedFolderItems[newIndex], reorderedFolderItems[currentIndex]];
-
-          return {
-            ...reserve,
-            items: [...otherItems, ...reorderedFolderItems],
-            lastUpdated: new Date().toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric"
-            })
-          };
-        }
-        return reserve;
-      })
-    }));
+      return {
+        reserves: state.reserves.map((entry) => entry.id === reserveId
+          ? {
+              ...entry,
+              items: reorderedItems,
+              lastUpdated: new Date().toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              })
+            }
+          : entry
+        )
+      };
+    });
   },
 
   moveFolderPosition: (reserveId, folderId, direction) => {

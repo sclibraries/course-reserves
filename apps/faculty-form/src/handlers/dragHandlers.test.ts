@@ -3,6 +3,56 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDragHandlers } from './dragHandlers';
 
 describe('createDragHandlers', () => {
+  it('moves a folder from the first position to the last position', () => {
+    const moveFolderToPosition = vi.fn();
+    const { handleDragEnd } = createDragHandlers(
+      'reserve-1',
+      [],
+      vi.fn(),
+      vi.fn(),
+      false,
+      moveFolderToPosition
+    );
+
+    handleDragEnd({
+      active: {
+        id: 'folder-first',
+        data: { current: { type: 'Folder', folder: { id: 'folder-first' } } },
+      },
+      over: {
+        id: 'folder-last',
+        data: { current: { type: 'Folder', folder: { id: 'folder-last' } } },
+      },
+    } as never);
+
+    expect(moveFolderToPosition).toHaveBeenCalledWith('reserve-1', 'folder-first', 'folder-last');
+  });
+
+  it('moves a folder from the last position to the first position', () => {
+    const moveFolderToPosition = vi.fn();
+    const { handleDragEnd } = createDragHandlers(
+      'reserve-1',
+      [],
+      vi.fn(),
+      vi.fn(),
+      false,
+      moveFolderToPosition
+    );
+
+    handleDragEnd({
+      active: {
+        id: 'folder-last',
+        data: { current: { type: 'Folder', folder: { id: 'folder-last' } } },
+      },
+      over: {
+        id: 'folder-first',
+        data: { current: { type: 'Folder', folder: { id: 'folder-first' } } },
+      },
+    } as never);
+
+    expect(moveFolderToPosition).toHaveBeenCalledWith('reserve-1', 'folder-last', 'folder-first');
+  });
+
   it('adds an item to a folder when dropped on an explicit folder dropzone', () => {
     const reorderItems = vi.fn();
     const addItemToFolder = vi.fn();

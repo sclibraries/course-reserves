@@ -23,7 +23,7 @@ export const useSubmissionEditor = () => {
     updateItem,
     deleteItem,
     reorderItems,
-    moveItemToPosition,
+    moveItemInList,
     updateReserve,
     createFolder,
     updateFolder,
@@ -32,6 +32,7 @@ export const useSubmissionEditor = () => {
     addItemToFolder,
     removeItemFromFolder,
     moveItemInFolder,
+    moveFolderToPosition,
     moveFolderPosition,
   } = useCourseReservesStore();
   
@@ -112,7 +113,7 @@ export const useSubmissionEditor = () => {
     updateItem,
     deleteItem,
     reorderItems,
-    moveItemToPosition,
+    moveItemInList,
     updateReserve,
     createFolder,
     updateFolder,
@@ -121,6 +122,7 @@ export const useSubmissionEditor = () => {
     addItemToFolder,
     removeItemFromFolder,
     moveItemInFolder,
+    moveFolderToPosition,
     moveFolderPosition,
   };
 };

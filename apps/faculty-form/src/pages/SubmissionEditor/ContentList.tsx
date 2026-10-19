@@ -138,12 +138,24 @@ export default function ContentList({
           <DndContext
             sensors={sensors}
             collisionDetection={(args) => {
-              const pointerCollisions = pointerWithin(args);
+              const isDraggingFolder = args.active.data.current?.type === 'Folder';
+              const keepValidFolderTargets = (collisions: ReturnType<typeof pointerWithin>) => {
+                if (!isDraggingFolder) return collisions;
+                return collisions.filter((collision) => {
+                  const droppable = args.droppableContainers.find((entry) => entry.id === collision.id);
+                  const data = droppable?.data.current as {
+                    type?: string;
+                    item?: { folderId?: string };
+                  } | undefined;
+                  return data?.type === 'Folder' || (data?.type === 'Item' && !data.item?.folderId);
+                });
+              };
+              const pointerCollisions = keepValidFolderTargets(pointerWithin(args));
               if (pointerCollisions.length > 0) {
                 return pointerCollisions;
               }
 
-              return closestCenter(args);
+              return keepValidFolderTargets(closestCenter(args));
             }}
             onDragEnd={dragHandlers.handleDragEnd}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
@@ -188,6 +200,8 @@ export default function ContentList({
                       />
                     );
                   } else if (contentItem.type === 'item' && contentItem.item) {
+                    const ungroupedIndex = filteredAndSortedContent.ungroupedItems
+                      .findIndex((item) => item.id === contentItem.item!.id);
                     return (
                       <SortableItem
                         key={contentItem.item.id}
@@ -195,6 +209,8 @@ export default function ContentList({
                         isNew={addedMaterials.some((added) => added.id === contentItem.item!.id)}
                         index={index}
                         totalItems={totalDisplayedItems}
+                        canMoveUp={ungroupedIndex > 0}
+                        canMoveDown={ungroupedIndex < filteredAndSortedContent.ungroupedItems.length - 1}
                         onEdit={itemHandlers.handleEditItem}
                         onMoveUp={() => itemHandlers.handleMoveUp(contentItem.item!.id)}
                         onMoveDown={() => itemHandlers.handleMoveDown(contentItem.item!.id)}

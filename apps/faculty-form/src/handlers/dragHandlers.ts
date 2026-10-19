@@ -11,7 +11,8 @@ export const createDragHandlers = (
   items: CourseItem[],
   reorderItems: (id: string, itemIds: string[]) => void,
   addItemToFolder: (id: string, folderId: string, itemId: string) => void,
-  hasActiveFiltersOrSort: boolean
+  hasActiveFiltersOrSort: boolean,
+  moveFolderToPosition?: (id: string, folderId: string, targetContentId: string) => void
 ) => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -44,10 +45,12 @@ export const createDragHandlers = (
       return;
     }
 
-    // Handle folder drag and drop (simplified approach)
+    // Handle folder drag and drop
     if (activeData?.type === 'Folder') {
-      // For now, let's disable folder drag and drop to focus on arrow buttons
-      toast.info("Use the arrow buttons to reorder folders");
+      const targetContentId = resolveFolderReorderTarget(overData);
+      if (targetContentId && moveFolderToPosition) {
+        moveFolderToPosition(reserveId, active.id.toString(), targetContentId);
+      }
       return;
     }
 
@@ -84,5 +87,15 @@ function resolveFolderDropTarget(overData?: {
     return overData.item.folderId;
   }
 
+  return null;
+}
+
+function resolveFolderReorderTarget(overData?: {
+  type?: string;
+  folder?: { id: string };
+  item?: { id: string; folderId?: string };
+}): string | null {
+  if (overData?.type === 'Folder') return overData.folder?.id || null;
+  if (overData?.type === 'Item' && !overData.item?.folderId) return overData.item.id;
   return null;
 }

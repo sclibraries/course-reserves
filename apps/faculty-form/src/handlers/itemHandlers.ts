@@ -11,9 +11,8 @@ export const createItemHandlers = (
   addItem: (id: string, item: Partial<CourseItem>) => boolean,
   updateItem: (id: string, itemId: string, updates: Partial<CourseItem>) => void,
   deleteItem: (id: string, itemId: string) => void,
-  moveItemToPosition: (id: string, itemId: string, position: number) => void,
+  moveItemInList: (id: string, itemId: string, direction: 'up' | 'down') => boolean,
   updateReserve: (id: string, updates: Partial<CourseReserve>) => void,
-  items: CourseItem[],
   hasActiveFiltersOrSort: boolean,
   setEditingItem: (item: (ItemData & { id: string }) | undefined) => void,
   setModalOpen: (open: boolean) => void
@@ -49,9 +48,7 @@ export const createItemHandlers = (
       return;
     }
 
-    const currentIndex = items.findIndex(item => item.id === itemId);
-    if (currentIndex > 0) {
-      moveItemToPosition(reserveId, itemId, currentIndex - 1);
+    if (moveItemInList(reserveId, itemId, 'up')) {
       toast.success("Item moved up");
     }
   };
@@ -62,9 +59,7 @@ export const createItemHandlers = (
       return;
     }
 
-    const currentIndex = items.findIndex(item => item.id === itemId);
-    if (currentIndex < items.length - 1) {
-      moveItemToPosition(reserveId, itemId, currentIndex + 1);
+    if (moveItemInList(reserveId, itemId, 'down')) {
       toast.success("Item moved down");
     }
   };

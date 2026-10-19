@@ -41,9 +41,9 @@ const SubmissionEditor = () => {
     courseModalOpen, setCourseModalOpen,
     sortBy, setSortBy, searchQuery, setSearchQuery,
     filters, setFilters, resetFilters, hasActiveFiltersOrSort,
-    addItem, updateItem, deleteItem, reorderItems, moveItemToPosition, updateReserve,
+    addItem, updateItem, deleteItem, reorderItems, moveItemInList, updateReserve,
     createFolder, updateFolder, deleteFolder, toggleFolder,
-    addItemToFolder, removeItemFromFolder, moveItemInFolder, moveFolderPosition,
+    addItemToFolder, removeItemFromFolder, moveItemInFolder, moveFolderToPosition, moveFolderPosition,
   } = useSubmissionEditor();
 
   const firstName = user?.full_name?.split(' ')[0] || '';
@@ -133,11 +133,20 @@ const SubmissionEditor = () => {
   const wrappedDeleteFolder = (...a: Parameters<typeof deleteFolder>) => { deleteFolder(...a); markChanged(); };
   const wrappedReorderItems = (...a: Parameters<typeof reorderItems>) => { reorderItems(...a); markChanged(); };
   const wrappedAddItemToFolder = (...a: Parameters<typeof addItemToFolder>) => { addItemToFolder(...a); markChanged(); };
+  const wrappedMoveItemInList = (...a: Parameters<typeof moveItemInList>) => {
+    const didMove = moveItemInList(...a);
+    if (didMove) markChanged();
+    return didMove;
+  };
+  const wrappedMoveFolderToPosition = (...a: Parameters<typeof moveFolderToPosition>) => {
+    moveFolderToPosition(...a);
+    markChanged();
+  };
 
-  const itemHandlers = createItemHandlers(id!, wrappedAddItem, wrappedUpdateItem, wrappedDeleteItem, moveItemToPosition, wrappedUpdateReserve, reserve.items, hasActiveFiltersOrSort, setEditingItem, setModalOpen);
+  const itemHandlers = createItemHandlers(id!, wrappedAddItem, wrappedUpdateItem, wrappedDeleteItem, wrappedMoveItemInList, wrappedUpdateReserve, hasActiveFiltersOrSort, setEditingItem, setModalOpen);
   const folderHandlers = createFolderHandlers(id!, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
-  const dragHandlers = createDragHandlers(id!, reserve.items, wrappedReorderItems, wrappedAddItemToFolder, hasActiveFiltersOrSort);
+  const dragHandlers = createDragHandlers(id!, reserve.items, wrappedReorderItems, wrappedAddItemToFolder, hasActiveFiltersOrSort, wrappedMoveFolderToPosition);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
   const handleItemsFromExternalSource = (items: Partial<CourseItem>[]) => {
     let skippedCount = 0;
