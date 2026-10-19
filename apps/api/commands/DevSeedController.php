@@ -9,7 +9,7 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * Seeds synthetic test roster and people for the fake-FOLIO scenarios.
+ * Seeds the synthetic test roster and people, plus the previous-course demo for Reuse.
  *
  * Usage: php yii dev-seed/test-courses [--current-period=AP_YYYYMM] [--upcoming-period=AP_YYYYMM] [--reset]
  */
@@ -24,13 +24,17 @@ class DevSeedController extends Controller
         return array_merge(parent::options($actionID), ['reset', 'currentPeriod', 'upcomingPeriod']);
     }
 
+    /**
+     * Seed API-078 test accounts and the CX-029 TST 101 Spring 2026 previous-course materials.
+     * Use --reset to remove the synthetic roster, course offering, folder, and electronic resources.
+     */
     public function actionTestCourses()
     {
         $service = new DevSeedService();
         try {
             if ($this->reset) {
                 $service->reset();
-                $this->stdout("Reset API-078 test roster and people.\n", Console::FG_GREEN);
+                $this->stdout("Reset API-078 test roster, people, and previous-course materials.\n", Console::FG_GREEN);
                 return ExitCode::OK;
             }
 
@@ -41,6 +45,14 @@ class DevSeedController extends Controller
             }
 
             $this->stdout("Seeded {$summary['assignmentCount']} API-078 course assignments.\n", Console::FG_GREEN);
+            $previousCourse = $summary['previousCourse'];
+            $this->stdout(sprintf(
+                "Previous course: %s %s - %d electronic, %d physical\n",
+                $previousCourse['courseNumber'],
+                $previousCourse['termName'],
+                $previousCourse['electronicCount'],
+                $previousCourse['physicalCount']
+            ), Console::FG_GREEN);
             $this->stdout('Current AP period: ' . $summary['currentPeriod'] . "\n");
             $this->stdout('Upcoming AP period: ' . $summary['upcomingPeriod'] . "\n");
             $this->printPerson($summary['people']['facultyA'], 'Faculty A');

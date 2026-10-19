@@ -6,7 +6,7 @@ use app\components\Environment;
 use Yii;
 
 /**
- * Creates only the synthetic API-078 roster and people rows.
+ * Creates the synthetic API-078 roster and people plus the CX-029 previous-course demo.
  */
 class DevSeedService
 {
@@ -37,6 +37,7 @@ class DevSeedService
 
         $transaction = $this->db->beginTransaction();
         try {
+            $previousCourse = (new DevSeedPreviousCourseService())->seed();
             $people = $this->people();
             foreach ($people as $person) {
                 $this->db->createCommand()->upsert('users', [
@@ -66,6 +67,7 @@ class DevSeedService
             'upcomingPeriod' => $upcomingPeriod,
             'people' => $people,
             'assignmentCount' => count($assignments),
+            'previousCourse' => $previousCourse,
         ];
     }
 
@@ -74,6 +76,7 @@ class DevSeedService
         $this->assertFixturesAllowed();
         $transaction = $this->db->beginTransaction();
         try {
+            (new DevSeedPreviousCourseService())->reset();
             $this->db->createCommand(
                 'DELETE FROM course_assignments WHERE smith_id LIKE :prefix'
             )->bindValue(':prefix', self::SMITH_ID_PREFIX . '%')->execute();

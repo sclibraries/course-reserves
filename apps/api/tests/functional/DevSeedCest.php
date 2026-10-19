@@ -84,6 +84,60 @@ class DevSeedCest extends BaseFunctionalCest
         )->bindValue(':smithId', '999000078')->queryScalar());
     }
 
+    public function previousCourseSeedCreatesOrderedResourcesAndResetRemovesThem(FunctionalTester $I)
+    {
+        $service = $this->service();
+        $summary = $service->seed($this->currentPeriod, $this->upcomingPeriod);
+        $service->seed($this->currentPeriod, $this->upcomingPeriod);
+
+        \PHPUnit\Framework\Assert::assertSame([
+            'courseNumber' => 'TST 101',
+            'termName' => 'Spring 2026',
+            'electronicCount' => 4,
+            'physicalCount' => 3,
+        ], $summary['previousCourse']);
+
+        $offering = \app\models\CourseOfferings::findOne([
+            'folio_course_id' => '00000000-0000-4000-8000-000000000209',
+        ]);
+        \PHPUnit\Framework\Assert::assertNotNull($offering);
+        $resources = (new \yii\db\Query())
+            ->select(['r.name', 'r.item_url', 'type' => 'mt.name', 'cr.order', 'folder_name' => 'f.name'])
+            ->from(['cr' => 'course_resources'])
+            ->innerJoin(['r' => 'resources'], 'r.resource_id = cr.resource_id')
+            ->leftJoin(['mt' => 'material_types'], 'mt.material_type_id = r.material_type_id')
+            ->leftJoin(['f' => 'folders'], 'f.folder_id = cr.folder_id')
+            ->where(['cr.offering_id' => $offering->offering_id])
+            ->orderBy(['cr.order' => SORT_ASC])
+            ->all();
+
+        \PHPUnit\Framework\Assert::assertSame([
+            ['name' => 'test-cx029-article', 'item_url' => 'https://example.test/cx029/journal-article', 'type' => 'article', 'order' => '1', 'folder_name' => 'Week 1'],
+            ['name' => 'test-cx029-chapter', 'item_url' => 'https://example.test/cx029/chapter', 'type' => 'chapter', 'order' => '2', 'folder_name' => 'Week 1'],
+            ['name' => 'test-cx029-website', 'item_url' => 'https://example.test/cx029/website', 'type' => 'website', 'order' => '3', 'folder_name' => null],
+            ['name' => 'test-cx029-video', 'item_url' => 'https://example.test/cx029/video', 'type' => 'video', 'order' => '4', 'folder_name' => null],
+        ], $resources);
+
+        $I->amOnRoute('course/get-merged-resources', [
+            'courseListingId' => '00000000-0000-4000-8000-000000000209',
+        ]);
+        $I->seeResponseCodeIs(200);
+        $merged = $I->grabJsonResponse();
+        \PHPUnit\Framework\Assert::assertSame(4, $merged['count']);
+        \PHPUnit\Framework\Assert::assertSame([
+            'test-cx029-article', 'test-cx029-chapter', 'test-cx029-website', 'test-cx029-video',
+        ], array_column($merged['resources'], 'title'));
+
+        $service->reset();
+        \PHPUnit\Framework\Assert::assertNull(\app\models\CourseOfferings::findOne([
+            'folio_course_id' => '00000000-0000-4000-8000-000000000209',
+        ]));
+        \PHPUnit\Framework\Assert::assertSame(0, (int)\app\models\Resources::find()
+            ->where(['like', 'name', 'test-cx029-', false])->count());
+        \PHPUnit\Framework\Assert::assertSame(0, (int)\app\models\Folder::find()
+            ->where(['description' => 'test-cx029-previous-course-week-1'])->count());
+    }
+
     public function refusesSeedOutsideDevAndTest(FunctionalTester $I)
     {
         $service = new \app\services\DevSeedService(null, function () {
@@ -172,11 +226,6 @@ class DevSeedCest extends BaseFunctionalCest
 
     private function cleanupSeed()
     {
-        \Yii::$app->db->createCommand(
-            'DELETE FROM course_assignments WHERE smith_id LIKE :prefix'
-        )->bindValue(':prefix', '999078%')->execute();
-        \Yii::$app->db->createCommand(
-            'DELETE FROM users WHERE username LIKE :prefix'
-        )->bindValue(':prefix', 'test-api078-%')->execute();
+        $this->service()->reset();
     }
 }

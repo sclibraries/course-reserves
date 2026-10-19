@@ -148,7 +148,8 @@ test('seed contains each course scenario and keeps cross-listed course records o
 
     assert.ok(spring.startDate.startsWith('2027-01-01'));
     assert.ok(fall.startDate.startsWith('2026-09-01'));
-    assert.equal(courses.filter((course) => course.courseNumber === 'TST 101').length, 2);
+    assert.equal(courses.filter((course) => course.courseNumber === 'TST 101' &&
+      ['Spring 2027', 'Fall 2026'].includes(course.courseListingObject.termObject.name)).length, 2);
     assert.equal(courses.find((course) => course.courseNumber === 'TST 103').sectionName, '02');
     assert.deepEqual(course104.courseListingObject.instructorObjects.map((i) => i.name).sort(),
       ['Test Faculty A', 'Test Faculty B']);
@@ -157,6 +158,45 @@ test('seed contains each course scenario and keeps cross-listed course records o
     assert.deepEqual(course106Sections, ['01', '02']);
     assert.equal(courses.some((course) => course.courseNumber === 'TST 102'), false);
     assert.ok(courses.every((course) => course.id !== course.courseListingId));
+  });
+});
+
+test('seed includes the synthetic past TST courses and three TST 101 reserves', async () => {
+  await withServer(async (baseUrl) => {
+    const { body: terms } = await getJson(baseUrl, '/folio/web/search/search-terms');
+    const { body: courses } = await getJson(baseUrl, '/folio/web/search/search-courses?' +
+      new URLSearchParams({ query: 'cql.allRecords=1' }));
+    const spring2026 = terms.data.terms.find((term) => term.name === 'Spring 2026');
+    const fall2025 = terms.data.terms.find((term) => term.name === 'Fall 2025');
+    const previous101 = courses.data.courses.find((course) =>
+      course.courseNumber === 'TST 101' && course.courseListingObject.termObject.name === 'Spring 2026');
+    const previous107 = courses.data.courses.find((course) =>
+      course.courseNumber === 'TST 107' && course.courseListingObject.termObject.name === 'Fall 2025');
+
+    assert.ok(spring2026, 'missing Spring 2026 term');
+    assert.ok(fall2025, 'missing Fall 2025 term');
+    assert.ok(spring2026.startDate.startsWith('2026-01-01'));
+    assert.ok(spring2026.endDate.startsWith('2026-05-31'));
+    assert.ok(previous101, 'missing previous TST 101 listing');
+    assert.ok(previous107, 'missing different-number past course');
+    assert.deepEqual(previous101.courseListingObject.instructorObjects.map((instructor) => instructor.name),
+      ['Test Faculty A']);
+
+    const { response, body } = await getJson(baseUrl, '/folio/web/search/search-course-listings?' +
+      new URLSearchParams({ courseListingId: previous101.courseListingId }));
+
+    assert.equal(response.status, 200);
+    assertEnvelope(body);
+    assert.equal(body.data.reserves.length, 3);
+    assert.deepEqual(body.data.reserves.map((reserve) => reserve.copiedItem.title), [
+      'test-cx029-physical-reserve-1',
+      'test-cx029-physical-reserve-2',
+      'test-cx029-physical-reserve-3',
+    ]);
+    assert.deepEqual(body.data.reserves.map((reserve) => reserve.copiedItem.barcode), [
+      'TEST-BARCODE-009', 'TEST-BARCODE-010', 'TEST-BARCODE-011',
+    ]);
+    assert.ok(body.data.reserves.every((reserve) => reserve.copiedItem.callNumber));
   });
 });
 
