@@ -2,6 +2,24 @@
 
 // Staff workflow routes must precede the generic REST rule.
 return [
+    'GET workflow/queue' => 'workflow-claim/queue',
+    'GET workflow/my-items' => 'workflow-claim/my-items',
+    'GET workflow/staff' => 'workflow-claim/staff',
+    'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/claim' => 'workflow-claim/claim',
+    'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/release' => 'workflow-claim/release',
+    'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/handoff' => 'workflow-claim/handoff',
+    'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/takeover' => 'workflow-claim/takeover',
+    'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/timeline' => 'workflow-claim/timeline',
+    'POST workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/claim-all' => 'workflow-claim/claim-all',
+    'OPTIONS workflow/queue' => 'workflow-claim/options',
+    'OPTIONS workflow/my-items' => 'workflow-claim/options',
+    'OPTIONS workflow/staff' => 'workflow-claim/options',
+    'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/claim' => 'workflow-claim/options',
+    'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/release' => 'workflow-claim/options',
+    'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/handoff' => 'workflow-claim/options',
+    'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/takeover' => 'workflow-claim/options',
+    'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/timeline' => 'workflow-claim/options',
+    'OPTIONS workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/claim-all' => 'workflow-claim/options',
     // Linking routes use submission UUIDs and precede the generic REST rule.
     'GET workflow/needs-linking' => 'workflow-link/needs-linking',
     'OPTIONS workflow/needs-linking' => 'workflow-link/options',

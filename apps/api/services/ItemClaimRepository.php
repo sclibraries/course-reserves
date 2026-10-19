@@ -1,0 +1,180 @@
+<?php
+
+namespace app\services;
+
+use Yii;
+use app\models\FacultySubmission;
+use app\models\SubmissionNewResource;
+use yii\web\BadRequestHttpException;
+
+/** Hides the new/reuse item tables behind the public kind/id reference. */
+class ItemClaimRepository
+{
+    public function table($kind)
+    {
+        if ($kind === 'new') {
+            return 'submission_new_resources';
+        }
+        if ($kind === 'reuse') {
+            return 'submission_reuse_resources';
+        }
+        throw new BadRequestHttpException('Item kind must be new or reuse.');
+    }
+
+    public function find($kind, $id, $forUpdate = false)
+    {
+        $table = $this->table($kind);
+        $materialTypeJoin = $kind === 'new'
+            ? 'mt.material_type_id = i.material_type_id'
+            : 'mt.material_type_id = source.material_type_id';
+        $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
+        $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
+            . 'i.assigned_group_id, i.item_status AS status, i.display_order AS position, '
+            . $resourceData . ' AS resource_data, source.name AS source_resource_title, mt.name AS material_type, '
+            . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, s.submitted_at, '
+            . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display '
+            . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
+            . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
+            . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
+            . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
+            . 'WHERE i.id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
+        $row = Yii::$app->db->createCommand($sql, [':id' => $id])->queryOne();
+        if ($row) {
+            $row['item_kind'] = $kind;
+        }
+        return $row ?: null;
+    }
+
+    public function claimIfUnclaimed($kind, $id, $username, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => $username,
+            'claimed_at' => $now,
+            'last_activity_at' => $now,
+            'item_status' => 'in_progress',
+        ], ['and', ['id' => $id], ['claimed_by' => null]])->execute();
+    }
+
+    public function releaseIfOwned($kind, $id, $username, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => null,
+            'claimed_at' => null,
+            'last_activity_at' => $now,
+        ], ['and', ['id' => $id], ['claimed_by' => $username]])->execute();
+    }
+
+    public function handoffIfOwned($kind, $id, $username, $toUsername, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => $toUsername,
+            'claimed_at' => $now,
+            'last_activity_at' => $now,
+            'assigned_group_id' => null,
+        ], ['and', ['id' => $id], ['claimed_by' => $username]])->execute();
+    }
+
+    public function takeoverIfClaimed($kind, $id, $toUsername, $now)
+    {
+        return Yii::$app->db->createCommand(
+            'UPDATE ' . $this->table($kind)
+            . ' SET claimed_by = :username, claimed_at = :now, last_activity_at = :now '
+            . 'WHERE id = :id AND claimed_by IS NOT NULL',
+            [':username' => $toUsername, ':now' => $now, ':id' => $id]
+        )->execute();
+    }
+
+    public function expireIfDue($kind, $id, $username, $cutoff, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => null,
+            'claimed_at' => null,
+            'last_activity_at' => $now,
+        ], [
+            'and',
+            ['id' => $id],
+            ['claimed_by' => $username],
+            ['or', ['<=', 'last_activity_at', $cutoff], ['and', ['last_activity_at' => null], ['<=', 'claimed_at', $cutoff]]],
+        ])->execute();
+    }
+
+    public function touchActivity($kind, $id, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'last_activity_at' => $now,
+        ], ['id' => $id])->execute();
+    }
+
+    public function clearClaimForChecklistCompletion($kind, $id, $now)
+    {
+        return Yii::$app->db->createCommand()->update($this->table($kind), [
+            'claimed_by' => null,
+            'claimed_at' => null,
+            'last_activity_at' => $now,
+        ], ['id' => $id])->execute();
+    }
+
+    public function itemRefsBySubmission($submissionId)
+    {
+        $items = [];
+        foreach (['new', 'reuse'] as $kind) {
+            $rows = Yii::$app->db->createCommand(
+                'SELECT id, display_order AS position FROM ' . $this->table($kind) . ' WHERE submission_id = :id',
+                [':id' => $submissionId]
+            )->queryAll();
+            foreach ($rows as $row) {
+                $items[] = ['kind' => $kind, 'id' => (int)$row['id'], 'position' => (int)$row['position']];
+            }
+        }
+        usort($items, function ($left, $right) {
+            if ($left['position'] !== $right['position']) {
+                return $left['position'] <=> $right['position'];
+            }
+            if ($left['kind'] !== $right['kind']) {
+                return $left['kind'] === 'new' ? -1 : 1;
+            }
+            return $left['id'] <=> $right['id'];
+        });
+        return $items;
+    }
+
+    public function expiredClaimCandidates($cutoff)
+    {
+        $items = [];
+        foreach (['new', 'reuse'] as $kind) {
+            $rows = Yii::$app->db->createCommand(
+                'SELECT id FROM ' . $this->table($kind)
+                . ' WHERE claimed_by IS NOT NULL AND COALESCE(last_activity_at, claimed_at) <= :cutoff',
+                [':cutoff' => $cutoff]
+            )->queryColumn();
+            foreach ($rows as $id) {
+                $items[] = ['kind' => $kind, 'id' => (int)$id];
+            }
+        }
+        return $items;
+    }
+
+    public function submissionByUuid($uuid)
+    {
+        return FacultySubmission::find()->where(['submission_uuid' => $uuid])->one();
+    }
+
+    public function findStaffByUsername($username)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT id, username, full_name, role FROM users WHERE username = :username AND role IN ("staff", "admin") LIMIT 1',
+            [':username' => $username]
+        )->queryOne();
+    }
+
+    public function legacyClaimedNewItems($username)
+    {
+        return SubmissionNewResource::find()
+            ->joinWith('submission')
+            ->where(['submission_new_resources.claimed_by' => $username])
+            ->andWhere(['faculty_submissions.link_state' => 'linked'])
+            ->with(['submission', 'materialType'])
+            ->orderBy(['submission_new_resources.claimed_at' => SORT_DESC])
+            ->all();
+    }
+}

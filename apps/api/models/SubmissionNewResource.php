@@ -125,6 +125,9 @@ class SubmissionNewResource extends ActiveRecord
     public function fields()
     {
         $fields = parent::fields();
+        foreach (['claimed_by', 'claimed_by_staff_id', 'claimed_at', 'last_activity_at', 'assigned_group_id'] as $field) {
+            unset($fields[$field]);
+        }
         
         // Only add materialType relation, NOT submission to avoid circular reference
         // (FacultySubmission already includes newResources)

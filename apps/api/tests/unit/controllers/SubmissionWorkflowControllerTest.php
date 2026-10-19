@@ -146,6 +146,16 @@ class SubmissionWorkflowControllerTest extends \Codeception\Test\Unit
         ]);
     }
 
+    public function testClaimActorUsesTokenUsername()
+    {
+        $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
+        $actor = $this->invokeMethod($controller, 'claimActor', [
+            (object) ['id' => 27, 'username' => 'test-api082-staff', 'role' => 'staff'],
+        ]);
+
+        $this->assertSame(['username' => 'test-api082-staff', 'role' => 'staff'], $actor);
+    }
+
     public function testSubmissionAssignmentConflictRejectsAlreadyAssignedSubmission()
     {
         $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
@@ -185,52 +195,19 @@ class SubmissionWorkflowControllerTest extends \Codeception\Test\Unit
         ]));
     }
 
-    public function testClaimConflictRejectsItemClaimedByAnotherStaffMember()
-    {
-        $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
-        $item = (object) [
-            'item_status' => 'pending',
-            'claimed_by_staff_id' => 42,
-            'claimed_at' => '2026-04-14 11:00:00',
-        ];
-
-        $this->expectException(ConflictHttpException::class);
-
-        $this->invokeMethod($controller, 'assertItemCanBeClaimedBy', [
-            $item,
-            (object) ['role' => 'staff', 'id' => 27],
-        ]);
-    }
-
-    public function testClaimAllowsCurrentStaffToResumeOwnInProgressItem()
-    {
-        $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
-        $item = (object) [
-            'item_status' => 'in_progress',
-            'claimed_by_staff_id' => 27,
-            'claimed_at' => '2026-04-14 11:00:00',
-        ];
-
-        $this->assertNull($this->invokeMethod($controller, 'assertItemCanBeClaimedBy', [
-            $item,
-            (object) ['role' => 'staff', 'id' => 27],
-        ]));
-    }
-
     public function testItemMutationRejectsItemClaimedByAnotherStaffMember()
     {
         $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
         $item = (object) [
             'item_status' => 'in_progress',
-            'claimed_by_staff_id' => 42,
-            'claimed_at' => '2026-04-14 11:00:00',
+            'claimed_by' => 'test-other-staff',
         ];
 
         $this->expectException(ConflictHttpException::class);
 
         $this->invokeMethod($controller, 'assertItemCanBeMutatedBy', [
             $item,
-            (object) ['role' => 'staff', 'id' => 27],
+            (object) ['role' => 'staff', 'id' => 27, 'username' => 'test-current-staff'],
             'updated',
         ]);
     }
@@ -240,13 +217,23 @@ class SubmissionWorkflowControllerTest extends \Codeception\Test\Unit
         $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
         $item = (object) [
             'item_status' => 'pending',
-            'claimed_by_staff_id' => null,
-            'claimed_at' => null,
+            'claimed_by' => null,
         ];
 
         $this->assertNull($this->invokeMethod($controller, 'assertItemCanBeMutatedBy', [
             $item,
-            (object) ['role' => 'staff', 'id' => 27],
+            (object) ['role' => 'staff', 'id' => 27, 'username' => 'test-current-staff'],
+            'updated',
+        ]));
+    }
+
+    public function testItemMutationAllowsClaimOwnerByUsername()
+    {
+        $controller = new SubmissionWorkflowController('submission-workflow', \Yii::$app);
+
+        $this->assertNull($this->invokeMethod($controller, 'assertItemCanBeMutatedBy', [
+            (object) ['claimed_by' => 'test-current-staff'],
+            (object) ['role' => 'staff', 'id' => 27, 'username' => 'test-current-staff'],
             'updated',
         ]));
     }

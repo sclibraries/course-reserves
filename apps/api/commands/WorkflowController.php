@@ -3,6 +3,7 @@
 namespace app\commands;
 
 use app\services\LinkSuggestionService;
+use app\services\ItemClaimService;
 use Yii;
 use yii\console\Controller;
 use yii\console\ExitCode;
@@ -28,5 +29,12 @@ class WorkflowController extends Controller
         );
         $this->stdout(json_encode($counts) . "\n");
         return $counts['errors'] > 0 ? ExitCode::UNSPECIFIED_ERROR : ExitCode::OK;
+    }
+
+    public function actionExpireClaims()
+    {
+        $expired = Yii::$container->get(ItemClaimService::class)->expireDueClaims();
+        $this->stdout($expired . " claims expired\n");
+        return ExitCode::OK;
     }
 }

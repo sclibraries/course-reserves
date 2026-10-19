@@ -15,6 +15,7 @@ use app\models\ItemChecklist;
 use app\models\ItemChecklistTask;
 use app\models\SubmissionNewResource;
 use app\services\SubmissionLinkGuard;
+use app\services\ItemClaimService;
 
 class ChecklistController extends Controller
 {
@@ -28,7 +29,6 @@ class ChecklistController extends Controller
     {
         $behaviors = parent::behaviors();
         
-        // CORS - must be first
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
@@ -391,7 +391,6 @@ class ChecklistController extends Controller
         if (!$task) throw new NotFoundHttpException('Task not found');
         if ($blocked = SubmissionLinkGuard::errorResponse($task->itemChecklist->submissionItem->submission)) return $blocked;
 
-        // Update completion status
         if (isset($data['completed'])) {
             $task->completed = (bool)$data['completed'];
             
@@ -404,7 +403,6 @@ class ChecklistController extends Controller
             }
         }
 
-        // Update notes
         if (isset($data['notes'])) {
             $task->notes = $data['notes'];
         }
@@ -412,6 +410,7 @@ class ChecklistController extends Controller
         if (!$task->save()) {
             throw new BadRequestHttpException('Failed to update task: ' . json_encode($task->errors));
         }
+        Yii::$container->get(ItemClaimService::class)->recordActivity('new', $itemId);
 
         return [
             'success' => true,
@@ -441,7 +440,6 @@ class ChecklistController extends Controller
 
         $transaction = Yii::$app->db->beginTransaction();
         try {
-            // Mark any remaining optional tasks as complete
             ItemChecklistTask::updateAll(
                 [
                     'completed' => true,
@@ -454,17 +452,19 @@ class ChecklistController extends Controller
                 ]
             );
 
-            // Mark checklist as complete
             $checklist->completed_at = date('Y-m-d H:i:s');
             $checklist->completed_by = (string)Yii::$app->user->identity->id;
             $checklist->save();
 
-            // Update submission item status
             $item = SubmissionNewResource::findOne($itemId);
             if ($item) {
                 $item->item_status = 'completed';
-                $item->claimed_by_staff_id = null; // Release from work queue
                 $item->save();
+                $identity = Yii::$app->user->identity;
+                Yii::$container->get(ItemClaimService::class)->completeLegacyChecklistItem('new', $itemId, [
+                    'username' => $identity->username ?? (string)$identity->id,
+                    'role' => $identity->role,
+                ]);
             }
 
             $transaction->commit();

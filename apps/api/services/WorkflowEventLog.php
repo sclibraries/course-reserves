@@ -7,7 +7,7 @@ use Yii;
 /** Persists and reads staff-only workflow history. Call record inside the write transaction. */
 class WorkflowEventLog
 {
-    public function record($submissionId, $itemId, array $actor, $eventType, $reason, array $before, array $after)
+    public function record($submissionId, $itemId, array $actor, $eventType, $reason, array $before, array $after, $itemKind = null)
     {
         $transaction = Yii::$app->db->getTransaction();
         if (!$transaction || !$transaction->isActive) {
@@ -17,6 +17,7 @@ class WorkflowEventLog
         Yii::$app->db->createCommand()->insert('workflow_events', [
             'submission_id' => $submissionId,
             'item_id' => $itemId,
+            'item_kind' => $itemKind,
             'actor_username' => $actor['username'],
             'actor_role' => $actor['role'],
             'event_type' => $eventType,
@@ -34,16 +35,30 @@ class WorkflowEventLog
             [':submission_id' => $submissionId]
         )->queryAll();
 
-        return array_map(function ($event) {
-            return [
-                'event_type' => $event['event_type'],
-                'actor' => $event['actor_username'],
-                'actor_role' => $event['actor_role'],
-                'reason' => $event['reason'],
-                'before' => $event['before_json'] === null ? null : json_decode($event['before_json'], true),
-                'after' => $event['after_json'] === null ? null : json_decode($event['after_json'], true),
-                'created_at' => $event['created_at'],
-            ];
-        }, $events);
+        return array_map([$this, 'formatEvent'], $events);
+    }
+
+    public function itemTimeline($kind, $itemId)
+    {
+        $events = Yii::$app->db->createCommand(
+            'SELECT event_type, actor_username, actor_role, reason, before_json, after_json, created_at '
+            . 'FROM workflow_events WHERE item_kind = :kind AND item_id = :item_id '
+            . 'ORDER BY created_at ASC, id ASC',
+            [':kind' => $kind, ':item_id' => $itemId]
+        )->queryAll();
+        return array_map([$this, 'formatEvent'], $events);
+    }
+
+    public function formatEvent(array $event)
+    {
+        return [
+            'event_type' => $event['event_type'],
+            'actor' => $event['actor_username'],
+            'actor_role' => $event['actor_role'],
+            'reason' => $event['reason'],
+            'before' => $event['before_json'] === null ? null : json_decode($event['before_json'], true),
+            'after' => $event['after_json'] === null ? null : json_decode($event['after_json'], true),
+            'created_at' => $event['created_at'],
+        ];
     }
 }

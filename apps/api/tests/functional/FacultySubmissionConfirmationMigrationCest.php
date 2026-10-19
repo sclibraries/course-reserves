@@ -11,6 +11,7 @@ class FacultySubmissionConfirmationMigrationCest
     private $api079MigrationVersion = 'm261016_000001_add_roster_course_to_faculty_submissions';
     private $api080MigrationVersion = 'm261016_000002_add_workflow_linking';
     private $api081MigrationVersion = 'm261016_000003_add_link_suggestions';
+    private $api082MigrationVersion = 'm261019_000001_add_item_claims';
     private $facultyId = 'test-api032-migration-faculty';
 
     /**
@@ -26,6 +27,7 @@ class FacultySubmissionConfirmationMigrationCest
         $api079MigrationIsDown = false;
         $api080MigrationIsDown = false;
         $api081MigrationIsDown = false;
+        $api082MigrationIsDown = false;
 
         try {
             $applied = (int) $db->createCommand(
@@ -61,8 +63,14 @@ class FacultySubmissionConfirmationMigrationCest
                 [':version' => $this->api081MigrationVersion]
             )->queryScalar();
             Assert::assertSame(1, $api081MigrationApplied, 'API-081 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api082MigrationVersion]
+            )->queryScalar(), 'API-082 migration must be applied by test-stack setup.');
 
             // Roll back later migrations so migrate/down 1 targets the confirmation migration.
+            $this->runMigration('down');
+            $api082MigrationIsDown = true;
             $this->runMigration('down');
             $api081MigrationIsDown = true;
             $this->runMigration('down');
@@ -106,6 +114,8 @@ class FacultySubmissionConfirmationMigrationCest
             $api080MigrationIsDown = false;
             $this->runMigration('up');
             $api081MigrationIsDown = false;
+            $this->runMigration('up');
+            $api082MigrationIsDown = false;
             foreach (['API032-HIST-1', 'API032-HIST-0'] as $courseCode) {
                 $row = $this->rowForCourse($db, $courseCode);
                 $submission = \app\models\FacultySubmission::findOne($row['submission_id']);
@@ -134,6 +144,9 @@ class FacultySubmissionConfirmationMigrationCest
                 $this->runMigration('up');
             }
             if ($api081MigrationIsDown) {
+                $this->runMigration('up');
+            }
+            if ($api082MigrationIsDown) {
                 $this->runMigration('up');
             }
             $db->schema->refreshTableSchema('faculty_submissions');

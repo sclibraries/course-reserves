@@ -5,6 +5,7 @@ $listFromEnvironment = static function ($name) {
 };
 
 return [
+    'workflowClaimExpiryHours' => 72,
     'corsOrigins' => $listFromEnvironment('CORS_ALLOWED_ORIGINS'),
     'facultyFormUrl' => getenv('FACULTY_FORM_URL') ?: null,
     'folio' => [

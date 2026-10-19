@@ -19,6 +19,7 @@ use app\models\SubmissionNewResource;
 use app\models\User;
 use app\services\SubmissionItemMaterializationService;
 use app\services\SubmissionLinkGuard;
+use app\services\ItemClaimService;
 
 /**
  * Staff Workflow Controller
@@ -291,6 +292,7 @@ class SubmissionWorkflowController extends Controller
         }
 
         if ($item->save()) {
+            Yii::$container->get(ItemClaimService::class)->recordActivity('new', $item->id);
             return [
                 'success' => true,
                 'item' => $item,
@@ -310,42 +312,26 @@ class SubmissionWorkflowController extends Controller
     {
         $currentUser = Yii::$app->user->identity;
         $this->assertClaimActor($currentUser);
-        
         $item = SubmissionNewResource::findOne($itemId);
-        
         if (!$item) throw new NotFoundHttpException('Item not found');
         if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
-
-        $this->assertItemCanBeClaimedBy($item, $currentUser);
-
-        // Claim the item
-        $item->item_status = 'in_progress';
-        $item->claimed_by_staff_id = $currentUser->id;
-        $item->claimed_at = date('Y-m-d H:i:s');
-        
-        // Add a staff note about who claimed it (for visibility)
-        $staffName = $currentUser->fullName ?? $currentUser->full_name ?? $currentUser->username ?? $currentUser->id;
-        $claimNote = "Claimed by {$staffName} at " . date('Y-m-d H:i:s');
-        
-        if (!empty($item->staff_notes)) {
-            $item->staff_notes .= "\n" . $claimNote;
-        } else {
-            $item->staff_notes = $claimNote;
+        $result = Yii::$container->get(ItemClaimService::class)->claim('new', $itemId, $this->claimActor($currentUser));
+        if ($result['status'] !== 200) {
+            Yii::$app->response->statusCode = $result['status'];
+            return $result['body'];
         }
-
-        if ($item->save()) {
-            return [
-                'success' => true,
-                'item' => $item,
-                'message' => 'Item claimed successfully',
-                'claimed_by' => $staffName,
-                'claimed_by_id' => $currentUser->id,
-                'claimed_at' => $item->claimed_at
-            ];
-        } else {
-            Yii::$app->response->statusCode = 422;
-            return ['errors' => $item->errors];
-        }
+        $item->refresh();
+        $itemData = $item->toArray([], ['materialType']);
+        $itemData['claimed_by_staff_id'] = $this->normalizeInt($currentUser->id);
+        $itemData['claimed_at'] = $item->claimed_at;
+        return [
+            'success' => true,
+            'item' => $itemData,
+            'message' => 'Item claimed successfully',
+            'claimed_by' => $result['body']['item']['claimed_by_display'],
+            'claimed_by_id' => $currentUser->id,
+            'claimed_at' => $item->claimed_at,
+        ];
     }
 
     /**
@@ -368,6 +354,7 @@ class SubmissionWorkflowController extends Controller
             $currentUser->id,
             Yii::$app->request->getBodyParams()
         );
+        Yii::$container->get(ItemClaimService::class)->recordActivity('new', $item->id);
 
         $item->refresh();
         $submission = $item->submission;
@@ -392,33 +379,20 @@ class SubmissionWorkflowController extends Controller
         }
     }
 
-    private function assertItemCanBeClaimedBy($item, $identity): void
+    private function claimActor($identity)
     {
-        $status = $item->item_status ?? null;
-        $claimedBy = $item->claimed_by_staff_id ?? null;
-        $claimedByCurrentUser = $claimedBy !== null && (string)$claimedBy === (string)$identity->id;
-
-        if ($status === 'complete') {
-            throw new ConflictHttpException('Completed items cannot be claimed.');
-        }
-
-        if ($claimedBy !== null && !$claimedByCurrentUser) {
-            throw new ConflictHttpException(sprintf(
-                'Item is already claimed by staff user %s.',
-                $claimedBy
-            ));
-        }
-
-        if ($status === 'in_progress' && !$claimedByCurrentUser) {
-            throw new ConflictHttpException('Item is already in progress.');
-        }
+        return [
+            'username' => $identity->username ?? (string)$identity->id,
+            'role' => $identity->role,
+        ];
     }
 
     private function assertItemCanBeMutatedBy($item, $identity, $action): void
     {
-        $claimedBy = $item->claimed_by_staff_id ?? null;
+        $claimedBy = $item->claimed_by ?? null;
+        $username = $identity->username ?? (string)$identity->id;
 
-        if ($claimedBy !== null && (string)$claimedBy !== (string)$identity->id) {
+        if ($claimedBy !== null && (string)$claimedBy !== (string)$username) {
             throw new ConflictHttpException(sprintf(
                 'Item is already claimed by staff user %s and cannot be %s by the current user.',
                 $claimedBy,
@@ -435,17 +409,15 @@ class SubmissionWorkflowController extends Controller
     {
         $currentUser = Yii::$app->user->identity;
 
-        $items = SubmissionNewResource::find()
-            ->where(['claimed_by_staff_id' => $currentUser->id])
-            ->with([
-                'submission',
-                'materialType'
-            ])
-            ->orderBy(['claimed_at' => SORT_DESC])
-            ->all();
+        $items = Yii::$container->get(ItemClaimService::class)
+            ->legacyClaimedNewItems($currentUser->username ?? (string)$currentUser->id);
 
-        return array_map(function ($item) {
-            return $this->formatClaimedItemResponse($item);
+        return array_map(function ($item) use ($currentUser) {
+            $response = $this->formatClaimedItemResponse($item);
+            if ($response['claimed_by_staff_id'] === null) {
+                $response['claimed_by_staff_id'] = $this->normalizeInt($currentUser->id);
+            }
+            return $response;
         }, $items);
     }
 
@@ -788,7 +760,12 @@ class SubmissionWorkflowController extends Controller
 
     protected function normalizeItemResponse($item)
     {
-        if (is_object($item) && method_exists($item, 'toArray')) {
+        if ($item instanceof SubmissionNewResource) {
+            $model = $item;
+            $item = $model->toArray([], ['submission', 'materialType']);
+            $item['claimed_by_staff_id'] = $this->normalizeInt($model->getAttribute('claimed_by_staff_id'));
+            $item['claimed_at'] = $model->getAttribute('claimed_at');
+        } elseif (is_object($item) && method_exists($item, 'toArray')) {
             $item = $item->toArray([], ['submission', 'materialType']);
         }
 

@@ -31,11 +31,34 @@ class UrlRulesTest extends \Codeception\Test\Unit
         );
         $this->assertSame(JSON_ERROR_NONE, json_last_error());
         $this->assertTrue(is_array($baseline));
-        $this->assertCount(165, $mergedRules);
-        $this->assertSame($baseline, $mergedRules);
+        $claimRules = [
+            'GET workflow/queue' => 'workflow-claim/queue',
+            'GET workflow/my-items' => 'workflow-claim/my-items',
+            'GET workflow/staff' => 'workflow-claim/staff',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/claim' => 'workflow-claim/claim',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/release' => 'workflow-claim/release',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/handoff' => 'workflow-claim/handoff',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/takeover' => 'workflow-claim/takeover',
+            'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/timeline' => 'workflow-claim/timeline',
+            'POST workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/claim-all' => 'workflow-claim/claim-all',
+            'OPTIONS workflow/queue' => 'workflow-claim/options',
+            'OPTIONS workflow/my-items' => 'workflow-claim/options',
+            'OPTIONS workflow/staff' => 'workflow-claim/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/claim' => 'workflow-claim/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/release' => 'workflow-claim/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/handoff' => 'workflow-claim/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/takeover' => 'workflow-claim/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/timeline' => 'workflow-claim/options',
+            'OPTIONS workflow/submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/claim-all' => 'workflow-claim/options',
+        ];
+        $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
+        $existingRules = array_diff_key($mergedRules, $claimRules);
+        $this->assertCount(183, $mergedRules);
+        $this->assertSame($claimRules, $expectedClaimRules);
+        $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
-        $this->assertSame($baseline, $config['components']['urlManager']['rules']);
+        $this->assertSame($mergedRules, $config['components']['urlManager']['rules']);
     }
 
     public function testRepresentativeUrlsKeepTheirRoutesAndParameters()
@@ -53,6 +76,16 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['OPTIONS', 'faculty-submission/' . $uuid, ['faculty-submission/options', ['id' => $uuid]]],
             ['GET', 'workflow/needs-linking', ['workflow-link/needs-linking', []]],
             ['OPTIONS', 'workflow/needs-linking', ['workflow-link/options', []]],
+            ['GET', 'workflow/queue', ['workflow-claim/queue', []]],
+            ['POST', 'workflow/item/new/999007207/claim', [
+                'workflow-claim/claim', ['kind' => 'new', 'id' => '999007207'],
+            ]],
+            ['OPTIONS', 'workflow/item/reuse/999007208/handoff', [
+                'workflow-claim/options', ['kind' => 'reuse', 'id' => '999007208'],
+            ]],
+            ['POST', 'workflow/submission/' . $uuid . '/claim-all', [
+                'workflow-claim/claim-all', ['uuid' => $uuid],
+            ]],
             ['POST', 'workflow/submission/' . $uuid . '/recheck', [
                 'workflow-link/recheck', ['uuid' => $uuid],
             ]],
