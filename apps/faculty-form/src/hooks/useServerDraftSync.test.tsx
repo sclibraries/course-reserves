@@ -29,6 +29,7 @@ vi.hoisted(() => {
 });
 
 import { useServerDraftSync } from './useServerDraftSync';
+import { DraftConflictNotice } from '@/components/SubmissionEditor/DraftConflictNotice';
 import { useReserveStore } from '@/store/useReserveStore';
 import { useDraftStore } from '@/store/draftStore';
 
@@ -50,9 +51,15 @@ const initialReserve: CourseReserve = {
   academicPeriod: 'AP_202702',
 };
 
-function Harness({ onReady }: { onReady: (sync: ReturnType<typeof useServerDraftSync>) => void }) {
+function Harness({
+  onReady,
+  autoSaveEnabled = true,
+}: {
+  onReady: (sync: ReturnType<typeof useServerDraftSync>) => void;
+  autoSaveEnabled?: boolean;
+}) {
   const reserve = useReserveStore((state) => state.reserves.find((item) => item.id === initialReserve.id));
-  const sync = useServerDraftSync(initialReserve.id, reserve, { autoSaveDelay: 3000 });
+  const sync = useServerDraftSync(initialReserve.id, reserve, { autoSaveDelay: 3000, autoSaveEnabled });
   React.useEffect(() => onReady(sync), [onReady, sync]);
 
   return (
@@ -60,10 +67,7 @@ function Harness({ onReady }: { onReady: (sync: ReturnType<typeof useServerDraft
       <span data-testid="save-status">{sync.saveStatus}</span>
       <div data-testid="items">{reserve?.items.map((item) => item.title).join(',')}</div>
       {sync.saveStatus === 'retrying' && <p>Not saved - retrying</p>}
-      {sync.hasConflict && <div>
-        <p>This list was changed on another device</p>
-        <button onClick={() => void sync.loadLatestVersion()}>Load the latest version</button>
-      </div>}
+      <DraftConflictNotice visible={sync.hasConflict} onLoadLatest={sync.loadLatestVersion} />
     </div>
   );
 }
@@ -91,6 +95,14 @@ describe('useServerDraftSync', () => {
     useReserveStore.setState({ reserves: [] });
     useDraftStore.getState().clearAllDrafts();
     vi.useRealTimers();
+  });
+
+  it('cancels a queued save when autosave becomes disabled', async () => {
+    act(() => sync?.markChanged());
+    act(() => root.render(<Harness autoSaveEnabled={false} onReady={(value) => { sync = value; }} />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+    expect(api.syncDraft).not.toHaveBeenCalled();
   });
 
   it('creates once on the first change and saves later changes with the returned version', async () => {

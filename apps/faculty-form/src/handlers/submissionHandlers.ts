@@ -9,6 +9,7 @@ import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submiss
 import { getSubmissionErrorMessage } from "./submissionErrorMessage";
 import { buildSubmissionPayload } from './submissionPayload';
 import { useReserveStore } from '@/store/useReserveStore';
+import { shouldSubmitAsDraft } from './shouldSubmitAsDraft';
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
@@ -26,7 +27,10 @@ export const createSubmissionHandlers = (
     mixedContent: MixedContentItem[];
   },
   setShowSubmitDialog: (show: boolean) => void,
-  draftActions?: { submitDraft: (emailConfirmation: boolean) => Promise<string | null> },
+  draftActions?: {
+    submitDraft: (emailConfirmation: boolean) => Promise<string | null>;
+    hasUnsavedChanges?: boolean;
+  },
 ) => {
   const handleSubmit = () => {
     setShowSubmitDialog(true);
@@ -54,8 +58,7 @@ export const createSubmissionHandlers = (
     // Submit to backend
     (async () => {
       try {
-        if (reserve.status === 'draft' && draftActions) {
-          if (!draftActions) throw new Error('Draft submission is unavailable');
+        if (draftActions && shouldSubmitAsDraft(reserve, draftActions.hasUnsavedChanges || false)) {
           const submissionUuid = await draftActions.submitDraft(emailConfirmation);
           if (!submissionUuid) return;
           toast.success('Submission completed successfully');

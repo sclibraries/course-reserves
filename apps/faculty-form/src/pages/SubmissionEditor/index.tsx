@@ -6,8 +6,7 @@ import { Edit } from 'lucide-react';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
 import { useOrganizedContent, useFilteredContent } from '@/hooks/useContentOrganization';
-import { useServerDraftSync } from '@/hooks/useServerDraftSync';
-import { useLegacyDraftUpload } from '@/hooks/useLegacyDraftUpload';
+import { useSubmissionEditorDrafts } from '@/hooks/useSubmissionEditorDrafts';
 import { useSubmissionLock } from '@/hooks/useSubmissionLock';
 import { hasLocalMaterialEdits } from '@/store/reserve/submissionRefetchMerge';
 import { SubmissionLockBanner } from '@/components/SubmissionLockBanner';
@@ -27,6 +26,7 @@ import SubmissionEditorContext from './SubmissionEditorContext';
 import StickyStack from './StickyStack';
 import ContentList from './ContentList';
 import SubmitDialog from './SubmitDialog';
+import { DraftConflictNotice } from '@/components/SubmissionEditor/DraftConflictNotice';
 import AddMaterialsPage from '../AddMaterials/AddMaterialsPage';
 
 const SubmissionEditor = () => {
@@ -44,14 +44,6 @@ const SubmissionEditor = () => {
     createFolder, updateFolder, deleteFolder, toggleFolder,
     addItemToFolder, removeItemFromFolder, moveItemInFolder, moveFolderPosition,
   } = useSubmissionEditor();
-
-  const handleLegacyServerDraft = React.useCallback((uuid: string) => {
-    navigate(`/submission/${uuid}/edit`, { replace: true });
-  }, [navigate]);
-  useLegacyDraftUpload(
-    !!user && !!reserve?.id.startsWith('reserve-') && !reserve.submissionUuid && reserve.items.length > 0,
-    handleLegacyServerDraft,
-  );
 
   const firstName = user?.full_name?.split(' ')[0] || '';
   const previousCourseDetection = usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
@@ -73,13 +65,11 @@ const SubmissionEditor = () => {
   }, [id]);
   const { isReadOnly, lockInfo } = useSubmissionLock(reserve, { onRefocus: refetchSubmission });
 
+  const draftSync = useSubmissionEditorDrafts(id, reserve, !!user, isReadOnly, navigate);
   const {
     saveDraft, markChanged, lastSaveTime, saveError, hasUnsavedChanges, isSaving,
-    saveStatus, hasConflict, loadLatestVersion, submitCurrentDraft,
-  } = useServerDraftSync(id, reserve, {
-    autoSaveEnabled: !isReadOnly && reserve?.status === 'draft',
-    autoSaveDelay: 3000,
-  });
+    saveStatus, hasConflict, loadLatestVersion,
+  } = draftSync;
   const addedMaterials = useAddedMaterialsVisitStore((state) => state.itemsByReserve[id || ''] || EMPTY_ADDED_MATERIALS);
   const undoAddedMaterial = (itemId: string) => {
     if (reserve?.items.some((item) => item.id === itemId)) {
@@ -131,8 +121,6 @@ const SubmissionEditor = () => {
     return <Navigate to={`/submission/${id}`} replace />;
   }
 
-  const isEditingSubmission = reserve.status === 'submitted';
-
   const wrappedUpdateItem = (...a: Parameters<typeof updateItem>) => { updateItem(...a); markChanged(); };
   const wrappedDeleteItem = (...a: Parameters<typeof deleteItem>) => { deleteItem(...a); markChanged(); };
   const wrappedUpdateReserve = (...a: Parameters<typeof updateReserve>) => { updateReserve(...a); markChanged(); };
@@ -151,18 +139,9 @@ const SubmissionEditor = () => {
   const folderHandlers = createFolderHandlers(id!, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, wrappedMoveTo, isSearching);
-  const draftSubmitActions = reserve.status === 'draft' && (
-    reserve.submissionUuid || hasUnsavedChanges || reserve.items.length > 0 || reserve.folders.length > 0
-  ) ? { submitDraft: submitCurrentDraft } : undefined;
-  const submissionHandlers = createSubmissionHandlers(
-    navigate,
-    reserve,
-    organizedContent,
-    setShowSubmitDialog,
-    draftSubmitActions,
-  );
+  const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog, draftSync);
   const ctxValue = {
-    id: id!, reserve, isEditingSubmission,
+    id: id!, reserve, isEditingSubmission: reserve.status === 'submitted',
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
     saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
@@ -208,14 +187,7 @@ const SubmissionEditor = () => {
               This submission was updated elsewhere. Your unsaved changes are kept.
             </div>
           )}
-          {hasConflict && (
-            <div role="alert" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <p>This list was changed on another device</p>
-              <Button variant="outline" size="sm" className="mt-2" onClick={() => void loadLatestVersion()}>
-                Load the latest version
-              </Button>
-            </div>
-          )}
+          <DraftConflictNotice visible={hasConflict} onLoadLatest={loadLatestVersion} />
           {isReadOnly && lockInfo && (
             <div className="mb-6">
               <SubmissionLockBanner lockInfo={lockInfo} onRefresh={refetchSubmission} onBack={() => navigate('/')} />

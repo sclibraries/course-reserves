@@ -15,6 +15,7 @@ vi.hoisted(() => {
 });
 
 import { createSubmissionHandlers } from './submissionHandlers';
+import { shouldSubmitAsDraft } from './shouldSubmitAsDraft';
 
 describe('submissionHandlers server draft submit', () => {
   beforeEach(() => {
@@ -40,6 +41,11 @@ describe('submissionHandlers server draft submit', () => {
       layout: [],
       lastUpdated: 'Oct 20, 2026',
     };
+    expect(shouldSubmitAsDraft(reserve, false)).toBe(true);
+    expect(shouldSubmitAsDraft({ ...reserve, submissionUuid: undefined }, true)).toBe(true);
+    expect(shouldSubmitAsDraft({ ...reserve, submissionUuid: undefined }, false)).toBe(false);
+    expect(shouldSubmitAsDraft({ ...reserve, status: 'submitted' }, true)).toBe(false);
+
     const handlers = createSubmissionHandlers(
       navigate,
       reserve,
@@ -71,6 +77,8 @@ describe('submissionHandlers server draft submit', () => {
       layout: [{ kind: 'item', id: 'item-1' }],
       lastUpdated: 'Oct 20, 2026',
     };
+    expect(shouldSubmitAsDraft(reserve, false)).toBe(true);
+
     const handlers = createSubmissionHandlers(
       navigate,
       reserve,

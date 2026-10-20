@@ -56,10 +56,12 @@ vi.mock('@/hooks/useSubmissionEditor', () => ({
     moveItemInFolder: () => {}, moveFolderToPosition: () => {}, moveFolderPosition: () => {},
   }),
 }));
-vi.mock('@/hooks/useDraftSaving', () => ({
-  useDraftSaving: () => ({
+vi.mock('@/hooks/useServerDraftSync', () => ({
+  useServerDraftSync: () => ({
     saveDraft: vi.fn(), markChanged: vi.fn(), lastSaveTime: null,
     saveError: null, hasUnsavedChanges: mocks.hasUnsavedChanges, isSaving: false,
+    saveStatus: 'idle', hasConflict: false, loadLatestVersion: vi.fn(),
+    submitCurrentDraft: vi.fn(),
   }),
 }));
 vi.mock('@/store/useReserveStore', () => ({
