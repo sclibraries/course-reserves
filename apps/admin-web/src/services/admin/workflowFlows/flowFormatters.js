@@ -1,3 +1,5 @@
+import { getDraftWorkflowErrorMessage } from '../workflowErrorMessages';
+
 const flowErrorMessages = {
   not_claimed_by_you: 'Claim this item to work on it',
   stale_step: 'Someone else moved this item on',
@@ -20,7 +22,8 @@ export function getFlowErrorCode(error) {
 }
 
 export function getFlowErrorMessage(error) {
-  return flowErrorMessages[getFlowErrorCode(error)]
+  return getDraftWorkflowErrorMessage(error)
+    || flowErrorMessages[getFlowErrorCode(error)]
     || error?.message
     || 'The item flow could not be updated. Check your connection and try again.';
 }

@@ -1,3 +1,5 @@
+import { getDraftWorkflowErrorMessage } from '../workflowErrorMessages';
+
 const HOUR_MS = 60 * 60 * 1000;
 
 const errorMessages = {
@@ -11,6 +13,9 @@ const errorMessages = {
 };
 
 export function getClaimsErrorMessage(error) {
+  const draftErrorMessage = getDraftWorkflowErrorMessage(error);
+  if (draftErrorMessage) return draftErrorMessage;
+
   const payload = error?.payload || error?.data;
   const code = payload?.error_code;
   if (code === 'already_claimed') {

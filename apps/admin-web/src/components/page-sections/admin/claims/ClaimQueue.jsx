@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Form, FormGroup, Input, Label } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage, sortQueueItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
 import QueueItemList from './QueueItemList';
 
 function ClaimQueue() {
@@ -17,7 +18,7 @@ function ClaimQueue() {
     if (!preserveError) setError('');
     try {
       const result = await claimsApi.getQueue({ ...nextFilters, page: 1 });
-      setItems(sortQueueItems(result?.items || []));
+      setItems(sortQueueItems(excludeDraftWorkflowItems(result?.items || [])));
       setCount(Number(result?.count) || 0);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));

@@ -56,4 +56,14 @@ describe('MyClaimedItems', () => {
     expect(mocks.releaseItem).toHaveBeenCalledWith('new', 1);
     expect(mocks.getMyItems).toHaveBeenCalledTimes(2);
   });
+
+  it('does not render release actions for a draft returned unexpectedly in My items', async () => {
+    const draft = { ...items[0], id: 99907802, title: 'Synthetic draft item', submission_status: 'draft' };
+    mocks.getMyItems.mockResolvedValueOnce({ items: [draft] });
+
+    await renderItems();
+
+    expect(container.querySelector('[data-item-id="99907802"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Release Synthetic draft item"]')).toBeNull();
+  });
 });

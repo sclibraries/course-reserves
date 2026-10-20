@@ -4,6 +4,7 @@ import { Alert, Badge, Button, Spinner, Table } from 'reactstrap';
 import { useNavigate } from 'react-router-dom';
 import { submissionWorkflowService } from '../../../../services/admin/submissionWorkflowService';
 import { formatCheckedAt, formatWaitingTime } from '../../../../services/admin/linkingFormatters';
+import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
 import './linking.css';
 
 const suggestionLabels = {
@@ -31,8 +32,10 @@ function NeedsLinkingList() {
     setError('');
     try {
       const result = await submissionWorkflowService.getNeedsLinking(1);
-      setItems(result.items || []);
-      setCount(result.count ?? result.items?.length ?? 0);
+      const responseItems = result.items || [];
+      const submittedItems = excludeDraftWorkflowItems(responseItems);
+      setItems(submittedItems);
+      setCount(Math.max(0, Number(result.count ?? responseItems.length) - (responseItems.length - submittedItems.length)));
     } catch (requestError) {
       setError(requestError.message || 'Failed to load submissions needing a course link.');
     } finally {

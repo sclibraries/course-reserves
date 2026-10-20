@@ -114,4 +114,14 @@ describe('NeedsLinkingList', () => {
 
     expect(container.textContent).toContain('Network offline');
   });
+
+  it('does not render a draft returned unexpectedly by the needs-linking response', async () => {
+    const draft = { ...rows[0], submission_id: 99907801, submission_uuid: 'synthetic-api078-draft', status: 'draft' };
+    mocks.getNeedsLinking.mockResolvedValueOnce({ items: [draft], count: 1 });
+
+    await renderList();
+
+    expect(container.querySelector('[data-submission-uuid="synthetic-api078-draft"]')).toBeNull();
+    expect(container.textContent).not.toContain('Faculty Newer');
+  });
 });

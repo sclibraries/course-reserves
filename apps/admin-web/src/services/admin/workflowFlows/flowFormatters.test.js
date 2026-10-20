@@ -10,6 +10,7 @@ describe('workflow flow errors', () => {
     ['step_not_available_yet', 'FOLIO confirmation arrives in a later update'],
     ['unknown_flow', 'The selected flow could not be found.'],
     ['unknown_group', 'The destination group could not be found.'],
+    ['submission_not_submitted', 'This submission is still a draft.'],
   ])('maps %s to its staff message', (code, message) => {
     const error = { payload: { error_code: code } };
 

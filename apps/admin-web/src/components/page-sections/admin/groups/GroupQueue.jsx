@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Button } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage, sortQueueItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
 import QueueItemList from '../claims/QueueItemList';
 
@@ -18,7 +19,7 @@ function GroupQueue({ group, onBack }) {
     if (!preserveError) setError('');
     try {
       const result = await staffGroupsApi.getGroupQueue(group.id);
-      setItems(sortQueueItems(result?.items || []));
+      setItems(sortQueueItems(excludeDraftWorkflowItems(result?.items || [])));
       setCount(Number(result?.count) || 0);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));

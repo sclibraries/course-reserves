@@ -32,6 +32,7 @@ import '../../../css/SubmissionWorkflow.css';
 
 // Components
 import SubmissionHeader from './submission/SubmissionHeader';
+import DraftSubmissionView from './submission/DraftSubmissionView';
 import LinkingPanel from './linking/LinkingPanel';
 import SubmissionClaimsPanel from './claims/SubmissionClaimsPanel';
 import ItemCard from './submission/ItemCard';
@@ -121,10 +122,6 @@ function SubmissionDetail() {
     }
   };
 
-  // --- Inline Component: Workflow Checklist ---
-  // TODO: Extract this to src/components/page-sections/admin/submission/WorkflowChecklist.jsx
-
-
   // --- Render ---
 
   if (loading) {
@@ -154,6 +151,9 @@ function SubmissionDetail() {
   const isCourseLinked = submission.linkState === 'linked' || Boolean(submission.folioCourseListingId);
   const currentUsername = currentUser?.username || currentUser?.user?.username || '';
   const submissionItems = [...folders.flatMap(folder => folder.items), ...unfolderedItems];
+  if (submission.status === 'draft') {
+    return <DraftSubmissionView submission={submission} items={submissionItems} onBack={() => navigate('/admin?tab=submissions')} />;
+  }
 
   // Helper for numbering items
   let currentNumber = 1;

@@ -18,6 +18,7 @@ describe('claims formatters', () => {
       ['group_has_items', {}, 'Move or finish its items first.'],
       ['unknown_staff', {}, 'The selected staff member could not be found.'],
       ['submission_not_linked', {}, 'Link this submission before managing its item claims.'],
+      ['submission_not_submitted', {}, 'This submission is still a draft.'],
     ];
 
     cases.forEach(([errorCode, details, expected]) => {

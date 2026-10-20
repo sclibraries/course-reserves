@@ -61,4 +61,14 @@ describe('MyGroups', () => {
     expect(mocks.claimItem).toHaveBeenCalledWith('new', 99907811);
     expect(mocks.getGroupQueue).toHaveBeenCalledTimes(2);
   });
+
+  it('does not render claim actions for a draft returned unexpectedly by a group queue', async () => {
+    const draft = { ...item, id: 99907802, title: 'Synthetic draft item', submission_status: 'draft' };
+    mocks.getGroupQueue.mockResolvedValueOnce({ items: [draft], count: 1 });
+    await renderMyGroups();
+    await act(async () => container.querySelector('button[aria-label="Open Synthetic acquisitions queue"]').click());
+
+    expect(container.querySelector('[data-item-id="99907802"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Claim Synthetic draft item"]')).toBeNull();
+  });
 });

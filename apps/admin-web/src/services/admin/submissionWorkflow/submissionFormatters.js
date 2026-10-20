@@ -3,6 +3,19 @@
  * @param {Object} submission - Raw submission data from API
  * @returns {Object} Formatted submission object
  */
+const submissionStatusLabels = {
+  draft: 'Draft',
+  pending: 'Pending',
+  submitted: 'Submitted',
+  in_progress: 'In Progress',
+  complete: 'Complete',
+  unavailable: 'Unavailable',
+};
+
+export function formatSubmissionStatusLabel(status) {
+  return submissionStatusLabels[status] || status;
+}
+
 export function formatSubmissionForDisplay(submission) {
   // Handle case where newResources might not be present
   const newResources = submission.newResources || [];

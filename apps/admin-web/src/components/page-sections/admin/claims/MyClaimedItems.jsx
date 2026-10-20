@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Spinner } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { formatExpiry, getClaimsErrorMessage, sortMyClaimedItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
 import ClaimItemSummary from './ClaimItemSummary';
 
 function MyClaimedItems() {
@@ -15,7 +16,7 @@ function MyClaimedItems() {
     setError('');
     try {
       const result = await claimsApi.getMyItems();
-      setItems(sortMyClaimedItems(result?.items || []));
+      setItems(sortMyClaimedItems(excludeDraftWorkflowItems(result?.items || [])));
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {

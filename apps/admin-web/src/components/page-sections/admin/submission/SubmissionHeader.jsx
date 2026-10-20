@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { Card, CardBody, Button, Alert } from 'reactstrap';
 import { FaLock, FaUnlock } from 'react-icons/fa';
-import StatusBadge from './shared/StatusBadge';
+import SubmissionStatusBadge from './shared/SubmissionStatusBadge';
 
 const SubmissionHeader = ({ submission, onLock, onUnlock }) => {
   return (
@@ -25,7 +25,7 @@ const SubmissionHeader = ({ submission, onLock, onUnlock }) => {
                 {new Date(submission.submittedAt).toLocaleDateString()}
               </span>
               <span>
-                <strong>Status:</strong> <StatusBadge status={submission.status} />
+                <strong>Status:</strong> <SubmissionStatusBadge status={submission.status} />
               </span>
             </div>
           </div>

@@ -3,114 +3,23 @@
  * @description Component for displaying the queue of pending faculty submissions
  */
 
-import { useEffect } from 'react';
-import PropTypes from 'prop-types';
-import { 
-  Table, 
-  Badge, 
-  Button, 
-  Spinner, 
-  Alert,
-  Progress,
-  Pagination,
-  PaginationItem,
-  PaginationLink
-} from 'reactstrap';
-import { FaLock, FaEye, FaClock, FaExclamationTriangle, FaComments } from 'react-icons/fa';
+import { useEffect, useState } from 'react';
+import { Alert, Badge, Button, FormGroup, Input, Label, Spinner, Table } from 'reactstrap';
+import { FaLock, FaEye, FaComments } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
+import SubmissionStatusBadge from './submission/shared/SubmissionStatusBadge';
+import { PriorityIndicator, ProgressBar } from './submission/queue/SubmissionQueueDisplay';
+import SubmissionQueuePagination from './submission/queue/SubmissionQueuePagination';
+import { formatSubmissionQueueDate } from './submission/queue/submissionQueueFormatters';
 import '../../../css/SubmissionWorkflow.css';
-
-/**
- * Format date for display (e.g., "2 days ago")
- */
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return date.toLocaleDateString();
-};
-
-/**
- * Status badge component
- */
-const StatusBadge = ({ status }) => {
-  const statusConfig = {
-    submitted: { color: 'info', text: 'Submitted' },
-    in_progress: { color: 'warning', text: 'In Progress' },
-    complete: { color: 'success', text: 'Complete' },
-    unavailable: { color: 'danger', text: 'Unavailable' }
-  };
-  
-  const config = statusConfig[status] || { color: 'secondary', text: status };
-  
-  return (
-    <Badge color={config.color} className={config.color === 'warning' ? 'text-dark' : ''}>
-      {config.text}
-    </Badge>
-  );
-};
-
-StatusBadge.propTypes = {
-  status: PropTypes.string.isRequired
-};
-
-/**
- * Priority indicator component
- */
-const PriorityIndicator = ({ priority }) => {
-  const priorityConfig = {
-    urgent: { color: 'danger', icon: FaExclamationTriangle, text: 'Urgent' },
-    high: { color: 'warning', icon: FaClock, text: 'High' },
-    normal: { color: 'secondary', icon: null, text: 'Normal' }
-  };
-  
-  const config = priorityConfig[priority] || priorityConfig.normal;
-  const Icon = config.icon;
-  
-  return (
-    <span className={`priority-indicator priority-${priority}`}>
-      {Icon && <Icon className="me-1" />}
-      {config.text}
-    </span>
-  );
-};
-
-PriorityIndicator.propTypes = {
-  priority: PropTypes.oneOf(['urgent', 'high', 'normal']).isRequired
-};
-
-/**
- * Progress bar component
- */
-const ProgressBar = ({ percentage, completeItems, totalItems }) => {
-  return (
-    <div className="progress-wrapper">
-      <Progress value={percentage} color={percentage === 100 ? 'success' : 'primary'}>
-        {percentage}%
-      </Progress>
-      <small className="text-muted">{completeItems}/{totalItems}</small>
-    </div>
-  );
-};
-
-ProgressBar.propTypes = {
-  percentage: PropTypes.number.isRequired,
-  completeItems: PropTypes.number.isRequired,
-  totalItems: PropTypes.number.isRequired
-};
 
 /**
  * Main submission queue component
  */
 function SubmissionQueue() {
   const navigate = useNavigate();
+  const [showDrafts, setShowDrafts] = useState(true);
   const {
     submissions,
     loading,
@@ -120,6 +29,9 @@ function SubmissionQueue() {
     setPage,
     clearError
   } = useSubmissionWorkflowStore();
+  const visibleSubmissions = showDrafts
+    ? submissions
+    : submissions.filter((submission) => submission.status !== 'draft');
 
   // Load submissions on mount
   useEffect(() => {
@@ -134,40 +46,6 @@ function SubmissionQueue() {
     setPage(newPage);
   };
 
-  // Generate pagination items
-  const renderPaginationItems = () => {
-    const items = [];
-    const { currentPage, pageCount } = pagination;
-    
-    for (let i = 1; i <= pageCount; i++) {
-      // Show first, last, current, and adjacent pages
-      if (
-        i === 1 ||
-        i === pageCount ||
-        (i >= currentPage - 1 && i <= currentPage + 1)
-      ) {
-        items.push(
-          <PaginationItem key={i} active={i === currentPage}>
-            <PaginationLink onClick={() => handlePageChange(i)}>
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      } else if (
-        i === currentPage - 2 ||
-        i === currentPage + 2
-      ) {
-        items.push(
-          <PaginationItem key={i} disabled>
-            <PaginationLink>...</PaginationLink>
-          </PaginationItem>
-        );
-      }
-    }
-    
-    return items;
-  };
-
   return (
     <div className="submission-queue">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -178,6 +56,17 @@ function SubmissionQueue() {
           </p>
         </div>
       </div>
+
+      <FormGroup check className="mb-3">
+        <Input
+          id="show-drafts"
+          name="show-drafts"
+          type="checkbox"
+          checked={showDrafts}
+          onChange={(event) => setShowDrafts(event.target.checked)}
+        />
+        <Label check for="show-drafts">Show drafts</Label>
+      </FormGroup>
 
       {/* Error Alert */}
       {error && (
@@ -195,15 +84,15 @@ function SubmissionQueue() {
       )}
 
       {/* Empty State */}
-      {!loading && submissions.length === 0 && (
+      {!loading && visibleSubmissions.length === 0 && (
         <Alert color="info">
           <h5 className="alert-heading">No Submissions Found</h5>
-          <p className="mb-0">There are currently no pending faculty submissions to process.</p>
+          <p className="mb-0">{showDrafts ? 'There are currently no pending faculty submissions to process.' : 'No submissions match the current filter.'}</p>
         </Alert>
       )}
 
       {/* Submissions Table */}
-      {!loading && submissions.length > 0 && (
+      {!loading && visibleSubmissions.length > 0 && (
         <>
           <div className="table-responsive">
             <Table hover className="submissions-table">
@@ -222,7 +111,7 @@ function SubmissionQueue() {
                 </tr>
               </thead>
               <tbody>
-                {submissions.map((sub) => (
+                {visibleSubmissions.map((sub) => (
                   <tr key={sub.submissionId} className={sub.isLocked ? 'locked-row' : ''}>
                     <td>
                       <PriorityIndicator priority={sub.priority} />
@@ -237,9 +126,11 @@ function SubmissionQueue() {
                     <td>{sub.facultyName}</td>
                     <td>{sub.term}</td>
                     <td>
-                      <span title={new Date(sub.submittedAt).toLocaleString()}>
-                        {formatDate(sub.submittedAt)}
-                      </span>
+                      {sub.submittedAt ? (
+                        <span title={new Date(sub.submittedAt).toLocaleString()}>
+                          {formatSubmissionQueueDate(sub.submittedAt)}
+                        </span>
+                      ) : 'Not submitted'}
                     </td>
                     <td>
                       <Badge color="secondary" pill>
@@ -254,7 +145,7 @@ function SubmissionQueue() {
                       />
                     </td>
                     <td>
-                      <StatusBadge status={sub.status} />
+                      <SubmissionStatusBadge status={sub.status} />
                     </td>
                     <td>
                       {sub.assignedTo ? (
@@ -307,25 +198,7 @@ function SubmissionQueue() {
 
           {/* Pagination */}
           {pagination.pageCount > 1 && (
-            <div className="d-flex justify-content-center mt-4">
-              <Pagination>
-                <PaginationItem disabled={pagination.currentPage === 1}>
-                  <PaginationLink 
-                    previous 
-                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                  />
-                </PaginationItem>
-                
-                {renderPaginationItems()}
-                
-                <PaginationItem disabled={pagination.currentPage === pagination.pageCount}>
-                  <PaginationLink 
-                    next 
-                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                  />
-                </PaginationItem>
-              </Pagination>
-            </div>
+            <SubmissionQueuePagination pagination={pagination} onPageChange={handlePageChange} />
           )}
         </>
       )}
