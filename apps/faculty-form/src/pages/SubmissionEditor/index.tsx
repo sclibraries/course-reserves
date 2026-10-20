@@ -6,14 +6,14 @@ import { Edit } from 'lucide-react';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
 import { useOrganizedContent, useFilteredContent } from '@/hooks/useContentOrganization';
-import { useDraftSaving } from '@/hooks/useDraftSaving';
+import { useServerDraftSync } from '@/hooks/useServerDraftSync';
+import { useLegacyDraftUpload } from '@/hooks/useLegacyDraftUpload';
 import { useSubmissionLock } from '@/hooks/useSubmissionLock';
 import { hasLocalMaterialEdits } from '@/store/reserve/submissionRefetchMerge';
 import { SubmissionLockBanner } from '@/components/SubmissionLockBanner';
 import { useReserveStore } from '@/store/useReserveStore';
 import { EMPTY_ADDED_MATERIALS, useAddedMaterialsVisitStore } from '@/store/addedMaterialsVisitStore';
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
-import type { DraftPayload } from '@/store/draftStore';
 import type { CourseItem, CourseReserve } from '@/store/courseReservesStore';
 import { createItemHandlers } from '@/handlers/itemHandlers';
 import { createAddMaterialHandler } from '@/handlers/addMaterialHandler';
@@ -45,6 +45,14 @@ const SubmissionEditor = () => {
     addItemToFolder, removeItemFromFolder, moveItemInFolder, moveFolderPosition,
   } = useSubmissionEditor();
 
+  const handleLegacyServerDraft = React.useCallback((uuid: string) => {
+    navigate(`/submission/${uuid}/edit`, { replace: true });
+  }, [navigate]);
+  useLegacyDraftUpload(
+    !!user && !!reserve?.id.startsWith('reserve-') && !reserve.submissionUuid && reserve.items.length > 0,
+    handleLegacyServerDraft,
+  );
+
   const firstName = user?.full_name?.split(' ')[0] || '';
   const previousCourseDetection = usePreviousCourseDetection(id, reserve?.courseCode, reserve?.items.length ?? 0, reserve?.folders.length ?? 0, firstName);
 
@@ -65,11 +73,12 @@ const SubmissionEditor = () => {
   }, [id]);
   const { isReadOnly, lockInfo } = useSubmissionLock(reserve, { onRefocus: refetchSubmission });
 
-  const { saveDraft, markChanged, lastSaveTime, saveError, hasUnsavedChanges, isSaving } = useDraftSaving(id, reserve, {
-    autoSaveEnabled: !isReadOnly, autoSaveDelay: 3000,
-    onSave: async (payload: DraftPayload) => { console.log('Saving draft:', payload); return new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 500)); },
-    onSaveSuccess: () => { console.log('Draft save succeeded'); },
-    onSaveError: (e) => { console.error('Draft save failed:', e); },
+  const {
+    saveDraft, markChanged, lastSaveTime, saveError, hasUnsavedChanges, isSaving,
+    saveStatus, hasConflict, loadLatestVersion, submitCurrentDraft,
+  } = useServerDraftSync(id, reserve, {
+    autoSaveEnabled: !isReadOnly && reserve?.status === 'draft',
+    autoSaveDelay: 3000,
   });
   const addedMaterials = useAddedMaterialsVisitStore((state) => state.itemsByReserve[id || ''] || EMPTY_ADDED_MATERIALS);
   const undoAddedMaterial = (itemId: string) => {
@@ -142,12 +151,22 @@ const SubmissionEditor = () => {
   const folderHandlers = createFolderHandlers(id!, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, wrappedMoveTo, isSearching);
-  const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog);
+  const draftSubmitActions = reserve.status === 'draft' && (
+    reserve.submissionUuid || hasUnsavedChanges || reserve.items.length > 0 || reserve.folders.length > 0
+  ) ? { submitDraft: submitCurrentDraft } : undefined;
+  const submissionHandlers = createSubmissionHandlers(
+    navigate,
+    reserve,
+    organizedContent,
+    setShowSubmitDialog,
+    draftSubmitActions,
+  );
   const ctxValue = {
     id: id!, reserve, isEditingSubmission,
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
     saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
+    saveStatus,
     itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers,
     markChanged,
     removeItemFromFolder: (...a: Parameters<typeof removeItemFromFolder>) => { removeItemFromFolder(...a); markChanged(); },
@@ -187,6 +206,14 @@ const SubmissionEditor = () => {
           {hasRemoteItemsChanged && (
             <div role="status" className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               This submission was updated elsewhere. Your unsaved changes are kept.
+            </div>
+          )}
+          {hasConflict && (
+            <div role="alert" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p>This list was changed on another device</p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => void loadLatestVersion()}>
+                Load the latest version
+              </Button>
             </div>
           )}
           {isReadOnly && lockInfo && (

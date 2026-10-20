@@ -12,18 +12,17 @@ import { CoursesTable } from "@/components/dashboard/CoursesTable";
 import { ReservesTable } from "@/components/dashboard/ReservesTable";
 import { EmptyState, TableLoadingSkeleton } from "@/components/dashboard/DashboardStates";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { useDraftStore } from "../store/draftStore";
 import { useHasAnyUnsavedChanges } from "@/hooks/useUnsavedChangesWarning";
-import { toast } from "sonner";
+import { useLegacyDraftUpload } from "@/hooks/useLegacyDraftUpload";
+import { useDraftLogout } from "@/hooks/useDraftLogout";
 
 const Index = () => {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-  const [isSavingBeforeLogout, setIsSavingBeforeLogout] = useState(false);
   
   // Use Zustand stores
-  const { reserves, getReserveStats, initialize, fetchSubmissions, startPolling, stopPolling } = useCourseReservesStore();
+  const { reserves, getReserveStats, initialize, startPolling, stopPolling } = useCourseReservesStore();
   const { 
     getCurrentTermName, 
     refreshTermsIfStale, 
@@ -31,8 +30,12 @@ const Index = () => {
   } = useTermsStore();
   const { user, isAuthenticated, initializeFromCookie, logout } = useAuthStore();
   const { assignments, loading: assignmentsLoading, error: assignmentsError } = useDashboardCourseAssignments();
-  const draftStore = useDraftStore();
   const hasAnyUnsavedChanges = useHasAnyUnsavedChanges();
+  useLegacyDraftUpload(isAuthenticated && !!user);
+  const { isSaving: isSavingBeforeLogout, handleSaveAndLogout } = useDraftLogout(() => {
+    setLogoutDialogOpen(false);
+    logout();
+  });
 
   // Initialize stores on first load
   useEffect(() => {
@@ -44,8 +47,6 @@ const Index = () => {
   // Fetch submissions from backend when authenticated and start polling
   useEffect(() => {
     if (isAuthenticated && user) {
-      fetchSubmissions();
-      
       // Start polling for real-time updates (every 30 seconds)
       startPolling(30000);
       
@@ -54,7 +55,7 @@ const Index = () => {
         stopPolling();
       };
     }
-  }, [isAuthenticated, user, fetchSubmissions, startPolling, stopPolling]);
+  }, [isAuthenticated, user, startPolling, stopPolling]);
 
   // Status filter options
   const statuses = ["Draft", "Partially Complete", "Submitted", "Complete"];
@@ -72,34 +73,6 @@ const Index = () => {
   const handleConfirmLogout = () => {
     setLogoutDialogOpen(false);
     logout();
-  };
-
-  const handleSaveAndLogout = async () => {
-    setIsSavingBeforeLogout(true);
-    try {
-      // Get all reserves with unsaved changes
-      const reservesWithChanges = Object.keys(draftStore.hasUnsavedChanges)
-        .filter(id => draftStore.hasUnsavedChanges[id]);
-
-      // Save each draft (in real implementation, this would call the backend)
-      for (const reserveId of reservesWithChanges) {
-        const draft = draftStore.getDraft(reserveId);
-        if (draft) {
-          console.log('Saving draft before logout:', reserveId);
-          // TODO: Call actual save API here
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      toast.success('All changes saved successfully');
-      setLogoutDialogOpen(false);
-      logout();
-    } catch (error) {
-      console.error('Failed to save drafts:', error);
-      toast.error('Failed to save some changes');
-    } finally {
-      setIsSavingBeforeLogout(false);
-    }
   };
 
   // Convert CourseReserve to Submission format - memoized to avoid recalculation

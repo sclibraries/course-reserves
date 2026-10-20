@@ -51,6 +51,7 @@ export interface BackendSubmission {
   unfoldered_items?: BackendMaterial[];
   submission_notes?: string | null;
   needed_by_date?: string | null;
+  draft_version?: number;
 }
 
 const mapMaterialStatus = (status: string): CourseItem['status'] => (
@@ -165,6 +166,7 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
 
   return {
     id: submission.submission_uuid,
+    submissionUuid: submission.submission_uuid,
     courseCode: submission.course_code,
     courseTitle: submission.course_title,
     section: submission.section || '',
@@ -178,6 +180,7 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
     isTestData: false,
     courseAssignmentId: submission.its_course_id || legacyCourseAssignmentId,
     ...(submission.academic_period ? { academicPeriod: submission.academic_period } : {}),
+    ...(typeof submission.draft_version === 'number' ? { draftVersion: submission.draft_version } : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
   };
@@ -188,6 +191,7 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
 
   return {
     id: submission.submission_uuid,
+    submissionUuid: submission.submission_uuid,
     courseCode: submission.course_code,
     courseTitle: submission.course_title,
     section: submission.section || '',
@@ -201,6 +205,7 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
     isTestData: false,
     ...(submission.its_course_id ? { courseAssignmentId: submission.its_course_id } : {}),
     ...(submission.academic_period ? { academicPeriod: submission.academic_period } : {}),
+    ...(typeof submission.draft_version === 'number' ? { draftVersion: submission.draft_version } : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
     submissionNotes: submission.submission_notes || null,

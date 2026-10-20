@@ -35,6 +35,7 @@ export default function Header() {
     hasUnsavedChanges,
     lastSaveTime,
     saveError,
+    saveStatus,
     submissionHandlers,
   } = useSubmissionEditorContext();
 
@@ -62,14 +63,16 @@ export default function Header() {
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status="draft" />
-            {lastSaveTime && (
+            {(saveStatus === 'saving' || saveStatus === 'saved' || hasUnsavedChanges) && (
               <span className="text-xs text-muted-foreground">
-                {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved changes' : `Saved ${formatSaveTime(lastSaveTime)}`}
+                {isSaving ? 'Saving...' : saveStatus === 'saved'
+                  ? (lastSaveTime ? `Saved ${formatSaveTime(lastSaveTime)}` : 'Saved')
+                  : hasUnsavedChanges ? 'Unsaved changes' : ''}
               </span>
             )}
-            {saveError && (
-              <span className="text-xs text-destructive" title={saveError}>
-                Save failed
+            {saveStatus === 'retrying' && (
+              <span className="text-xs text-destructive">
+                {saveError || 'Not saved - retrying'}
               </span>
             )}
             <Button variant="ghost" onClick={saveDraft} disabled={isSaving || isReadOnly}>

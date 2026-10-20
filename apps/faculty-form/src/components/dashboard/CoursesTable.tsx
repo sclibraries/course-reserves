@@ -8,6 +8,7 @@ import { useCourseReservesStore } from '@/store/courseReservesStore';
 import type { CourseAssignment } from '@/store/courseAssignmentsStore';
 import type { Submission } from '@/components/SubmissionCard';
 import { getCourseTermLabel } from '@/utils/courseTermLabel';
+import { DraftDiscardButton } from './DraftDiscardButton';
 
 type CourseRow = {
   type: 'submission' | 'assignment';
@@ -73,9 +74,12 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
                   <TableCell className="text-sm text-muted-foreground">{submission.lastUpdated}</TableCell>
                   <TableCell className="text-right">
                     {submission.status === 'draft' && canEdit ? (
-                      <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
-                        <Edit className="h-4 w-4 mr-1" />Edit
-                      </Button>
+                      <div className="inline-flex gap-2">
+                        <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
+                          <Edit className="h-4 w-4 mr-1" />Edit
+                        </Button>
+                        <DraftDiscardButton submissionId={submission.id} />
+                      </div>
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => navigate(`/submission/${submission.id}`)}>
                         <Eye className="h-4 w-4 mr-1" />View

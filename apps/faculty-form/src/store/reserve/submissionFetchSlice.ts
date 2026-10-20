@@ -30,7 +30,11 @@ export const createSubmissionFetchSlice: ReserveSlice<
         .map((item: BackendSubmission) => mapSubmissionIndexItem(item));
 
       set((state) => {
-        const localDrafts = (state.reserves || []).filter((reserve) => reserve.id.startsWith('reserve-'));
+        const serverIds = new Set(backendReserves.map((reserve) => reserve.id));
+        const localDrafts = (state.reserves || []).filter((reserve) => (
+          reserve.id.startsWith('reserve-') &&
+          (!reserve.submissionUuid || !serverIds.has(reserve.submissionUuid))
+        ));
         const merged = [...localDrafts, ...backendReserves];
         const hasChanged = JSON.stringify(state.reserves) !== JSON.stringify(merged);
         if (!hasChanged && silent) return state;

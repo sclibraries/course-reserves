@@ -137,6 +137,7 @@ describe('useReserveStore characterization', () => {
     });
     expect(store.getState().reserves).toEqual([{
       id: 'submission-1',
+      submissionUuid: 'submission-1',
       courseCode: 'BIO 220',
       courseTitle: 'Ecology',
       section: '01',
@@ -170,6 +171,7 @@ describe('useReserveStore characterization', () => {
     const detail = await store.getState().fetchSubmissionDetails('submission-1');
     expect(detail).toEqual({
       id: 'submission-1',
+      submissionUuid: 'submission-1',
       courseCode: 'BIO 220',
       courseTitle: 'Ecology',
       section: '01',
@@ -210,6 +212,45 @@ describe('useReserveStore characterization', () => {
       state: { reserves: [reserve], _initialized: false },
       version: 1,
     }));
+  });
+
+  it('replaces a locally cached server draft with the latest index row', async () => {
+    const localDraft: CourseReserve = {
+      ...buildReserve(),
+      id: 'reserve-local',
+      status: 'draft',
+      submissionUuid: 'server-draft-1',
+      draftVersion: 1,
+      courseAssignmentId: 'BIO-101-01-202702',
+      academicPeriod: 'AP_202702',
+    };
+    store.setState({ reserves: [localDraft] });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{
+        submission_uuid: 'server-draft-1',
+        its_course_id: 'BIO-101-01-202702',
+        academic_period: 'AP_202702',
+        course_code: 'BIO 101',
+        course_title: 'Server course',
+        section: '01',
+        faculty_display_name: 'Faculty One',
+        term_code: '2027SP',
+        status: 'draft',
+        draft_version: 4,
+        updated_at: '2026-10-20T12:00:00.000Z',
+        folders: [],
+        unfoldered_items: [],
+      }] }),
+    }));
+
+    await store.getState().fetchSubmissions();
+
+    expect(store.getState().reserves).toHaveLength(1);
+    expect(store.getState().reserves[0]).toMatchObject({
+      id: 'server-draft-1', submissionUuid: 'server-draft-1', draftVersion: 4,
+      courseTitle: 'Server course',
+    });
   });
 
   it('migrates a legacy persisted reserve without changing its mixed order', async () => {

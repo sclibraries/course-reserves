@@ -17,6 +17,7 @@ export interface SubmissionEditorContextValue {
   // Draft saving
   saveDraft: () => void;
   isSaving: boolean;
+  saveStatus?: 'idle' | 'saving' | 'saved' | 'retrying' | 'conflict';
   hasUnsavedChanges: boolean;
   lastSaveTime: Date | null;
   saveError: string | null;

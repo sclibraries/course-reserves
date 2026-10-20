@@ -1,17 +1,14 @@
 import { toast } from "sonner";
 import type { CourseReserve, CourseFolder, CourseItem } from "../store/courseReservesStore";
-import { useAuthStore, getAuthHeaders } from "@/store/authStore";
+import { getAuthHeaders } from "@/store/authStore";
 import { useDraftStore } from "@/store/draftStore";
 import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { API_ENDPOINTS, DEFAULT_CONFIG } from "@/config/endpoints";
 import { validateReserveForSubmission } from "@/utils/reserveValidation";
 import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submissionUpdateErrors";
-import { withActingForFaculty } from "./actingForPayload";
-import { withRosterCourse } from "./rosterSubmissionPayload";
 import { getSubmissionErrorMessage } from "./submissionErrorMessage";
-import { transformItemForBackend } from './submissionResourcePayload';
-import { toPayloadOrder } from '@/utils/listLayout';
-import { getLayoutState } from '@/store/reserve/layoutState';
+import { buildSubmissionPayload } from './submissionPayload';
+import { useReserveStore } from '@/store/useReserveStore';
 
 type MixedContentItem = { 
   type: 'folder' | 'item'; 
@@ -28,7 +25,8 @@ export const createSubmissionHandlers = (
     ungroupedItems: CourseItem[];
     mixedContent: MixedContentItem[];
   },
-  setShowSubmitDialog: (show: boolean) => void
+  setShowSubmitDialog: (show: boolean) => void,
+  draftActions?: { submitDraft: (emailConfirmation: boolean) => Promise<string | null> },
 ) => {
   const handleSubmit = () => {
     setShowSubmitDialog(true);
@@ -45,74 +43,10 @@ export const createSubmissionHandlers = (
       return;
     }
 
-    const order = toPayloadOrder(getLayoutState(reserve));
-    const foldersWithItems = organizedContent.folders.map((folder) => {
-      return {
-        id: folder.id,
-        backendFolderId: folder.backendFolderId, // Preserve backend folder ID
-        title: folder.title,
-        description: folder.description,
-        position: order.folderOrder[folder.id] ?? 0,
-        isOpen: folder.isOpen,
-        items: folder.items,
-      };
-    });
-
-    const displayOrder = order.displayOrder;
-
-    // Resolve items to submit from current reserve (no override in this path)
-    const submittedItems = reserve.items;
-
-    // Transform items to backend format with proper display order and folder mapping
-    const transformedResources = submittedItems.map((item) => {
-      const folder = foldersWithItems.find(f => f.id === item.folderId);
-      const positionInfo = order.resourceOrder[item.id] || { displayOrder: 0, positionInFolder: null };
-      
-      return {
-        ...transformItemForBackend(item, positionInfo.displayOrder, folder?.title),
-        position_in_folder: positionInfo.positionInFolder
-      };
-    });
-
-    // Prepare submission data
-    const submissionData = {
-      reserveId: reserve.id,
-      courseInfo: {
-        courseCode: reserve.courseCode,
-        courseTitle: reserve.courseTitle,
-        section: reserve.section,
-        instructors: reserve.instructors,
-        term: reserve.term,
-        status: reserve.status,
-        lastUpdated: reserve.lastUpdated,
-      },
-      // Send both original items and transformed resources
-      items: submittedItems, // Keep for backward compatibility
-      resources: transformedResources, // New backend format
-      folders: foldersWithItems,
-      displayOrder,
-      metadata: {
-        totalItems: submittedItems.length,
-        totalFolders: foldersWithItems.length,
-        itemsInFolders: submittedItems.filter(item => item.folderId).length,
-        ungroupedItems: submittedItems.filter(item => !item.folderId).length,
-        reuseItems: transformedResources.filter(r => r.is_reuse).length,
-        newItems: transformedResources.filter(r => !r.is_reuse).length,
-        submittedAt: new Date().toISOString(),
-        emailConfirmation,
-        submittedBy: (() => {
-          const user = useAuthStore.getState().user;
-          return user ? {
-            id: user.id,
-            username: user.username,
-            fullName: user.full_name,
-            email: user.email,
-            role: user.role,
-            institution: user.institution,
-          } : null;
-        })(),
-      }
-    };
+    const submissionPayload = buildSubmissionPayload(reserve, emailConfirmation, organizedContent);
+    const foldersWithItems = submissionPayload.folders;
+    const submittedItems = submissionPayload.items;
+    const transformedResources = submissionPayload.resources;
 
     // Check if this is an update to an existing submission or a new submission
     const isUpdate = reserve.status === 'submitted';
@@ -120,9 +54,20 @@ export const createSubmissionHandlers = (
     // Submit to backend
     (async () => {
       try {
+        if (reserve.status === 'draft' && draftActions) {
+          if (!draftActions) throw new Error('Draft submission is unavailable');
+          const submissionUuid = await draftActions.submitDraft(emailConfirmation);
+          if (!submissionUuid) return;
+          toast.success('Submission completed successfully');
+          useDraftStore.getState().deleteDraft(reserve.id);
+          if (reserve.id.startsWith('reserve-')) useReserveStore.getState().deleteReserve(reserve.id);
+          navigate(`/submission/${submissionUuid}?refresh=true`);
+          return;
+        }
+
         let url: string;
         let method: string;
-        let payload: typeof submissionData | Record<string, unknown>;
+        let payload: Record<string, unknown>;
         
         if (isUpdate) {
           // UPDATE existing submission using PUT endpoint
@@ -167,7 +112,7 @@ export const createSubmissionHandlers = (
           // CREATE new submission using POST endpoint
           url = `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_SUBMIT_COMPLETE}`;
           method = 'POST';
-          payload = withActingForFaculty(withRosterCourse(submissionData, reserve));
+          payload = submissionPayload;
         }
         
         const res = await fetch(url, {

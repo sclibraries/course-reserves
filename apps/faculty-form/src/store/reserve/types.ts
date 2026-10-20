@@ -148,6 +148,8 @@ export interface CourseReserve {
   proxyCanEdit?: boolean;
 
   // Submission fields
+  submissionUuid?: string;
+  draftVersion?: number;
   submissionNotes?: string | null; // Faculty notes about the submission
   neededByDate?: string | null; // ISO date string when materials are needed
 }

@@ -14,9 +14,11 @@ export const API_ENDPOINTS = {
     COURSES: '/courses',
     FACULTY: '/faculty',
     FACULTY_SUBMISSION_INDEX: '/faculty-submission/index',
+    FACULTY_SUBMISSION_DRAFT: '/faculty-submission/draft',
     FACULTY_SUBMISSION_SUBMIT_COMPLETE: '/faculty-submission/submit-complete',
     FACULTY_SUBMISSION_UPDATE: '/faculty-submission/:uuid', // PUT endpoint for updates
     FACULTY_SUBMISSION_DELETE: '/faculty-submission/:uuid', // DELETE endpoint
+    FACULTY_SUBMISSION_SUBMIT: '/faculty-submission/:uuid/submit',
     GET_MERGED_RESOURCES: '/course/get-merged-resources',
     MOCK_LOGIN: '/faculty-submission/mock-login',
     // Communications endpoints
