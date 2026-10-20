@@ -2,6 +2,7 @@
 
 namespace app\services;
 
+use app\components\FolioCourseQuery;
 use app\models\CourseAssignments;
 use app\models\FacultyProxyPermission;
 use Yii;
@@ -52,8 +53,10 @@ class InstructorCourseListService
             if ($folioTerm && $parsedCourse['courseNumber']) {
                 $termId = $folioTerm['id'];
                 $courseNumber = $parsedCourse['courseNumber'];
-                $query = '(department.name=="SC*" and courseNumber=="' . $courseNumber
-                    . '" and courseListing.termId=="' . $termId . '") sortby name';
+                $query = '(department.name=="SC*" and ' . FolioCourseQuery::courseNumberAndTermClauses(
+                    $courseNumber,
+                    $termId
+                ) . ') sortby name';
                 $folioResult = $this->folioService->searchCourses($query);
 
                 if ($debug) {

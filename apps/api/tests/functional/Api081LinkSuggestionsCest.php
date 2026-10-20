@@ -126,8 +126,10 @@ class Api081LinkSuggestionsCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame('test-api081-manual-tst103', $this->response($I)['items'][0]['folio_course_listing_id']);
         Assert::assertSame('none', $this->response($I)['items'][0]['match']);
-        Assert::assertStringContainsString('courseNumber=="TST 103"', $this->folio->lastQuery);
-        Assert::assertStringContainsString('termId=="test-api081-term-1"', $this->folio->lastQuery);
+        Assert::assertSame(
+            '(courseNumber=="TST 103" and courseListing.termId=="test-api081-term-1")',
+            $this->folio->lastQuery
+        );
 
         $this->getCandidates($I, $uuid, $this->staffToken);
         $I->seeResponseCodeIs(200);
@@ -249,7 +251,10 @@ class Api081LinkSuggestionsCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame('exact', $this->response($I)['match']);
         Assert::assertSame($this->folio->transactionBeforeTermSearch, $this->folio->transactionDuringTermSearch);
-        Assert::assertStringContainsString('termId=="test-api081-term-1"', $this->folio->searchCalls[0]);
+        Assert::assertSame(
+            '(courseNumber=="TST 101" and courseListing.termId=="test-api081-term-1")',
+            $this->folio->searchCalls[0]
+        );
     }
 
     private function recheck(FunctionalTester $I, $uuid, $token)
@@ -437,12 +442,13 @@ class TestApi081FolioService
     {
         $this->searchCalls[] = $query;
         $this->lastQuery = $query;
+        $this->assertSupportedCourseQuery($query);
         if ($this->failCourses) {
             throw new \RuntimeException('synthetic FOLIO outage');
         }
 
         $courseNumber = $this->queryValue($query, 'courseNumber');
-        $termId = $this->queryValue($query, 'termId');
+        $termId = $this->queryValue($query, 'courseListing.termId');
         $results = [];
         foreach ($this->searchResults as $listing) {
             if ($courseNumber !== null && !$this->hasCourseNumber($listing, $courseNumber)) {
@@ -480,6 +486,16 @@ class TestApi081FolioService
             return null;
         }
         return stripcslashes($matches[1]);
+    }
+
+    private function assertSupportedCourseQuery($query)
+    {
+        preg_match_all('/([A-Za-z.]+)=="/', $query, $matches);
+        foreach ($matches[1] as $field) {
+            if (!in_array($field, ['courseNumber', 'courseListing.termId'], true)) {
+                throw new \RuntimeException('Unsupported CQL field: ' . $field);
+            }
+        }
     }
 
     private function hasCourseNumber(array $listing, $number)

@@ -64,7 +64,10 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         $item = $this->response($I)['items'][0];
         Assert::assertSame('exact', $item['match']);
         Assert::assertTrue($item['term_verified']);
-        Assert::assertStringContainsString('termId=="test-api080-term-1"', $this->folio->lastQuery);
+        Assert::assertSame(
+            '(courseNumber=="AFR 155" and courseListing.termId=="test-api080-term-1")',
+            $this->folio->lastQuery
+        );
     }
 
     public function linkResolvesMissingRosterTermAndRecordsItInTheEvent(FunctionalTester $I)

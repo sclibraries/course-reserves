@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use app\components\FolioCourseQuery;
+
 /** Produces FOLIO candidates using the shared roster-term resolver and match rule. */
 class SubmissionLinkCandidateService
 {
@@ -66,12 +68,10 @@ class SubmissionLinkCandidateService
 
     private function query($search, array $attributes)
     {
-        $query = '(courseNumber=="' . $this->escapeQuery($search) . '")';
-        if (!empty($attributes['roster_term_id'])) {
-            $query = '(' . substr($query, 1, -1) . ' and termId=="' .
-                $this->escapeQuery($attributes['roster_term_id']) . '")';
-        }
-        return $query;
+        return '(' . FolioCourseQuery::courseNumberAndTermClauses(
+            $search,
+            $attributes['roster_term_id'] ?? null
+        ) . ')';
     }
 
     private function formatResults($results, array $attributes)
@@ -127,10 +127,5 @@ class SubmissionLinkCandidateService
             ];
         }
         return $summary;
-    }
-
-    private function escapeQuery($value)
-    {
-        return str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$value);
     }
 }
