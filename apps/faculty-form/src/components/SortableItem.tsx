@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/StatusBadge";
-import { GripVertical, Edit2, ArrowUp, ArrowDown, FolderPlus, FolderMinus } from "lucide-react";
+import { GripVertical, Edit2, ArrowUp, ArrowDown, FolderPlus, FolderMinus, MoreHorizontal } from "lucide-react";
 import { DeleteItemDialog } from './DeleteItemDialog';
 import { ItemDropZones } from './ListDropZones';
 import type { CourseItem, CourseFolder } from "../store/courseReservesStore";
@@ -28,6 +28,7 @@ interface SortableItemProps {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onDelete?: (itemId: string) => void;
+  onViewFullRecord?: (dbId: string, an: string) => void;
   isDragDisabled?: boolean;
   availableFolders?: CourseFolder[];
   onAddToFolder?: (itemId: string, folderId: string) => void;
@@ -46,6 +47,7 @@ export const SortableItem = ({
   onMoveUp, 
   onMoveDown,
   onDelete,
+  onViewFullRecord,
   isDragDisabled = false,
   availableFolders = [],
   onAddToFolder,
@@ -75,6 +77,9 @@ export const SortableItem = ({
   };
   const isMoveUpDisabled = canMoveUp === undefined ? index <= 0 : !canMoveUp;
   const isMoveDownDisabled = canMoveDown === undefined ? index >= totalItems - 1 : !canMoveDown;
+  const viewFullRecord = () => {
+    if (item.eds?.dbId && item.eds.an) onViewFullRecord?.(item.eds.dbId, item.eds.an);
+  };
 
   return (
     <Card
@@ -162,6 +167,25 @@ export const SortableItem = ({
 
           {/* Action buttons */}
           <div className="flex flex-col gap-1">
+            {item.eds?.dbId && item.eds.an && onViewFullRecord && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Item actions"
+                    className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onSelect={viewFullRecord} className="cursor-pointer">
+                    View full record
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {/* Folder management buttons */}
             <div className="flex gap-1">
               {/* Add to folder or remove from folder */}

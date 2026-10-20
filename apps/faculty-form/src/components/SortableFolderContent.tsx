@@ -11,6 +11,7 @@ interface SortableFolderContentProps {
   newItemIds: string[];
   onEditItem: (item: CourseItem) => void;
   onDeleteItem: (itemId: string) => void;
+  onViewFullRecord?: (dbId: string, an: string) => void;
   onRemoveItemFromFolder: (itemId: string) => void;
   onMoveItemInFolder: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
   canMoveItemUp: (itemId: string) => boolean;
@@ -26,6 +27,7 @@ export function SortableFolderContent({
   newItemIds,
   onEditItem,
   onDeleteItem,
+  onViewFullRecord,
   onRemoveItemFromFolder,
   onMoveItemInFolder,
   canMoveItemUp,
@@ -54,6 +56,7 @@ export function SortableFolderContent({
                     canMoveDown={canMoveItemDown(item.id)}
                     onEdit={onEditItem}
                     onDelete={onDeleteItem}
+                    onViewFullRecord={onViewFullRecord}
                     onMoveUp={() => onMoveItemInFolder(folder.id, item.id, 'up')}
                     onMoveDown={() => onMoveItemInFolder(folder.id, item.id, 'down')}
                     availableFolders={[]}

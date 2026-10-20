@@ -27,6 +27,7 @@ interface SortableFolderProps {
   index: number;
   onEditItem: (item: CourseItem) => void;
   onDeleteItem: (itemId: string) => void;
+  onViewFullRecord?: (dbId: string, an: string) => void;
   onUpdateFolder: (folderId: string, updates: Partial<Pick<CourseFolder, 'title' | 'description' | 'isOpen'>>) => void;
   onDeleteFolder: (folderId: string) => void;
   onToggleFolder: (folderId: string) => void;
@@ -49,6 +50,7 @@ export const SortableFolder = ({
   index,
   onEditItem,
   onDeleteItem,
+  onViewFullRecord,
   onUpdateFolder,
   onDeleteFolder,
   onToggleFolder,
@@ -270,6 +272,7 @@ export const SortableFolder = ({
         newItemIds={newItemIds}
         onEditItem={onEditItem}
         onDeleteItem={onDeleteItem}
+        onViewFullRecord={onViewFullRecord}
         onRemoveItemFromFolder={onRemoveItemFromFolder}
         onMoveItemInFolder={onMoveItemInFolder}
         canMoveItemUp={canMoveItemUp}

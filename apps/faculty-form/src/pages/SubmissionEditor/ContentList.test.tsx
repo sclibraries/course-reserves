@@ -1,12 +1,20 @@
 import { act, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseReserve } from '@/store/courseReservesStore';
+import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import { retrieveDiscoveryRecord } from '@/services/discoverySearchService';
 import { filterContentBySearch } from '@/utils/contentSearch';
 import { useOrganizedContent } from '@/hooks/useContentOrganization';
 import SubmissionEditorContext, { type SubmissionEditorContextValue } from './SubmissionEditorContext';
 import ContentList from './ContentList';
+import AddMaterialsPage from '@/pages/AddMaterials/AddMaterialsPage';
+
+vi.mock('@/services/discoverySearchService', () => ({
+  retrieveDiscoveryRecord: vi.fn(),
+  searchDiscovery: vi.fn(),
+}));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,7 +30,10 @@ const reserve: CourseReserve = {
     { id: 'loose-first', title: 'First loose book', materialType: 'book', status: 'draft' },
     { id: 'folder-first', title: 'First inside', materialType: 'book', status: 'draft', folderId: 'folder-1' },
     { id: 'folder-target', title: 'Target chapter', materialType: 'chapter', status: 'draft', folderId: 'folder-1' },
-    { id: 'loose-target', title: 'Target reader', materialType: 'article', status: 'draft' },
+    {
+      id: 'loose-target', title: 'Target reader', materialType: 'article', status: 'draft',
+      eds: { dbId: 'synthetic-database', an: 'synthetic-an', plink: 'https://example.test/record' },
+    },
   ],
   folders: [{ id: 'folder-1', title: 'Unit One', isOpen: true, itemIds: ['folder-first', 'folder-target'] }],
   layout: [
@@ -71,12 +82,19 @@ const editorContext: SubmissionEditorContextValue = {
 describe('SubmissionEditor ContentList', () => {
   let container: HTMLDivElement | null = null;
   let root: Root | null = null;
+  let originalWidth: number;
+
+  beforeEach(() => {
+    originalWidth = window.innerWidth;
+    vi.clearAllMocks();
+  });
 
   afterEach(() => {
     act(() => root?.unmount());
     container?.remove();
     container = null;
     root = null;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
   });
 
   it('keeps a search box without sort or filter controls', () => {
@@ -130,14 +148,105 @@ describe('SubmissionEditor ContentList', () => {
     expect(container?.textContent).not.toContain('First loose book');
   });
 
-  function renderList() {
+  it('loads an EDS full record from a read-only list and closes without changing the search', async () => {
+    vi.mocked(retrieveDiscoveryRecord).mockResolvedValue(fullRecord);
+    renderList({ isReadOnly: true, initialSearchQuery: 'Target reader' });
+
+    const triggers = container!.querySelectorAll('[role="button"][aria-label="Item actions"]');
+    expect(triggers).toHaveLength(1);
+    await openItemMenu(triggers[0] as HTMLElement);
+    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
+      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
+    expect(viewAction).toBeTruthy();
+
+    await act(async () => {
+      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(retrieveDiscoveryRecord).toHaveBeenCalledWith('synthetic-database', 'synthetic-an');
+    const dialog = document.body.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Full catalog record title');
+    expect(dialog?.textContent).not.toContain('Add to my list');
+
+    const closeButton = Array.from(dialog!.querySelectorAll('button'))
+      .find((button) => button.querySelector('.sr-only')?.textContent === 'Close');
+    expect(closeButton).toBeTruthy();
+    act(() => closeButton?.click());
+
+    expect(container?.querySelector<HTMLInputElement>('input[aria-label="Search materials"]')?.value)
+      .toBe('Target reader');
+    expect(container?.textContent).toContain('Target reader');
+  });
+
+  it('uses the record route on narrow screens and Back returns to the main list', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    vi.mocked(retrieveDiscoveryRecord).mockResolvedValue(fullRecord);
+    renderList({ isReadOnly: true });
+
+    const trigger = container!.querySelector<HTMLElement>('[role="button"][aria-label="Item actions"]');
+    expect(trigger).toBeTruthy();
+    await openItemMenu(trigger!);
+    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
+      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
+    await act(async () => {
+      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(locationText()).toContain('/submission/reserve-1/edit/add/record/synthetic-database/synthetic-an');
+    expect(locationText()).toContain('returnTo=list');
+    expect(document.body.textContent).toContain('Full catalog record title');
+    expect(document.body.textContent).not.toContain('Add materials is unavailable');
+    expect(Array.from(document.body.querySelectorAll('button')).some((button) => button.textContent?.includes('Back to my list')))
+      .toBe(true);
+
+    const backButton = Array.from(document.body.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Back to my list'));
+    act(() => backButton?.click());
+
+    expect(locationText()).toContain('/submission/reserve-1/edit');
+    expect(container?.textContent).toContain('Target reader');
+  });
+
+  it('returns to the main list from the mobile record error state', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    vi.mocked(retrieveDiscoveryRecord).mockRejectedValue(new Error('Catalog unavailable'));
+    renderList({ isReadOnly: true });
+
+    const trigger = container!.querySelector<HTMLElement>('[role="button"][aria-label="Item actions"]');
+    await openItemMenu(trigger!);
+    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
+      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
+    await act(async () => {
+      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.textContent).toContain('Catalog unavailable');
+    const backButtons = Array.from(document.body.querySelectorAll('button'))
+      .filter((button) => button.textContent?.trim().startsWith('Back'));
+    act(() => backButtons[backButtons.length - 1]?.click());
+
+    expect(locationText()).toContain('/submission/reserve-1/edit');
+    expect(locationText()).not.toContain('/add/record/');
+  });
+
+  function renderList(options: { isReadOnly?: boolean; initialSearchQuery?: string } = {}) {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
     act(() => root?.render(
-      <MemoryRouter>
-        <SubmissionEditorContext.Provider value={editorContext}>
-          <SearchHarness />
+      <MemoryRouter initialEntries={['/submission/reserve-1/edit']}>
+        <SubmissionEditorContext.Provider value={{ ...editorContext, isReadOnly: options.isReadOnly || false }}>
+          <Routes>
+            <Route path="/submission/:id/edit" element={<SearchHarness
+              isReadOnly={options.isReadOnly || false}
+              initialSearchQuery={options.initialSearchQuery}
+            />} />
+            <Route path="/submission/:id/edit/add/record/:dbId/:an" element={<><AddMaterialsPage /><LocationProbe /></>} />
+          </Routes>
         </SubmissionEditorContext.Provider>
       </MemoryRouter>
     ));
@@ -154,8 +263,19 @@ describe('SubmissionEditor ContentList', () => {
   }
 });
 
-function SearchHarness() {
-  const [searchQuery, setSearchQuery] = useState('');
+const fullRecord: DiscoverySearchResult = {
+  id: 'synthetic-an',
+  dbId: 'synthetic-database',
+  title: 'Full catalog record title',
+  authors: ['Synthetic Author'],
+  publicationType: 'Book',
+  database: 'Synthetic Catalog',
+  pLink: 'https://example.test/full-record',
+  hasFullText: false,
+};
+
+function SearchHarness({ isReadOnly, initialSearchQuery = '' }: { isReadOnly: boolean; initialSearchQuery?: string }) {
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const organizedContent = useOrganizedContent(reserve);
   const filteredContent = useMemo(
     () => filterContentBySearch(organizedContent, searchQuery),
@@ -163,12 +283,43 @@ function SearchHarness() {
   );
 
   return (
-    <ContentList
-      organizedContent={organizedContent}
-      filteredContent={filteredContent}
-      searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
-      isSearching={searchQuery.trim().length > 0}
-    />
+    <>
+      {isReadOnly ? (
+        <fieldset disabled>
+          <ContentList
+            organizedContent={organizedContent}
+            filteredContent={filteredContent}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            isSearching={searchQuery.trim().length > 0}
+          />
+        </fieldset>
+      ) : (
+        <ContentList
+          organizedContent={organizedContent}
+          filteredContent={filteredContent}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          isSearching={searchQuery.trim().length > 0}
+        />
+      )}
+      <LocationProbe />
+    </>
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="current-location">{location.pathname}{location.search}</output>;
+}
+
+function locationText() {
+  return document.querySelector('[data-testid="current-location"]')?.textContent || '';
+}
+
+async function openItemMenu(trigger: HTMLElement) {
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    await Promise.resolve();
+  });
 }

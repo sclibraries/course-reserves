@@ -1,14 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DiscoveryFilterBar from '@/components/discovery/DiscoveryFilterBar';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
-import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { useDiscoverySearch } from '@/hooks/useDiscoverySearch';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useSelection } from '@/hooks/useSelection';
+import { useOpenDiscoveryRecord } from '@/hooks/useOpenDiscoveryRecord';
 import { useOnEscape } from './useOnEscape';
 import { useDiscoveryResultActions } from './useDiscoveryResultActions';
 
@@ -33,7 +33,17 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
   const sectionRef = useRef<HTMLElement>(null);
   const resultsPaneRef = useRef<HTMLDivElement>(null);
   const recordPaneRef = useRef<HTMLDivElement>(null);
+  const returnToList = searchParams.get('returnTo') === 'list';
   const isSplitView = !showRecordRoute && Boolean(selectedId) && search.results.length > 0;
+  const selectRecord = useCallback((selectedRecord: { dbId: string; an: string }) => {
+    if (recordPaneRef.current) recordPaneRef.current.scrollTop = 0;
+    void loadRecord(selectedRecord.dbId, selectedRecord.an);
+  }, [loadRecord]);
+  const openRecord = useOpenDiscoveryRecord({
+    submissionId: id,
+    tab: 'search',
+    onOpenInline: selectRecord,
+  });
 
   useEffect(() => setDraftQuery(search.query), [search.query]);
   useEffect(() => {
@@ -91,23 +101,14 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     event.preventDefault();
     search.setQuery(draftQuery);
   };
-  const selectRecord = (dbId: string, an: string) => {
-    if (recordPaneRef.current) recordPaneRef.current.scrollTop = 0;
-    void loadRecord(dbId, an);
-  };
-  const openRecord = (result: DiscoverySearchResult) => {
-    if (window.innerWidth < 768) {
-      const params = new URLSearchParams(searchParams);
-      params.set('tab', 'search');
-      navigate(`/submission/${id}/edit/add/record/${encodeURIComponent(result.dbId)}/${encodeURIComponent(result.id)}?${params.toString()}`);
-      return;
-    }
-    selectRecord(result.dbId, result.id);
-  };
   const addFullRecord = () => {
     if (record) addResult(record);
   };
   const backToSearch = () => {
+    if (returnToList) {
+      navigate(`/submission/${id}/edit`);
+      return;
+    }
     const params = new URLSearchParams(searchParams);
     params.set('tab', 'search');
     navigate(`/submission/${id}/edit/add?${params.toString()}`);
@@ -149,7 +150,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
                   result={result}
                   isDuplicate={isDuplicate(result)}
                   isSelected={selectedId === result.id}
-                  onOpenRecord={() => openRecord(result)}
+                  onOpenRecord={() => openRecord({ dbId: result.dbId, an: result.id })}
                   onAdd={() => addResult(result)}
                 />
               ))}
@@ -173,7 +174,8 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
               error={error}
               isRoute={showRecordRoute}
               onBack={showRecordRoute ? backToSearch : clearSelection}
-              onAdd={record && !isDuplicate(record) ? addFullRecord : undefined}
+              backLabel={returnToList ? 'Back to my list' : undefined}
+              onAdd={record && !returnToList && !isDuplicate(record) ? addFullRecord : undefined}
             />
           </div>
         )}

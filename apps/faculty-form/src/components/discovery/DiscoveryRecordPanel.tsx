@@ -8,11 +8,12 @@ interface DiscoveryRecordPanelProps {
   error?: string | null;
   isRoute?: boolean;
   onBack?: () => void;
+  backLabel?: string;
   onAdd?: () => void;
   addLabel?: string;
 }
 
-export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
+export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, backLabel = 'Back to results', onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
   const closeButton = !isRoute && onBack && (
     <div className="flex justify-end">
       <Button variant="ghost" size="icon" aria-label="Close full record" onClick={onBack}>
@@ -32,7 +33,7 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
   if (error) {
     return (
       <div className="space-y-4 rounded-md border border-destructive/40 p-6">
-        {isRoute && <Button variant="ghost" className="mb-4 px-0" onClick={onBack}>Back to results</Button>}
+        {isRoute && onBack && <Button variant="ghost" className="mb-4 px-0" onClick={onBack}>{backLabel}</Button>}
         {closeButton}
         <p className="whitespace-pre-line text-sm text-destructive">{error}</p>
       </div>
@@ -55,7 +56,7 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
 
   return (
     <article aria-label="Full record" className="space-y-4 rounded-md border bg-background p-5">
-      {isRoute && <Button variant="ghost" className="px-0" onClick={onBack}>Back to results</Button>}
+      {isRoute && onBack && <Button variant="ghost" className="px-0" onClick={onBack}>{backLabel}</Button>}
       {closeButton}
       <div>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{record.publicationType}</p>

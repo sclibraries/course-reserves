@@ -18,10 +18,15 @@ export default function AddMaterialsPage() {
   const { dbId, an } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const isRecordRoute = Boolean(dbId && an);
+  const returnToList = isRecordRoute && searchParams.get('returnTo') === 'list';
   const tab = validTab(searchParams.get('tab'));
 
   const navigateBack = () => {
     if (isRecordRoute) {
+      if (returnToList) {
+        navigate(`/submission/${id}/edit`);
+        return;
+      }
       const params = new URLSearchParams(searchParams);
       params.set('tab', tab);
       navigate(`/submission/${id}/edit/add?${params.toString()}`, { state: location.state });
@@ -41,12 +46,12 @@ export default function AddMaterialsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-4 border-b pb-4">
         <Button variant="ghost" className="px-0" onClick={navigateBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />{isRecordRoute ? 'Back to results' : 'Back to my list'}
+          <ArrowLeft className="mr-2 h-4 w-4" />{returnToList ? 'Back to my list' : isRecordRoute ? 'Back to results' : 'Back to my list'}
         </Button>
         <h1 className="text-xl font-semibold">{reserve.courseCode} · {reserve.courseTitle}</h1>
       </div>
 
-      {isReadOnly ? (
+      {isReadOnly && !returnToList ? (
         <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           Add materials is unavailable while this submission is locked.
         </div>

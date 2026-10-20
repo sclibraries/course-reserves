@@ -1,6 +1,11 @@
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
+import { useSelection } from '@/hooks/useSelection';
+import { useOpenDiscoveryRecord } from '@/hooks/useOpenDiscoveryRecord';
 import {
   DndContext,
   KeyboardSensor,
@@ -55,6 +60,25 @@ export default function ContentList({
     moveFolderPosition,
   } = useSubmissionEditorContext();
   const navigate = useNavigate();
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+  const { record, loading, error, loadRecord, clearSelection } = useSelection();
+  const openRecordDialog = useCallback((reference: { dbId: string; an: string }) => {
+    setRecordDialogOpen(true);
+    void loadRecord(reference.dbId, reference.an);
+  }, [loadRecord]);
+  const openDiscoveryRecord = useOpenDiscoveryRecord({
+    submissionId: id,
+    tab: 'search',
+    returnToList: true,
+    onOpenInline: openRecordDialog,
+  });
+  const openRecordFromList = useCallback((dbId: string, an: string) => {
+    openDiscoveryRecord({ dbId, an });
+  }, [openDiscoveryRecord]);
+  const closeRecordDialog = useCallback((open: boolean) => {
+    setRecordDialogOpen(open);
+    if (!open) clearSelection();
+  }, [clearSelection]);
   const newItemIds = addedMaterials.map((item) => item.id);
   const layout = getLayoutState(reserve);
   const itemPositionsByFolderId = new Map(organizedContent.folders.map((folder) => [
@@ -148,6 +172,7 @@ export default function ContentList({
                       <SortableFolder
                         key={contentItem.folder.id}
                         folder={contentItem.folder}
+                        onViewFullRecord={openRecordFromList}
                         index={contentItem.position}
                         onEditItem={itemHandlers.handleEditItem}
                         onDeleteItem={itemHandlers.handleDeleteItem}
@@ -175,6 +200,7 @@ export default function ContentList({
                     <SortableItem
                       key={contentItem.item.id}
                       item={contentItem.item}
+                      onViewFullRecord={openRecordFromList}
                       isNew={addedMaterials.some((added) => added.id === contentItem.item.id)}
                       index={contentItem.position}
                       totalItems={totalDisplayedItems}
@@ -196,6 +222,13 @@ export default function ContentList({
           </DndContext>
         </div>
       )}
+      <Dialog open={recordDialogOpen} onOpenChange={closeRecordDialog}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogTitle className="sr-only">Full catalog record</DialogTitle>
+          <DialogDescription className="sr-only">Catalog details for the selected item.</DialogDescription>
+          <DiscoveryRecordPanel record={record} loading={loading} error={error} />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

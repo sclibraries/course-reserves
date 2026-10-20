@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
+import { useOpenDiscoveryRecord, type OpenDiscoveryRecordOptions } from '@/hooks/useOpenDiscoveryRecord';
 import { useSelection } from '@/hooks/useSelection';
 import { searchDiscovery } from '@/services/discoverySearchService';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
@@ -34,6 +35,16 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const { id, addedItemsByCitation, isWrittenDuplicate, isResultDuplicate, addAsWritten, addMatch, undoAddedMaterial } =
     usePasteCitationActions(workspace, setWorkspace);
   const { record, loading, error: recordError, loadRecord, clearSelection } = useSelection();
+  const selectRecord = useCallback((selectedRecord: { dbId: string; an: string }, options: OpenDiscoveryRecordOptions) => {
+    if (!options.citationId) return;
+    setActiveCitationId(options.citationId);
+    void loadRecord(selectedRecord.dbId, selectedRecord.an);
+  }, [loadRecord]);
+  const openDiscoveryRecord = useOpenDiscoveryRecord({
+    submissionId: id,
+    tab: 'paste',
+    onOpenInline: selectRecord,
+  });
   const routeCitationId = searchParams.get('citation') || undefined;
   const selectedCitationId = isRecordRoute ? routeCitationId : activeCitationId;
   const hasRecordPanel = !isRecordRoute && Boolean(activeCitationId) && window.innerWidth >= 768;
@@ -99,18 +110,10 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     }));
   };
 
-  const openRecord = (citationId: string, result: DiscoverySearchResult) => {
-    if (window.innerWidth < 768) {
-      const params = new URLSearchParams(searchParams);
-      params.set('tab', 'paste');
-      params.set('citation', citationId);
-      const recordPath = '/submission/' + id + '/edit/add/record/' + encodeURIComponent(result.dbId) + '/' + encodeURIComponent(result.id) + '?' + params.toString();
-      navigate(recordPath, { state: { pasteWorkspace: workspace, pasteText } });
-      return;
-    }
-    setActiveCitationId(citationId);
-    void loadRecord(result.dbId, result.id);
-  };
+  const openRecord = (citationId: string, result: DiscoverySearchResult) => openDiscoveryRecord(
+    { dbId: result.dbId, an: result.id },
+    { citationId, navigationState: { pasteWorkspace: workspace, pasteText } },
+  );
 
   const backToPaste = (nextWorkspace = workspace) => {
     const params = new URLSearchParams(searchParams);
