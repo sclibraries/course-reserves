@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Form, FormGroup, Input, Label } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage, sortQueueItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
-import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
+import useMutation from '../../../../hooks/admin/useMutation';
 import QueueItemList from './QueueItemList';
 
 function ClaimQueue() {
@@ -10,22 +10,21 @@ function ClaimQueue() {
   const [count, setCount] = useState(0);
   const [filters, setFilters] = useState({ term: '', type: '' });
   const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState('');
-  const [error, setError] = useState('');
+  const { pending: claiming, error, setError, run } = useMutation();
 
   const loadQueue = useCallback(async (nextFilters, preserveError = false) => {
     setLoading(true);
     if (!preserveError) setError('');
     try {
       const result = await claimsApi.getQueue({ ...nextFilters, page: 1 });
-      setItems(sortQueueItems(excludeDraftWorkflowItems(result?.items || [])));
-      setCount(Number(result?.count) || 0);
+      setItems(sortQueueItems(result.items));
+      setCount(Number(result.count) || 0);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => { loadQueue({ term: '', type: '' }); }, [loadQueue]);
 
@@ -36,20 +35,15 @@ function ClaimQueue() {
 
   const handleClaim = async (item) => {
     const key = `${item.kind}/${item.id}`;
-    setClaiming(key);
-    setError('');
-    try {
-      await claimsApi.claimItem(item.kind, item.id);
-      await loadQueue(filters);
-    } catch (requestError) {
-      const message = getClaimsErrorMessage(requestError);
+    await run(() => claimsApi.claimItem(item.kind, item.id), {
+      pendingKey: key,
+      reload: () => loadQueue(filters),
+      onError: async (requestError) => {
       if (requestError?.payload?.error_code === 'already_claimed') {
         await loadQueue(filters, true);
       }
-      setError(message);
-    } finally {
-      setClaiming('');
-    }
+      },
+    });
   };
 
   return (
@@ -81,7 +75,7 @@ function ClaimQueue() {
         loading={loading}
         error={error}
         emptyMessage="No unclaimed items match these filters."
-        claimingKey={claiming}
+        claimingKey={claiming || ''}
         onClaim={handleClaim}
       />
     </section>

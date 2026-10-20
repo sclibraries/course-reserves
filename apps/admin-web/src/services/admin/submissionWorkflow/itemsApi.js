@@ -241,7 +241,12 @@ export const itemsApi = {
       }
 
       const items = await response.json();
-      return items.map(item => formatClaimedItem(item));
+      return items.map((item) => ({
+        ...formatClaimedItem(item),
+        course_code: item.submission.course_code,
+        course_title: item.submission.course_title,
+        instructor_name: item.submission.faculty_display_name,
+      }));
     } catch (error) {
       console.error('Error getting claimed items:', error);
       throw error;

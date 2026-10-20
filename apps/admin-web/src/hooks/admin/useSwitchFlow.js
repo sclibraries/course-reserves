@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { getFlowErrorMessage } from '../../services/admin/workflowFlows/flowFormatters';
 import { workflowFlowsApi } from '../../services/admin/workflowFlows/workflowFlowsApi';
+import useMutation from './useMutation';
 
 function parseFlowId(value) {
   const numericId = Number(value);
@@ -13,10 +14,9 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
   const [flows, setFlows] = useState([]);
   const [selectedFlow, setSelectedFlow] = useState('');
   const [reason, setReason] = useState('');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const { pending, error, setError, run } = useMutation(getFlowErrorMessage);
 
-  const clearError = useCallback(() => setError(''), []);
+  const clearError = useCallback(() => setError(''), [setError]);
 
   const openSwitchFlow = useCallback(async () => {
     setOpen(true);
@@ -27,36 +27,30 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
     setLoading(true);
     try {
       const result = await workflowFlowsApi.getFlows();
-      setFlows(result?.flows || []);
+      setFlows(result.flows);
     } catch (requestError) {
       setError(getFlowErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
-  }, [clearItemError, flows.length, loading]);
+  }, [clearItemError, flows.length, loading, setError]);
 
   const submitSwitchFlow = useCallback(async () => {
     if (!selectedFlow || !reason.trim() || !canAct) return false;
 
-    setPending(true);
-    setError('');
-    try {
-      const result = await workflowFlowsApi.switchFlow(item.kind, item.id, {
+    const result = await run(() => workflowFlowsApi.switchFlow(item.kind, item.id, {
         flow_id: parseFlowId(selectedFlow),
         reason: reason.trim(),
-      });
-      onFlowStateChange?.(result);
-      setOpen(false);
-      setReason('');
-      await onChanged?.();
-      return true;
-    } catch (requestError) {
-      setError(getFlowErrorMessage(requestError));
-      return false;
-    } finally {
-      setPending(false);
-    }
-  }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, reason, selectedFlow]);
+      }), {
+      reload: onChanged,
+      onSuccess: (flow) => {
+        onFlowStateChange?.(flow);
+        setOpen(false);
+        setReason('');
+      },
+    });
+    return result !== null;
+  }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, reason, run, selectedFlow]);
 
   return {
     open, loading, flows, selectedFlow, reason, pending, error,

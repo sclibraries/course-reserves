@@ -81,14 +81,4 @@ describe('ClaimQueue', () => {
     expect(container.querySelector('[data-item-id="3"]')).toBeNull();
   });
 
-  it('does not render claim actions for a draft returned unexpectedly by the queue', async () => {
-    const draft = { ...items[0], id: 99907801, title: 'Synthetic draft item', submission_status: 'draft' };
-    mocks.getQueue.mockResolvedValueOnce({ items: [draft], count: 1 });
-
-    await renderQueue();
-
-    expect(container.querySelector('[data-item-id="99907801"]')).toBeNull();
-    expect(container.querySelector('button[aria-label="Claim Synthetic draft item"]')).toBeNull();
-  });
-
 });

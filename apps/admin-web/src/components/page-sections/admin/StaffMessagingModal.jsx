@@ -12,17 +12,12 @@ import {
   ModalFooter,
   Button,
   Form,
-  FormGroup,
-  Label,
-  Input,
-  ListGroup,
-  ListGroupItem,
   Spinner,
-  Alert
 } from 'reactstrap';
-import { FaComment, FaPaperPlane, FaTimes, FaAt, FaExclamationCircle } from 'react-icons/fa';
+import { FaComment, FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
+import StaffMessageFields from './StaffMessageFields';
 import './StaffMessagingModal.css';
 
 const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
@@ -143,7 +138,7 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
     setSending(true);
     try {
       // Get numeric submission_id from item - API requires numeric ID, not UUID
-      const submissionId = item.submission_id || item.submission?.submission_id || item.submission?.id;
+      const submissionId = item.submission_id;
       
       if (!submissionId) {
         console.error('Item structure:', item);
@@ -191,182 +186,31 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
       
       <Form onSubmit={handleSubmit}>
         <ModalBody>
-          <Alert color="info" className="mb-3">
-            <small>
-              <strong>Tip:</strong> Use <code>@username</code> to mention staff members. 
-              Messages are visible to all staff by default.
-            </small>
-          </Alert>
-
-          {/* Subject (optional) */}
-          <FormGroup>
-            <Label for="subject">Subject (optional)</Label>
-            <Input
-              id="subject"
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Brief subject line"
-            />
-          </FormGroup>
-
-          {/* Message */}
-          <FormGroup className="position-relative">
-            <Label for="message">
-              Message <span className="text-danger">*</span>
-            </Label>
-            <Input
-              id="message"
-              type="textarea"
-              innerRef={textareaRef}
-              value={message}
-              onChange={handleMessageChange}
-              rows={6}
-              placeholder="Type your message here... Use @username to mention staff"
-              required
-            />
-            
-            {/* @Mention Autocomplete Dropdown */}
-            {showMentions && (
-              <div className="mention-dropdown">
-                {searchingStaff ? (
-                  <div className="mention-loading">
-                    <Spinner size="sm" /> Searching...
-                  </div>
-                ) : staffUsers.length > 0 ? (
-                  <ListGroup flush>
-                    {staffUsers.map((user) => (
-                      <ListGroupItem
-                        key={user.id}
-                        action
-                        onClick={() => insertMention(user.username)}
-                        className="mention-option"
-                      >
-                        <FaAt className="me-2 text-muted" />
-                        <strong>@{user.username}</strong>
-                        <span className="text-muted ms-2">- {user.full_name}</span>
-                      </ListGroupItem>
-                    ))}
-                  </ListGroup>
-                ) : mentionQuery.length >= 2 ? (
-                  <div className="mention-empty">No staff found matching &ldquo;{mentionQuery}&rdquo;</div>
-                ) : null}
-              </div>
-            )}
-          </FormGroup>
-
-          <div className="row">
-            {/* Category */}
-            <div className="col-md-4">
-              <FormGroup>
-                <Label for="category">Category</Label>
-                <Input
-                  id="category"
-                  type="select"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  <option value="question">Question</option>
-                  <option value="issue">Issue</option>
-                  <option value="update">Update</option>
-                  <option value="acquisitions">Acquisitions</option>
-                  <option value="cataloging">Cataloging</option>
-                  <option value="digitization">Digitization</option>
-                  <option value="copyright">Copyright</option>
-                  <option value="task">Task</option>
-                </Input>
-              </FormGroup>
-            </div>
-
-            {/* Priority */}
-            <div className="col-md-4">
-              <FormGroup>
-                <Label for="priority">Priority</Label>
-                <Input
-                  id="priority"
-                  type="select"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </Input>
-              </FormGroup>
-            </div>
-
-            {/* Visibility */}
-            <div className="col-md-4">
-              <FormGroup>
-                <Label for="visibility">Visibility</Label>
-                <Input
-                  id="visibility"
-                  type="select"
-                  value={visibility}
-                  onChange={(e) => setVisibility(e.target.value)}
-                >
-                  <option value="staff_only">Staff</option>
-                  <option value="faculty_visible">Faculty</option>
-                  <option value="assigned_only">Assignee</option>
-                </Input>
-              </FormGroup>
-            </div>
-          </div>
-
-          {/* Task Options */}
-          <FormGroup check className="mb-3">
-            <Input
-              id="isTask"
-              type="checkbox"
-              checked={isTask}
-              onChange={(e) => setIsTask(e.target.checked)}
-            />
-            <Label for="isTask" check>
-              <FaExclamationCircle className="me-1 text-warning" />
-              Create as Task (requires action)
-            </Label>
-          </FormGroup>
-
-          {isTask && (
-            <div className="task-options border p-3 rounded bg-light mb-3">
-              <div className="row">
-                <div className="col-md-6">
-                  <FormGroup>
-                    <Label for="taskAssignee">Assign To (username)</Label>
-                    <Input
-                      id="taskAssignee"
-                      type="text"
-                      value={taskAssignee}
-                      onChange={(e) => setTaskAssignee(e.target.value)}
-                      placeholder="username"
-                    />
-                  </FormGroup>
-                </div>
-                <div className="col-md-6">
-                  <FormGroup>
-                    <Label for="taskDueDate">Due Date</Label>
-                    <Input
-                      id="taskDueDate"
-                      type="date"
-                      value={taskDueDate}
-                      onChange={(e) => setTaskDueDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </FormGroup>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Item Context */}
-          <div className="item-context border-top pt-3">
-            <small className="text-muted">
-              <strong>Item:</strong> {item.title}<br />
-              <strong>Course:</strong> {item.submission?.course_code} - {item.submission?.course_title}<br />
-              <strong>Faculty:</strong> {item.submission?.faculty_display_name}
-            </small>
-          </div>
+          <StaffMessageFields
+            item={item}
+            subject={subject}
+            setSubject={setSubject}
+            message={message}
+            onMessageChange={handleMessageChange}
+            textareaRef={textareaRef}
+            showMentions={showMentions}
+            searchingStaff={searchingStaff}
+            staffUsers={staffUsers}
+            mentionQuery={mentionQuery}
+            insertMention={insertMention}
+            category={category}
+            setCategory={setCategory}
+            priority={priority}
+            setPriority={setPriority}
+            visibility={visibility}
+            setVisibility={setVisibility}
+            isTask={isTask}
+            setIsTask={setIsTask}
+            taskAssignee={taskAssignee}
+            setTaskAssignee={setTaskAssignee}
+            taskDueDate={taskDueDate}
+            setTaskDueDate={setTaskDueDate}
+          />
         </ModalBody>
         
         <ModalFooter>

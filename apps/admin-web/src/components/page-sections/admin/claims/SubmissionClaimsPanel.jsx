@@ -2,36 +2,29 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Button, Spinner } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
-import { formatSubmissionClaimItems, getClaimsErrorMessage } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { formatSubmissionClaimItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import useMutation from '../../../../hooks/admin/useMutation';
 import ClaimItemCard from './ClaimItemCard';
 
 function resultMessage(result) {
-  const claimed = result?.claimed || [];
-  const skipped = result?.skipped || [];
+  const claimed = result.claimed;
+  const skipped = result.skipped;
   const skippedNames = skipped.map((item) => item.claimed_by_display).filter(Boolean);
   const skippedBy = skippedNames.length ? ` (${skippedNames.join(', ')})` : '';
   return `Claimed ${claimed.length} item${claimed.length === 1 ? '' : 's'}. Skipped ${skipped.length} item${skipped.length === 1 ? '' : 's'}${skippedBy}.`;
 }
 
 function SubmissionClaimsPanel({ submission, items, currentUsername = '', onChanged }) {
-  const [claimingAll, setClaimingAll] = useState(false);
-  const [error, setError] = useState('');
+  const { pending: claimingAll, error, run } = useMutation();
   const [claimAllResult, setClaimAllResult] = useState(null);
   const claimItems = formatSubmissionClaimItems(items, submission);
 
   const handleClaimAll = async () => {
-    setClaimingAll(true);
-    setError('');
     setClaimAllResult(null);
-    try {
-      const result = await claimsApi.claimAllItems(submission.uuid);
-      setClaimAllResult(result);
-      await onChanged?.();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setClaimingAll(false);
-    }
+    await run(() => claimsApi.claimAllItems(submission.uuid), {
+      reload: onChanged,
+      onSuccess: setClaimAllResult,
+    });
   };
 
   return (

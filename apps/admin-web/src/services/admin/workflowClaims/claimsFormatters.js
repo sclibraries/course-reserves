@@ -16,7 +16,7 @@ export function getClaimsErrorMessage(error) {
   const draftErrorMessage = getDraftWorkflowErrorMessage(error);
   if (draftErrorMessage) return draftErrorMessage;
 
-  const payload = error?.payload || error?.data;
+  const payload = error?.payload;
   const code = payload?.error_code;
   if (code === 'already_claimed') {
     return `Already claimed by ${payload.claimed_by_display || 'another staff member'}.`;

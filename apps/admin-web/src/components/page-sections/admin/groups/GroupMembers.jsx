@@ -4,14 +4,14 @@ import { Alert, Button, Form, FormGroup, Input, Label, Spinner } from 'reactstra
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage } from '../../../../services/admin/workflowClaims/claimsFormatters';
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
+import useMutation from '../../../../hooks/admin/useMutation';
 
 function GroupMembers({ group }) {
   const [members, setMembers] = useState([]);
   const [staff, setStaff] = useState([]);
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const { pending, error, setError, run } = useMutation();
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
@@ -21,44 +21,28 @@ function GroupMembers({ group }) {
         staffGroupsApi.getMembers(group.id),
         claimsApi.getStaff(''),
       ]);
-      setMembers(memberResult?.members || memberResult?.items || []);
-      setStaff(staffResult?.items || []);
+      setMembers(memberResult.members);
+      setStaff(staffResult.items);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
-  }, [group.id]);
+  }, [group.id, setError]);
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
 
   const handleAdd = async (event) => {
     event.preventDefault();
     if (!username) return;
-    setPending(true);
-    setError('');
-    try {
-      await staffGroupsApi.addMember(group.id, username);
-      setUsername('');
-      await loadMembers();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setPending(false);
-    }
+    await run(() => staffGroupsApi.addMember(group.id, username), {
+      reload: loadMembers,
+      onSuccess: () => setUsername(''),
+    });
   };
 
   const handleRemove = async (memberUsername) => {
-    setPending(true);
-    setError('');
-    try {
-      await staffGroupsApi.removeMember(group.id, memberUsername);
-      await loadMembers();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setPending(false);
-    }
+    await run(() => staffGroupsApi.removeMember(group.id, memberUsername), { reload: loadMembers });
   };
 
   const memberUsernames = new Set(members.map((member) => member.username));

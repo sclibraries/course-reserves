@@ -2,42 +2,32 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Spinner } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { formatExpiry, getClaimsErrorMessage, sortMyClaimedItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
-import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
+import useMutation from '../../../../hooks/admin/useMutation';
 import ClaimItemSummary from './ClaimItemSummary';
 
 function MyClaimedItems() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [releasing, setReleasing] = useState('');
-  const [error, setError] = useState('');
+  const { pending: releasing, error, setError, run } = useMutation();
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const result = await claimsApi.getMyItems();
-      setItems(sortMyClaimedItems(excludeDraftWorkflowItems(result?.items || [])));
+      setItems(sortMyClaimedItems(result.items));
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
   const handleRelease = async (item) => {
     const key = `${item.kind}/${item.id}`;
-    setReleasing(key);
-    setError('');
-    try {
-      await claimsApi.releaseItem(item.kind, item.id);
-      await loadItems();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setReleasing('');
-    }
+    await run(() => claimsApi.releaseItem(item.kind, item.id), { pendingKey: key, reload: loadItems });
   };
 
   return (

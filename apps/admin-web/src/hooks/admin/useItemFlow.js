@@ -13,6 +13,12 @@ function useItemFlow({ item, onChanged }) {
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
 
+  const resetForm = useCallback(() => {
+    setSelectedOutcome(null);
+    setNotes('');
+    setReason('');
+  }, []);
+
   const loadFlow = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -41,9 +47,7 @@ function useItemFlow({ item, onChanged }) {
         buildStepResultBody(step, outcome, notes, reason),
       );
       setFlowState(result);
-      setSelectedOutcome(null);
-      setNotes('');
-      setReason('');
+      resetForm();
       await onChanged?.();
       return true;
     } catch (requestError) {
@@ -51,9 +55,7 @@ function useItemFlow({ item, onChanged }) {
       const message = getFlowErrorMessage(requestError);
       if (code === 'stale_step') {
         onStale?.();
-        setSelectedOutcome(null);
-        setNotes('');
-        setReason('');
+        resetForm();
         setNotice(message);
         await loadFlow();
       } else if (code === 'step_not_available_yet') {
@@ -65,7 +67,7 @@ function useItemFlow({ item, onChanged }) {
     } finally {
       setPending(false);
     }
-  }, [flowState, item.kind, item.id, loadFlow, onChanged]);
+  }, [flowState, item.kind, item.id, loadFlow, onChanged, resetForm]);
 
   const handleOutcome = useCallback((outcome) => {
     if (!flowState?.can_act) return;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Form, FormGroup, Input, Label, Spinner } from 'reactstrap';
 import { getClaimsErrorMessage } from '../../../../services/admin/workflowClaims/claimsFormatters';
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
+import useMutation from '../../../../hooks/admin/useMutation';
 import GroupMembers from './GroupMembers';
 
 function AdminGroups() {
@@ -10,8 +11,7 @@ function AdminGroups() {
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
   const [membersGroupId, setMembersGroupId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const { pending, error, setError, run } = useMutation();
   const [message, setMessage] = useState('');
 
   const loadGroups = useCallback(async () => {
@@ -19,7 +19,7 @@ function AdminGroups() {
     setError('');
     try {
       const result = await staffGroupsApi.getAllGroups();
-      const nextGroups = result?.groups || result?.items || [];
+      const nextGroups = result.groups;
       setGroups(nextGroups);
       setDrafts(Object.fromEntries(nextGroups.map((group) => [group.id, {
         name: group.name || '', description: group.description || '',
@@ -29,66 +29,40 @@ function AdminGroups() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
     if (!newGroup.name.trim()) return;
-    setPending(true);
-    setError('');
     setMessage('');
-    try {
-      await staffGroupsApi.createGroup({
+    await run(() => staffGroupsApi.createGroup({
         name: newGroup.name.trim(),
         ...(newGroup.description.trim() ? { description: newGroup.description.trim() } : {}),
-      });
-      setNewGroup({ name: '', description: '' });
-      setMessage('Group created.');
-      await loadGroups();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setPending(false);
-    }
+      }), { reload: loadGroups, onSuccess: () => {
+        setNewGroup({ name: '', description: '' });
+        setMessage('Group created.');
+      } });
   };
 
   const handleUpdate = async (event, groupId) => {
     event.preventDefault();
     const draft = drafts[groupId] || {};
     if (!draft.name?.trim()) return;
-    setPending(true);
-    setError('');
     setMessage('');
-    try {
-      await staffGroupsApi.updateGroup(groupId, {
+    await run(() => staffGroupsApi.updateGroup(groupId, {
         name: draft.name.trim(),
         ...(draft.description?.trim() ? { description: draft.description.trim() } : {}),
-      });
-      setMessage('Group updated.');
-      await loadGroups();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setPending(false);
-    }
+      }), { reload: loadGroups, onSuccess: () => setMessage('Group updated.') });
   };
 
   const handleDelete = async (group) => {
-    setPending(true);
-    setError('');
     setMessage('');
-    try {
-      await staffGroupsApi.deleteGroup(group.id);
+    await run(() => staffGroupsApi.deleteGroup(group.id), { reload: loadGroups, onSuccess: () => {
       if (membersGroupId === group.id) setMembersGroupId(null);
       setMessage('Group deleted.');
-      await loadGroups();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setPending(false);
-    }
+    } });
   };
 
   const updateDraft = (groupId, key, value) => {

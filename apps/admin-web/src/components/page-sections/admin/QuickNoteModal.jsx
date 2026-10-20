@@ -44,7 +44,7 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
     setSaving(true);
     try {
       // Get numeric submission_id from item - API requires numeric ID, not UUID
-      const submissionId = item.submission_id || item.submission?.submission_id || item.submission?.id;
+      const submissionId = item.submission_id;
       
       if (!submissionId) {
         console.error('Item structure:', item);

@@ -15,7 +15,7 @@ function MyGroups() {
     setError('');
     try {
       const result = await staffGroupsApi.getMyGroups();
-      setGroups(result?.groups || []);
+      setGroups(result.groups);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {

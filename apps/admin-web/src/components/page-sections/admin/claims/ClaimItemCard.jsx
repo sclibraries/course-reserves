@@ -4,58 +4,72 @@ import { Alert, Button, Form, FormGroup, Input, Label, Spinner } from 'reactstra
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage } from '../../../../services/admin/workflowClaims/claimsFormatters';
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
+import useLazyLoad from '../../../../hooks/admin/useLazyLoad';
+import useMutation from '../../../../hooks/admin/useMutation';
 import WorkflowTimeline from '../linking/WorkflowTimeline';
 import ClaimItemSummary from './ClaimItemSummary';
 import ItemFlowPanel from './ItemFlowPanel';
 
+function HandoffSelect({ id, label, name, value, onChange, placeholder, options, valueKey, labelKey, loading }) {
+  return (
+    <FormGroup>
+      <Label for={id}>{label}</Label>
+      {loading ? <Spinner size="sm" /> : (
+        <Input id={id} type="select" name={name} value={value} onChange={onChange}>
+          <option value="">{placeholder}</option>
+          {options.map((option) => (
+            <option key={option[valueKey]} value={option[valueKey]}>{option[labelKey]}</option>
+          ))}
+        </Input>
+      )}
+    </FormGroup>
+  );
+}
+
+HandoffSelect.propTypes = {
+  id: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string.isRequired,
+  options: PropTypes.arrayOf(PropTypes.object).isRequired,
+  valueKey: PropTypes.string.isRequired,
+  labelKey: PropTypes.string.isRequired,
+  loading: PropTypes.bool,
+};
+
 function ClaimItemCard({ item, currentUsername = '', onChanged }) {
-  const [pending, setPending] = useState('');
-  const [error, setError] = useState('');
+  const { pending, error, setError, run } = useMutation();
   const [handoffOpen, setHandoffOpen] = useState(false);
-  const [staff, setStaff] = useState([]);
-  const [staffLoading, setStaffLoading] = useState(false);
   const [toUsername, setToUsername] = useState('');
   const [handoffTargetType, setHandoffTargetType] = useState('person');
-  const [groups, setGroups] = useState([]);
-  const [groupsLoading, setGroupsLoading] = useState(false);
   const [toGroupId, setToGroupId] = useState('');
   const [takeoverOpen, setTakeoverOpen] = useState(false);
   const [takeoverReason, setTakeoverReason] = useState('');
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [timelineLoaded, setTimelineLoaded] = useState(false);
-  const [timelineLoading, setTimelineLoading] = useState(false);
-  const [timelineEvents, setTimelineEvents] = useState([]);
   const [timelineError, setTimelineError] = useState('');
   const [flowOpen, setFlowOpen] = useState(false);
+  const staff = useLazyLoad(async () => (await claimsApi.getStaff('')).items);
+  const groups = useLazyLoad(async () => (await staffGroupsApi.getGroupsForHandoff()).groups);
+  const timeline = useLazyLoad(async () => (await claimsApi.getItemTimeline(item.kind, item.id)).items);
 
   const isClaimed = Boolean(item.claimed_by);
   const isMine = Boolean(currentUsername && item.claimed_by === currentUsername);
-  const runAction = async (action, request) => {
-    setPending(action);
-    setError('');
-    try {
-      await request();
-      await onChanged?.();
-    } catch (requestError) {
-      setError(getClaimsErrorMessage(requestError));
-      if (requestError?.payload?.error_code === 'already_claimed') await onChanged?.();
-    } finally {
-      setPending('');
-    }
-  };
+  const runAction = (action, request) => run(request, {
+    pendingKey: action,
+    reload: onChanged,
+    onError: (requestError) => requestError?.payload?.error_code === 'already_claimed' && onChanged?.(),
+  });
 
   const openHandoff = async () => {
     setHandoffOpen(true);
     setError('');
-    if (staff.length) return;
-    setStaffLoading(true);
+    if (staff.loaded || staff.loading) return;
     try {
-      const result = await claimsApi.getStaff('');
-      setStaff(result?.items || []);
+      await staff.load();
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setStaffLoading(false);
     }
   };
 
@@ -70,15 +84,11 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
   const changeHandoffTargetType = async (event) => {
     const targetType = event.target.value;
     setHandoffTargetType(targetType);
-    if (targetType !== 'group' || groups.length || groupsLoading) return;
-    setGroupsLoading(true);
+    if (targetType !== 'group' || groups.loaded || groups.loading) return;
     try {
-      const result = await staffGroupsApi.getGroupsForHandoff();
-      setGroups(result?.groups || []);
+      await groups.load();
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
-    } finally {
-      setGroupsLoading(false);
     }
   };
 
@@ -91,17 +101,12 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
   const toggleTimeline = async () => {
     const nextOpen = !timelineOpen;
     setTimelineOpen(nextOpen);
-    if (!nextOpen || timelineLoaded) return;
-    setTimelineLoading(true);
+    if (!nextOpen || timeline.loaded) return;
     setTimelineError('');
     try {
-      const result = await claimsApi.getItemTimeline(item.kind, item.id);
-      setTimelineEvents(result?.items || []);
-      setTimelineLoaded(true);
+      await timeline.load();
     } catch (requestError) {
       setTimelineError(getClaimsErrorMessage(requestError));
-    } finally {
-      setTimelineLoading(false);
     }
   };
 
@@ -155,38 +160,32 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
             </Input>
           </FormGroup>
           {handoffTargetType === 'person' && (
-            <FormGroup>
-              <Label for={`handoff-staff-${item.kind}-${item.id}`}>Staff member</Label>
-              {staffLoading ? <Spinner size="sm" /> : (
-                <Input
-                  id={`handoff-staff-${item.kind}-${item.id}`}
-                  type="select"
-                  name="to_username"
-                  value={toUsername}
-                  onChange={(event) => setToUsername(event.target.value)}
-                >
-                  <option value="">Choose staff</option>
-                  {staff.map((person) => <option key={person.username} value={person.username}>{person.display_name}</option>)}
-                </Input>
-              )}
-            </FormGroup>
+            <HandoffSelect
+              id={`handoff-staff-${item.kind}-${item.id}`}
+              label="Staff member"
+              name="to_username"
+              value={toUsername}
+              onChange={(event) => setToUsername(event.target.value)}
+              placeholder="Choose staff"
+              options={staff.data}
+              valueKey="username"
+              labelKey="display_name"
+              loading={staff.loading}
+            />
           )}
           {handoffTargetType === 'group' && (
-            <FormGroup>
-              <Label for={`handoff-group-${item.kind}-${item.id}`}>Staff group</Label>
-              {groupsLoading ? <Spinner size="sm" /> : (
-              <Input
-                id={`handoff-group-${item.kind}-${item.id}`}
-                type="select"
-                name="to_group_id"
-                value={toGroupId}
-                onChange={(event) => setToGroupId(event.target.value)}
-              >
-                <option value="">Choose group</option>
-                {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-              </Input>
-              )}
-            </FormGroup>
+            <HandoffSelect
+              id={`handoff-group-${item.kind}-${item.id}`}
+              label="Staff group"
+              name="to_group_id"
+              value={toGroupId}
+              onChange={(event) => setToGroupId(event.target.value)}
+              placeholder="Choose group"
+              options={groups.data}
+              valueKey="id"
+              labelKey="name"
+              loading={groups.loading}
+            />
           )}
           <Button type="submit" data-action="handoff" disabled={!(handoffTargetType === 'group' ? toGroupId : toUsername) || Boolean(pending)}>
             Send handoff
@@ -221,9 +220,9 @@ function ClaimItemCard({ item, currentUsername = '', onChanged }) {
         </Button>
         {timelineOpen && (
           <div className="mt-2">
-            {timelineLoading ? <Spinner size="sm" aria-label="Loading item timeline" /> : (
+            {timeline.loading ? <Spinner size="sm" aria-label="Loading item timeline" /> : (
               <WorkflowTimeline
-                events={timelineEvents}
+                events={timeline.data}
                 error={timelineError}
                 title={`Item timeline: ${item.title}`}
                 id={`item-timeline-${item.kind}-${item.id}`}

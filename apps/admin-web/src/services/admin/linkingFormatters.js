@@ -21,7 +21,7 @@ export function formatCheckedAt(value) {
 }
 
 export function getLinkingErrorMessage(error, action) {
-  const payload = error?.payload || error?.data;
+  const payload = error?.payload;
   const code = payload?.error_code;
 
   if (code === 'not_exact_match') {

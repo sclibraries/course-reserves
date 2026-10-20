@@ -47,7 +47,7 @@ function LinkingPanel({ submission, items = [], onChanged = () => {} }) {
     setCandidateError('');
     try {
       const result = await submissionWorkflowService.getCandidates(submission.uuid, query || undefined);
-      const found = result.items || [];
+      const found = result.items;
       setCandidates(found);
       setCheckedAt(result.checked_at || null);
       setSelectedId((previous) => found.some((item) => candidateId(item) === previous)
@@ -64,7 +64,7 @@ function LinkingPanel({ submission, items = [], onChanged = () => {} }) {
     setTimelineError('');
     try {
       const result = await submissionWorkflowService.getTimeline(submission.uuid);
-      setEvents(result.items || []);
+      setEvents(result.items);
     } catch (error) {
       setTimelineError(error.message || 'Could not load the workflow timeline.');
     }

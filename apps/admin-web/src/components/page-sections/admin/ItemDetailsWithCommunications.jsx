@@ -63,7 +63,7 @@ const ItemDetailsWithCommunications = ({
   }, [refreshTrigger]);
 
   // Get submission ID for communications
-  const submissionId = item.submission_id || item.submission?.submission_id || item.submission?.id;
+  const submissionId = item.submission_id;
   
   // Debug log
   console.log('ItemDetailsWithCommunications - Item:', {

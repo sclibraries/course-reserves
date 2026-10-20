@@ -3,47 +3,41 @@ import PropTypes from 'prop-types';
 import { Button } from 'reactstrap';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import { getClaimsErrorMessage, sortQueueItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
-import { excludeDraftWorkflowItems } from '../../../../services/admin/workflowDrafts';
 import { staffGroupsApi } from '../../../../services/admin/staffGroupsApi';
+import useMutation from '../../../../hooks/admin/useMutation';
 import QueueItemList from '../claims/QueueItemList';
 
 function GroupQueue({ group, onBack }) {
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [claimingKey, setClaimingKey] = useState('');
-  const [error, setError] = useState('');
+  const { pending: claimingKey, error, setError, run } = useMutation();
 
   const loadQueue = useCallback(async (preserveError = false) => {
     setLoading(true);
     if (!preserveError) setError('');
     try {
       const result = await staffGroupsApi.getGroupQueue(group.id);
-      setItems(sortQueueItems(excludeDraftWorkflowItems(result?.items || [])));
-      setCount(Number(result?.count) || 0);
+      setItems(sortQueueItems(result.items));
+      setCount(Number(result.count) || 0);
     } catch (requestError) {
       setError(getClaimsErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
-  }, [group.id]);
+  }, [group.id, setError]);
 
   useEffect(() => { loadQueue(); }, [loadQueue]);
 
   const handleClaim = async (item) => {
     const key = `${item.kind}/${item.id}`;
-    setClaimingKey(key);
-    setError('');
-    try {
-      await claimsApi.claimItem(item.kind, item.id);
-      await loadQueue();
-    } catch (requestError) {
-      const message = getClaimsErrorMessage(requestError);
+    await run(() => claimsApi.claimItem(item.kind, item.id), {
+      pendingKey: key,
+      reload: loadQueue,
+      onError: async (requestError) => {
       if (requestError?.payload?.error_code === 'already_claimed') await loadQueue(true);
-      setError(message);
-    } finally {
-      setClaimingKey('');
-    }
+      },
+    });
   };
 
   return (
@@ -61,7 +55,7 @@ function GroupQueue({ group, onBack }) {
         loading={loading}
         error={error}
         emptyMessage="This group has no queued items."
-        claimingKey={claimingKey}
+        claimingKey={claimingKey || ''}
         onClaim={handleClaim}
       />
     </section>

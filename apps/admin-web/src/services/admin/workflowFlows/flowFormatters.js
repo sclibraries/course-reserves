@@ -18,7 +18,7 @@ const finishStateLabels = {
 };
 
 export function getFlowErrorCode(error) {
-  return (error?.payload || error?.data)?.error_code || '';
+  return error?.payload?.error_code || '';
 }
 
 export function getFlowErrorMessage(error) {
