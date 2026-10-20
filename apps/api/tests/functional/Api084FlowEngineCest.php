@@ -173,6 +173,26 @@ class Api084FlowEngineCest extends BaseFunctionalCest
         Assert::assertSame('unavailable', $summary['finish_state']);
     }
 
+    public function stepOutcomeCanFinishAtReasonRequiredFinishStep(FunctionalTester $I)
+    {
+        $flowId = $this->createFlow($I, $this->prefix . 'step finish flow', $this->stepFinishSteps());
+        $this->mapFlow($I, $flowId);
+        $item = $this->createItem('step-finish');
+        $this->claim($I, $item['id'], 'staff');
+        $this->getItemFlow($I, $item['id'], 'staff');
+
+        $this->postStep($I, $item['id'], 'start', 'cannot_get', 'staff');
+        $I->seeResponseCodeIs(400);
+        Assert::assertSame('reason_required', $this->response($I)['error_code']);
+
+        $this->postStep($I, $item['id'], 'start', 'cannot_get', 'staff', [
+            'reason' => 'Synthetic unavailable reason',
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('unavailable', $this->response($I)['finished']['finish_state']);
+        Assert::assertSame('Synthetic unavailable reason', $this->response($I)['finished']['reason']);
+    }
+
     public function flowVersionsStayPinnedAndSwitchKeepsOldHistory(FunctionalTester $I)
     {
         $oldFlowId = $this->createFlow($I, $this->prefix . 'old flow', $this->middleSteps('Version one middle'));
@@ -346,7 +366,7 @@ class Api084FlowEngineCest extends BaseFunctionalCest
                 'outcomes' => [
                     ['key' => 'yes', 'label' => 'Yes', 'next' => ['finish' => 'on_reserve']],
                     ['key' => 'no', 'label' => 'No', 'next' => ['handoff_group' => $groupName]],
-                    ['key' => 'cannot_get', 'label' => "We can't get this", 'next' => ['step' => 'unavailable']],
+                    ['key' => 'cannot_get', 'label' => "We can't get this", 'next' => ['finish' => 'unavailable']],
                 ],
             ],
             [
@@ -356,6 +376,27 @@ class Api084FlowEngineCest extends BaseFunctionalCest
             [
                 'key' => 'unavailable', 'kind' => 'finish', 'label' => 'Unavailable', 'help_text' => null,
                 'finish_state' => 'unavailable', 'reason_required' => true, 'outcomes' => [],
+            ],
+        ];
+    }
+
+    private function stepFinishSteps()
+    {
+        return [
+            [
+                'key' => 'start', 'kind' => 'question', 'label' => 'Can we get this?', 'help_text' => null,
+                'outcomes' => [
+                    ['key' => 'cannot_get', 'label' => "We can't get this", 'next' => ['step' => 'unavailable']],
+                    ['key' => 'can_get', 'label' => 'Yes', 'next' => ['finish' => 'available']],
+                ],
+            ],
+            [
+                'key' => 'unavailable', 'kind' => 'finish', 'label' => 'Unavailable', 'help_text' => null,
+                'finish_state' => 'unavailable', 'reason_required' => true, 'outcomes' => [],
+            ],
+            [
+                'key' => 'available', 'kind' => 'finish', 'label' => 'Available', 'help_text' => null,
+                'finish_state' => 'available_online', 'reason_required' => false, 'outcomes' => [],
             ],
         ];
     }
