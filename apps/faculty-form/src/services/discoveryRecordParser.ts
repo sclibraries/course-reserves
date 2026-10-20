@@ -22,7 +22,8 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
   const subjectList = subjects.length > 0 ? subjects : (bib?.Subjects || []).map((subject) => subject.SubjectFull);
   const url = cleanValues(record.Items?.URL?.[0]?.CleanData)[0];
   const relationUrls = findGroup(record.Items?.SrcInfo, /relation/i);
-  const holdings = record.Holdings?.[0]?.HoldingSimple?.CopyInformationList?.[0];
+  const holdings = record.Holdings?.flatMap((group) => group.HoldingSimple?.CopyInformationList || []) || [];
+  const firstHolding = holdings[0];
   const abstracts = cleanValues(record.Items?.Ab?.[0]?.CleanData);
   const publicationInfo = cleanValues(record.Items?.Src?.[0]?.CleanData)[0];
   const sourceType = record.pubType || 'Unknown';
@@ -42,8 +43,9 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
     url,
     fullTextUrl: links.find((link) => link.Url)?.Url,
     fullTextLinks: links,
-    callNumber: holdings?.ShelfLocator,
-    location: holdings?.Sublocation,
+    callNumber: firstHolding?.ShelfLocator,
+    location: firstHolding?.Sublocation,
+    holdings,
     database: record.DbLabel,
     pLink: record.PLink,
     languages: bib?.Languages?.map((language) => language.Text).filter(Boolean),
@@ -55,7 +57,7 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
     publisher: firstGroupValue(itemGroups, /publisher|publishing/i) || firstGroupValue(itemGroups, /^pub$/i),
     fileDescription: findGroup(record.Items?.SrcInfo, /file description/i),
     additionalUrls: typeof relationUrls === 'string' ? [relationUrls] : relationUrls,
-    hasFullText: links.some((link) => Boolean(link.Url)),
+    hasFullText: Boolean(record.FullText || record.PDF || record.HTML || links.some((link) => Boolean(link.Url))),
   };
 }
 

@@ -17,6 +17,7 @@ export type {
   DiscoverySearchResponse,
   EBSCOFullTextLink,
   EBSCORecord,
+  EDSHoldingCopy,
   FieldQuery,
   SearchLimiters,
 } from './discoverySearchTypes';

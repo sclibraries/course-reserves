@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
     // EBSCO Discovery Search
     EBSCO_SEARCH: '/ebsco-search/search',
     EBSCO_RETRIEVE: '/ebsco-search/retrieve',
+    CATALOG_AVAILABILITY: '/catalog-availability',
     // Course Assignments - new backend service
     COURSE_ASSIGNMENTS: '/course-assignments/instructor-courses',
     FACULTY_PROXY_MY_PROXIES: '/faculty-proxy/my-proxies',

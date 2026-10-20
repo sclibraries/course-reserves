@@ -14,6 +14,11 @@ export interface EBSCOFullTextLink {
   Url: string;
 }
 
+export interface EDSHoldingCopy {
+  Sublocation?: string;
+  ShelfLocator?: string;
+}
+
 export interface EBSCORecord {
   AccessLevel: string;
   pubType: string;
@@ -50,7 +55,7 @@ export interface EBSCORecord {
   };
   Holdings?: Array<{
     HoldingSimple?: {
-      CopyInformationList?: Array<{ Sublocation: string; ShelfLocator: string }>;
+      CopyInformationList?: EDSHoldingCopy[];
     };
   }>;
 }
@@ -88,6 +93,7 @@ export interface DiscoverySearchResult {
   fullTextUrl?: string;
   callNumber?: string;
   location?: string;
+  holdings?: EDSHoldingCopy[];
   database: string;
   pLink: string;
   languages?: string[];

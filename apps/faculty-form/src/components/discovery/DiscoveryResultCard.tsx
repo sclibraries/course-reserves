@@ -1,9 +1,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import DiscoveryAvailabilityBadge from './DiscoveryAvailabilityBadge';
 
 interface DiscoveryResultCardProps {
   result: DiscoverySearchResult;
+  availability?: CatalogAvailability;
+  availabilityLoading?: boolean;
+  availabilityFailed?: boolean;
   isDuplicate?: boolean;
   isSelected?: boolean;
   onOpenRecord?: () => void;
@@ -14,6 +19,9 @@ interface DiscoveryResultCardProps {
 
 export default function DiscoveryResultCard({
   result,
+  availability,
+  availabilityLoading = false,
+  availabilityFailed = false,
   isDuplicate = false,
   isSelected = false,
   onOpenRecord,
@@ -47,7 +55,12 @@ export default function DiscoveryResultCard({
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{result.hasFullText ? 'Full text available' : 'Check availability'}</Badge>
+          <DiscoveryAvailabilityBadge
+            result={result}
+            availability={availability}
+            loading={availabilityLoading}
+            failed={availabilityFailed}
+          />
           {isDuplicate && <Badge variant="secondary">In your list ✓</Badge>}
         </div>
         <div className="flex flex-wrap items-center gap-2">

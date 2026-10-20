@@ -1,9 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
+import type { CatalogAvailability, CatalogAvailabilityCopy } from '@/services/catalogAvailabilityApi';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import { isPhysicalRecord, sortSmithFirstCopies, sortSmithFirstEdsHoldings, summarizeCopies } from '@/utils/holdingsSummary';
 
 interface DiscoveryRecordPanelProps {
   record?: DiscoverySearchResult;
+  availability?: CatalogAvailability;
+  availabilityLoading?: boolean;
+  availabilityFailed?: boolean;
   loading?: boolean;
   error?: string | null;
   isRoute?: boolean;
@@ -13,7 +18,7 @@ interface DiscoveryRecordPanelProps {
   addLabel?: string;
 }
 
-export default function DiscoveryRecordPanel({ record, loading = false, error, isRoute = false, onBack, backLabel = 'Back to results', onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
+export default function DiscoveryRecordPanel({ record, availability, availabilityLoading = false, availabilityFailed = false, loading = false, error, isRoute = false, onBack, backLabel = 'Back to results', onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
   const closeButton = !isRoute && onBack && (
     <div className="flex justify-end">
       <Button variant="ghost" size="icon" aria-label="Close full record" onClick={onBack}>
@@ -53,6 +58,12 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
     record.issn && `ISSN: ${record.issn}`,
     record.doi && `DOI: ${record.doi}`,
   ].filter(Boolean);
+  const physical = isPhysicalRecord(record);
+  const physicalCopies = sortSmithFirstCopies(availability?.copies || []);
+  const electronicHoldings = sortSmithFirstEdsHoldings(record.holdings || []);
+  const availabilityMessage = physical && physicalCopies.length === 0
+    ? summarizeCopies(availability, availabilityLoading, availabilityFailed).label
+    : undefined;
 
   return (
     <article aria-label="Full record" className="space-y-4 rounded-md border bg-background p-5">
@@ -69,7 +80,31 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
         {record.publicationDate && <><dt className="font-medium">Date</dt><dd>{[record.publicationDate.year, record.publicationDate.month, record.publicationDate.day].filter(Boolean).join('-')}</dd></>}
         {record.journalTitle && <><dt className="font-medium">Source</dt><dd>{record.journalTitle}{record.volumeNumber ? `, volume ${record.volumeNumber}` : ''}{record.issueNumber ? `, issue ${record.issueNumber}` : ''}</dd></>}
         {identifiers.length > 0 && <><dt className="font-medium">Identifiers</dt><dd>{identifiers.join(' · ')}</dd></>}
-        {(record.location || record.callNumber) && <><dt className="font-medium">Holdings</dt><dd>{[record.location, record.callNumber].filter(Boolean).join(' · ')}</dd></>}
+        {physical ? (
+          <>
+            <dt className="font-medium">Holdings</dt>
+            <dd>
+              {availabilityMessage ? <span>{availabilityMessage}</span> : (
+                <ul className="space-y-2">
+                  {physicalCopies.map((copy, index) => <li key={copyLine(copy, index)}>{copyLine(copy)}</li>)}
+                </ul>
+              )}
+            </dd>
+          </>
+        ) : electronicHoldings.length > 0 ? (
+          <>
+            <dt className="font-medium">Holdings</dt>
+            <dd>
+              <ul className="space-y-2">
+                {electronicHoldings.map((holding, index) => (
+                  <li key={holding.Sublocation + ':' + holding.ShelfLocator + ':' + index}>
+                    {[holding.Sublocation, holding.ShelfLocator].filter(Boolean).join(' · ')}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        ) : null}
       </dl>
       {record.subjects && record.subjects.length > 0 && <section><h3 className="font-medium">Subjects</h3><p className="mt-1 text-sm text-muted-foreground">{record.subjects.join('; ')}</p></section>}
       {record.abstract && <section><h3 className="font-medium">Abstract</h3><p className="mt-1 whitespace-pre-line text-sm leading-relaxed">{record.abstract}</p></section>}
@@ -83,4 +118,9 @@ export default function DiscoveryRecordPanel({ record, loading = false, error, i
       {onAdd && <Button className="w-full" onClick={onAdd}>{addLabel}</Button>}
     </article>
   );
+}
+
+function copyLine(copy: CatalogAvailabilityCopy, index?: number): string {
+  const fields = [copy.library, copy.location, copy.callNumber, copy.status].filter(Boolean);
+  return fields.join(' · ') || 'Copy ' + ((index || 0) + 1);
 }

@@ -6,6 +6,7 @@ import type { CitationBatchSearchGroup } from '@/utils/citationBatchSearch';
 import { findCitationBestMatch } from '@/utils/citationBestMatch';
 import type { CitationChoice, EditableCitation } from './pasteCitationTypes';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
 import type { CourseItem } from '@/store/courseReservesStore';
 
 interface CitationReviewGroupProps {
@@ -17,6 +18,9 @@ interface CitationReviewGroupProps {
   writtenDuplicate?: boolean;
   isResultDuplicate: (result: DiscoverySearchResult) => boolean;
   disabled?: boolean;
+  availabilityByAn?: Record<string, CatalogAvailability>;
+  availabilityLoading?: boolean;
+  availabilityFailed?: boolean;
   onEdit: (id: string, text: string) => void;
   onRemove: (id: string) => void;
   onAddAsWritten: (citation: EditableCitation) => void;
@@ -25,7 +29,7 @@ interface CitationReviewGroupProps {
   onUndo: (itemId: string) => void;
 }
 
-export default function CitationReviewGroup({ citation, index, group, choice, addedItem, writtenDuplicate, isResultDuplicate, disabled = false, onEdit, onRemove, onAddAsWritten, onOpenRecord, onAddMatch, onUndo }: CitationReviewGroupProps) {
+export default function CitationReviewGroup({ citation, index, group, choice, addedItem, writtenDuplicate, isResultDuplicate, disabled = false, availabilityByAn = {}, availabilityLoading = false, availabilityFailed = false, onEdit, onRemove, onAddAsWritten, onOpenRecord, onAddMatch, onUndo }: CitationReviewGroupProps) {
   const [showOtherMatches, setShowOtherMatches] = useState(false);
   const { best, others } = group ? findCitationBestMatch(citation.text, group.results) : { best: undefined, others: [] };
   const hasAddedChoice = Boolean(choice && addedItem);
@@ -37,6 +41,9 @@ export default function CitationReviewGroup({ citation, index, group, choice, ad
       <DiscoveryResultCard
         key={`${citation.id}:${result.dbId}:${result.id}`}
         result={result}
+        availability={availabilityByAn[result.id]}
+        availabilityLoading={availabilityLoading && !availabilityByAn[result.id]}
+        availabilityFailed={availabilityFailed}
         isDuplicate={!selectedChoice && isResultDuplicate(result)}
         onOpenRecord={() => onOpenRecord(citation.id, result)}
         onAdd={addedItem ? undefined : () => onAddMatch(citation.id, result)}
