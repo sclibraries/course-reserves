@@ -21,13 +21,14 @@ import {
 import { SortableFolderContent } from './SortableFolderContent';
 import { FolderDropZones } from './ListDropZones';
 import type { CourseFolder, CourseItem } from "../store/courseReservesStore";
+import type { DiscoveryRecordReference } from '@/hooks/useOpenDiscoveryRecord';
 
 interface SortableFolderProps {
   folder: CourseFolder & { items: CourseItem[] };
   index: number;
   onEditItem: (item: CourseItem) => void;
   onDeleteItem: (itemId: string) => void;
-  onViewFullRecord?: (dbId: string, an: string) => void;
+  onViewFullRecord?: (record: DiscoveryRecordReference) => void;
   onUpdateFolder: (folderId: string, updates: Partial<Pick<CourseFolder, 'title' | 'description' | 'isOpen'>>) => void;
   onDeleteFolder: (folderId: string) => void;
   onToggleFolder: (folderId: string) => void;

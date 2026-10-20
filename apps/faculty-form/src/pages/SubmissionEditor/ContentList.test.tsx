@@ -148,19 +148,24 @@ describe('SubmissionEditor ContentList', () => {
     expect(container?.textContent).not.toContain('First loose book');
   });
 
+  it('shows the full-record button only on catalog items', () => {
+    renderList({ isReadOnly: true });
+
+    expect(viewFullRecordButtonFor('Target reader')).toBeTruthy();
+    for (const title of ['First loose book', 'First inside', 'Target chapter']) {
+      expect(viewFullRecordButtonFor(title)).toBeNull();
+    }
+  });
+
   it('loads an EDS full record from a read-only list and closes without changing the search', async () => {
     vi.mocked(retrieveDiscoveryRecord).mockResolvedValue(fullRecord);
     renderList({ isReadOnly: true, initialSearchQuery: 'Target reader' });
 
-    const triggers = container!.querySelectorAll('[role="button"][aria-label="Item actions"]');
-    expect(triggers).toHaveLength(1);
-    await openItemMenu(triggers[0] as HTMLElement);
-    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
-      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
-    expect(viewAction).toBeTruthy();
+    const viewButton = viewFullRecordButtonFor('Target reader');
+    expect(viewButton).toBeTruthy();
 
     await act(async () => {
-      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      viewButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
 
@@ -184,13 +189,10 @@ describe('SubmissionEditor ContentList', () => {
     vi.mocked(retrieveDiscoveryRecord).mockResolvedValue(fullRecord);
     renderList({ isReadOnly: true });
 
-    const trigger = container!.querySelector<HTMLElement>('[role="button"][aria-label="Item actions"]');
-    expect(trigger).toBeTruthy();
-    await openItemMenu(trigger!);
-    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
-      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
+    const viewButton = viewFullRecordButtonFor('Target reader');
+    expect(viewButton).toBeTruthy();
     await act(async () => {
-      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      viewButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
 
@@ -214,12 +216,9 @@ describe('SubmissionEditor ContentList', () => {
     vi.mocked(retrieveDiscoveryRecord).mockRejectedValue(new Error('Catalog unavailable'));
     renderList({ isReadOnly: true });
 
-    const trigger = container!.querySelector<HTMLElement>('[role="button"][aria-label="Item actions"]');
-    await openItemMenu(trigger!);
-    const viewAction = Array.from(document.body.querySelectorAll('[role="menuitem"]'))
-      .find((menuItem) => menuItem.textContent?.trim() === 'View full record');
+    const viewButton = viewFullRecordButtonFor('Target reader');
     await act(async () => {
-      viewAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      viewButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -260,6 +259,14 @@ describe('SubmissionEditor ContentList', () => {
       setValue?.call(input, query);
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
+  }
+
+  function viewFullRecordButtonFor(title: string): HTMLButtonElement | null {
+    const heading = Array.from(container!.querySelectorAll('h4'))
+      .find((itemHeading) => itemHeading.textContent?.trim() === title);
+    const card = heading?.closest('.group');
+    return Array.from(card?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent?.trim() === 'View full record') ?? null;
   }
 });
 
@@ -315,11 +322,4 @@ function LocationProbe() {
 
 function locationText() {
   return document.querySelector('[data-testid="current-location"]')?.textContent || '';
-}
-
-async function openItemMenu(trigger: HTMLElement) {
-  await act(async () => {
-    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
-    await Promise.resolve();
-  });
 }

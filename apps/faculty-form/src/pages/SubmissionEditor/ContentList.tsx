@@ -72,9 +72,6 @@ export default function ContentList({
     returnToList: true,
     onOpenInline: openRecordDialog,
   });
-  const openRecordFromList = useCallback((dbId: string, an: string) => {
-    openDiscoveryRecord({ dbId, an });
-  }, [openDiscoveryRecord]);
   const closeRecordDialog = useCallback((open: boolean) => {
     setRecordDialogOpen(open);
     if (!open) clearSelection();
@@ -172,7 +169,7 @@ export default function ContentList({
                       <SortableFolder
                         key={contentItem.folder.id}
                         folder={contentItem.folder}
-                        onViewFullRecord={openRecordFromList}
+                        onViewFullRecord={openDiscoveryRecord}
                         index={contentItem.position}
                         onEditItem={itemHandlers.handleEditItem}
                         onDeleteItem={itemHandlers.handleDeleteItem}
@@ -200,7 +197,7 @@ export default function ContentList({
                     <SortableItem
                       key={contentItem.item.id}
                       item={contentItem.item}
-                      onViewFullRecord={openRecordFromList}
+                      onViewFullRecord={openDiscoveryRecord}
                       isNew={addedMaterials.some((added) => added.id === contentItem.item.id)}
                       index={contentItem.position}
                       totalItems={totalDisplayedItems}

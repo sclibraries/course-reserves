@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { SortableItem } from './SortableItem';
 import { X } from 'lucide-react';
 import type { CourseFolder, CourseItem } from '../store/courseReservesStore';
+import type { DiscoveryRecordReference } from '@/hooks/useOpenDiscoveryRecord';
 
 interface SortableFolderContentProps {
   folder: CourseFolder & { items: CourseItem[] };
   newItemIds: string[];
   onEditItem: (item: CourseItem) => void;
   onDeleteItem: (itemId: string) => void;
-  onViewFullRecord?: (dbId: string, an: string) => void;
+  onViewFullRecord?: (record: DiscoveryRecordReference) => void;
   onRemoveItemFromFolder: (itemId: string) => void;
   onMoveItemInFolder: (folderId: string, itemId: string, direction: 'up' | 'down') => void;
   canMoveItemUp: (itemId: string) => boolean;
