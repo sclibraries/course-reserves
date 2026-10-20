@@ -97,17 +97,23 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS faculty-submission/draft' => 'faculty-draft/options',
             'DELETE faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>' => 'faculty-draft/delete',
         ];
+        $availabilityRules = [
+            'GET catalog-availability' => 'catalog-availability/index',
+            'OPTIONS catalog-availability' => 'catalog-availability/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
         $expectedDraftRules = array_intersect_key($mergedRules, $draftRules);
-        $declaredWorkflowRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules);
-        $existingRules = array_diff_key($mergedRules, $declaredWorkflowRules);
-        $this->assertCount(223, $mergedRules);
+        $expectedAvailabilityRules = array_intersect_key($mergedRules, $availabilityRules);
+        $declaredRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules, $availabilityRules);
+        $existingRules = array_diff_key($mergedRules, $declaredRules);
+        $this->assertCount(225, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
         $this->assertSame($draftRules, $expectedDraftRules);
+        $this->assertSame($availabilityRules, $expectedAvailabilityRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -201,6 +207,8 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['GET', 'tracking/top-courses', ['tracking/top-courses', []]],
             ['OPTIONS', 'tracking/analytics', ['tracking/options', []]],
             ['GET', 'tracking/course-detail', ['tracking/course-detail', []]],
+            ['GET', 'catalog-availability', ['catalog-availability/index', []]],
+            ['OPTIONS', 'catalog-availability', ['catalog-availability/options', []]],
             ['OPTIONS', 'material-type/all', ['material-type/options', []]],
             ['GET', 'material-type/fields', ['material-type/fields', []]],
             ['GET', 'checklist/get-template/999007204', [

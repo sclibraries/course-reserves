@@ -1,6 +1,7 @@
 <?php
 namespace app\services;
 
+use app\components\FolioAvailabilityMapper;
 use Yii;
 use yii\httpclient\Client;
 
@@ -156,6 +157,77 @@ class FolioService
     }
 
     /**
+     * Fetch holdings for instance ids in parallel and return only public copy fields.
+     *
+     * @param array $instanceIds
+     * @return array Instance id to copies or a generic per-id failure.
+     */
+    public function fetchAvailability(array $instanceIds)
+    {
+        $instanceIds = array_values(array_unique(array_filter($instanceIds, 'is_string')));
+        if (empty($instanceIds)) {
+            return [];
+        }
+
+        $client = $this->createClient();
+        $requests = [];
+        foreach ($instanceIds as $instanceId) {
+            $requests[$instanceId] = $this->createGetRequest(
+                $client,
+                $this->searchBaseUrl . '/search-rtac',
+                ['id' => $instanceId]
+            );
+        }
+
+        try {
+            $responses = $client->batchSend($requests);
+        } catch (\Throwable $exception) {
+            $results = [];
+            foreach ($instanceIds as $instanceId) {
+                $results[$instanceId] = $this->availabilityFailure($instanceId, 0);
+            }
+            return $results;
+        }
+
+        $results = [];
+        foreach ($instanceIds as $instanceId) {
+            $response = isset($responses[$instanceId]) ? $responses[$instanceId] : null;
+            $status = $response ? (int)$response->statusCode : 0;
+            if ($status === 404) {
+                $results[$instanceId] = [];
+                continue;
+            }
+            if (!$response || !$response->isOk) {
+                $results[$instanceId] = $this->availabilityFailure($instanceId, $status);
+                continue;
+            }
+
+            $data = $response->getData();
+            if (!isset($data['data']['holding']) || !is_array($data['data']['holding'])) {
+                $results[$instanceId] = $this->availabilityFailure($instanceId, $status);
+                continue;
+            }
+
+            $results[$instanceId] = FolioAvailabilityMapper::copiesFromHoldings($data['data']['holding']);
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param string $instanceId
+     * @param int $status
+     * @return array
+     */
+    private function availabilityFailure($instanceId, $status)
+    {
+        $reference = Yii::$app->security->generateRandomString(12);
+        Yii::error('FOLIO availability failed: status=' . $status . ' id=' . $instanceId
+            . ' reference=' . $reference);
+        return ['error' => true, 'reference' => $reference];
+    }
+
+    /**
      * Create the HTTP client used for FOLIO requests.
      *
      * @return Client
@@ -174,7 +246,21 @@ class FolioService
      */
     private function sendGet($url, $data = null)
     {
-        $request = $this->createClient()->createRequest()
+        $client = $this->createClient();
+        return $this->createGetRequest($client, $url, $data)->send();
+    }
+
+    /**
+     * Build a timed JSON GET request shared by single and batched FOLIO calls.
+     *
+     * @param Client $client
+     * @param string $url
+     * @param array|null $data
+     * @return \yii\httpclient\Request
+     */
+    private function createGetRequest(Client $client, $url, $data = null)
+    {
+        $request = $client->createRequest()
             ->setMethod('GET')
             ->setUrl($url)
             ->setOptions(['timeout' => $this->timeoutSeconds])
@@ -184,7 +270,7 @@ class FolioService
             $request->setData($data);
         }
 
-        return $request->send();
+        return $request;
     }
 
     /**

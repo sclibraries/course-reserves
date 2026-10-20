@@ -280,22 +280,40 @@ test('search-inventory returns contributor and publication data by instance id',
   });
 });
 
-test('search-rtac preserves object and array holding shapes', async () => {
+test('search-rtac returns synthetic middleware-shaped holdings and not-found responses', async () => {
   await withServer(async (baseUrl) => {
-    const one = await getJson(baseUrl, '/folio/web/search/search-rtac?id=00000000-0000-4000-8000-000000000301');
-    const many = await getJson(baseUrl, '/folio/web/search/search-rtac?id=00000000-0000-4000-8000-000000000399');
+    const availableId = '00000000-0000-4000-8000-000000000881';
+    const checkedOutId = '00000000-0000-4000-8000-000000000882';
+    const otherCollegesId = '00000000-0000-4000-8000-000000000883';
+    const emptyId = '00000000-0000-4000-8000-000000000884';
+    const available = await getJson(baseUrl, '/folio/web/search/search-rtac?id=' + availableId);
+    const checkedOut = await getJson(baseUrl, '/folio/web/search/search-rtac?id=' + checkedOutId);
+    const otherColleges = await getJson(baseUrl, '/folio/web/search/search-rtac?id=' + otherCollegesId);
+    const empty = await getJson(baseUrl, '/folio/web/search/search-rtac?id=' + emptyId);
+    const unknown = await getJson(baseUrl,
+      '/folio/web/search/search-rtac?id=00000000-0000-4000-8000-000000000885');
 
-    assertEnvelope(one.body);
-    assert.equal(Array.isArray(one.body.data.holding), false);
-    assertEnvelope(many.body);
-    assert.ok(Array.isArray(many.body.data.holding));
-    for (const field of ['id', 'barcode', 'location', 'library', 'status', 'callNumber',
-      'volume', 'itemCopyNumber', 'materialType', 'temporaryLoanType', 'permanentLoanType',
-      'uri', 'url']) {
-      assert.ok(Object.hasOwn(one.body.data.holding, field), 'missing holding field ' + field);
+    assertEnvelope(available.body);
+    assert.equal(available.body.data.instanceId, availableId);
+    assert.ok(Array.isArray(available.body.data.holding));
+    assert.equal(available.body.data.holding.length, 1);
+    assert.equal(available.body.data.holding[0].status, 'Available');
+    for (const field of ['id', 'callNumber', 'location', 'locationCode', 'locationId', 'status',
+      'permanentLoanType', 'barcode', 'suppressFromDiscovery', 'totalHoldRequests', 'materialType',
+      'library', 'notes', 'holdingsStatements']) {
+      assert.ok(Object.hasOwn(available.body.data.holding[0], field), 'missing holding field ' + field);
     }
-    assert.ok(one.body.data.holding.library.name);
-    assert.ok(one.body.data.holding.materialType.name);
+    assert.equal(checkedOut.body.data.instanceId, checkedOutId);
+    assert.equal(checkedOut.body.data.holding[0].status, 'Checked out');
+    assert.equal(otherColleges.body.data.instanceId, otherCollegesId);
+    assert.deepEqual(otherColleges.body.data.holding.map((holding) => holding.library.name), [
+      'Mount Holyoke College Library',
+      'University of Massachusetts Amherst Libraries',
+    ]);
+    assert.equal(empty.body.data.instanceId, emptyId);
+    assert.deepEqual(empty.body.data.holding, []);
+    assert.equal(unknown.response.status, 404);
+    assert.deepEqual(unknown.body, { message: 'not found', code: 404, data: null });
   });
 });
 
@@ -415,7 +433,7 @@ test('control actions create the absent scenario, change reserve and item status
     assert.equal(response.status, 200);
 
     const rtac = await getJson(baseUrl, '/folio/web/search/search-rtac?id=00000000-0000-4000-8000-000000000303');
-    assert.equal(rtac.body.data.holding.status, 'checked out');
+    assert.equal(rtac.body.data.holding[0].status, 'Checked out');
 
     response = await fetch(baseUrl + '/_fake-folio/api/reserves', {
       method: 'DELETE',
@@ -436,7 +454,7 @@ test('control actions create the absent scenario, change reserve and item status
     assert.deepEqual(resetCourses.body.data.courses, []);
     const resetRtac = await getJson(baseUrl,
       '/folio/web/search/search-rtac?id=00000000-0000-4000-8000-000000000303');
-    assert.equal(resetRtac.body.data.holding.status, 'available');
+    assert.equal(resetRtac.body.data.holding[0].status, 'Available');
     const resetReserves = await getJson(baseUrl, '/folio/web/search/search-course-listings?' +
       new URLSearchParams({ courseListingId: listingId }));
     assert.equal(resetReserves.body.data.reserves.some((reserve) => reserve.itemId === itemId), false);
