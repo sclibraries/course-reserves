@@ -20,26 +20,51 @@ interface CatalogAvailabilityResponse {
   records?: Record<string, CatalogAvailability>;
 }
 
-const availabilityByPendingAn = new Map<string, Promise<CatalogAvailability>>();
+export const CATALOG_AVAILABILITY_BATCH_SIZE = 20;
+export const CATALOG_AVAILABILITY_CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface CachedCatalogAvailability {
+  promise: Promise<CatalogAvailability>;
+  expiresAt: number;
+}
+
+const availabilityByAn = new Map<string, CachedCatalogAvailability>();
+
+export function getCatalogAvailabilityExpiresAt(accessionNumber: string): number | undefined {
+  return availabilityByAn.get(accessionNumber)?.expiresAt;
+}
 
 export async function getCatalogAvailability(accessionNumbers: string[]): Promise<Record<string, CatalogAvailability>> {
   const uniqueAccessionNumbers = Array.from(new Set(accessionNumbers));
-  const newAccessionNumbers = uniqueAccessionNumbers.filter((an) => !availabilityByPendingAn.has(an));
-  if (newAccessionNumbers.length > 0) {
-    const request = requestCatalogAvailability(newAccessionNumbers);
-    newAccessionNumbers.forEach((an) => {
-      const pending = request.then((records) => {
-        if (!records[an]) throw new Error('Availability lookup failed');
-        return records[an];
-      }).finally(() => {
-        if (availabilityByPendingAn.get(an) === pending) availabilityByPendingAn.delete(an);
+  const uncached = uniqueAccessionNumbers.filter((an) => {
+    const cached = availabilityByAn.get(an);
+    if (!cached) return true;
+    if (cached.expiresAt > Date.now()) return false;
+    availabilityByAn.delete(an);
+    return true;
+  });
+
+  for (let index = 0; index < uncached.length; index += CATALOG_AVAILABILITY_BATCH_SIZE) {
+    const batch = uncached.slice(index, index + CATALOG_AVAILABILITY_BATCH_SIZE);
+    const request = requestCatalogAvailability(batch);
+    batch.forEach((an) => {
+      let cached: CachedCatalogAvailability;
+      const promise = request.then((records) => {
+        const entry = records[an];
+        if (!entry) throw new Error('Availability lookup failed');
+        cached.expiresAt = Date.now() + CATALOG_AVAILABILITY_CACHE_TTL_MS;
+        return entry;
+      }).catch((error: unknown) => {
+        if (availabilityByAn.get(an) === cached) availabilityByAn.delete(an);
+        throw error;
       });
-      availabilityByPendingAn.set(an, pending);
+      cached = { promise, expiresAt: Number.POSITIVE_INFINITY };
+      availabilityByAn.set(an, cached);
     });
   }
 
   const entries = await Promise.all(uniqueAccessionNumbers.map(async (an) => (
-    [an, await availabilityByPendingAn.get(an)!] as [string, CatalogAvailability]
+    [an, await availabilityByAn.get(an)!.promise] as [string, CatalogAvailability]
   )));
   return Object.fromEntries(entries);
 }

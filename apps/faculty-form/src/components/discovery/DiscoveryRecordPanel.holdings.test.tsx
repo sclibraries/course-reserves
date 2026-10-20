@@ -42,7 +42,10 @@ describe('DiscoveryRecordPanel holdings', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     act(() => root?.render(
-      <DiscoveryRecordPanel record={baseRecord as DiscoverySearchResult} availability={availability} />,
+      <DiscoveryRecordPanel
+        record={baseRecord as DiscoverySearchResult}
+        availability={{ entry: availability, loading: false, failed: false }}
+      />,
     ));
 
     const copies = Array.from(container.querySelectorAll('li')).map((item) => item.textContent);

@@ -1,14 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import type { CatalogAvailability, CatalogAvailabilityCopy } from '@/services/catalogAvailabilityApi';
+import type { CatalogAvailabilityCopy } from '@/services/catalogAvailabilityApi';
+import type { CatalogAvailabilityView } from '@/hooks/useCatalogAvailability';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { isPhysicalRecord, sortSmithFirstCopies, sortSmithFirstEdsHoldings, summarizeCopies } from '@/utils/holdingsSummary';
 
 interface DiscoveryRecordPanelProps {
   record?: DiscoverySearchResult;
-  availability?: CatalogAvailability;
-  availabilityLoading?: boolean;
-  availabilityFailed?: boolean;
+  availability?: CatalogAvailabilityView;
   loading?: boolean;
   error?: string | null;
   isRoute?: boolean;
@@ -18,7 +17,7 @@ interface DiscoveryRecordPanelProps {
   addLabel?: string;
 }
 
-export default function DiscoveryRecordPanel({ record, availability, availabilityLoading = false, availabilityFailed = false, loading = false, error, isRoute = false, onBack, backLabel = 'Back to results', onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
+export default function DiscoveryRecordPanel({ record, availability, loading = false, error, isRoute = false, onBack, backLabel = 'Back to results', onAdd, addLabel = 'Add to my list' }: DiscoveryRecordPanelProps) {
   const closeButton = !isRoute && onBack && (
     <div className="flex justify-end">
       <Button variant="ghost" size="icon" aria-label="Close full record" onClick={onBack}>
@@ -59,10 +58,10 @@ export default function DiscoveryRecordPanel({ record, availability, availabilit
     record.doi && `DOI: ${record.doi}`,
   ].filter(Boolean);
   const physical = isPhysicalRecord(record);
-  const physicalCopies = sortSmithFirstCopies(availability?.copies || []);
+  const physicalCopies = sortSmithFirstCopies(availability?.entry?.copies || []);
   const electronicHoldings = sortSmithFirstEdsHoldings(record.holdings || []);
   const availabilityMessage = physical && physicalCopies.length === 0
-    ? summarizeCopies(availability, availabilityLoading, availabilityFailed).label
+    ? summarizeCopies(availability?.entry, availability?.loading, availability?.failed).label
     : undefined;
 
   return (

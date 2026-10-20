@@ -8,7 +8,6 @@ import { useSelection } from '@/hooks/useSelection';
 import { useCatalogAvailability } from '@/hooks/useCatalogAvailability';
 import { searchDiscovery } from '@/services/discoverySearchService';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
-import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
 import { extractCitationsFromSyllabus } from '@/utils/syllabusCitationExtractor';
 import { executeCitationBatchSearch, prepareCitationSearches } from '@/utils/citationBatchSearch';
 import CitationReviewGroup from './CitationReviewGroup';
@@ -55,22 +54,12 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     clearSelection();
   }, [clearSelection]);
   const groupsById = useMemo(() => new Map(workspace.groups.map((group) => [group.id, group])), [workspace.groups]);
-  const routeState = location.state as {
-    catalogAvailabilityByAn?: Record<string, CatalogAvailability>;
-  } | null;
   const citationResults = useMemo(() => workspace.groups.flatMap((group) => group.results), [workspace.groups]);
-  const availabilityPageKey = workspace.groups.map((group) =>
-    group.id + ':' + group.results.map((result) => result.id).join(','),
-  ).join('|');
   const availabilityResults = useMemo(
     () => isRecordRoute && record ? [record] : citationResults,
     [citationResults, isRecordRoute, record],
   );
-  const availability = useCatalogAvailability(
-    availabilityResults,
-    isRecordRoute ? 'record:' + (record?.id || an || '') : availabilityPageKey,
-    routeState?.catalogAvailabilityByAn || EMPTY_AVAILABILITY,
-  );
+  const availability = useCatalogAvailability(availabilityResults);
 
   useEffect(() => {
     if (isRecordRoute && dbId && an) void loadRecord(dbId, an);
@@ -177,9 +166,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
       <section aria-label="Paste a list record" className="space-y-4">
         <DiscoveryRecordPanel
           record={record}
-          availability={record ? availability.byAn[record.id] : undefined}
-          availabilityLoading={availability.loading && Boolean(record)}
-          availabilityFailed={availability.failed}
+          availability={availability.get(record?.id || '')}
           loading={loading}
           error={recordError}
           isRoute
@@ -227,9 +214,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
                   citation={citation}
                   index={index}
                   group={groupsById.get(citation.id)}
-                  availabilityByAn={availability.byAn}
-                  availabilityLoading={availability.loading}
-                  availabilityFailed={availability.failed}
+                  availability={availability.get}
                   choice={addedItemsByCitation.has(citation.id) ? workspace.choices[citation.id] : undefined}
                   addedItem={addedItemsByCitation.get(citation.id)}
                   writtenDuplicate={isWrittenDuplicate(citation)}
@@ -247,9 +232,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
             {hasRecordPanel && (
               <DiscoveryRecordPanel
                 record={record}
-                availability={record ? availability.byAn[record.id] : undefined}
-                availabilityLoading={availability.loading && Boolean(record)}
-                availabilityFailed={availability.failed}
+                availability={availability.get(record?.id || '')}
                 loading={loading}
                 error={recordError}
                 onBack={closeRecordPanel}
@@ -284,5 +267,3 @@ function restorePasteText(locationState: unknown): string {
   if (!locationState || typeof locationState !== 'object' || !('pasteText' in locationState)) return '';
   return typeof locationState.pasteText === 'string' ? locationState.pasteText : '';
 }
-
-const EMPTY_AVAILABILITY: Record<string, CatalogAvailability> = {};

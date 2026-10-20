@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DiscoveryFilterBar from '@/components/discovery/DiscoveryFilterBar';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
-import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
 import { useDiscoverySearch } from '@/hooks/useDiscoverySearch';
 import { useCatalogAvailability } from '@/hooks/useCatalogAvailability';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
@@ -22,7 +21,6 @@ interface SearchTabProps {
 
 export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTabProps) {
   const { id, isDuplicate, addResult } = useDiscoveryResultActions();
-  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const route = useParams();
@@ -47,19 +45,11 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     tab: 'search',
     onOpenInline: selectRecord,
   });
-  const routeState = location.state as { catalogAvailabilityByAn?: Record<string, CatalogAvailability> } | null;
   const availabilityResults = useMemo(
     () => showRecordRoute ? (record ? [record] : []) : search.results,
     [record, search.results, showRecordRoute],
   );
-  const availabilityPageKey = showRecordRoute
-    ? 'record:' + (recordAn || '')
-    : JSON.stringify([search.query, search.filters, search.page]);
-  const availability = useCatalogAvailability(
-    availabilityResults,
-    availabilityPageKey,
-    routeState?.catalogAvailabilityByAn || EMPTY_AVAILABILITY,
-  );
+  const availability = useCatalogAvailability(availabilityResults);
 
   useEffect(() => setDraftQuery(search.query), [search.query]);
   useEffect(() => {
@@ -164,9 +154,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
                 <DiscoveryResultCard
                   key={`${result.dbId}:${result.id}`}
                   result={result}
-                  availability={availability.byAn[result.id]}
-                  availabilityLoading={availability.loading && !availability.byAn[result.id]}
-                  availabilityFailed={availability.failed}
+                  availability={availability.get(result.id)}
                   isDuplicate={isDuplicate(result)}
                   isSelected={selectedId === result.id}
                   onOpenRecord={() => openRecord({ dbId: result.dbId, an: result.id })}
@@ -189,9 +177,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
           >
             <DiscoveryRecordPanel
               record={record}
-              availability={record ? availability.byAn[record.id] : undefined}
-              availabilityLoading={availability.loading && Boolean(record)}
-              availabilityFailed={availability.failed}
+              availability={availability.get(record?.id || '')}
               loading={loading}
               error={error}
               isRoute={showRecordRoute}
@@ -205,5 +191,3 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     </section>
   );
 }
-
-const EMPTY_AVAILABILITY: Record<string, CatalogAvailability> = {};

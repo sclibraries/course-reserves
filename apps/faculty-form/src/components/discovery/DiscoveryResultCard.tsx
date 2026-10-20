@@ -1,14 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
+import type { CatalogAvailabilityView } from '@/hooks/useCatalogAvailability';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import DiscoveryAvailabilityBadge from './DiscoveryAvailabilityBadge';
 
 interface DiscoveryResultCardProps {
   result: DiscoverySearchResult;
-  availability?: CatalogAvailability;
-  availabilityLoading?: boolean;
-  availabilityFailed?: boolean;
+  availability?: CatalogAvailabilityView;
   isDuplicate?: boolean;
   isSelected?: boolean;
   onOpenRecord?: () => void;
@@ -20,8 +18,6 @@ interface DiscoveryResultCardProps {
 export default function DiscoveryResultCard({
   result,
   availability,
-  availabilityLoading = false,
-  availabilityFailed = false,
   isDuplicate = false,
   isSelected = false,
   onOpenRecord,
@@ -58,8 +54,6 @@ export default function DiscoveryResultCard({
           <DiscoveryAvailabilityBadge
             result={result}
             availability={availability}
-            loading={availabilityLoading}
-            failed={availabilityFailed}
           />
           {isDuplicate && <Badge variant="secondary">In your list ✓</Badge>}
         </div>

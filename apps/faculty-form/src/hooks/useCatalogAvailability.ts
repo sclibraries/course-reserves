@@ -1,65 +1,92 @@
-import { useEffect, useMemo, useState } from 'react';
-import { getCatalogAvailability, type CatalogAvailability } from '@/services/catalogAvailabilityApi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CATALOG_AVAILABILITY_BATCH_SIZE,
+  getCatalogAvailability,
+  getCatalogAvailabilityExpiresAt,
+  type CatalogAvailability,
+} from '@/services/catalogAvailabilityApi';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { isPhysicalRecord } from '@/utils/holdingsSummary';
 
-export interface CatalogAvailabilityState {
-  byAn: Record<string, CatalogAvailability>;
+export interface CatalogAvailabilityView {
+  entry?: CatalogAvailability;
   loading: boolean;
   failed: boolean;
 }
 
-const EMPTY_STATE: CatalogAvailabilityState = { byAn: {}, loading: false, failed: false };
-const EMPTY_BY_AN: Record<string, CatalogAvailability> = {};
+interface StoredAvailabilityView extends CatalogAvailabilityView {
+  expiresAt?: number;
+}
 
-export function useCatalogAvailability(
-  visibleResults: DiscoverySearchResult[],
-  requestKey: string,
-  seedByAn: Record<string, CatalogAvailability> = EMPTY_BY_AN,
-): CatalogAvailabilityState {
+export interface CatalogAvailabilityLookup {
+  get: (accessionNumber: string) => CatalogAvailabilityView;
+}
+
+const EMPTY_VIEW: CatalogAvailabilityView = { loading: false, failed: false };
+
+export function useCatalogAvailability(visibleResults: DiscoverySearchResult[]): CatalogAvailabilityLookup {
   const accessionNumbers = useMemo(() => Array.from(new Set(
     visibleResults.filter(isPhysicalRecord).map((result) => result.id).filter(Boolean),
   )), [visibleResults]);
-  const [state, setState] = useState(EMPTY_STATE);
+  const [entries, setEntries] = useState<Record<string, StoredAvailabilityView>>({});
+  const entriesRef = useRef(entries);
+  const pending = useRef(new Set<string>());
+  const mounted = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const seeded = Object.fromEntries(accessionNumbers
-      .filter((an) => Object.prototype.hasOwnProperty.call(seedByAn, an))
-      .map((an) => [an, seedByAn[an]]));
-    const toFetch = accessionNumbers.filter((an) => !Object.prototype.hasOwnProperty.call(seeded, an));
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
-    if (toFetch.length === 0) {
-      setState({ byAn: seeded, loading: false, failed: false });
-      return () => { cancelled = true; };
+  useEffect(() => {
+    const missing = accessionNumbers.filter((an) => {
+      if (pending.current.has(an)) return false;
+      const current = entriesRef.current[an];
+      return !current?.entry || (current.expiresAt !== undefined && current.expiresAt <= Date.now());
+    });
+    if (missing.length === 0) return;
+
+    missing.forEach((an) => pending.current.add(an));
+    const loadingEntries = { ...entriesRef.current };
+    missing.forEach((an) => {
+      loadingEntries[an] = { loading: true, failed: false };
+    });
+    entriesRef.current = loadingEntries;
+    setEntries(loadingEntries);
+
+    const batches: string[][] = [];
+    for (let index = 0; index < missing.length; index += CATALOG_AVAILABILITY_BATCH_SIZE) {
+      batches.push(missing.slice(index, index + CATALOG_AVAILABILITY_BATCH_SIZE));
     }
-
-    setState({ byAn: seeded, loading: true, failed: false });
-    const batches = [];
-    for (let index = 0; index < toFetch.length; index += 20) {
-      batches.push(toFetch.slice(index, index + 20));
-    }
-
     void Promise.all(batches.map(async (batch) => {
       try {
-        return { records: await getCatalogAvailability(batch), failed: false };
+        return { accessionNumbers: batch, records: await getCatalogAvailability(batch), failed: false };
       } catch {
-        return {
-          records: Object.fromEntries(batch.map((an) => [an, { instanceId: null, error: true as const }])),
-          failed: true,
-        };
+        return { accessionNumbers: batch, records: {}, failed: true };
       }
     })).then((responses) => {
-      if (cancelled) return;
-      setState({
-        byAn: Object.assign({}, seeded, ...responses.map((response) => response.records)),
-        loading: false,
-        failed: responses.some((response) => response.failed),
-      });
+      const nextEntries = { ...entriesRef.current };
+      responses.forEach((response) => response.accessionNumbers.forEach((an) => {
+        pending.current.delete(an);
+        nextEntries[an] = response.failed
+          ? { loading: false, failed: true }
+          : {
+            entry: response.records[an],
+            loading: false,
+            failed: false,
+            expiresAt: getCatalogAvailabilityExpiresAt(an),
+          };
+      }));
+      entriesRef.current = nextEntries;
+      if (mounted.current) setEntries(nextEntries);
     });
+  }, [accessionNumbers]);
 
-    return () => { cancelled = true; };
-  }, [accessionNumbers, requestKey, seedByAn]);
+  const get = useCallback((accessionNumber: string) => {
+    const entry = entries[accessionNumber];
+    if (!entry || (entry.expiresAt !== undefined && entry.expiresAt <= Date.now())) return EMPTY_VIEW;
+    return entry;
+  }, [entries]);
 
-  return state;
+  return { get };
 }

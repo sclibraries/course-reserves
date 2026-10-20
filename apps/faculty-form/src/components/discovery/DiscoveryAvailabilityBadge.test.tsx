@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
-import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
+import type { CatalogAvailabilityView } from '@/hooks/useCatalogAvailability';
 import DiscoveryAvailabilityBadge from './DiscoveryAvailabilityBadge';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,26 +32,30 @@ describe('DiscoveryAvailabilityBadge', () => {
     root = null;
   });
 
-  function renderBadge(record: DiscoverySearchResult, availability?: CatalogAvailability, loading = false, failed = false) {
+  function renderBadge(record: DiscoverySearchResult, availability?: CatalogAvailabilityView) {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
     act(() => root?.render(
-      <DiscoveryAvailabilityBadge result={record} availability={availability} loading={loading} failed={failed} />,
+      <DiscoveryAvailabilityBadge result={record} availability={availability} />,
     ));
     return container;
   }
 
   it('shows live Smith availability for a physical catalog record', () => {
     const view = renderBadge(result(), {
-      instanceId: 'synthetic-instance',
-      copies: [{
-        library: 'SC Neilson Library',
-        location: 'Smith College Neilson Stacks',
-        callNumber: 'QA 76 .A1',
-        status: 'Available',
-        loanType: 'Standard Loan',
-      }],
+      entry: {
+        instanceId: 'synthetic-instance',
+        copies: [{
+          library: 'SC Neilson Library',
+          location: 'Smith College Neilson Stacks',
+          callNumber: 'QA 76 .A1',
+          status: 'Available',
+          loanType: 'Standard Loan',
+        }],
+      },
+      loading: false,
+      failed: false,
     });
 
     expect(view.textContent).toContain('Available at Smith · Neilson Stacks');

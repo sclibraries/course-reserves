@@ -64,9 +64,9 @@ describe('CitationReviewGroup availability', () => {
         onOpenRecord={vi.fn()}
         onAddMatch={vi.fn()}
         onUndo={vi.fn()}
-        availabilityByAn={{ 'synthetic-an': availability }}
-        availabilityLoading={false}
-        availabilityFailed={false}
+        availability={(an) => an === 'synthetic-an'
+          ? { entry: availability, loading: false, failed: false }
+          : { loading: false, failed: false }}
       />,
     ));
 

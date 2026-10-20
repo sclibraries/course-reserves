@@ -1,13 +1,11 @@
 import { Badge } from '@/components/ui/badge';
-import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import type { CatalogAvailabilityView } from '@/hooks/useCatalogAvailability';
 import { isHeldElectronically, isPhysicalRecord, summarizeCopies } from '@/utils/holdingsSummary';
 
 interface DiscoveryAvailabilityBadgeProps {
   result: DiscoverySearchResult;
-  availability?: CatalogAvailability;
-  loading?: boolean;
-  failed?: boolean;
+  availability?: CatalogAvailabilityView;
 }
 
 const toneClasses = {
@@ -19,14 +17,9 @@ const toneClasses = {
   error: 'border-destructive/40 bg-destructive/5 text-destructive',
 };
 
-export default function DiscoveryAvailabilityBadge({
-  result,
-  availability,
-  loading = false,
-  failed = false,
-}: DiscoveryAvailabilityBadgeProps) {
+export default function DiscoveryAvailabilityBadge({ result, availability }: DiscoveryAvailabilityBadgeProps) {
   const summary = isPhysicalRecord(result)
-    ? summarizeCopies(availability, loading, failed)
+    ? summarizeCopies(availability?.entry, availability?.loading, availability?.failed)
     : result.hasFullText
       ? { label: 'Full text available', tone: 'available' as const }
       : isHeldElectronically(result)
