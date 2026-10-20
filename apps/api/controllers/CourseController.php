@@ -830,39 +830,7 @@ class CourseController extends ActiveController
 
     //END NEW 
 
-    /**
-     * Link Course Offering to Faculty Submission
-     * 
-     * This action receives FOLIO course data from staff when they're processing a faculty submission.
-     * It will:
-     * 1. Check if the permanent course exists, create it if not
-     * 2. Check if the course offering exists, create it if not
-     * 3. Link the offering_id to the faculty submission
-     * 
-     * POST /course/link-course-offering
-     * Body: {
-     *   "submission_id": 123,
-     *   "selectedCourse": { // FOLIO course data
-     *     "courseNumber": "PHY 360gr",
-     *     "name": "Advanced Topics in Physics - General Relativity",
-     *     "departmentId": "uuid",
-     *     "departmentObject": { "name": "SC Physics" },
-     *     "courseListingId": "uuid", // This becomes folio_course_id
-     *     "courseListingObject": {
-     *       "locationId": "uuid",
-     *       "locationObject": { "name": "SC Neilson Reserve" },
-     *       "termId": "uuid",
-     *       "termObject": { "name": "2026 Spring", "startDate": "...", "endDate": "..." }
-     *     }
-     *   }
-     * }
-     * 
-     * Returns: {
-     *   "course": { ... permanent course record ... },
-     *   "offering": { ... course offering record ... },
-     *   "submission": { ... updated faculty submission ... }
-     * }
-     */
+    /** Links a staff-selected FOLIO listing to a faculty submission. */
     public function actionLinkCourseOffering()
     {
         $body = Yii::$app->request->post();
@@ -878,7 +846,16 @@ class CourseController extends ActiveController
             throw new NotFoundHttpException('Faculty submission not found.');
         }
         $linkService = new CourseOfferingLinkService();
-        $listing = $linkService->fetchListing((string)$body['selectedCourse']['courseListingId']);
+        try {
+            $listing = $linkService->fetchListing(
+                (string)$body['selectedCourse']['courseListingId'],
+                $submission->course_code
+            );
+        } catch (\app\services\FolioListingLookupException $exception) {
+            $result = $exception->getResult();
+            Yii::$app->response->statusCode = $result['status'];
+            return $result['body'];
+        }
         $match = (new \app\services\SubmissionLinkMatchRule())->evaluate($submission->attributes, $listing);
         if ($match['match'] !== 'exact') {
             Yii::$app->response->statusCode = 409;

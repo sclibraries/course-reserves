@@ -3,12 +3,12 @@
 namespace app\services;
 
 use Yii;
+use app\components\FolioCourseQuery;
 use app\models\CourseOfferings;
 use app\models\Courses;
 use yii\db\IntegrityException;
 use yii\web\BadRequestHttpException;
 use yii\web\ConflictHttpException;
-use yii\web\NotFoundHttpException;
 use yii\web\ServerErrorHttpException;
 
 /** Shared FOLIO course and offering lookup/create behavior for all linking paths. */
@@ -21,13 +21,36 @@ class CourseOfferingLinkService
         $this->folioService = $folioService ?: Yii::$container->get(FolioService::class);
     }
 
-    public function fetchListing($listingId)
+    public function fetchListing($listingId, $courseCode = null)
     {
         try {
-            return $this->folioService->fetchCourseById($listingId);
-        } catch (\RuntimeException $exception) {
-            throw new NotFoundHttpException('FOLIO course listing not found.');
+            $courses = $this->folioService->searchCoursesStrict(
+                '(' . FolioCourseQuery::courseListingIdClause($listingId) . ')'
+            );
+        } catch (\Exception $exception) {
+            $reference = strtoupper(bin2hex(random_bytes(3)));
+            Yii::error(
+                $reference . ' ' . str_replace(["\r", "\n"], ' ', $exception->getMessage()),
+                'folio'
+            );
+            throw FolioListingLookupException::unavailable($reference);
         }
+
+        if (!is_array($courses) || empty($courses)) {
+            throw FolioListingLookupException::notFound();
+        }
+        if (isset($courses['courseListingId'])) {
+            $courses = [$courses];
+        }
+
+        $matchRule = new SubmissionLinkMatchRule();
+        foreach ($courses as $course) {
+            if ($matchRule->matchesCourseNumber($courseCode ?: '', $course)) {
+                return $course;
+            }
+        }
+
+        return reset($courses);
     }
 
     public function findOrCreateFromListing(array $listing)

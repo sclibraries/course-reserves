@@ -35,7 +35,7 @@ class SubmissionLinkMatchRule
         ];
     }
 
-    private function matchesCourseNumber($courseCode, array $listing)
+    public function matchesCourseNumber($courseCode, array $listing)
     {
         $wanted = $this->normalizeCourseNumber($courseCode);
         foreach ($this->listingCourses($listing) as $course) {

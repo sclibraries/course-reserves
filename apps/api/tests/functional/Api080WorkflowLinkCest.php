@@ -155,7 +155,7 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         Assert::assertSame('test-api080-staff', $response['linked_by']);
         Assert::assertSame($listing['courseListingId'], $response['folio_course_listing_id']);
         Assert::assertSame('AFR155', $this->courseNumber($response['offering_id']));
-        Assert::assertSame($listing['courseListingId'], $this->folio->lastFetchedId);
+        Assert::assertSame('(courseListingId=="' . $listing['courseListingId'] . '")', $this->folio->lastListingQuery);
 
         $event = $this->event($uuid, 'linked');
         Assert::assertSame('test-api080-staff', $event['actor_username']);
@@ -180,6 +180,58 @@ class Api080WorkflowLinkCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame('1', $this->response($I)['offering']['section_name']);
         Assert::assertSame('linked', $this->event($uuid, 'linked')['event_type']);
+    }
+
+    public function crossListedListingSelectsCourseMatchingSubmission(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('cross-listed');
+        $listingId = $this->prefix . 'cross-listed';
+        $this->folio->addListing($this->listing('cross-listed', [
+            'courseNumber' => 'AFR 156',
+            'courseListingId' => $listingId,
+        ]));
+        $this->folio->addListing($this->listing('cross-listed', [
+            'courseNumber' => 'AFR155',
+            'courseListingId' => $listingId,
+        ]));
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $listingId,
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('AFR155', $this->courseNumber($this->response($I)['offering_id']));
+    }
+
+    public function folioTransportFailureReturnsGenericUnavailableResponse(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('folio-timeout');
+        $this->folio->listingSearchException = new \yii\httpclient\Exception(
+            'Curl error: #28 - Resolving timed out after 5000 milliseconds'
+        );
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $this->prefix . 'missing',
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(502);
+        $body = $this->response($I);
+        Assert::assertSame('folio_unavailable', $body['error_code']);
+        Assert::assertSame("FOLIO isn't responding. Try again in a moment.", $body['message']);
+        Assert::assertNotEmpty($body['reference']);
+        Assert::assertStringNotContainsString('Curl', json_encode($body));
+    }
+
+    public function unknownFolioListingReturnsSpecificNotFoundResponse(FunctionalTester $I)
+    {
+        $uuid = $this->insertSubmission('unknown-listing');
+
+        $this->post($I, 'workflow/submission/' . $uuid . '/link', [
+            'folio_course_listing_id' => $this->prefix . 'unknown',
+        ], $this->staffToken);
+
+        $I->seeResponseCodeIs(404);
+        Assert::assertSame('folio_listing_not_found', $this->response($I)['error_code']);
     }
 
     public function linkRejectsNonExactAndReportsAlreadyLinkedBy(FunctionalTester $I)
@@ -637,11 +689,13 @@ class TestApi080WorkflowFolioService
     public $terms = [];
     public $lastFetchedId;
     public $lastQuery;
+    public $lastListingQuery;
+    public $listingSearchException;
     public $onFetch;
 
     public function addListing(array $listing)
     {
-        $this->listings[$listing['courseListingId']] = $listing;
+        $this->listings[$listing['courseListingId']][] = $listing;
     }
 
     public function fetchCourseById($id)
@@ -650,16 +704,32 @@ class TestApi080WorkflowFolioService
         if ($this->onFetch !== null) {
             call_user_func($this->onFetch);
         }
-        if (!isset($this->listings[$id])) {
-            throw new \RuntimeException('FOLIO_COURSE_NOT_FOUND');
-        }
-        return $this->listings[$id];
+        throw new \RuntimeException('FOLIO_COURSE_NOT_FOUND');
     }
 
     public function searchCourses($query)
     {
         $this->lastQuery = $query;
         return $this->searchResults ?: null;
+    }
+
+    public function searchCoursesStrict($query)
+    {
+        $this->lastListingQuery = $query;
+        if ($this->onFetch !== null) {
+            call_user_func($this->onFetch);
+        }
+        if ($this->listingSearchException !== null) {
+            throw $this->listingSearchException;
+        }
+        if (!preg_match('/^\(courseListingId=="([^"]+)"\)$/', $query, $matches)) {
+            return null;
+        }
+        $listings = $this->listings[$matches[1]] ?? [];
+        if (count($listings) > 1) {
+            return $listings;
+        }
+        return $listings ? $listings[0] : null;
     }
 
     public function searchTerms()

@@ -187,7 +187,11 @@ class SubmissionLinkService
             ]];
         }
 
-        $listing = $this->courseOfferingService->fetchListing($listingId);
+        try {
+            $listing = $this->courseOfferingService->fetchListing($listingId, $submission->course_code);
+        } catch (FolioListingLookupException $exception) {
+            return $exception->getResult();
+        }
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $submission = $this->findSubmissionForUpdate($uuid);

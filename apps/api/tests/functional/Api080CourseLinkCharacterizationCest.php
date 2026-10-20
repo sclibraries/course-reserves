@@ -174,6 +174,17 @@ class TestApi080CharacterizationFolioService
         return null;
     }
 
+    public function searchCoursesStrict($query)
+    {
+        if (!preg_match('/^\(courseListingId=="([^"]+)"\)$/', $query, $matches)) {
+            return null;
+        }
+        $listing = self::listing();
+        $listing['courseListingId'] = $matches[1];
+        $listing['id'] = $matches[1];
+        return $listing;
+    }
+
     public static function listing()
     {
         return [

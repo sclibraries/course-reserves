@@ -14,6 +14,11 @@ class FolioCourseQuery
         return implode(' and ', $clauses);
     }
 
+    public static function courseListingIdClause($listingId)
+    {
+        return 'courseListingId=="' . self::escape($listingId) . '"';
+    }
+
     private static function escape($value)
     {
         return str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$value);
