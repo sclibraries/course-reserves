@@ -13,7 +13,6 @@ interface ReserveItemLike {
   materialType?: string | null;
   isbn?: string | null;
   doi?: string | null;
-  sourceLink?: string | null;
   url?: string | null;
   displayStartDate?: Date | string | null;
   displayEndDate?: Date | string | null;
@@ -87,7 +86,7 @@ export const validateReserveItem = (item: ReserveItemLike): ValidationResult => 
   const materialType = (item.materialType || '').trim();
   const isbn = (item.isbn || '').trim();
   const doi = (item.doi || '').trim();
-  const url = (item.sourceLink || item.url || '').trim();
+  const url = (item.url || '').trim();
   const displayStartDate = normalizeDate(item.displayStartDate);
   const displayEndDate = normalizeDate(item.displayEndDate);
 

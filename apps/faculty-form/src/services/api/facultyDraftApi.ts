@@ -73,3 +73,8 @@ export const isDraftConflict = (error: unknown): boolean => {
   const data = (error as { response?: { data?: { error_code?: string } } })?.response?.data;
   return data?.error_code === 'draft_conflict';
 };
+
+export const isRetryableSaveError = (error: unknown): boolean => {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  return status === undefined || status === 408 || status === 429 || (status >= 500 && status < 600);
+};

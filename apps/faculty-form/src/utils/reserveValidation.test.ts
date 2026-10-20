@@ -47,12 +47,24 @@ describe('validateReserveItem', () => {
       materialType: 'Book',
       isbn: '12345',
       doi: 'abc/123',
-      sourceLink: 'ftp://example.test/resource',
+      url: 'ftp://example.test/resource',
     });
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('ISBN must be a valid 10 or 13 digit ISBN.');
     expect(result.errors).toContain('DOI must start with 10. and include a suffix.');
+    expect(result.errors).toContain('URL must start with http:// or https://.');
+  });
+
+  it('validates the URL that the submission payload sends', () => {
+    const result = validateReserveItem({
+      title: 'Example Book',
+      materialType: 'Book',
+      sourceLink: 'https://valid.example.test/resource',
+      url: 'ftp://invalid.example.test/resource',
+    });
+
+    expect(result.valid).toBe(false);
     expect(result.errors).toContain('URL must start with http:// or https://.');
   });
 

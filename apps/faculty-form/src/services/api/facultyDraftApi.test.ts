@@ -26,6 +26,7 @@ import {
   createDraft,
   discardDraft,
   getDraft,
+  isRetryableSaveError,
   saveDraft,
   syncDraft,
   submitDraft,
@@ -33,6 +34,20 @@ import {
 
 describe('faculty draft API', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('retries network errors, timeouts, and transient HTTP responses', () => {
+    expect(isRetryableSaveError(new Error('network failure'))).toBe(true);
+    expect(isRetryableSaveError({ code: 'ETIMEDOUT' })).toBe(true);
+    [408, 429, 500, 599].forEach((status) => {
+      expect(isRetryableSaveError({ response: { status } })).toBe(true);
+    });
+  });
+
+  it('does not retry other client errors, draft conflicts, or locked submissions', () => {
+    [400, 401, 409, 423, 499].forEach((status) => {
+      expect(isRetryableSaveError({ response: { status } })).toBe(false);
+    });
+  });
 
   it('creates a draft with the existing submit payload and returns its version', async () => {
     const payload = { courseInfo: { courseCode: 'BIO 101' }, items: [{ title: 'Synthetic item' }] };

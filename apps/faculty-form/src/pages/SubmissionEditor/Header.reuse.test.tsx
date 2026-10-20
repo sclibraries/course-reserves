@@ -12,6 +12,7 @@ const headerMocks = vi.hoisted(() => ({
     isReadOnly: false,
     saveDraft: vi.fn(),
     isSaving: false,
+    saveStatus: 'idle' as string,
     hasUnsavedChanges: false,
     lastSaveTime: null,
     saveError: null,
@@ -58,5 +59,13 @@ describe('SubmissionEditor Header reuse shortcut', () => {
 
     expect(container!.querySelector('[data-testid="current-location"]')?.textContent)
       .toBe('/submission/reserve-026/edit/add?tab=reuse&course=last');
+  });
+
+  it('shows guidance for a save that stopped retrying', () => {
+    headerMocks.context.saveStatus = 'error';
+    headerMocks.context.saveError = 'Not saved. Please contact the library if this continues.';
+    act(() => root?.render(<MemoryRouter initialEntries={['/submission/reserve-026/edit']}><Header /></MemoryRouter>));
+
+    expect(container!.textContent).toContain('Not saved. Please contact the library if this continues.');
   });
 });

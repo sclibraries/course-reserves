@@ -7,13 +7,15 @@ import type { CourseReserve } from '@/store/courseReservesStore';
 const api = vi.hoisted(() => ({
   syncDraft: vi.fn(),
   getDraft: vi.fn(),
-  isDraftConflict: vi.fn((error: unknown) => (
-    (error as { response?: { data?: { error_code?: string } } })?.response?.data?.error_code === 'draft_conflict'
-  )),
   submitDraft: vi.fn(),
 }));
 
-vi.mock('@/services/api/facultyDraftApi', () => api);
+vi.mock('@/services/api/facultyDraftApi', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/services/api/facultyDraftApi')>(),
+  syncDraft: api.syncDraft,
+  getDraft: api.getDraft,
+  submitDraft: api.submitDraft,
+}));
 
 vi.hoisted(() => {
   const values: Record<string, string> = {};
@@ -66,7 +68,7 @@ function Harness({
     <div>
       <span data-testid="save-status">{sync.saveStatus}</span>
       <div data-testid="items">{reserve?.items.map((item) => item.title).join(',')}</div>
-      {sync.saveStatus === 'retrying' && <p>Not saved - retrying</p>}
+      {sync.saveError && <p>{sync.saveError}</p>}
       <DraftConflictNotice visible={sync.hasConflict} onLoadLatest={sync.loadLatestVersion} />
     </div>
   );
@@ -79,7 +81,7 @@ describe('useServerDraftSync', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     sync = null;
     useDraftStore.getState().clearAllDrafts();
     useReserveStore.setState({ reserves: [{ ...initialReserve }] });
@@ -160,6 +162,41 @@ describe('useServerDraftSync', () => {
     expect(api.syncDraft).toHaveBeenCalledTimes(3);
   });
 
+  it('stops retrying a rejected save until another edit and shows generic guidance', async () => {
+    api.syncDraft
+      .mockRejectedValueOnce({ response: { status: 400, data: { message: 'invalid item URL' } } })
+      .mockResolvedValueOnce({ submission_uuid: 'server-draft-1', status: 'draft', draft_version: 1 });
+
+    act(() => sync?.markChanged());
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
+    expect(sync?.saveStatus).toBe('error');
+    expect(container.textContent).toContain('Not saved. Please contact the library if this continues.');
+    expect(container.textContent).not.toContain('invalid item URL');
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
+
+    act(() => sync?.markChanged());
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(2);
+    expect(sync?.saveStatus).toBe('saved');
+  });
+
+  it('retries a server error', async () => {
+    api.syncDraft
+      .mockRejectedValueOnce({ response: { status: 500 } })
+      .mockResolvedValueOnce({ submission_uuid: 'server-draft-1', status: 'draft', draft_version: 1 });
+
+    act(() => sync?.markChanged());
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(2);
+    expect(sync?.saveStatus).toBe('saved');
+  });
+
   it('keeps local edits on a conflict until the user loads the latest version', async () => {
     const serverDraft: CourseReserve = {
       ...initialReserve,
@@ -181,6 +218,9 @@ describe('useServerDraftSync', () => {
     act(() => sync?.markChanged());
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
 
+    expect(sync?.saveStatus).toBe('conflict');
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('This list was changed on another device');
     expect(container.querySelector('[data-testid="items"]')?.textContent).toContain('Local edit');
 

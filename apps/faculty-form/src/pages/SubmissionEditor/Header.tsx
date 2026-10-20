@@ -70,7 +70,7 @@ export default function Header() {
                   : hasUnsavedChanges ? 'Unsaved changes' : ''}
               </span>
             )}
-            {saveStatus === 'retrying' && (
+            {(saveStatus === 'retrying' || saveStatus === 'error') && (
               <span className="text-xs text-destructive">
                 {saveError || 'Not saved - retrying'}
               </span>

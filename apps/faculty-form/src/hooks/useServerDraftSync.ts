@@ -6,11 +6,12 @@ import { buildSubmissionPayload } from '@/handlers/submissionPayload';
 import {
   getDraft,
   isDraftConflict,
+  isRetryableSaveError,
   syncDraft,
   submitDraft as submitServerDraft,
 } from '@/services/api/facultyDraftApi';
 
-export type DraftSaveStatus = 'idle' | 'saving' | 'saved' | 'retrying' | 'conflict';
+export type DraftSaveStatus = 'idle' | 'saving' | 'saved' | 'retrying' | 'conflict' | 'error';
 
 interface ServerDraftSyncConfig {
   autoSaveDelay?: number;
@@ -61,9 +62,7 @@ export function useServerDraftSync(
   const performSave = useCallback((): Promise<boolean> => {
     if (inFlightPromiseRef.current) return inFlightPromiseRef.current;
     const current = reserveRef.current;
-    if (!reserveId || !current || current.status !== 'draft' || !autoSaveEnabled || conflictRef.current) {
-      return Promise.resolve(false);
-    }
+    if (!reserveId || !current || current.status !== 'draft' || !autoSaveEnabled || conflictRef.current) return Promise.resolve(false);
     const markConflict = () => {
       conflictRef.current = true;
       setSaveStatus('conflict');
@@ -100,8 +99,12 @@ export function useServerDraftSync(
         return true;
       } catch (error) {
         console.error('Failed to save faculty draft:', error);
-        if (isDraftConflict(error)) {
-          markConflict();
+        if (isDraftConflict(error)) { markConflict(); return false; }
+
+        if (!isRetryableSaveError(error)) {
+          setSaveStatus('error');
+          draftStore.setSavingStatus(reserveId, 'error');
+          draftStore.setSaveError(reserveId, 'Not saved. Please contact the library if this continues.');
           return false;
         }
 
@@ -109,8 +112,7 @@ export function useServerDraftSync(
         setSaveStatus('retrying');
         draftStore.setSavingStatus(reserveId, 'error');
         draftStore.setSaveError(reserveId, 'Not saved - retrying');
-        const retryDelay = Math.min(autoSaveDelay * (2 ** Math.min(retryCountRef.current - 1, 5)), 60000);
-        queueSave(retryDelay);
+        queueSave(Math.min(autoSaveDelay * (2 ** Math.min(retryCountRef.current - 1, 5)), 60000));
         return false;
       } finally {
         inFlightPromiseRef.current = null;
@@ -184,9 +186,7 @@ export function useServerDraftSync(
     return uuid;
   }, [performSave, reserveId, saveDraft]);
 
-  useEffect(() => {
-    if (!autoSaveEnabled) clearTimer();
-  }, [autoSaveEnabled, clearTimer]);
+  useEffect(() => { if (!autoSaveEnabled) clearTimer(); }, [autoSaveEnabled, clearTimer]);
 
   useEffect(() => {
     if (hasUnsavedChanges || reserve?.status !== 'draft' || !reserve.draftVersion || conflictRef.current) return;
@@ -212,7 +212,7 @@ export function useServerDraftSync(
     markChanged,
     saveStatus,
     lastSaveTime,
-    saveError: saveStatus === 'retrying' ? 'Not saved - retrying' : null,
+    saveError: draftStore.getSaveError(reserveId || '') || (saveStatus === 'retrying' ? 'Not saved - retrying' : null),
     hasUnsavedChanges,
     isSaving: saveStatus === 'saving',
     hasConflict: saveStatus === 'conflict',
