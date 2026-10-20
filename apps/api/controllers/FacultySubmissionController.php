@@ -16,9 +16,7 @@ use app\models\SubmissionMetadata;
 use app\models\MaterialTypes;
 use app\models\Course;
 use app\models\CourseOffering;
-use app\services\FacultyTokenClaims;
-use app\services\SubmissionOwnershipPolicy;
-use app\services\SubmissionMaterializationGuard;
+use app\services\{FacultyTokenClaims, SubmissionOwnershipPolicy, SubmissionMaterializationGuard, SubmissionPayloadService, SubmittedSubmissionUpdateValidator};
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use yii\helpers\ArrayHelper;
@@ -721,7 +719,7 @@ class FacultySubmissionController extends BaseRestController
         }
 
         $data = Yii::$app->request->getBodyParams();
-        (new SubmissionOwnershipPolicy())->assertUpdateDoesNotChangeOwnership($data);
+        $data = (new SubmittedSubmissionUpdateValidator())->validate($submission, $data);
 
         if (isset($data['items']) || isset($data['folders'])) {
             $existingItems = SubmissionNewResource::find()
@@ -962,7 +960,7 @@ class FacultySubmissionController extends BaseRestController
 
     private function buildUpdatedResourceData(array $currentData, array $itemData): array
     {
-        return SubmissionMaterializationGuard::buildUpdatedResourceData($currentData, $itemData);
+        return SubmissionPayloadService::normalizeResourceData(SubmissionMaterializationGuard::buildUpdatedResourceData($currentData, $itemData));
     }
 
     private function buildNewResourceData(array $itemData): array

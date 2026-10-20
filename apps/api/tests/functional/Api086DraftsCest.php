@@ -116,6 +116,142 @@ class Api086DraftsCest extends BaseFunctionalCest
         Assert::assertSame('Updated API-086 draft item', json_decode($savedTitle, true)['title']);
     }
 
+    public function draftPutNormalizesLinksWithSpacesAndAccents(FunctionalTester $I)
+    {
+        $this->postDraft($I, $this->draftPayload());
+        $uuid = $this->response($I)['submission_uuid'];
+        $updated = $this->draftPayload();
+        $updated['draft_version'] = 1;
+        $updated['resources'][0]['resource_data']['url'] = 'https://example.org/a b';
+        $updated['resources'][] = [
+            'resource_data' => [
+                'title' => 'Synthetic accented URL item',
+                'url' => 'https://example.org/café',
+                'materialType' => 'book',
+            ],
+            'display_order' => 1,
+        ];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
+        $I->seeResponseCodeIs(200);
+
+        $resources = $this->storedResourceData($uuid);
+        Assert::assertSame('https://example.org/a%20b', $resources[0]['url']);
+        Assert::assertSame('https://example.org/caf%C3%A9', $resources[1]['url']);
+    }
+
+    public function draftPutPreservesInvalidUrlAndDoesNotRequireItemTitle(FunctionalTester $I)
+    {
+        $this->postDraft($I, $this->draftPayload());
+        $uuid = $this->response($I)['submission_uuid'];
+        $updated = $this->draftPayload();
+        $updated['draft_version'] = 1;
+        $updated['resources'][0]['resource_data'] = ['url' => 'not a url'];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
+        $I->seeResponseCodeIs(200);
+
+        Assert::assertSame('not a url', $this->storedResourceData($uuid)[0]['url']);
+    }
+
+    public function draftSaveRejectsMalformedResourceListsAndMissingCourseFields(FunctionalTester $I)
+    {
+        $malformed = $this->draftPayload();
+        $malformed['resources'] = 'not an array';
+        $this->postDraft($I, $malformed);
+        $I->seeResponseCodeIs(400);
+
+        $malformed['resources'] = null;
+        $this->postDraft($I, $malformed);
+        $I->seeResponseCodeIs(400);
+
+        $this->postDraft($I, $this->draftPayload());
+        $uuid = $this->response($I)['submission_uuid'];
+        $updated = $this->draftPayload();
+        $updated['draft_version'] = 1;
+        $updated['resources'] = 'not an array';
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
+
+        $updated['resources'] = null;
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
+
+        $updated = $this->draftPayload();
+        $updated['draft_version'] = 1;
+        $updated['courseInfo']['term'] = '';
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
+    }
+
+    public function submitCompleteRejectsInvalidUrlAndNormalizesAcceptedUrl(FunctionalTester $I)
+    {
+        $invalid = $this->draftPayload();
+        $invalid['resources'][0]['resource_data']['url'] = 'not a url';
+        $this->postComplete($I, $invalid);
+        $I->seeResponseCodeIs(400);
+        Assert::assertSame('Resource 0 has an invalid URL', $this->response($I)['message']);
+
+        $valid = $this->draftPayload();
+        $valid['resources'][0]['resource_data']['url'] = 'https://example.org/a b';
+        $this->postComplete($I, $valid);
+        $I->seeResponseCodeIs(200);
+        $uuid = \Yii::$app->db->createCommand(
+            'SELECT submission_uuid FROM faculty_submissions WHERE shibboleth_user_id = :owner '
+            . 'AND its_course_id = :course AND academic_period = :period',
+            [':owner' => $this->ownerId, ':course' => $this->courseId, ':period' => $this->academicPeriod]
+        )->queryScalar();
+        Assert::assertSame('https://example.org/a%20b', $this->storedResourceData($uuid)[0]['url']);
+    }
+
+    public function draftSubmitRejectsAnInvalidUrlSavedDuringDrafting(FunctionalTester $I)
+    {
+        $payload = $this->draftPayload();
+        $payload['resources'][0]['resource_data']['url'] = 'not a url';
+        $this->postDraft($I, $payload);
+        $I->seeResponseCodeIs(201);
+        $uuid = $this->response($I)['submission_uuid'];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('POST', 'faculty-submission/submit', [], ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
+        Assert::assertSame('Resource 0 has an invalid URL', $this->response($I)['message']);
+    }
+
+    public function submittedPutValidatesAndNormalizesResourceUrls(FunctionalTester $I)
+    {
+        $this->postComplete($I, $this->draftPayload());
+        $uuid = \Yii::$app->db->createCommand(
+            'SELECT submission_uuid FROM faculty_submissions WHERE shibboleth_user_id = :owner '
+            . 'AND its_course_id = :course AND academic_period = :period',
+            [':owner' => $this->ownerId, ':course' => $this->courseId, ':period' => $this->academicPeriod]
+        )->queryScalar();
+        $itemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = '
+            . '(SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid)',
+            [':uuid' => $uuid]
+        )->queryScalar();
+        $items = [[
+            'id' => $itemId,
+            'title' => 'Synthetic API-089 submitted item',
+            'url' => 'not a url',
+            'display_order' => 0,
+        ]];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', ['items' => $items], ['id' => $uuid]);
+        $I->seeResponseCodeIs(400);
+        Assert::assertSame('Resource 0 has an invalid URL', $this->response($I)['message']);
+
+        $items[0]['url'] = 'https://example.org/a b';
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', ['items' => $items], ['id' => $uuid]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('https://example.org/a%20b', $this->storedResourceData($uuid)[0]['url']);
+    }
+
     public function submitPromotesDraftWithoutCreatingAnotherRow(FunctionalTester $I)
     {
         $this->postDraft($I, $this->draftPayload());
@@ -331,6 +467,19 @@ class Api086DraftsCest extends BaseFunctionalCest
         $response = json_decode($I->grabPageSource(), true);
         Assert::assertIsArray($response);
         return $response;
+    }
+
+    private function storedResourceData($uuid)
+    {
+        $rows = \Yii::$app->db->createCommand(
+            'SELECT resource_data FROM submission_new_resources WHERE submission_id = '
+            . '(SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid) '
+            . 'ORDER BY display_order ASC',
+            [':uuid' => $uuid]
+        )->queryColumn();
+        return array_map(function ($resourceData) {
+            return json_decode($resourceData, true);
+        }, $rows);
     }
 
     private function token($username, $role, $internalId = null)

@@ -29,7 +29,7 @@ class FacultyDraftService
 
     public function create(array $actor, array $data)
     {
-        $resolved = $this->resolveAndValidate($actor, $data);
+        $resolved = $this->resolveAndValidate($actor, $data, true);
         if (isset($resolved['status_code'])) {
             return $resolved;
         }
@@ -144,7 +144,7 @@ class FacultyDraftService
             if (isset($data['courseInfo']) && is_array($data['courseInfo'])) {
                 $payload['courseInfo'] = array_merge($payload['courseInfo'] ?? [], $data['courseInfo']);
             }
-            if (isset($data['items']) && !isset($data['resources'])) {
+            if (array_key_exists('items', $data) && !array_key_exists('resources', $data)) {
                 unset($payload['resources']);
                 $payload['items'] = $data['items'];
             }
@@ -154,8 +154,7 @@ class FacultyDraftService
                 'term' => $submission->term_code,
                 'section' => $submission->section,
             ];
-            $resources = $payload['resources'] ?? $payload['items'] ?? [];
-            $this->payloads->validate($course, $this->payloads->validationResources($resources));
+            $this->payloads->validateDraft($course, $this->payloads->payloadResources($payload));
             $payload['courseInfo'] = $course;
 
             $this->applyDraftCourseFields($submission, $payload);
@@ -187,6 +186,10 @@ class FacultyDraftService
             }
             $context['owner_id'] = $submission->shibboleth_user_id;
         }
+        $this->payloads->validate(
+            $payload['courseInfo'] ?? [],
+            $this->payloads->validationResources($this->payloads->payloadResources($payload))
+        );
 
         return Transactional::run(function () use ($submission, $context, $payload) {
             $this->contexts->apply($submission, $context);
@@ -229,7 +232,7 @@ class FacultyDraftService
         return null;
     }
 
-    private function resolveAndValidate(array $actor, array $data)
+    private function resolveAndValidate(array $actor, array $data, $draft = false)
     {
         $context = $this->contexts->resolve($actor, $data);
         if (isset($context['error_code'])) {
@@ -238,10 +241,12 @@ class FacultyDraftService
                 'body' => ['error_code' => $context['error_code']],
             ];
         }
-        $this->payloads->validate(
-            $data['courseInfo'],
-            $this->payloads->validationResources($data['resources'] ?? $data['items'] ?? [])
-        );
+        $resources = $this->payloads->payloadResources($data);
+        if ($draft) {
+            $this->payloads->validateDraft($data['courseInfo'], $resources);
+        } else {
+            $this->payloads->validate($data['courseInfo'], $this->payloads->validationResources($resources));
+        }
         return ['context' => $context];
     }
 

@@ -18,6 +18,10 @@ class SubmissionPayloadService
     {
         $result = [];
         foreach ($resources as $item) {
+            if (!is_array($item)) {
+                $result[] = ['resource_data' => null];
+                continue;
+            }
             if (isset($item['resource_data'])) {
                 $result[] = $item;
                 continue;
@@ -27,23 +31,56 @@ class SubmissionPayloadService
         return $result;
     }
 
+    public function payloadResources(array $payload)
+    {
+        $key = array_key_exists('resources', $payload) ? 'resources' : 'items';
+        $resources = array_key_exists($key, $payload) ? $payload[$key] : [];
+        if (!is_array($resources)) {
+            throw new \yii\web\BadRequestHttpException('Resources must be an array');
+        }
+        return $resources;
+    }
+
+    public function validateDraft(array $course, $resources)
+    {
+        $this->validateCourse($course);
+        if (!is_array($resources)) {
+            throw new \yii\web\BadRequestHttpException('Resources must be an array');
+        }
+    }
+
     public function validate(array $course, array $resources)
+    {
+        $this->validateCourse($course);
+        foreach ($resources as $index => $resource) {
+            $resourceData = $resource['resource_data'] ?? [];
+            if (!is_array($resourceData) || empty($resourceData['title'])) {
+                throw new \yii\web\BadRequestHttpException('Resource ' . $index . ' is missing required title');
+            }
+            if (!empty($resourceData['url']) && \app\components\ResourceUrl::normalize($resourceData['url']) === null) {
+                throw new \yii\web\BadRequestHttpException('Resource ' . $index . ' has an invalid URL');
+            }
+        }
+    }
+
+    private function validateCourse(array $course)
     {
         foreach (['courseCode', 'courseTitle', 'term'] as $field) {
             if (!isset($course[$field]) || trim((string)$course[$field]) === '') {
                 throw new \yii\web\BadRequestHttpException('Missing required course information: ' . $field);
             }
         }
+    }
 
-        foreach ($resources as $index => $resource) {
-            $resourceData = $resource['resource_data'] ?? [];
-            if (!is_array($resourceData) || empty($resourceData['title'])) {
-                throw new \yii\web\BadRequestHttpException('Resource ' . $index . ' is missing required title');
-            }
-            if (!empty($resourceData['url']) && !filter_var(trim($resourceData['url']), FILTER_VALIDATE_URL)) {
-                throw new \yii\web\BadRequestHttpException('Resource ' . $index . ' has an invalid URL');
+    public static function normalizeResourceData(array $resourceData)
+    {
+        if (!empty($resourceData['url'])) {
+            $normalized = \app\components\ResourceUrl::normalize($resourceData['url']);
+            if ($normalized !== null) {
+                $resourceData['url'] = $normalized;
             }
         }
+        return $resourceData;
     }
 
     public function replace($submissionId, array $payload, array $actor)
@@ -74,7 +111,14 @@ class SubmissionPayloadService
         }
 
         foreach ($resources as $index => $resource) {
+            if (!is_array($resource)) {
+                $resource = [];
+            }
             $data = $resource['resource_data'] ?? [];
+            if (!is_array($data)) {
+                $data = [];
+            }
+            $data = self::normalizeResourceData($data);
             $folderId = $resource['folder_id'] ?? $resource['folder_uuid'] ?? null;
             $folderName = $resource['folder_name'] ?? ($folderNames[$folderId] ?? null);
             $materialType = $data['materialType'] ?? 'book';
@@ -136,12 +180,16 @@ class SubmissionPayloadService
 
     private function resourcesFromPayload(array $payload)
     {
-        if (isset($payload['resources']) && is_array($payload['resources'])) {
-            return $payload['resources'];
+        if (array_key_exists('resources', $payload)) {
+            return $this->payloadResources($payload);
         }
 
         $resources = [];
-        foreach ($payload['items'] ?? [] as $item) {
+        foreach ($this->payloadResources($payload) as $item) {
+            if (!is_array($item)) {
+                $resources[] = ['resource_data' => []];
+                continue;
+            }
             $data = $item['resource_data'] ?? $this->resourceData($item);
             $resources[] = [
                 'resource_data' => $data,
