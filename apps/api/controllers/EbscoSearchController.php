@@ -1026,7 +1026,7 @@ class EbscoSearchController extends ActiveController
                 foreach ($bibEntity['Languages'] as $language) {
                     $result['RecordInfo']['BibEntity']['Languages'][] = [
                         'Code' => $language['Code'] ?? '',
-                        'Text' => $language['Text'] ?? ''
+                        'Text' => \app\components\EbscoText::decode($language['Text'] ?? '')
                     ];
                 }
             }
@@ -1043,7 +1043,7 @@ class EbscoSearchController extends ActiveController
             if (!empty($bibEntity['Subjects'])) {
                 foreach ($bibEntity['Subjects'] as $subject) {
                     $result['RecordInfo']['BibEntity']['Subjects'][] = [
-                        'SubjectFull' => $subject['SubjectFull'] ?? '',
+                        'SubjectFull' => \app\components\EbscoText::decode($subject['SubjectFull'] ?? ''),
                         'Type' => $subject['Type'] ?? ''
                     ];
                 }
@@ -1053,7 +1053,7 @@ class EbscoSearchController extends ActiveController
             if (!empty($bibEntity['Titles'])) {
                 foreach ($bibEntity['Titles'] as $title) {
                     $result['RecordInfo']['BibEntity']['Titles'][] = [
-                        'TitleFull' => $title['TitleFull'] ?? '',
+                        'TitleFull' => \app\components\EbscoText::decode($title['TitleFull'] ?? ''),
                         'Type' => $title['Type'] ?? ''
                     ];
                 }
@@ -1070,7 +1070,7 @@ class EbscoSearchController extends ActiveController
             // Contributors
             if (!empty($bibRelationships['HasContributorRelationships'])) {
                 foreach ($bibRelationships['HasContributorRelationships'] as $contributor) {
-                    $nameFull = $contributor['PersonEntity']['Name']['NameFull'] ?? '';
+                    $nameFull = \app\components\EbscoText::decode($contributor['PersonEntity']['Name']['NameFull'] ?? '');
                     if ($nameFull) {
                         $result['RecordInfo']['BibRelationships']['HasContributorRelationships'][] = [
                             'NameFull' => $nameFull
@@ -1110,7 +1110,7 @@ class EbscoSearchController extends ActiveController
                     if (!empty($relEntity['Titles'])) {
                         foreach ($relEntity['Titles'] as $title) {
                             $result['RecordInfo']['BibRelationships']['IsPartOfRelationships']['Titles'][] = [
-                                'TitleFull' => $title['TitleFull'] ?? '',
+                                'TitleFull' => \app\components\EbscoText::decode($title['TitleFull'] ?? ''),
                                 'Type' => $title['Type'] ?? ''
                             ];
                         }
@@ -1228,7 +1228,7 @@ class EbscoSearchController extends ActiveController
             'Su' => 'Subject'
         ];
 
-        $data = html_entity_decode($data);
+        $data = \app\components\EbscoText::decode($data);
 
         if (!empty($data)) {
             $search = array_keys($xml_to_html_tags);
@@ -1275,7 +1275,7 @@ class EbscoSearchController extends ActiveController
     private function cleanItemData($data, $group = '')
     {
         // Decode HTML entities first
-        $data = html_entity_decode($data);
+        $data = \app\components\EbscoText::decode($data);
         
         // For URL groups, extract just the URL
         // Raw EBSCO data uses <link linkTerm="URL"> format, not <a href="">

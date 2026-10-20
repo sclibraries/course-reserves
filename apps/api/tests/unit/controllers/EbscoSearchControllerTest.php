@@ -2,6 +2,7 @@
 
 namespace tests\unit\controllers;
 
+use app\components\EbscoText;
 use app\controllers\EbscoSearchController;
 use yii\httpclient\Client;
 use yii\caching\ArrayCache;
@@ -10,6 +11,87 @@ use yii\web\TooManyRequestsHttpException;
 
 class EbscoSearchControllerTest extends \Codeception\Test\Unit
 {
+    public function testEbscoTextDecoderHandlesCommonEntities()
+    {
+        $cases = [
+            'Ender&#39;s' => "Ender's",
+            '&amp;#39;' => "'",
+            '&eacute;' => 'é',
+            'Caf&#233;' => 'Café',
+            'Tom &amp; Jerry' => 'Tom & Jerry',
+            'plain UTF-8 é' => 'plain UTF-8 é',
+            'AT&T' => 'AT&T'
+        ];
+
+        foreach ($cases as $encoded => $decoded) {
+            $this->assertSame($decoded, EbscoText::decode($encoded));
+        }
+    }
+
+    public function testSearchAndRetrieveDecodeItemAndBibEntityTitles()
+    {
+        $record = [
+            'Items' => [
+                ['Label' => 'Title', 'Group' => 'Ti', 'Data' => 'Ender&#39;s Game']
+            ],
+            'RecordInfo' => [
+                'BibRecord' => [
+                    'BibEntity' => [
+                        'Subjects' => [
+                            ['SubjectFull' => 'Ender&#39;s subject', 'Type' => 'topic']
+                        ],
+                        'Titles' => [
+                            ['TitleFull' => 'Ender&#39;s Game', 'Type' => 'main']
+                        ]
+                    ],
+                    'BibRelationships' => [
+                        'HasContributorRelationships' => [
+                            ['PersonEntity' => ['Name' => ['NameFull' => 'Ender&#39;s author']]]
+                        ],
+                        'IsPartOfRelationships' => [
+                            ['BibEntity' => [
+                                'Titles' => [
+                                    ['TitleFull' => 'Ender&#39;s journal', 'Type' => 'periodical']
+                                ]
+                            ]]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+
+        $search = $this->invokeMethod($controller, 'processFullSearchResults', [json_encode([
+            'SearchResult' => ['Data' => ['Records' => [$record]]]
+        ])]);
+        $searchRecord = $search['records'][0];
+
+        $retrieve = $this->invokeMethod($controller, 'processRetrieveResults', [json_encode([
+            'Record' => $record
+        ])]);
+        $retrieveRecord = $retrieve['record'];
+
+        foreach ([$searchRecord, $retrieveRecord] as $mappedRecord) {
+            $this->assertSame("Ender's Game", $mappedRecord['Items']['Ti'][0]['CleanData']);
+            $this->assertSame(
+                "Ender's Game",
+                $mappedRecord['RecordInfo']['BibEntity']['Titles'][0]['TitleFull']
+            );
+            $this->assertSame(
+                "Ender's subject",
+                $mappedRecord['RecordInfo']['BibEntity']['Subjects'][0]['SubjectFull']
+            );
+            $this->assertSame(
+                "Ender's author",
+                $mappedRecord['RecordInfo']['BibRelationships']['HasContributorRelationships'][0]['NameFull']
+            );
+            $this->assertSame(
+                "Ender's journal",
+                $mappedRecord['RecordInfo']['BibRelationships']['IsPartOfRelationships']['Titles'][0]['TitleFull']
+            );
+        }
+    }
+
     public function testEbscoProxyRequiresBearerAuthAndRestrictsCorsOrigins()
     {
         $previousOrigins = \Yii::$app->params['corsOrigins'];
