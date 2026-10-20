@@ -1,6 +1,7 @@
 <?php
 
 use yii\db\Migration;
+use app\services\PrintBookFlowMapping;
 
 class m261019_000003_add_staff_workflow_flows extends Migration
 {
@@ -75,7 +76,7 @@ class m261019_000003_add_staff_workflow_flows extends Migration
         );
 
         $this->alterColumn('workflow_events', 'submission_id', $this->bigInteger()->unsigned()->null());
-        $this->seedPrintBookFlow();
+        (new PrintBookFlowMapping($this->db))->findOrCreate();
     }
 
     public function safeDown()
@@ -91,93 +92,4 @@ class m261019_000003_add_staff_workflow_flows extends Migration
         $this->alterColumn('workflow_events', 'submission_id', $this->bigInteger()->unsigned()->notNull());
     }
 
-    private function seedPrintBookFlow()
-    {
-        $materialTypeId = $this->db->createCommand(
-            'SELECT material_type_id FROM material_types WHERE name = :name LIMIT 1', [':name' => 'book']
-        )->queryScalar();
-        if (!$materialTypeId) {
-            return;
-        }
-
-        $this->insert('flows', [
-            'name' => 'Print book',
-            'description' => 'Process a physical book for course reserve.',
-            'created_by' => 'system',
-        ]);
-        $flowId = (int)$this->db->getLastInsertID();
-        $this->insert('flow_versions', [
-            'flow_id' => $flowId,
-            'version' => 1,
-            'steps_json' => json_encode($this->printBookSteps(), JSON_UNESCAPED_SLASHES),
-            'created_by' => 'system',
-        ]);
-        $this->insert('material_type_flows', [
-            'material_type_id' => (int)$materialTypeId,
-            'flow_id' => $flowId,
-        ]);
-    }
-
-    private function printBookSteps()
-    {
-        return [
-            $this->question('own_it', 'Do we own it?', [
-                $this->outcome('yes', 'Yes', ['step' => 'available']),
-                $this->outcome('no', 'No', ['handoff_group' => 'Acquisitions']),
-                $this->outcome('cannot_get', "We can't get this", ['finish' => 'unavailable']),
-            ]),
-            $this->question('available', 'Is it available?', [
-                $this->outcome('available', 'Available', ['step' => 'pull']),
-                $this->outcome('checked_out', 'Checked out', ['step' => 'recall']),
-                $this->outcome('lost', 'Lost', ['handoff_group' => 'Acquisitions']),
-                $this->outcome('cannot_get', "We can't get this", ['finish' => 'unavailable']),
-            ]),
-            $this->action('recall', 'Recall it', ['step' => 'available']),
-            $this->action('pull', 'Pull it from the shelf', ['step' => 'folio_reserve']),
-            $this->action('folio_reserve', 'Change its location to on reserve and attach it to the course in FOLIO', ['step' => 'confirm']),
-            [
-                'key' => 'confirm',
-                'kind' => 'confirm_on_reserve',
-                'label' => 'Confirm on reserve in FOLIO',
-                'help_text' => null,
-                'outcomes' => [$this->outcome('done', 'Done', ['finish' => 'on_reserve'])],
-            ],
-            $this->finish('on_reserve', 'On reserve', 'on_reserve', false),
-            $this->finish('unavailable', 'Unavailable', 'unavailable', true),
-        ];
-    }
-
-    private function question($key, $label, array $outcomes)
-    {
-        return ['key' => $key, 'kind' => 'question', 'label' => $label, 'help_text' => null, 'outcomes' => $outcomes];
-    }
-
-    private function action($key, $label, array $next)
-    {
-        return [
-            'key' => $key,
-            'kind' => 'action',
-            'label' => $label,
-            'help_text' => null,
-            'outcomes' => [$this->outcome('done', 'Done', $next)],
-        ];
-    }
-
-    private function finish($key, $label, $state, $reasonRequired)
-    {
-        return [
-            'key' => $key,
-            'kind' => 'finish',
-            'label' => $label,
-            'help_text' => null,
-            'finish_state' => $state,
-            'reason_required' => $reasonRequired,
-            'outcomes' => [],
-        ];
-    }
-
-    private function outcome($key, $label, array $next)
-    {
-        return ['key' => $key, 'label' => $label, 'next' => $next, 'reason_required' => false];
-    }
 }

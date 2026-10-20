@@ -60,6 +60,59 @@ class DevSeedCest extends BaseFunctionalCest
             'name' => 'Acquisitions',
             'username' => 'test-api078-staff',
         ], $seededGroup);
+
+        $book = \Yii::$app->db->createCommand(
+            'SELECT material_type_id, name, description FROM material_types WHERE LOWER(name) = :name LIMIT 1',
+            [':name' => 'book']
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertNotNull($book, 'dev-seed must ensure a book material type exists.');
+        \PHPUnit\Framework\Assert::assertSame('book', strtolower($book['name']));
+        \PHPUnit\Framework\Assert::assertSame(
+            'Synthetic material type created by dev-seed/test-courses for the Print book flow.',
+            $book['description']
+        );
+        $mapping = \Yii::$app->db->createCommand(
+            'SELECT f.name FROM material_type_flows m INNER JOIN flows f ON f.id = m.flow_id '
+            . 'WHERE m.material_type_id = :type_id', [':type_id' => $book['material_type_id']]
+        )->queryScalar();
+        \PHPUnit\Framework\Assert::assertSame('Print book', $mapping);
+    }
+
+    public function seedCommandPrintsPrintBookMappingAndResetRemovesSeededType(FunctionalTester $I)
+    {
+        $seed = $this->runSeedCommand(false);
+        \PHPUnit\Framework\Assert::assertSame(0, $seed['status'], implode("\n", $seed['output']));
+        \PHPUnit\Framework\Assert::assertSame(1, count(array_filter($seed['output'], function ($line) {
+            return trim($line) === 'Flow: Print book mapped to material type book';
+        })), 'The seed command must print the flow mapping exactly once.');
+
+        $repeat = $this->runSeedCommand(false);
+        \PHPUnit\Framework\Assert::assertSame(0, $repeat['status'], implode("\n", $repeat['output']));
+        $seededBook = \Yii::$app->db->createCommand(
+            'SELECT material_type_id FROM material_types WHERE description = :description LIMIT 1',
+            [':description' => 'Synthetic material type created by dev-seed/test-courses for the Print book flow.']
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertNotNull($seededBook);
+        \PHPUnit\Framework\Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM material_types WHERE LOWER(name) = :name', [':name' => 'book']
+        )->queryScalar());
+        \PHPUnit\Framework\Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM material_type_flows m INNER JOIN material_types mt '
+            . 'ON mt.material_type_id = m.material_type_id INNER JOIN flows f ON f.id = m.flow_id '
+            . 'WHERE LOWER(mt.name) = :name AND f.name = :flow',
+            [':name' => 'book', ':flow' => 'Print book']
+        )->queryScalar());
+
+        $reset = $this->runSeedCommand(true);
+        \PHPUnit\Framework\Assert::assertSame(0, $reset['status'], implode("\n", $reset['output']));
+        \PHPUnit\Framework\Assert::assertSame(0, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM material_types WHERE description = :description',
+            [':description' => 'Synthetic material type created by dev-seed/test-courses for the Print book flow.']
+        )->queryScalar());
+        \PHPUnit\Framework\Assert::assertSame(0, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM material_type_flows WHERE material_type_id = :type_id',
+            [':type_id' => $seededBook['material_type_id']]
+        )->queryScalar());
     }
 
     public function rerunningSeedDoesNotCreateDuplicates(FunctionalTester $I)
@@ -102,6 +155,92 @@ class DevSeedCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertSame(1, (int) \Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM course_assignments WHERE smith_id = :smithId'
         )->bindValue(':smithId', '999000078')->queryScalar());
+    }
+
+    public function resetKeepsPreExistingBookTypeAndMapping(FunctionalTester $I)
+    {
+        $db = \Yii::$app->db;
+        $type = $db->createCommand(
+            'SELECT material_type_id, name, description FROM material_types WHERE LOWER(name) = :name LIMIT 1',
+            [':name' => 'book']
+        )->queryOne();
+        $createdType = !$type;
+        if (!$type) {
+            $db->createCommand()->insert('material_types', [
+                'name' => 'Book',
+                'description' => 'Pre-existing API-084-fr1 material type fixture.',
+            ])->execute();
+            $type = $db->createCommand(
+                'SELECT material_type_id, name, description FROM material_types WHERE LOWER(name) = :name LIMIT 1',
+                [':name' => 'book']
+            )->queryOne();
+        }
+        $flowId = $db->createCommand(
+            'SELECT id FROM flows WHERE name = :name LIMIT 1', [':name' => 'API-084-fr1 pre-existing flow fixture']
+        )->queryScalar();
+        $createdFlow = !$flowId;
+        if (!$flowId) {
+            $db->createCommand()->insert('flows', [
+                'name' => 'API-084-fr1 pre-existing flow fixture',
+                'description' => 'Synthetic pre-existing mapping fixture.',
+                'created_by' => 'test-api084-fr1',
+            ])->execute();
+            $flowId = (int)$db->getLastInsertID();
+        }
+        $mappingRow = $db->createCommand(
+            'SELECT flow_id FROM material_type_flows WHERE material_type_id = :type_id',
+            [':type_id' => $type['material_type_id']]
+        )->queryOne();
+        $createdMapping = !$mappingRow;
+        $originalFlowId = $mappingRow ? $mappingRow['flow_id'] : null;
+        $mapping = $mappingRow ? $mappingRow['flow_id'] : null;
+        if ($createdMapping) {
+            $db->createCommand()->insert('material_type_flows', [
+                'material_type_id' => $type['material_type_id'],
+                'flow_id' => $flowId,
+            ])->execute();
+            $mapping = $flowId;
+        } elseif ($mapping === null) {
+            $db->createCommand()->update('material_type_flows', ['flow_id' => $flowId], [
+                'material_type_id' => $type['material_type_id'],
+            ])->execute();
+            $mapping = $flowId;
+        }
+        $typeBefore = $type;
+
+        try {
+            $service = $this->service();
+            $service->seed($this->currentPeriod, $this->upcomingPeriod);
+            $reset = $this->runSeedCommand(true);
+            \PHPUnit\Framework\Assert::assertSame(0, $reset['status'], implode("\n", $reset['output']));
+            $typeAfter = $db->createCommand(
+                'SELECT material_type_id, name, description FROM material_types WHERE material_type_id = :id',
+                [':id' => $typeBefore['material_type_id']]
+            )->queryOne();
+            \PHPUnit\Framework\Assert::assertSame($typeBefore, $typeAfter);
+            \PHPUnit\Framework\Assert::assertSame((string)$mapping, (string)$db->createCommand(
+                'SELECT flow_id FROM material_type_flows WHERE material_type_id = :type_id',
+                [':type_id' => $typeBefore['material_type_id']]
+            )->queryScalar());
+        } finally {
+            if ($createdMapping) {
+                $db->createCommand()->delete('material_type_flows', [
+                    'material_type_id' => $typeBefore['material_type_id'],
+                ])->execute();
+            } elseif ($originalFlowId === null) {
+                $db->createCommand()->update('material_type_flows', ['flow_id' => null], [
+                    'material_type_id' => $typeBefore['material_type_id'],
+                ])->execute();
+            }
+            if ($createdType) {
+                $db->createCommand()->delete('material_types', [
+                    'material_type_id' => $typeBefore['material_type_id'],
+                ])->execute();
+            }
+            if ($createdFlow) {
+                $db->createCommand()->delete('flows', ['id' => $flowId])->execute();
+            }
+        }
     }
 
     public function previousCourseSeedCreatesOrderedResourcesAndResetRemovesThem(FunctionalTester $I)
@@ -181,6 +320,37 @@ class DevSeedCest extends BaseFunctionalCest
     private function service()
     {
         return new \app\services\DevSeedService();
+    }
+
+    private function runSeedCommand($reset)
+    {
+        $currentPeriod = $this->currentPeriod;
+        $upcomingPeriod = $this->upcomingPeriod;
+        $controller = new class('dev-seed', \Yii::$app) extends \app\commands\DevSeedController {
+            public $capturedOutput = '';
+            public $capturedErrors = '';
+
+            public function stdout($string)
+            {
+                $this->capturedOutput .= $string;
+                return strlen($string);
+            }
+
+            public function stderr($string)
+            {
+                $this->capturedErrors .= $string;
+                return strlen($string);
+            }
+        };
+        $controller->reset = $reset;
+        $controller->currentPeriod = $currentPeriod;
+        $controller->upcomingPeriod = $upcomingPeriod;
+        $status = $controller->actionTestCourses();
+        return [
+            'status' => $status,
+            'output' => explode("\n", $controller->capturedOutput),
+            'errors' => $controller->capturedErrors,
+        ];
     }
 
     private function expectedAssignments()

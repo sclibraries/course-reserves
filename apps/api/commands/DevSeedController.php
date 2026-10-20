@@ -26,7 +26,7 @@ class DevSeedController extends Controller
 
     /**
      * Seed API-078 test accounts and the CX-029 TST 101 Spring 2026 previous-course materials.
-     * Use --reset to remove the synthetic roster, course offering, folder, and electronic resources.
+     * Use --reset to remove the seed-owned roster, flow material type, offering, folder, and resources.
      */
     public function actionTestCourses()
     {
@@ -45,6 +45,9 @@ class DevSeedController extends Controller
             }
 
             $this->stdout("Seeded {$summary['assignmentCount']} API-078 course assignments.\n", Console::FG_GREEN);
+            if (!empty($summary['printBookMapped'])) {
+                $this->stdout("Flow: Print book mapped to material type book\n", Console::FG_GREEN);
+            }
             $previousCourse = $summary['previousCourse'];
             $this->stdout(sprintf(
                 "Previous course: %s %s - %d electronic, %d physical\n",
