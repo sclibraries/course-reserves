@@ -1,35 +1,23 @@
 import type { CourseFolder } from '@/store/reserve/types';
 import type { ListLayoutState, MoveTarget } from './listLayoutTypes';
 
-export function canMoveUp(state: ListLayoutState, id: string): boolean {
+export function canMove(state: ListLayoutState, id: string, direction: 'up' | 'down'): boolean {
+  const offset = direction === 'up' ? -1 : 1;
   const topIndex = state.layout.findIndex((entry) => entry.id === id);
-  if (topIndex >= 0) return topIndex > 0;
+  if (topIndex >= 0) return canMoveIndex(topIndex, state.layout.length, offset);
   const folder = state.folders.find((candidate) => candidate.itemIds.includes(id));
-  return !!folder && folder.itemIds.indexOf(id) > 0;
+  return !!folder && canMoveIndex(folder.itemIds.indexOf(id), folder.itemIds.length, offset);
 }
 
-export function canMoveDown(state: ListLayoutState, id: string): boolean {
-  const topIndex = state.layout.findIndex((entry) => entry.id === id);
-  if (topIndex >= 0) return topIndex < state.layout.length - 1;
-  const folder = state.folders.find((candidate) => candidate.itemIds.includes(id));
-  return !!folder && folder.itemIds.indexOf(id) < folder.itemIds.length - 1;
-}
-
-export function moveUp(state: ListLayoutState, id: string): ListLayoutState {
-  const topIndex = state.layout.findIndex((entry) => entry.id === id);
-  if (topIndex > 0) return swapTopLevel(state, topIndex, topIndex - 1);
-  if (topIndex === 0) return state;
-  const folder = state.folders.find((candidate) => candidate.itemIds.includes(id));
-  return folder ? moveFolderItem(state, folder, id, -1) : state;
-}
-
-export function moveDown(state: ListLayoutState, id: string): ListLayoutState {
+export function move(state: ListLayoutState, id: string, direction: 'up' | 'down'): ListLayoutState {
+  const offset = direction === 'up' ? -1 : 1;
   const topIndex = state.layout.findIndex((entry) => entry.id === id);
   if (topIndex >= 0) {
-    return topIndex < state.layout.length - 1 ? swapTopLevel(state, topIndex, topIndex + 1) : state;
+    const target = topIndex + offset;
+    return target >= 0 && target < state.layout.length ? swapTopLevel(state, topIndex, target) : state;
   }
   const folder = state.folders.find((candidate) => candidate.itemIds.includes(id));
-  return folder ? moveFolderItem(state, folder, id, 1) : state;
+  return folder ? moveFolderItem(state, folder, id, offset) : state;
 }
 
 export function moveTo(state: ListLayoutState, id: string, target: MoveTarget): ListLayoutState {
@@ -48,18 +36,7 @@ export function moveTo(state: ListLayoutState, id: string, target: MoveTarget): 
     const folder = detached.folders.find((candidate) => candidate.id === target.intoFolder);
     const item = detached.items.find((candidate) => candidate.id === id);
     if (!folder || !item) return state;
-    const itemIds = folder.itemIds.slice();
-    const insertAt = clamp(target.index ?? itemIds.length, 0, itemIds.length);
-    itemIds.splice(insertAt, 0, id);
-    next = {
-      ...detached,
-      folders: detached.folders.map((candidate) => candidate.id === folder.id
-        ? { ...candidate, itemIds }
-        : candidate),
-      items: detached.items.map((candidate) => candidate.id === id
-        ? { ...candidate, folderId: folder.id }
-        : candidate),
-    };
+    next = insertIntoFolder(detached, folder, id, target.index ?? folder.itemIds.length);
   } else if ('end' in target) {
     next = { ...detached, layout: [...detached.layout, { kind: activeFolder ? 'folder' : 'item', id }] };
   } else {
@@ -67,18 +44,12 @@ export function moveTo(state: ListLayoutState, id: string, target: MoveTarget): 
     const targetFolder = detached.folders.find((folder) => folder.itemIds.includes(targetId));
     if (targetFolder) {
       if (activeFolder) return state;
-      const itemIds = targetFolder.itemIds.slice();
-      const targetIndex = itemIds.indexOf(targetId);
-      itemIds.splice(targetIndex + ('after' in target ? 1 : 0), 0, id);
-      next = {
-        ...detached,
-        folders: detached.folders.map((folder) => folder.id === targetFolder.id
-          ? { ...folder, itemIds }
-          : folder),
-        items: detached.items.map((item) => item.id === id
-          ? { ...item, folderId: targetFolder.id }
-          : item),
-      };
+      next = insertIntoFolder(
+        detached,
+        targetFolder,
+        id,
+        targetFolder.itemIds.indexOf(targetId) + ('after' in target ? 1 : 0),
+      );
     } else {
       const targetIndex = detached.layout.findIndex((entry) => entry.id === targetId);
       if (targetIndex < 0) return state;
@@ -90,6 +61,21 @@ export function moveTo(state: ListLayoutState, id: string, target: MoveTarget): 
   }
 
   return sameOrder(state, next) ? state : next;
+}
+
+function canMoveIndex(index: number, length: number, offset: -1 | 1): boolean {
+  const target = index + offset;
+  return index >= 0 && target >= 0 && target < length;
+}
+
+function insertIntoFolder(state: ListLayoutState, folder: CourseFolder, id: string, index: number): ListLayoutState {
+  const itemIds = folder.itemIds.slice();
+  itemIds.splice(clamp(index, 0, itemIds.length), 0, id);
+  return {
+    ...state,
+    folders: state.folders.map((candidate) => candidate.id === folder.id ? { ...candidate, itemIds } : candidate),
+    items: state.items.map((item) => item.id === id ? { ...item, folderId: folder.id } : item),
+  };
 }
 
 function swapTopLevel(state: ListLayoutState, first: number, second: number): ListLayoutState {

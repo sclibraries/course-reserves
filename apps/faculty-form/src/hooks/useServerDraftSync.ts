@@ -53,12 +53,22 @@ export function useServerDraftSync(
     }, delay);
   }, [clearTimer]);
 
+  const markSaved = useCallback(() => {
+    draftStore.markAsSaved(reserveId!);
+    setSaveStatus('saved');
+  }, [draftStore, reserveId]);
+
   const performSave = useCallback((): Promise<boolean> => {
     if (inFlightPromiseRef.current) return inFlightPromiseRef.current;
     const current = reserveRef.current;
     if (!reserveId || !current || current.status !== 'draft' || !autoSaveEnabled || conflictRef.current) {
       return Promise.resolve(false);
     }
+    const markConflict = () => {
+      conflictRef.current = true;
+      setSaveStatus('conflict');
+      draftStore.setSavingStatus(reserveId, 'error');
+    };
 
     const savedRevision = revisionRef.current;
     draftStore.setSavingStatus(reserveId, 'saving');
@@ -67,19 +77,14 @@ export function useServerDraftSync(
 
     const request = (async () => {
       try {
-        const payload = buildSubmissionPayload(current, false);
-        const response = await syncDraft(current, payload);
-        const serverUuid = response.submission_uuid;
-        const nextVersion = response.draft_version;
+        const response = await syncDraft(current, buildSubmissionPayload(current, false));
         if (response.existing) {
-          conflictRef.current = true;
-          updateDraftIdentity(reserveId, serverUuid, nextVersion);
-          setSaveStatus('conflict');
-          draftStore.setSavingStatus(reserveId, 'error');
+          updateDraftIdentity(reserveId, response.submission_uuid, response.draft_version);
+          markConflict();
           return false;
         }
 
-        updateDraftIdentity(reserveId, serverUuid, nextVersion);
+        updateDraftIdentity(reserveId, response.submission_uuid, response.draft_version);
         retryCountRef.current = 0;
         draftStore.setSavingStatus(reserveId, 'saved');
         const savedAt = new Date();
@@ -88,8 +93,7 @@ export function useServerDraftSync(
 
         if (revisionRef.current === savedRevision) {
           savedRevisionRef.current = savedRevision;
-          draftStore.markAsSaved(reserveId);
-          setSaveStatus('saved');
+          markSaved();
         } else {
           setSaveStatus('saving');
         }
@@ -97,9 +101,7 @@ export function useServerDraftSync(
       } catch (error) {
         console.error('Failed to save faculty draft:', error);
         if (isDraftConflict(error)) {
-          conflictRef.current = true;
-          setSaveStatus('conflict');
-          draftStore.setSavingStatus(reserveId, 'error');
+          markConflict();
           return false;
         }
 
@@ -119,7 +121,7 @@ export function useServerDraftSync(
     })();
     inFlightPromiseRef.current = request;
     return request;
-  }, [autoSaveDelay, autoSaveEnabled, draftStore, queueSave, reserveId]);
+  }, [autoSaveDelay, autoSaveEnabled, draftStore, markSaved, queueSave, reserveId]);
   performSaveRef.current = performSave;
 
   const saveDraft = useCallback(async (): Promise<boolean> => {
@@ -142,7 +144,7 @@ export function useServerDraftSync(
 
   const loadLatestVersion = useCallback(async () => {
     const current = reserveRef.current;
-    const uuid = current?.submissionUuid || (current && !current.id.startsWith('reserve-') ? current.id : undefined);
+    const uuid = serverUuid(current);
     if (!reserveId || !uuid) return false;
 
     try {
@@ -153,32 +155,30 @@ export function useServerDraftSync(
       conflictRef.current = false;
       revisionRef.current += 1;
       savedRevisionRef.current = revisionRef.current;
-      draftStore.markAsSaved(reserveId);
+      markSaved();
       draftStore.setSavingStatus(reserveId, 'saved');
       const savedAt = new Date();
       draftStore.setLastSaveTime(reserveId, savedAt);
       setLastSaveTime(savedAt);
-      setSaveStatus('saved');
       return true;
     } catch (error) {
       console.error('Failed to load latest faculty draft:', error);
       return false;
     }
-  }, [draftStore, reserveId]);
+  }, [draftStore, markSaved, reserveId]);
 
   const submitCurrentDraft = useCallback(async (_emailConfirmation: boolean): Promise<string | null> => {
     let current = reserveRef.current;
     if (!current || conflictRef.current) return null;
     const needsSave = !current.submissionUuid || savedRevisionRef.current !== revisionRef.current;
-    const hasLocalList = current.items.length > 0 || current.folders.length > 0;
-    if (needsSave && hasLocalList && !current.submissionUuid) {
+    if (needsSave && (current.items.length > 0 || current.folders.length > 0) && !current.submissionUuid) {
       if (!(await performSave())) return null;
     } else if (needsSave && !(await saveDraft())) {
       return null;
     }
 
     current = useReserveStore.getState().getReserveById(reserveId || '') || reserveRef.current;
-    const uuid = current?.submissionUuid || (current && !current.id.startsWith('reserve-') ? current.id : undefined);
+    const uuid = serverUuid(current);
     if (!uuid) return null;
     await submitServerDraft(uuid);
     return uuid;
@@ -219,6 +219,10 @@ export function useServerDraftSync(
     loadLatestVersion,
     submitCurrentDraft,
   };
+}
+
+function serverUuid(reserve: CourseReserve | null | undefined): string | undefined {
+  return reserve?.submissionUuid || (reserve && !reserve.id.startsWith('reserve-') ? reserve.id : undefined);
 }
 
 function updateDraftIdentity(reserveId: string, submissionUuid: string, draftVersion: number) {

@@ -3,15 +3,13 @@ import {
   addFolder,
   addItem,
   assertLayout,
-  canMoveDown,
-  canMoveUp,
+  canMove,
   deleteFolder,
   fromLegacy,
   fromServer,
-  moveDown,
+  move,
   moveOutOfFolder,
   moveTo,
-  moveUp,
   removeItem,
   toPayloadOrder,
 } from './listLayout';
@@ -39,34 +37,34 @@ const topLevelIds = (state: ListLayoutState) => state.layout.map((item) => item.
 describe('listLayout', () => {
   it('folder at 1, item at 2: up moves it to 1', () => {
     const state = layoutState();
-    expect(topLevelIds(moveUp(state, 'loose-1'))).toEqual(['loose-1', 'week-1', 'week-2', 'loose-2']);
+    expect(topLevelIds(move(state, 'loose-1', 'up'))).toEqual(['loose-1', 'week-1', 'week-2', 'loose-2']);
   });
 
   it('moves a folder or loose item by swapping with its top-level neighbor', () => {
     const state = layoutState();
-    expect(topLevelIds(moveDown(state, 'week-1'))).toEqual(['loose-1', 'week-1', 'week-2', 'loose-2']);
-    expect(topLevelIds(moveDown(state, 'loose-1'))).toEqual(['week-1', 'week-2', 'loose-1', 'loose-2']);
+    expect(topLevelIds(move(state, 'week-1', 'down'))).toEqual(['loose-1', 'week-1', 'week-2', 'loose-2']);
+    expect(topLevelIds(move(state, 'loose-1', 'down'))).toEqual(['week-1', 'week-2', 'loose-1', 'loose-2']);
   });
 
   it('moves items inside their folder and leaves them in place at its ends', () => {
     const state = layoutState();
-    expect(moveUp(state, 'week-1-b').folders[0].itemIds).toEqual(['week-1-b', 'week-1-a']);
-    expect(moveDown(state, 'week-1-a').folders[0].itemIds).toEqual(['week-1-b', 'week-1-a']);
-    expect(moveUp(state, 'week-1-a')).toBe(state);
-    expect(moveDown(state, 'week-1-b')).toBe(state);
+    expect(move(state, 'week-1-b', 'up').folders[0].itemIds).toEqual(['week-1-b', 'week-1-a']);
+    expect(move(state, 'week-1-a', 'down').folders[0].itemIds).toEqual(['week-1-b', 'week-1-a']);
+    expect(move(state, 'week-1-a', 'up')).toBe(state);
+    expect(move(state, 'week-1-b', 'down')).toBe(state);
   });
 
   it('reports arrow capabilities from the shared layout order', () => {
     const state = layoutState();
-    expect(canMoveUp(state, 'week-1')).toBe(false);
-    expect(canMoveDown(state, 'week-1')).toBe(true);
-    expect(canMoveUp(state, 'loose-2')).toBe(true);
-    expect(canMoveDown(state, 'loose-2')).toBe(false);
-    expect(canMoveUp(state, 'loose-1')).toBe(true);
-    expect(canMoveUp(state, 'week-1-a')).toBe(false);
-    expect(canMoveDown(state, 'week-1-a')).toBe(true);
-    expect(canMoveUp(state, 'week-1-b')).toBe(true);
-    expect(canMoveDown(state, 'week-1-b')).toBe(false);
+    expect(canMove(state, 'week-1', 'up')).toBe(false);
+    expect(canMove(state, 'week-1', 'down')).toBe(true);
+    expect(canMove(state, 'loose-2', 'up')).toBe(true);
+    expect(canMove(state, 'loose-2', 'down')).toBe(false);
+    expect(canMove(state, 'loose-1', 'up')).toBe(true);
+    expect(canMove(state, 'week-1-a', 'up')).toBe(false);
+    expect(canMove(state, 'week-1-a', 'down')).toBe(true);
+    expect(canMove(state, 'week-1-b', 'up')).toBe(true);
+    expect(canMove(state, 'week-1-b', 'down')).toBe(false);
   });
 
   it('item at 4 dropped before the folder at 3 goes to 3, not into the folder', () => {

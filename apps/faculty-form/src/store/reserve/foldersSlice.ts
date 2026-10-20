@@ -1,5 +1,5 @@
 import type { ReserveSlice } from './types';
-import { addFolder, moveDown, moveTo, moveUp, moveOutOfFolder, deleteFolder } from '@/utils/listLayout';
+import { addFolder, move, moveTo, moveOutOfFolder, deleteFolder } from '@/utils/listLayout';
 import { updateReserveLayout } from './layoutState';
 import { createFolderDragSlice } from './folderDragSlice';
 
@@ -65,7 +65,7 @@ export const createFoldersSlice: ReserveSlice<
       if (!current.folders.some((folder) => folder.id === folderId && folder.itemIds.includes(itemId))) {
         return current;
       }
-      return direction === 'up' ? moveUp(current, itemId) : moveDown(current, itemId);
+      return move(current, itemId, direction);
     }));
   },
 

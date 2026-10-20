@@ -1,6 +1,6 @@
 import type { ReserveSlice, CourseItem } from './types';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
-import { addItem, moveDown, moveTo, moveUp, removeItem, type MoveTarget } from '@/utils/listLayout';
+import { addItem, move, moveTo, removeItem, type MoveTarget } from '@/utils/listLayout';
 import { updateReserveLayout } from './layoutState';
 
 export const createItemsSlice: ReserveSlice<
@@ -34,7 +34,7 @@ export const createItemsSlice: ReserveSlice<
   moveItemInList: (reserveId, itemId, direction) => {
     let didMove = false;
     set((state) => updateReserveLayout(state, reserveId, (current) => {
-      const updated = direction === 'up' ? moveUp(current, itemId) : moveDown(current, itemId);
+      const updated = move(current, itemId, direction);
       didMove = updated !== current;
       return updated;
     }));

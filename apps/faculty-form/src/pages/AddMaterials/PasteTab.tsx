@@ -26,7 +26,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const [searchParams] = useSearchParams();
   const [pasteText, setPasteText] = useState(() => restorePasteText(location.state));
   const [workspace, setWorkspace] = useState<PasteWorkspace>(() => restoreWorkspace(location.state));
-  const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(() => restoreWorkspace(location.state).citations.length > 0);
+  const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(() => workspace.citations.length > 0);
   const [error, setError] = useState<string | null>(null);
   const [searchProgress, setSearchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [searching, setSearching] = useState(false);
@@ -84,25 +84,19 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
 
   const editCitation = (idToEdit: string, text: string) => {
     setWorkspace((current) => ({
+      ...current,
       citations: current.citations.map((citation) => citation.id === idToEdit ? { ...citation, text } : citation),
-      skipped: current.skipped,
       groups: [],
-      choices: current.choices,
     }));
   };
 
   const removeCitation = (idToRemove: string) => {
     setWorkspace((current) => ({
+      ...current,
       citations: current.citations.filter((citation) => citation.id !== idToRemove),
-      skipped: current.skipped,
       groups: [],
       choices: Object.fromEntries(Object.entries(current.choices).filter(([id]) => id !== idToRemove)),
     }));
-  };
-
-  const closeAfterAdd = () => {
-    setActiveCitationId(undefined);
-    clearSelection();
   };
 
   const openRecord = (citationId: string, result: DiscoverySearchResult) => {
@@ -131,7 +125,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     const nextWorkspace = addMatch(citationId, record);
     if (!nextWorkspace) return;
     if (isRecordRoute) backToPaste(nextWorkspace);
-    else closeAfterAdd();
+    else closeRecordPanel();
   };
 
   const findMatches = async () => {
@@ -218,7 +212,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
                   onRemove={removeCitation}
                   onAddAsWritten={addAsWritten}
                   onOpenRecord={openRecord}
-                  onAddMatch={(citationId, result) => { if (addMatch(citationId, result)) closeAfterAdd(); }}
+                  onAddMatch={(citationId, result) => { if (addMatch(citationId, result)) closeRecordPanel(); }}
                   onUndo={undoAddedMaterial}
                 />
               ))}

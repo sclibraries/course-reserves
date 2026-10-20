@@ -60,13 +60,7 @@ function extractLineBasedBlocks(rawText: string): string[] {
       continue;
     }
 
-    if (HEADER_PATTERN.test(line)) {
-      pushCurrent();
-      blocks.push(line);
-      continue;
-    }
-
-    if (COPYRIGHT_PATTERN.test(line)) {
+    if (HEADER_PATTERN.test(line) || COPYRIGHT_PATTERN.test(line)) {
       pushCurrent();
       blocks.push(line);
       continue;
@@ -159,10 +153,6 @@ function hasYearlessBibliographicEvidence(text: string): boolean {
 }
 
 function startsNewCitation(line: string): boolean {
-  if (!line) {
-    return false;
-  }
-
   const hasLegalCaseStart = (
     /^[A-Z][\w\s.''-]+\s+v\.\s+[A-Z]/iu.test(line) ||
     /^In\s+re\s+[A-Z]/iu.test(line) ||
@@ -183,10 +173,6 @@ function startsNewCitation(line: string): boolean {
 }
 
 function isContinuation(line: string): boolean {
-  if (!line) {
-    return false;
-  }
-
   return (
     /^[a-z]/u.test(line) ||
     /^Vol\.|^pp\.|^No\.|^Issue|^Pages|^Journal/iu.test(line) ||

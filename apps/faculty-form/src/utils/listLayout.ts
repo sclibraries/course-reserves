@@ -2,7 +2,7 @@ import type { CourseFolder, CourseItem } from '@/store/reserve/types';
 import type { ListLayoutState } from './listLayoutTypes';
 
 export type { LayoutEntry, ListLayoutState, MoveTarget } from './listLayoutTypes';
-export { canMoveDown, canMoveUp, moveDown, moveTo, moveUp } from './listLayoutMoves';
+export { canMove, move, moveTo } from './listLayoutMoves';
 
 export function assertLayout(state: ListLayoutState): true {
   const foldersById = new Map(state.folders.map((folder) => [folder.id, folder]));

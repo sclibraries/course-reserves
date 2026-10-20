@@ -19,7 +19,7 @@ import { SortableItem } from '@/components/SortableItem';
 import { EmptyState } from '@/components/EmptyState';
 import { ListSearchToolbar } from '@/components/ListSearchToolbar';
 import { useSubmissionEditorContext } from './SubmissionEditorContext';
-import { canMoveDown, canMoveUp } from '@/utils/listLayout';
+import { canMove } from '@/utils/listLayout';
 import { getLayoutState } from '@/store/reserve/layoutState';
 import { listCollisionDetection } from '@/utils/listCollisionDetection';
 import type { OrganizedContent } from '@/utils/contentSearch';
@@ -160,10 +160,10 @@ export default function ContentList({
                         onMoveItemInFolder={(folderId, itemId, direction) =>
                           moveItemInFolder(id, folderId, itemId, direction)
                         }
-                        canMoveFolderUp={!isSearching && canMoveUp(layout, contentItem.folder.id)}
-                        canMoveFolderDown={!isSearching && canMoveDown(layout, contentItem.folder.id)}
-                        canMoveItemUp={(itemId) => !isSearching && canMoveUp(layout, itemId)}
-                        canMoveItemDown={(itemId) => !isSearching && canMoveDown(layout, itemId)}
+                        canMoveFolderUp={!isSearching && canMove(layout, contentItem.folder.id, 'up')}
+                        canMoveFolderDown={!isSearching && canMove(layout, contentItem.folder.id, 'down')}
+                        canMoveItemUp={(itemId) => !isSearching && canMove(layout, itemId, 'up')}
+                        canMoveItemDown={(itemId) => !isSearching && canMove(layout, itemId, 'down')}
                         itemPositionById={itemPositionsByFolderId.get(contentItem.folder.id)}
                         onMoveFolderUp={() => moveFolderPosition(id, contentItem.folder.id, 'up')}
                         onMoveFolderDown={() => moveFolderPosition(id, contentItem.folder.id, 'down')}
@@ -178,8 +178,8 @@ export default function ContentList({
                       isNew={addedMaterials.some((added) => added.id === contentItem.item.id)}
                       index={contentItem.position}
                       totalItems={totalDisplayedItems}
-                      canMoveUp={!isSearching && canMoveUp(layout, contentItem.item.id)}
-                      canMoveDown={!isSearching && canMoveDown(layout, contentItem.item.id)}
+                      canMoveUp={!isSearching && canMove(layout, contentItem.item.id, 'up')}
+                      canMoveDown={!isSearching && canMove(layout, contentItem.item.id, 'down')}
                       onEdit={itemHandlers.handleEditItem}
                       onMoveUp={() => itemHandlers.handleMoveUp(contentItem.item.id)}
                       onMoveDown={() => itemHandlers.handleMoveDown(contentItem.item.id)}
