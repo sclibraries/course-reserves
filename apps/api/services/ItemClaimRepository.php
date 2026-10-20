@@ -33,7 +33,8 @@ class ItemClaimRepository
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, '
             . 'mt.name AS material_type, mt.material_type_id, flow_run.current_step_key, '
             . 'flow_run.finish_state AS flow_finish_state, flow_version.steps_json AS flow_steps_json, '
-            . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, s.submitted_at, '
+            . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, '
+            . 's.status AS submission_status, s.submitted_at, '
             . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
@@ -60,7 +61,10 @@ class ItemClaimRepository
             . 'last_activity_at = :now, item_status = "in_progress" '
             . 'WHERE id = :id AND claimed_by IS NULL AND '
             . '(assigned_group_id IS NULL OR EXISTS (SELECT 1 FROM staff_group_members m '
-            . 'WHERE m.group_id = ' . $this->table($kind) . '.assigned_group_id AND m.username = :username))',
+            . 'WHERE m.group_id = ' . $this->table($kind) . '.assigned_group_id AND m.username = :username)) '
+            . 'AND EXISTS (SELECT 1 FROM faculty_submissions submitted '
+            . 'WHERE submitted.submission_id = ' . $this->table($kind) . '.submission_id AND '
+            . SubmittedSubmissionScope::sqlPredicate('submitted') . ')',
             [':username' => $username, ':now' => $now, ':id' => $id]
         )->execute();
     }
@@ -164,7 +168,9 @@ class ItemClaimRepository
         foreach (['new', 'reuse'] as $kind) {
             $rows = Yii::$app->db->createCommand(
                 'SELECT id FROM ' . $this->table($kind)
-                . ' WHERE claimed_by IS NOT NULL AND COALESCE(last_activity_at, claimed_at) <= :cutoff',
+                . ' WHERE claimed_by IS NOT NULL AND COALESCE(last_activity_at, claimed_at) <= :cutoff AND EXISTS '
+                . '(SELECT 1 FROM faculty_submissions s WHERE s.submission_id = ' . $this->table($kind) . '.submission_id '
+                . 'AND ' . SubmittedSubmissionScope::sqlPredicate('s') . ')',
                 [':cutoff' => $cutoff]
             )->queryColumn();
             foreach ($rows as $id) {
@@ -193,6 +199,7 @@ class ItemClaimRepository
             ->joinWith('submission')
             ->where(['submission_new_resources.claimed_by' => $username])
             ->andWhere(['faculty_submissions.link_state' => 'linked'])
+            ->andWhere(['<>', 'faculty_submissions.status', FacultySubmission::STATUS_DRAFT])
             ->with(['submission', 'materialType'])
             ->orderBy(['submission_new_resources.claimed_at' => SORT_DESC])
             ->all();

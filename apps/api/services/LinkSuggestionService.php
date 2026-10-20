@@ -13,6 +13,7 @@ class LinkSuggestionService
     private $candidateService;
     private $repository;
     private $eventLog;
+    private $submittedScope;
 
     public function __construct(
         $folioService = null,
@@ -25,11 +26,15 @@ class LinkSuggestionService
         $this->candidateService = new SubmissionLinkCandidateService($folioService, $matchRule, true);
         $this->repository = $repository ?: new LinkSuggestionRepository();
         $this->eventLog = $eventLog ?: new WorkflowEventLog();
+        $this->submittedScope = new SubmittedSubmissionScope();
     }
 
     public function candidates($uuid, $manualQuery = null)
     {
         $submission = $this->findSubmission($uuid);
+        if ($blocked = $this->submittedScope->guardStatus($submission->status)) {
+            return $blocked;
+        }
         if ($manualQuery !== null && trim((string)$manualQuery) !== '') {
             return $this->candidateService->candidates($submission, $manualQuery);
         }
@@ -44,6 +49,9 @@ class LinkSuggestionService
     public function recheck($uuid, array $actor)
     {
         $submission = $this->findSubmission($uuid);
+        if ($blocked = $this->submittedScope->guardStatus($submission->status)) {
+            return $blocked;
+        }
         if ($submission->link_state !== 'needs_linking') {
             throw new ConflictHttpException('Only unlinked submissions can be rechecked.');
         }
@@ -86,7 +94,8 @@ class LinkSuggestionService
     public function checkSubmissionId($submissionId, array $actor)
     {
         $submission = FacultySubmission::findOne($submissionId);
-        if (!$submission || $submission->link_state !== 'needs_linking') {
+        if (!$submission || $submission->status === \app\models\FacultySubmission::STATUS_DRAFT ||
+            $submission->link_state !== 'needs_linking') {
             $this->repository->clearQueue($submissionId);
             return ['state' => 'skipped', 'summary' => $this->summary($submissionId)];
         }

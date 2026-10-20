@@ -7,12 +7,14 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000002_add_staff_groups';
     private $api084MigrationVersion = 'm261019_000003_add_staff_workflow_flows';
+    private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
 
     public function createsGroupSchemaWithoutSeedingAcquisitions(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
         $migrationIsDown = false;
         $api084MigrationIsDown = false;
+        $api086MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int)$db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
@@ -23,7 +25,13 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api084MigrationVersion]
             )->queryScalar(), 'API-084 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api086MigrationVersion]
+            )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api086MigrationIsDown = true;
             $this->runMigration('down');
             $api084MigrationIsDown = true;
             $this->runMigration('down');
@@ -36,6 +44,8 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
             $migrationIsDown = false;
             $this->runMigration('up');
             $api084MigrationIsDown = false;
+            $this->runMigration('up');
+            $api086MigrationIsDown = false;
             $db->schema->refresh();
             Assert::assertNotNull($db->schema->getTableSchema('staff_groups', true));
             Assert::assertNotNull($db->schema->getTableSchema('staff_group_members', true));
@@ -69,6 +79,10 @@ class Api083StaffGroupsMigrationCest extends BaseFunctionalCest
             if ($api084MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refresh();
+            }
+            if ($api086MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
             }
         }
     }

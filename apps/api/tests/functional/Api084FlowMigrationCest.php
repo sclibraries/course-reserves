@@ -6,6 +6,7 @@ use PHPUnit\Framework\Assert;
 class Api084FlowMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000003_add_staff_workflow_flows';
+    private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
 
     public function alwaysSeedsPrintBookAndMapsBookCaseInsensitively(FunctionalTester $I)
     {
@@ -14,13 +15,20 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
             'SELECT material_type_id, name, description, created_at FROM material_types ORDER BY material_type_id'
         )->queryAll();
         $migrationIsDown = false;
+        $api086MigrationIsDown = false;
 
         try {
             Assert::assertSame(1, (int)$db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->migrationVersion]
             )->queryScalar());
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api086MigrationVersion]
+            )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api086MigrationIsDown = true;
             $this->runMigration('down');
             $migrationIsDown = true;
             $this->replaceMaterialTypes([]);
@@ -62,6 +70,10 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
             }
             $this->replaceMaterialTypes($originalTypes);
             $this->runMigration('up');
+            if ($api086MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
+            }
         }
     }
 

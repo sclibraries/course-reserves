@@ -34,6 +34,10 @@ class ItemClaimTransitionService
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
             }
+            if ($blocked = (new SubmittedSubmissionScope())->guardStatus($item['submission_status'])) {
+                $transaction->rollBack();
+                return $this->result(409, $blocked);
+            }
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
                 return $this->result(409, ['error_code' => 'submission_not_linked']);

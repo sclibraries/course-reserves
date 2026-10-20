@@ -12,7 +12,7 @@ class FacultySubmissionPresenter
     private const SUBMISSION_FIELDS = [
         'submission_uuid', 'term_code', 'course_code', 'section', 'course_title',
         'its_course_id', 'academic_period',
-        'folio_course_listing_id', 'offering_id', 'needed_by_date', 'status',
+        'folio_course_listing_id', 'offering_id', 'needed_by_date', 'status', 'draft_version',
         'submission_notes', 'faculty_display_name', 'created_at', 'updated_at',
         'submitted_at', 'is_locked', 'locked_at', 'locked_by_staff_id', 'lock_reason',
         'email_confirmation_status', 'email_confirmation_requested_at',

@@ -36,7 +36,8 @@ class ItemClaimListRepository
     {
         list($sql, $params) = $this->unionRows(['new', 'reuse'], function ($kind, $suffix) use ($username) {
             return [
-                'i.claimed_by = :username_' . $suffix . ' AND s.link_state = "linked"',
+                'i.claimed_by = :username_' . $suffix . ' AND s.link_state = "linked" AND '
+                    . SubmittedSubmissionScope::sqlPredicate('s'),
                 [':username_' . $suffix => $username],
             ];
         });
@@ -51,7 +52,8 @@ class ItemClaimListRepository
     {
         list($sql, $params) = $this->unionRows(['new', 'reuse'], function ($kind, $suffix) use ($groupId) {
             return [
-                'i.assigned_group_id = :group_' . $suffix . ' AND i.claimed_by IS NULL AND s.link_state = "linked"',
+                'i.assigned_group_id = :group_' . $suffix . ' AND i.claimed_by IS NULL AND s.link_state = "linked" AND '
+                    . SubmittedSubmissionScope::sqlPredicate('s'),
                 [':group_' . $suffix => (int)$groupId],
             ];
         });
@@ -78,7 +80,12 @@ class ItemClaimListRepository
     {
         $kinds = in_array($type, ['new', 'reuse'], true) ? [$type] : ['new', 'reuse'];
         list($sql, $params) = $this->unionRows($kinds, function ($kind, $suffix) use ($term, $type) {
-            $where = ['i.claimed_by IS NULL', 'i.assigned_group_id IS NULL', 's.link_state = "linked"'];
+            $where = [
+                'i.claimed_by IS NULL',
+                'i.assigned_group_id IS NULL',
+                's.link_state = "linked"',
+                SubmittedSubmissionScope::sqlPredicate('s'),
+            ];
             $params = [];
             if ($term !== null && trim((string)$term) !== '') {
                 $where[] = 's.term_code = :term_' . $suffix;

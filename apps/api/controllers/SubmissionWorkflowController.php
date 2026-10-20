@@ -107,8 +107,7 @@ class SubmissionWorkflowController extends Controller
     public function actionPendingSubmissions()
     {
         $dataProvider = new ActiveDataProvider([
-            'query' => FacultySubmission::find()
-                ->where(['status' => FacultySubmission::STATUS_SUBMITTED])
+            'query' => (new \app\services\SubmittedSubmissionScope())->staffSubmissionList(FacultySubmission::find())
                 ->with(['reuseResources', 'newResources'])
                 ->orderBy(['submitted_at' => SORT_ASC]),
             'pagination' => [
@@ -127,7 +126,7 @@ class SubmissionWorkflowController extends Controller
         $currentUser = Yii::$app->user->identity;
         
         $dataProvider = new ActiveDataProvider([
-            'query' => FacultySubmission::find()
+            'query' => (new \app\services\SubmittedSubmissionScope())->excludeDrafts(FacultySubmission::find())
                 ->joinWith('workflowAssignment')
                 ->where(['submission_workflow_assignments.assigned_staff_user_id' => $currentUser->id])
                 ->with(['reuseResources', 'newResources', 'workflowAssignment'])

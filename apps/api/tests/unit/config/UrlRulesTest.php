@@ -92,15 +92,22 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS workflow/admin/flows/<id:\\d+>/versions' => 'workflow-flow-admin/options',
             'OPTIONS workflow/admin/flow-mapping' => 'workflow-flow-admin/options',
         ];
+        $draftRules = [
+            'POST faculty-submission/draft' => 'faculty-draft/create',
+            'OPTIONS faculty-submission/draft' => 'faculty-draft/options',
+            'DELETE faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>' => 'faculty-draft/delete',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
-        $declaredWorkflowRules = array_merge($claimRules, $groupRules, $flowRules);
+        $expectedDraftRules = array_intersect_key($mergedRules, $draftRules);
+        $declaredWorkflowRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules);
         $existingRules = array_diff_key($mergedRules, $declaredWorkflowRules);
-        $this->assertCount(220, $mergedRules);
+        $this->assertCount(223, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
+        $this->assertSame($draftRules, $expectedDraftRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -116,6 +123,9 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['POST', 'dev-auth/login', ['dev-auth/login', []]],
             ['OPTIONS', 'dev-auth/login', ['dev-auth/login', []]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
+            ['POST', 'faculty-submission/draft', ['faculty-draft/create', []]],
+            ['OPTIONS', 'faculty-submission/draft', ['faculty-draft/options', []]],
+            ['DELETE', 'faculty-submission/' . $uuid, ['faculty-draft/delete', ['id' => $uuid]]],
             ['POST', 'faculty-submission/' . $uuid . '/communications', [
                 'faculty-submission/create-communication', ['id' => $uuid],
             ]],

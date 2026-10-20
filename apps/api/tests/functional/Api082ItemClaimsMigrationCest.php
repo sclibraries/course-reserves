@@ -8,6 +8,7 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
     private $migrationVersion = 'm261019_000001_add_item_claims';
     private $api083MigrationVersion = 'm261019_000002_add_staff_groups';
     private $api084MigrationVersion = 'm261019_000003_add_staff_workflow_flows';
+    private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
     private $prefix = 'test-api082-migration-';
 
     public function addsClaimColumnsAndBackfillsLegacyClaimsAndEvents(FunctionalTester $I)
@@ -16,6 +17,7 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
         $migrationIsDown = false;
         $api083MigrationIsDown = false;
         $api084MigrationIsDown = false;
+        $api086MigrationIsDown = false;
         $username = $this->prefix . 'staff';
         $uuid = '82000000-0000-4000-8000-000000000082';
         $submissionId = null;
@@ -35,7 +37,13 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api084MigrationVersion]
             )->queryScalar(), 'API-084 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api086MigrationVersion]
+            )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api086MigrationIsDown = true;
             $this->runMigration('down');
             $api084MigrationIsDown = true;
             $this->runMigration('down');
@@ -90,6 +98,8 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
             $api083MigrationIsDown = false;
             $this->runMigration('up');
             $api084MigrationIsDown = false;
+            $this->runMigration('up');
+            $api086MigrationIsDown = false;
             $db->schema->refreshTableSchema('submission_new_resources');
             $db->schema->refreshTableSchema('submission_reuse_resources');
             $db->schema->refreshTableSchema('workflow_events');
@@ -133,6 +143,10 @@ class Api082ItemClaimsMigrationCest extends BaseFunctionalCest
             if ($api084MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('workflow_events');
+            }
+            if ($api086MigrationIsDown) {
+                $this->runMigration('up');
+                $db->schema->refreshTableSchema('faculty_submissions');
             }
             if ($submissionId) {
                 $db->createCommand()->delete('workflow_events', ['submission_id' => $submissionId])->execute();

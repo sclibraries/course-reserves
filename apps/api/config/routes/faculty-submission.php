@@ -2,6 +2,9 @@
 
 // UUID and communications routes must precede the generic REST rule.
 return [
+    'POST faculty-submission/draft' => 'faculty-draft/create',
+    'OPTIONS faculty-submission/draft' => 'faculty-draft/options',
+    'DELETE faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>' => 'faculty-draft/delete',
     // UUID-based faculty submission routes - MUST be before UrlRule
     'GET faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>' => 'faculty-submission/view',
     'PUT faculty-submission/<id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>' => 'faculty-submission/update',

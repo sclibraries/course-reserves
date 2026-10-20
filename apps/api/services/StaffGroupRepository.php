@@ -128,10 +128,12 @@ class StaffGroupRepository
             . '(SELECT COUNT(*) FROM staff_group_members m WHERE m.group_id = g.id) AS member_count, '
             . '(SELECT COUNT(*) FROM submission_new_resources i '
             . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
-            . 'WHERE i.assigned_group_id = g.id AND i.claimed_by IS NULL AND s.link_state = "linked") '
+            . 'WHERE i.assigned_group_id = g.id AND i.claimed_by IS NULL AND s.link_state = "linked" AND '
+            . SubmittedSubmissionScope::sqlPredicate('s') . ') '
             . '+ (SELECT COUNT(*) FROM submission_reuse_resources i '
             . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
-            . 'WHERE i.assigned_group_id = g.id AND i.claimed_by IS NULL AND s.link_state = "linked") AS queue_count '
+            . 'WHERE i.assigned_group_id = g.id AND i.claimed_by IS NULL AND s.link_state = "linked" AND '
+            . SubmittedSubmissionScope::sqlPredicate('s') . ') AS queue_count '
             . 'FROM staff_groups g ' . $membership . $where . 'ORDER BY g.name ASC, g.id ASC';
     }
 }

@@ -151,7 +151,6 @@ class FacultySubmission extends ActiveRecord
     {
         $fields = parent::fields();
         unset($fields['email_confirmation_legacy_sent']);
-
         // Add related data fields
         $fields['reuseResources'] = 'reuseResources';
         $fields['newResources'] = 'newResources';
@@ -160,8 +159,9 @@ class FacultySubmission extends ActiveRecord
             return (new \app\services\SubmissionCommunicationService())
                 ->submissionMessages($model->submission_id);
         };
+        $fields['read_only'] = function ($model) { return $model->status === self::STATUS_DRAFT; };
+        $fields['status_label'] = function ($model) { return $model->status === self::STATUS_DRAFT ? 'Draft - not submitted yet' : $model->status; };
         $fields['courseOffering'] = 'courseOffering';
-        
         return $fields;
     }
 

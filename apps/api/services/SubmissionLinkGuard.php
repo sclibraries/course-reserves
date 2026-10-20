@@ -9,6 +9,10 @@ class SubmissionLinkGuard
 {
     public static function errorResponse($submission)
     {
+        if ($submission && $submission->status === \app\models\FacultySubmission::STATUS_DRAFT) {
+            Yii::$app->response->statusCode = 409;
+            return ['error_code' => 'submission_not_submitted'];
+        }
         if ($submission && $submission->link_state === 'linked') {
             return null;
         }

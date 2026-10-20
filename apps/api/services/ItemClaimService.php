@@ -17,6 +17,7 @@ class ItemClaimService
     private $transitionService;
     private $activityService;
     private $groups;
+    private $submittedScope;
 
     public function __construct($repository = null, $eventLog = null, $nowProvider = null, $notifier = null, $groups = null)
     {
@@ -39,6 +40,7 @@ class ItemClaimService
             $this->groups
         );
         $this->activityService = new ItemClaimActivityService($this->repository, $this->eventLog, $this->expiry);
+        $this->submittedScope = new SubmittedSubmissionScope();
     }
 
     public function claim($kind, $id, array $actor)
@@ -50,6 +52,10 @@ class ItemClaimService
             if (!$item) {
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
+            }
+            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
+                $transaction->rollBack();
+                return $this->result(409, $blocked);
             }
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
@@ -136,6 +142,9 @@ class ItemClaimService
         if (!$submission) {
             return $this->result(404, ['error_code' => 'submission_not_found']);
         }
+        if ($blocked = $this->submittedScope->guardStatus($submission->status)) {
+            return $this->result(409, $blocked);
+        }
         if ($submission->link_state !== 'linked') {
             return $this->result(409, ['error_code' => 'submission_not_linked']);
         }
@@ -187,6 +196,10 @@ class ItemClaimService
             if (!$item) {
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
+            }
+            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
+                $transaction->rollBack();
+                return $this->result(409, $blocked);
             }
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();

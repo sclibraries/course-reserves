@@ -131,6 +131,7 @@ class LinkSuggestionRepository
             . 'FROM link_suggestions GROUP BY submission_id) suggestions '
             . 'ON suggestions.submission_id = submissions.submission_id '
             . 'WHERE submissions.link_state = :link_state '
+            . 'AND ' . SubmittedSubmissionScope::sqlPredicate('submissions') . ' '
             . 'AND (COALESCE(suggestions.last_error_at, suggestions.checked_at) IS NULL '
             . 'OR COALESCE(suggestions.last_error_at, suggestions.checked_at) <= :cutoff) '
             . 'AND suggestions.requested_at IS NULL '
@@ -180,6 +181,7 @@ class LinkSuggestionRepository
             . 'WHERE requested_at IS NOT NULL GROUP BY submission_id) queued '
             . 'ON queued.submission_id = submissions.submission_id '
             . 'WHERE submissions.link_state = :link_state '
+            . 'AND ' . SubmittedSubmissionScope::sqlPredicate('submissions') . ' '
             . 'ORDER BY submissions.submitted_at ASC, queued.requested_at ASC, submissions.submission_id ASC'
             . $limitSql,
             [':link_state' => 'needs_linking']
@@ -190,7 +192,8 @@ class LinkSuggestionRepository
     {
         $limitSql = $limit > 0 ? ' LIMIT ' . max(1, min(5000, (int)$limit)) : '';
         return $this->db->createCommand(
-            'SELECT submission_id FROM faculty_submissions WHERE link_state = :link_state '
+            'SELECT submission_id FROM faculty_submissions WHERE link_state = :link_state AND '
+            . SubmittedSubmissionScope::sqlPredicate('faculty_submissions') . ' '
             . 'ORDER BY submitted_at ASC, submission_id ASC' . $limitSql,
             [':link_state' => 'needs_linking']
         )->queryColumn();
@@ -199,7 +202,8 @@ class LinkSuggestionRepository
     public function needsLinkingPage($page, $term, $pageSize)
     {
         $query = (new Query())->from(['submissions' => 'faculty_submissions'])
-            ->where(['submissions.link_state' => 'needs_linking']);
+            ->where(['submissions.link_state' => 'needs_linking'])
+            ->andWhere(SubmittedSubmissionScope::sqlPredicate('submissions'));
         if ($term !== null && trim((string)$term) !== '') {
             $query->andWhere(['or',
                 ['submissions.term_code' => trim((string)$term)],

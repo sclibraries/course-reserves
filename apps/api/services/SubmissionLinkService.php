@@ -40,12 +40,15 @@ class SubmissionLinkService
 
     public function candidates($uuid, $manualQuery = null)
     {
-        return $this->candidateService->candidates($this->findSubmission($uuid), $manualQuery);
+        $submission = $this->findSubmission($uuid);
+        if ($blocked = $this->draftConflict($submission)) return $blocked;
+        return $this->candidateService->candidates($submission, $manualQuery);
     }
 
     public function timeline($uuid)
     {
         $submission = $this->findSubmission($uuid);
+        if ($blocked = $this->draftConflict($submission)) return $blocked;
         return ['items' => $this->eventLog->timeline($submission->submission_id)];
     }
 
@@ -73,6 +76,10 @@ class SubmissionLinkService
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $submission = $this->findSubmissionForUpdate($uuid);
+            if ($blocked = $this->draftConflict($submission, true)) {
+                $transaction->rollBack();
+                return $blocked;
+            }
             if ($submission->link_state === 'linked') {
                 $transaction->rollBack();
                 return ['status' => 409, 'body' => ['error_code' => 'already_linked']];
@@ -115,7 +122,7 @@ class SubmissionLinkService
             );
             // TODO(API-045): emit the submission_corrected email event here.
             $transaction->commit();
-            return ['status' => 200, 'body' => $this->staffSubmission($submission)];
+            return ['status' => 200, 'body' => (new SubmissionLinkPresenter())->present($submission)];
         } catch (\Throwable $exception) {
             if ($transaction->isActive) $transaction->rollBack();
             throw $exception;
@@ -128,6 +135,10 @@ class SubmissionLinkService
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $submission = $this->findSubmissionForUpdate($uuid);
+            if ($blocked = $this->draftConflict($submission, true)) {
+                $transaction->rollBack();
+                return $blocked;
+            }
             if ($submission->link_state !== 'linked') {
                 $transaction->rollBack();
                 return ['status' => 409, 'body' => ['error_code' => 'submission_not_linked']];
@@ -157,7 +168,7 @@ class SubmissionLinkService
                 SubmissionLinkSnapshot::fromSubmission($submission)
             );
             $transaction->commit();
-            return ['status' => 200, 'body' => $this->staffSubmission($submission)];
+            return ['status' => 200, 'body' => (new SubmissionLinkPresenter())->present($submission)];
         } catch (\Throwable $exception) {
             if ($transaction->isActive) $transaction->rollBack();
             throw $exception;
@@ -168,6 +179,7 @@ class SubmissionLinkService
     {
         if (!$listingId) throw new BadRequestHttpException('folio_course_listing_id is required.');
         $submission = $this->findSubmission($uuid);
+        if ($blocked = $this->draftConflict($submission, true)) return $blocked;
         if ($submission->link_state === 'linked') {
             return ['status' => 409, 'body' => [
                 'error_code' => 'already_linked',
@@ -223,7 +235,7 @@ class SubmissionLinkService
                 SubmissionLinkSnapshot::fromSubmission($submission)
             );
             $transaction->commit();
-            $response = $this->staffSubmission($submission);
+            $response = (new SubmissionLinkPresenter())->present($submission);
             $response['course'] = $result['course']->toArray();
             $response['offering'] = $result['offering']->toArray();
             return ['status' => 200, 'body' => $response];
@@ -269,25 +281,11 @@ class SubmissionLinkService
         return $reason;
     }
 
-    private function staffSubmission($submission)
+    private function draftConflict($submission, $asResult = false)
     {
-        return [
-            'submission_id' => (int)$submission->submission_id,
-            'submission_uuid' => $submission->submission_uuid,
-            'link_state' => $submission->link_state,
-            'link_flag' => $submission->link_flag,
-            'linked_at' => $submission->linked_at,
-            'linked_by' => $submission->linked_by,
-            'offering_id' => $submission->offering_id ? (int)$submission->offering_id : null,
-            'folio_course_listing_id' => $submission->folio_course_listing_id,
-            'its_course_id' => $submission->its_course_id,
-            'academic_period' => $submission->academic_period,
-            'roster_term_id' => $submission->roster_term_id,
-            'term_code' => $submission->term_code,
-            'course_code' => $submission->course_code,
-            'section' => $submission->section,
-            'course_title' => $submission->course_title,
-        ];
+        $body = (new SubmittedSubmissionScope())->guardStatus($submission->status);
+        return $body === null ? null : ($asResult ? ['status' => 409, 'body' => $body] : $body);
     }
+
 
 }

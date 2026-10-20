@@ -34,6 +34,7 @@ class FlowRunner
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
             }
+            if ($blocked = (new SubmittedSubmissionScope())->guardServiceResult($item['submission_status'], $transaction)) return $blocked;
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
                 return $this->result(409, ['error_code' => 'submission_not_linked']);
@@ -78,6 +79,7 @@ class FlowRunner
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
             }
+            if ($blocked = (new SubmittedSubmissionScope())->guardServiceResult($item['submission_status'], $transaction)) return $blocked;
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
                 return $this->result(409, ['error_code' => 'submission_not_linked']);
@@ -215,6 +217,7 @@ class FlowRunner
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'item_not_found']);
             }
+            if ($blocked = (new SubmittedSubmissionScope())->guardServiceResult($item['submission_status'], $transaction)) return $blocked;
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
                 return $this->result(409, ['error_code' => 'submission_not_linked']);

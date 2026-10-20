@@ -102,7 +102,7 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
                 'faculty-submission/update',
                 'id' => $this->submissionUuid,
             ]),
-            ['submission_notes' => 'Synthetic API-077 update']
+            ['submission_notes' => 'Synthetic API-077 update', 'draft_version' => 0]
         );
         $responses['add-new-resource'] = $this->request(
             $I,
@@ -180,13 +180,14 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
         $this->assertListIncludesSubmission($responses['index']);
         $this->assertListIncludesSubmission($responses['proxy-index']);
         $this->assertListIncludesSubmission($responses['co-instructor-index']);
-        foreach (['view', 'update', 'proxy-view', 'co-instructor-view'] as $endpoint) {
+        foreach (['view', 'proxy-view', 'co-instructor-view'] as $endpoint) {
             \PHPUnit\Framework\Assert::assertSame(
                 $this->submissionUuid,
                 $responses[$endpoint]['submission_uuid'] ?? null,
                 $endpoint . ' did not return the seeded submission: ' . json_encode($responses[$endpoint])
             );
         }
+        \PHPUnit\Framework\Assert::assertSame(1, $responses['update']['draft_version'] ?? null);
         \PHPUnit\Framework\Assert::assertTrue($responses['submit-complete']['success'] ?? false);
 
         $leaks = [];

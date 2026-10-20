@@ -648,361 +648,15 @@ class FacultySubmissionController extends BaseRestController
      */
     public function actionSubmitComplete()
     {
-        $facultyUser = $this->getFacultyUser();
-        $data = Yii::$app->request->getBodyParams();
-        $isStaff = \app\components\Roles::isStaff($facultyUser['role'] ?? null);
-        $itsCourseId = $data['its_course_id'] ?? null;
-        $academicPeriod = $data['academic_period'] ?? null;
-        $hasItsCourseId = is_string($itsCourseId) && trim($itsCourseId) !== '';
-        $hasAcademicPeriod = is_string($academicPeriod) && trim($academicPeriod) !== '';
-        if ($hasItsCourseId !== $hasAcademicPeriod || (!$isStaff && !$hasItsCourseId)) {
-            Yii::$app->response->statusCode = 422;
-            return ['error_code' => 'roster_course_required'];
-        }
-
-        if (empty($data['courseInfo'])) {
-            throw new BadRequestHttpException('Missing courseInfo');
-        }
-        $courseInfo = $data['courseInfo'];
-        $resources = $data['resources'] ?? [];
-        $folders = $data['folders'] ?? [];
-        $metadata = $data['metadata'] ?? [];
-        $displayOrder = $data['displayOrder'] ?? [];
-        $submittedBy = $metadata['submittedBy'] ?? [];
-        $this->validateCompleteSubmissionPayload($courseInfo, $resources);
-        $folioCourseListingId = $data['folio_course_listing_id'] ?? null;
-        $ownership = (new SubmissionOwnershipPolicy())->resolveOwner(
-            $facultyUser,
-            $data['acting_for_faculty_id'] ?? null,
-            $folioCourseListingId,
-            $courseInfo,
-            $hasItsCourseId ? $itsCourseId : null,
-            $hasAcademicPeriod ? $academicPeriod : null
+        return (new \app\services\FacultyDraftService())->submitComplete(
+            $this->getFacultyUser(),
+            Yii::$app->request->getBodyParams()
         );
-        if (isset($ownership['error_code'])) {
-            Yii::$app->response->statusCode = $ownership['status_code'];
-            return ['error_code' => $ownership['error_code']];
-        }
-        $facultyId = $ownership['owner_id'];
-        $isProxySubmission = $ownership['is_proxy'];
-        $rosterCourse = $ownership['roster_course'] ?? null;
-        $termCode = $rosterCourse['term_code'] ?? $courseInfo['term'];
-        $courseCode = $rosterCourse['course_code'] ?? $courseInfo['courseCode'];
-        $section = $rosterCourse['section'] ?? $courseInfo['section'] ?? '';
-        $courseTitle = $rosterCourse['course_title'] ?? $courseInfo['courseTitle'];
-
-        $duplicateCriteria = $rosterCourse !== null
-            ? ['its_course_id' => $rosterCourse['its_course_id'], 'academic_period' => $rosterCourse['academic_period']]
-            : ['term_code' => $termCode, 'course_code' => $courseCode, 'section' => $section];
-        $existingSubmission = FacultySubmission::find()
-            ->where(['shibboleth_user_id' => $facultyId])
-            ->andWhere($duplicateCriteria)
-            ->one();
-
-        if ($existingSubmission) {
-            throw new BadRequestHttpException('Submission already exists for this course and section');
-        }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            $submission = new FacultySubmission();
-            $submission->shibboleth_user_id = $facultyId;
-            $submission->faculty_display_name = $courseInfo['instructors'] ?? $submittedBy['fullName'] ?? $facultyUser['display_name'];
-            $submission->term_code = $termCode;
-            $submission->course_code = $courseCode;
-            $submission->section = $section;
-            $submission->course_title = $courseTitle;
-            $submission->its_course_id = $rosterCourse['its_course_id'] ?? null;
-            $submission->academic_period = $rosterCourse['academic_period'] ?? null;
-            $submission->roster_term_id = $rosterCourse['roster_term_id'] ?? null;
-            $submission->folio_course_listing_id = $folioCourseListingId;
-            $submission->status = FacultySubmission::STATUS_SUBMITTED;
-            $submission->submitted_at = date('Y-m-d H:i:s');
-
-            if (!empty($metadata['duplicatePreviousCourse'])) {
-                $submission->is_duplicate_previous = 1;
-                $submission->duplicate_note = $metadata['duplicateNote'] ?? null;
-            }
-            \app\services\SubmissionConfirmationState::request($submission, !empty($metadata['emailConfirmation']));
-
-            if ($isProxySubmission) {
-                $submission->proxy_shibboleth_user_id = $facultyUser['user_id'];
-                $submission->proxy_display_name = $facultyUser['display_name'];
-            }
-
-            if (!$submission->save()) {
-                throw new \Exception('Failed to save submission: ' . json_encode($submission->errors));
-            }
-
-            $folderIdMap = [];
-            foreach ($folders as $folder) {
-                $folderMapping = $this->createSubmissionFolder($submission->submission_id, $folder, $displayOrder);
-                $folderIdMap = array_merge($folderIdMap, $folderMapping);
-            }
-
-            $processedResources = 0;
-            foreach ($resources as $index => $resource) {
-                $processedResources += $this->processSubmissionResource(
-                    $submission->submission_id, 
-                    $resource,
-                    $folderIdMap,
-                    $index
-                );
-            }
-
-            $this->storeSubmissionMetadata($submission->submission_id, $metadata, $data, $facultyUser);
-
-            $transaction->commit();
-
-            return \app\services\FacultySubmissionPresenter::submitCompleteResponse([
-                'success' => true,
-                'message' => 'Submission completed successfully',
-                'submission' => \app\services\SubmissionConfirmationState::projectResponse($submission),
-                'stats' => [
-                    'resources_processed' => $processedResources,
-                    'folders_created' => count($folders),
-                    'reuse_items' => $metadata['reuseItems'] ?? 0,
-                    'new_items' => $metadata['newItems'] ?? 0,
-                ]
-            ]);
-        } catch (\Exception $e) {
-            $transaction->rollBack();
-            Yii::error('Submission creation failed: ' . $e->getMessage(), __METHOD__);
-            throw new BadRequestHttpException('Failed to create submission: ' . $e->getMessage());
-        }
     }
 
-    /**
-     * Process individual submission resource using new unified structure
-     * Resources come pre-structured from frontend with all necessary fields
-     */
-    protected function processSubmissionResource($submissionId, $resource, $folderIdMap = [], $resourceIndex = 0)
+    protected function validateCompleteSubmissionPayload(array $courseInfo, array $resources): void
     {
-        // Extract data from the resource structure
-        $isReuse = $resource['is_reuse'] ?? false;
-        $displayOrder = $resource['display_order'] ?? $resourceIndex;
-        $folderName = $resource['folder_name'] ?? null;
-        $positionInFolder = $resource['position_in_folder'] ?? null;
-        $facultyNotes = $resource['faculty_notes'] ?? null;
-        $priority = $resource['priority'] ?? 'medium';
-        $resourceData = $resource['resource_data'] ?? [];
-        
-        // Get material type from resource_data
-        $materialTypeName = $resourceData['materialType'] ?? 'book';
-        $materialTypeId = $this->getMaterialTypeIdByName($materialTypeName);
-        
-        if (!$materialTypeId) {
-            Yii::warning("Could not find material type for: $materialTypeName", __METHOD__);
-            $materialTypeId = 1; // Default to book
-        }
-        
-        // Create new resource using unified table
-        $newResource = new SubmissionNewResource();
-        $newResource->submission_id = $submissionId;
-        $newResource->material_type_id = $materialTypeId;
-        $newResource->resource_data = json_encode($resourceData);
-        $newResource->is_reuse = $isReuse ? 1 : 0;
-        $newResource->source_barcode = $isReuse ? ($resource['source_barcode'] ?? null) : null;
-        $newResource->source_call_number = $isReuse ? ($resource['source_call_number'] ?? null) : null;
-        $newResource->source_resource_id = $isReuse ? ($resource['source_resource_id'] ?? null) : null;
-        $newResource->source_folio_instance_id = $isReuse ? ($resource['source_folio_instance_id'] ?? null) : null;
-        $newResource->display_order = $displayOrder;
-        $newResource->folder_name = $folderName;
-        $newResource->position_in_folder = $positionInFolder;
-        $newResource->faculty_notes = $facultyNotes;
-        $newResource->priority = $priority;
-        $newResource->item_status = 'pending';
-        
-        if (!$newResource->save()) {
-            throw new \Exception('Failed to save resource: ' . json_encode($newResource->errors));
-        }
-        
-        return 1;
-    }
-
-    private function validateCompleteSubmissionPayload(array $courseInfo, array $resources): void
-    {
-        $requiredCourseFields = [
-            'courseCode' => 'courseCode',
-            'courseTitle' => 'courseTitle',
-            'term' => 'term',
-        ];
-
-        foreach ($requiredCourseFields as $field => $label) {
-            if (!isset($courseInfo[$field]) || trim((string)$courseInfo[$field]) === '') {
-                throw new BadRequestHttpException("Missing required course information: {$label}");
-            }
-        }
-
-        foreach ($resources as $index => $resource) {
-            $resourceData = $resource['resource_data'] ?? [];
-            if (!is_array($resourceData)) {
-                throw new BadRequestHttpException("Resource {$index} must include structured resource_data");
-            }
-
-            if (!isset($resourceData['title']) || trim((string)$resourceData['title']) === '') {
-                throw new BadRequestHttpException("Resource {$index} is missing required title");
-            }
-
-            if (isset($resourceData['url']) && trim((string)$resourceData['url']) !== '') {
-                $url = trim((string)$resourceData['url']);
-                if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                    throw new BadRequestHttpException("Resource {$index} has an invalid URL");
-                }
-            }
-        }
-    }
-
-    /**
-     * Process individual submission item (DEPRECATED - use processSubmissionResource instead)
-     * Kept for backward compatibility
-     */
-    protected function processSubmissionItem($submissionId, $item, $displayOrder = [], $folderIdMap = [], $itemIndex = 0, $positionInFolder = null)
-    {
-        // Extract barcode and call number from notes if present
-        $barcode = null;
-        $callNumber = null;
-        if (!empty($item['notes'])) {
-            // Parse: "Call Number: DC148 .D5313 1989 | Barcode: 310183606685598"
-            if (preg_match('/Barcode:\s*([^\s|]+)/', $item['notes'], $matches)) {
-                $barcode = trim($matches[1]);
-            }
-            if (preg_match('/Call Number:\s*([^|]+)/', $item['notes'], $matches)) {
-                $callNumber = trim($matches[1]);
-            }
-        }
-
-        // Find display order for this item
-        $displayPos = 999;
-        foreach ($displayOrder as $orderItem) {
-            if ($orderItem['id'] === $item['id']) {
-                $displayPos = $orderItem['displayPosition'] ?? 999;
-                break;
-            }
-        }
-        
-        // If not found in displayOrder (likely in a folder), use the item's array index
-        // This preserves the order items appear in the payload
-        if ($displayPos === 999) {
-            $displayPos = $itemIndex;
-        }
-
-        // Determine folder name if item belongs to a folder
-        $folderName = null;
-        if (!empty($item['folderId'])) {
-            // Normalize folder ID (remove "folder-" prefix if present)
-            $normalizedFolderId = str_replace('folder-', '', $item['folderId']);
-            $folderName = $folderIdMap[$normalizedFolderId] ?? $folderIdMap[$item['folderId']] ?? null;
-        }
-
-        // If item has barcode, it's a reuse item
-        if ($barcode) {
-            $reuseResource = new SubmissionReuseResource();
-            $reuseResource->submission_id = $submissionId;
-            $reuseResource->source_resource_id = null; // Will be matched later by staff
-            $reuseResource->barcode = $barcode;
-            $reuseResource->call_number = $callNumber;
-            $reuseResource->display_order = $displayPos;
-            $reuseResource->folder_name = $folderName;
-            $reuseResource->position_in_folder = $positionInFolder;
-            $reuseResource->faculty_notes = $item['notes'] ?? null;
-            
-            if (!$reuseResource->save()) {
-                throw new \Exception('Failed to save reuse resource: ' . json_encode($reuseResource->errors));
-            }
-            return 1;
-        } else {
-            // Otherwise treat as new resource request
-            $newResource = new SubmissionNewResource();
-            $newResource->submission_id = $submissionId;
-            $newResource->material_type_id = $this->getMaterialTypeIdByName($item['materialType'] ?? 'book');
-            $newResource->resource_data = json_encode([
-                'title' => $item['title'] ?? '',
-                'authors' => $item['authors'] ?? '',
-                'publisher' => $item['publisher'] ?? '',
-                'publicationYear' => $item['publicationYear'] ?? '',
-                'materialType' => $item['materialType'] ?? 'book',
-                'isbn' => $item['isbn'] ?? '',
-                'notes' => $item['notes'] ?? '',
-            ]);
-            $newResource->display_order = $displayPos;
-            $newResource->folder_name = $folderName;
-            $newResource->position_in_folder = $positionInFolder;
-            $newResource->faculty_notes = $item['notes'] ?? null;
-            $newResource->priority = SubmissionNewResource::PRIORITY_MEDIUM;
-            
-            if (!$newResource->save()) {
-                throw new \Exception('Failed to save new resource: ' . json_encode($newResource->errors));
-            }
-            return 1;
-        }
-    }
-
-    /**
-     * Create submission folder and return ID map
-     */
-    protected function createSubmissionFolder($submissionId, $folder, $displayOrder)
-    {
-        // Find display order for this folder
-        $displayPos = 999;
-        $folderId = $folder['id'];
-        foreach ($displayOrder as $orderItem) {
-            if ($orderItem['id'] === $folderId) {
-                $displayPos = $orderItem['displayPosition'] ?? 999;
-                break;
-            }
-        }
-
-        // Insert folder record
-        $sql = "INSERT INTO submission_folders 
-                (submission_id, folder_name, display_order)
-                VALUES 
-                (:submission_id, :folder_name, :display_order)";
-        
-        Yii::$app->db->createCommand($sql, [
-            ':submission_id' => $submissionId,
-            ':folder_name' => $folder['title'] ?? 'Untitled Folder',
-            ':display_order' => $displayPos,
-        ])->execute();
-        
-        $dbFolderId = Yii::$app->db->getLastInsertID();
-        
-        // Return mapping of frontend folder ID to folder name
-        // We'll use folder title as the folder_name in items
-        $normalizedId = str_replace('folder-', '', $folderId);
-        return [
-            $folderId => $folder['title'] ?? 'Untitled Folder',
-            $normalizedId => $folder['title'] ?? 'Untitled Folder',
-        ];
-    }
-
-    /**
-     * Store submission metadata
-     */
-    protected function storeSubmissionMetadata($submissionId, $metadata, $fullPayload, $facultyUser)
-    {
-        $sql = "INSERT INTO submission_metadata 
-                (submission_id, total_items, total_folders, items_in_folders, ungrouped_items,
-                 submitted_by_user_id, submitted_by_username, submitted_by_full_name, 
-                 submitted_by_email, submitted_by_institution, raw_payload)
-                VALUES 
-                (:submission_id, :total_items, :total_folders, :items_in_folders, :ungrouped_items,
-                 :user_id, :username, :full_name, :email, :institution, :raw_payload)";
-        
-        Yii::$app->db->createCommand($sql, [
-            ':submission_id' => $submissionId,
-            ':total_items' => $metadata['totalItems'] ?? 0,
-            ':total_folders' => $metadata['totalFolders'] ?? 0,
-            ':items_in_folders' => $metadata['itemsInFolders'] ?? 0,
-            ':ungrouped_items' => $metadata['ungroupedItems'] ?? 0,
-            ':user_id' => $facultyUser['user_id'],
-            ':username' => $facultyUser['user_id'],
-            ':full_name' => $facultyUser['display_name'] ?? null,
-            ':email' => $facultyUser['email'] ?? null,
-            ':institution' => $facultyUser['institution'] ?? null,
-            ':raw_payload' => json_encode($fullPayload),
-        ])->execute();
-        
-        return true;
+        (new \app\services\SubmissionPayloadService())->validate($courseInfo, $resources);
     }
 
     /**
@@ -1040,6 +694,14 @@ class FacultySubmissionController extends BaseRestController
     {
         $facultyUser = $this->getFacultyUser();
         $submission = $this->findSubmission($id, $facultyUser, true);
+
+        if ($submission->status === FacultySubmission::STATUS_DRAFT) {
+            return (new \app\services\FacultyDraftService())->updateDraft(
+                $submission,
+                $facultyUser,
+                Yii::$app->request->getBodyParams()
+            );
+        }
 
         // Check if submission is locked
         if ($submission->isLocked()) {
@@ -1392,6 +1054,10 @@ class FacultySubmissionController extends BaseRestController
     {
         $facultyUser = $this->getFacultyUser();
         $submission = $this->findSubmission($id, $facultyUser, true);
+
+        if ($submission->status === FacultySubmission::STATUS_DRAFT) {
+            return (new \app\services\FacultyDraftService())->submitDraft($submission, $facultyUser);
+        }
 
         if (!$submission->isEditable()) {
             throw new BadRequestHttpException('Submission cannot be modified in current status');
