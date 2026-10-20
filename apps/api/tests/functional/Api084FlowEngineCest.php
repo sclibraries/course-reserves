@@ -346,7 +346,7 @@ class Api084FlowEngineCest extends BaseFunctionalCest
                 'outcomes' => [
                     ['key' => 'yes', 'label' => 'Yes', 'next' => ['finish' => 'on_reserve']],
                     ['key' => 'no', 'label' => 'No', 'next' => ['handoff_group' => $groupName]],
-                    ['key' => 'cannot_get', 'label' => "We can't get this", 'next' => ['finish' => 'unavailable']],
+                    ['key' => 'cannot_get', 'label' => "We can't get this", 'next' => ['step' => 'unavailable']],
                 ],
             ],
             [

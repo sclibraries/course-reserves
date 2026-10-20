@@ -12,6 +12,8 @@ use app\models\SubmissionNewResource;
 /** Persists the shared course, folder, item and metadata payload. */
 class SubmissionPayloadService
 {
+    const RESOURCE_FIELDS = ['title', 'authors', 'publisher', 'publicationYear', 'materialType', 'isbn', 'notes', 'url'];
+
     public function validationResources(array $resources)
     {
         $result = [];
@@ -20,9 +22,7 @@ class SubmissionPayloadService
                 $result[] = $item;
                 continue;
             }
-            $result[] = ['resource_data' => array_intersect_key($item, array_flip([
-                'title', 'authors', 'publisher', 'publicationYear', 'materialType', 'isbn', 'url',
-            ]))];
+            $result[] = ['resource_data' => $this->resourceData($item)];
         }
         return $result;
     }
@@ -53,14 +53,12 @@ class SubmissionPayloadService
         $metadata = $payload['metadata'] ?? [];
         $displayOrder = $payload['displayOrder'] ?? [];
 
-        Yii::$app->db->createCommand()->delete('submission_new_resources', ['submission_id' => $submissionId])->execute();
-        Yii::$app->db->createCommand()->delete('submission_reuse_resources', ['submission_id' => $submissionId])->execute();
-        Yii::$app->db->createCommand()->delete('submission_folders', ['submission_id' => $submissionId])->execute();
+        $this->deletePayload($submissionId);
 
         $folderNames = [];
         foreach ($folders as $folder) {
-            $id = $folder['id'] ?? $folder['folder_uuid'] ?? $folder['folder_id'] ?? null;
-            $name = $folder['title'] ?? $folder['folder_name'] ?? $folder['name'] ?? 'Untitled Folder';
+            $id = $folder['id'];
+            $name = $folder['title'];
             $position = $this->displayPosition($displayOrder, $id, $folder['display_order'] ?? 999);
             $row = new SubmissionFolder();
             $row->submission_id = $submissionId;
@@ -86,10 +84,11 @@ class SubmissionPayloadService
             $item->material_type_id = $this->materialTypeId($materialType);
             $item->resource_data = json_encode($data);
             $item->is_reuse = $isReuse ? 1 : 0;
-            $item->source_barcode = $isReuse ? ($resource['source_barcode'] ?? null) : null;
-            $item->source_call_number = $isReuse ? ($resource['source_call_number'] ?? null) : null;
-            $item->source_resource_id = $isReuse ? ($resource['source_resource_id'] ?? null) : null;
-            $item->source_folio_instance_id = $isReuse ? ($resource['source_folio_instance_id'] ?? null) : null;
+            $source = $isReuse ? $resource : [];
+            $item->source_barcode = $source['source_barcode'] ?? null;
+            $item->source_call_number = $source['source_call_number'] ?? null;
+            $item->source_resource_id = $source['source_resource_id'] ?? null;
+            $item->source_folio_instance_id = $source['source_folio_instance_id'] ?? null;
             $item->display_order = $resource['display_order'] ?? $index;
             $item->folder_name = $folderName;
             $item->position_in_folder = $resource['position_in_folder'] ?? null;
@@ -113,6 +112,17 @@ class SubmissionPayloadService
         return json_decode($metadata->raw_payload, true) ?: [];
     }
 
+    public function deletePayload($submissionId, $includeMetadata = false)
+    {
+        $tables = ['submission_new_resources', 'submission_reuse_resources', 'submission_folders'];
+        if ($includeMetadata) {
+            array_unshift($tables, 'submission_metadata');
+        }
+        foreach ($tables as $table) {
+            Yii::$app->db->createCommand()->delete($table, ['submission_id' => $submissionId])->execute();
+        }
+    }
+
     public function submissionStats(array $payload)
     {
         $resources = $payload['resources'] ?? $payload['items'] ?? [];
@@ -132,9 +142,7 @@ class SubmissionPayloadService
 
         $resources = [];
         foreach ($payload['items'] ?? [] as $item) {
-            $data = $item['resource_data'] ?? array_intersect_key($item, array_flip([
-                'title', 'authors', 'publisher', 'publicationYear', 'materialType', 'isbn', 'notes', 'url',
-            ]));
+            $data = $item['resource_data'] ?? $this->resourceData($item);
             $resources[] = [
                 'resource_data' => $data,
                 'is_reuse' => !empty($item['barcode']),
@@ -174,6 +182,11 @@ class SubmissionPayloadService
             }
         }
         return $fallback;
+    }
+
+    private function resourceData(array $item)
+    {
+        return array_intersect_key($item, array_flip(self::RESOURCE_FIELDS));
     }
 
     private function materialTypeId($name)

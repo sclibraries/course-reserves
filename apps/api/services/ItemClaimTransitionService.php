@@ -2,61 +2,42 @@
 
 namespace app\services;
 
-use Yii;
-
 /** Performs conditional release, person hand-off, and takeover writes. */
 class ItemClaimTransitionService
 {
+    use ServiceResult;
+
     private $repository;
     private $eventLog;
     private $presenter;
     private $expiry;
     private $notifier;
     private $groups;
+    private $linkedItems;
 
-    public function __construct($repository, $eventLog, $presenter, $expiry, $notifier, $groups = null)
+    public function __construct($repository, $eventLog, $presenter, $expiry, $notifier, $groups, $linkedItems)
     {
         $this->repository = $repository;
         $this->eventLog = $eventLog;
         $this->presenter = $presenter;
         $this->expiry = $expiry;
         $this->notifier = $notifier;
-        $this->groups = $groups ?: new StaffGroupRepository();
+        $this->groups = $groups;
+        $this->linkedItems = $linkedItems;
     }
 
     public function transition($operation, $kind, $id, array $actor, $reason, $target)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        $notification = null;
-        try {
-            $item = $this->repository->find($kind, $id, true);
-            if (!$item) {
-                $transaction->rollBack();
-                return $this->result(404, ['error_code' => 'item_not_found']);
-            }
-            if ($blocked = (new SubmittedSubmissionScope())->guardStatus($item['submission_status'])) {
-                $transaction->rollBack();
-                return $this->result(409, $blocked);
-            }
-            if ($item['link_state'] !== 'linked') {
-                $transaction->rollBack();
-                return $this->result(409, ['error_code' => 'submission_not_linked']);
-            }
-            $now = $this->expiry->now();
-            $notification = $this->expiry->expireLocked($kind, $item, $now);
-            if ($notification) {
-                $item = $this->repository->find($kind, $id, true);
-            }
+        $notice = null;
+        $result = $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use (
+            $operation, $kind, $id, $actor, $reason, $target, &$notice
+        ) {
             $actorUsername = (string)($actor['username'] ?? $actor['id'] ?? '');
             $previousHolder = $item['claimed_by'];
             if ($operation === 'takeover' && $previousHolder === null) {
-                $transaction->commit();
-                $this->expiry->notify($notification);
                 return $this->result(409, ['error_code' => 'not_claimed']);
             }
             if ($operation !== 'takeover' && !$this->isClaimedBy($item, $actor)) {
-                $transaction->commit();
-                $this->expiry->notify($notification);
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
             $before = $this->snapshot($item);
@@ -68,8 +49,6 @@ class ItemClaimTransitionService
                         ? $this->repository->handoffToGroupIfOwned($kind, $id, $actorUsername, $target['id'], $now)
                         : $this->repository->takeoverIfClaimed($kind, $id, $actorUsername, $now)));
             if (!$updated) {
-                $transaction->commit();
-                $this->expiry->notify($notification);
                 return $this->result(409, ['error_code' => $operation === 'takeover' ? 'not_claimed' : 'not_claimed_by_you']);
             }
             $eventType = [
@@ -82,8 +61,11 @@ class ItemClaimTransitionService
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, $eventType, $reason, $before, $this->snapshot($after), $kind
             );
-            $transaction->commit();
-            $this->expiry->notify($notification);
+            $notice = [$item, $actorUsername, $previousHolder];
+            return $this->result(200, ['item' => $this->presenter->present($after, $this->expiry->hours())]);
+        });
+        if ($notice) {
+            list($item, $actorUsername, $previousHolder) = $notice;
             if ($operation === 'handoff') {
                 $this->notify('claim_handed_off', $this->notificationContext($kind, $id, $item, $actorUsername, $target['username']));
             } elseif ($operation === 'takeover') {
@@ -96,13 +78,8 @@ class ItemClaimTransitionService
                     $this->notify('group_handoff', $context);
                 }
             }
-            return $this->result(200, ['item' => $this->presenter->present($after, $this->expiry->hours())]);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
         }
+        return $result;
     }
 
     private function snapshot(array $item)
@@ -136,10 +113,5 @@ class ItemClaimTransitionService
     {
         $username = (string)($actor['username'] ?? $actor['id'] ?? '');
         return $item['claimed_by'] !== null && $item['claimed_by'] === $username;
-    }
-
-    private function result($status, array $body)
-    {
-        return ['status' => $status, 'body' => $body];
     }
 }

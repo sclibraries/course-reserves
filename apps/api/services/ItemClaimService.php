@@ -7,6 +7,8 @@ use Yii;
 /** Coordinates atomic item claims and exposes one shared read shape to staff controllers. */
 class ItemClaimService
 {
+    use ServiceResult;
+
     const PAGE_SIZE = 20;
 
     private $repository;
@@ -18,6 +20,7 @@ class ItemClaimService
     private $activityService;
     private $groups;
     private $submittedScope;
+    private $linkedItems;
 
     public function __construct($repository = null, $eventLog = null, $nowProvider = null, $notifier = null, $groups = null)
     {
@@ -31,52 +34,30 @@ class ItemClaimService
         };
         $notifier = $notifier ?: new NullWorkflowNotifier();
         $this->expiry = new ItemClaimExpiryService($this->repository, $this->eventLog, $nowProvider, $notifier);
+        $this->submittedScope = new SubmittedSubmissionScope();
+        $this->linkedItems = new LinkedItemService($this->repository, $this->expiry, $this->submittedScope);
         $this->transitionService = new ItemClaimTransitionService(
             $this->repository,
             $this->eventLog,
             $this->presenter,
             $this->expiry,
             $notifier,
-            $this->groups
+            $this->groups,
+            $this->linkedItems
         );
         $this->activityService = new ItemClaimActivityService($this->repository, $this->eventLog, $this->expiry);
-        $this->submittedScope = new SubmittedSubmissionScope();
     }
 
     public function claim($kind, $id, array $actor)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        $notification = null;
-        try {
-            $item = $this->repository->find($kind, $id, true);
-            if (!$item) {
-                $transaction->rollBack();
-                return $this->result(404, ['error_code' => 'item_not_found']);
-            }
-            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
-                $transaction->rollBack();
-                return $this->result(409, $blocked);
-            }
-            if ($item['link_state'] !== 'linked') {
-                $transaction->rollBack();
-                return $this->result(409, ['error_code' => 'submission_not_linked']);
-            }
-            $now = $this->expiry->now();
-            $notification = $this->expiry->expireLocked($kind, $item, $now);
-            if ($notification) {
-                $item = $this->repository->find($kind, $id, true);
-            }
+        return $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use ($kind, $id, $actor) {
             $username = $this->username($actor);
             if (!empty($item['assigned_group_id']) && !$this->groups->isMember($item['assigned_group_id'], $username)) {
-                $transaction->commit();
-                $this->expiry->notify($notification);
                 return $this->result(403, ['error_code' => 'not_group_member']);
             }
             $before = $this->snapshot($item);
             if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
                 $current = $this->repository->find($kind, $id, true);
-                $transaction->commit();
-                $this->expiry->notify($notification);
                 if ($current && !empty($current['assigned_group_id']) && !$this->groups->isMember($current['assigned_group_id'], $username)) {
                     return $this->result(403, ['error_code' => 'not_group_member']);
                 }
@@ -89,15 +70,8 @@ class ItemClaimService
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
             );
-            $transaction->commit();
-            $this->expiry->notify($notification);
             return $this->result(200, ['item' => $this->presenter->present($claimed, $this->expiry->hours())]);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function release($kind, $id, array $actor, $reason = null)
@@ -189,31 +163,26 @@ class ItemClaimService
 
     public function timeline($kind, $id)
     {
-        $notification = null;
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        $outcome = Transactional::run(function ($transaction) use ($kind, $id) {
             $item = $this->repository->find($kind, $id, true);
             if (!$item) {
                 $transaction->rollBack();
-                return $this->result(404, ['error_code' => 'item_not_found']);
+                return ['result' => $this->result(404, ['error_code' => 'item_not_found'])];
             }
             if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
                 $transaction->rollBack();
-                return $this->result(409, $blocked);
+                return ['result' => $this->result(409, $blocked)];
             }
             if ($item['link_state'] !== 'linked') {
                 $transaction->rollBack();
-                return $this->result(409, ['error_code' => 'submission_not_linked']);
+                return ['result' => $this->result(409, ['error_code' => 'submission_not_linked'])];
             }
-            $notification = $this->expiry->expireLocked($kind, $item, $this->expiry->now());
-            $transaction->commit();
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
+            return ['notification' => $this->expiry->expireLocked($kind, $item, $this->expiry->now())];
+        });
+        if (isset($outcome['result'])) {
+            return $outcome['result'];
         }
-        $this->expiry->notify($notification);
+        $this->expiry->notify($outcome['notification']);
         return $this->result(200, ['items' => $this->eventLog->itemTimeline($kind, $id)]);
     }
 
@@ -245,6 +214,11 @@ class ItemClaimService
     public function notifyClaimExpiry($notification)
     {
         $this->expiry->notify($notification);
+    }
+
+    public function withLinkedItem($kind, $id, callable $callback)
+    {
+        return $this->linkedItems->withLinkedItem($kind, $id, $callback);
     }
 
     public function completeLegacyChecklistItem($kind, $id, array $actor)
@@ -283,10 +257,5 @@ class ItemClaimService
     private function username(array $actor)
     {
         return (string)($actor['username'] ?? $actor['id'] ?? '');
-    }
-
-    private function result($status, array $body)
-    {
-        return ['status' => $status, 'body' => $body];
     }
 }

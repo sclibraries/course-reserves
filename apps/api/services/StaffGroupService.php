@@ -7,6 +7,8 @@ use Yii;
 /** Applies staff-group access rules and transactionally records admin changes. */
 class StaffGroupService
 {
+    use ServiceResult;
+
     private $repository;
     private $eventLog;
     private $claims;
@@ -46,8 +48,7 @@ class StaffGroupService
             return $this->result(409, ['error_code' => 'group_name_exists']);
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function () use ($name, $description, $actor) {
             $id = $this->repository->insertGroup([
                 'name' => $name,
                 'description' => $description,
@@ -55,19 +56,10 @@ class StaffGroupService
             ]);
             $after = ['name' => $name, 'description' => $description];
             $this->eventLog->record($id, $name, $actor, 'group_created', [], $after);
-            $transaction->commit();
             return $this->result(201, ['group' => $this->groupSummary($id)]);
-        } catch (\yii\db\IntegrityException $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+        }, function () {
             return $this->result(409, ['error_code' => 'group_name_exists']);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function updateGroup($id, array $input, array $actor)
@@ -87,8 +79,7 @@ class StaffGroupService
             return $this->result(400, ['error_code' => 'group_update_required']);
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($id, $values, $actor) {
             $group = $this->repository->find($id, true);
             if (!$group) {
                 $transaction->rollBack();
@@ -102,20 +93,13 @@ class StaffGroupService
             $updated = array_merge($before, $values);
             $this->repository->updateGroup($id, $values);
             $this->eventLog->record($id, $group['name'], $actor, 'group_updated', $before, $updated);
-            $transaction->commit();
             return $this->result(200, ['group' => $this->groupSummary($id)]);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function deleteGroup($id, array $actor)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($id, $actor) {
             $group = $this->repository->find($id, true);
             if (!$group) {
                 $transaction->rollBack();
@@ -128,14 +112,8 @@ class StaffGroupService
             $before = ['name' => $group['name'], 'description' => $group['description']];
             $this->eventLog->record($id, $group['name'], $actor, 'group_deleted', $before, []);
             $this->repository->deleteGroup($id);
-            $transaction->commit();
             return $this->result(204, []);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function members($groupId)
@@ -152,8 +130,7 @@ class StaffGroupService
         if ($username === '') {
             return $this->result(400, ['error_code' => 'username_required']);
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($groupId, $username, $actor) {
             $group = $this->repository->find($groupId, true);
             if (!$group) {
                 $transaction->rollBack();
@@ -173,25 +150,15 @@ class StaffGroupService
             $this->eventLog->record(
                 $groupId, $group['name'], $actor, 'member_added', [], $after
             );
-            $transaction->commit();
             return $this->result(201, ['member' => $this->memberSummary($groupId, $username)]);
-        } catch (\yii\db\IntegrityException $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+        }, function () {
             return $this->result(409, ['error_code' => 'already_group_member']);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function removeMember($groupId, $username, array $actor)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($groupId, $username, $actor) {
             $group = $this->repository->find($groupId, true);
             if (!$group) {
                 $transaction->rollBack();
@@ -206,14 +173,8 @@ class StaffGroupService
             $this->eventLog->record(
                 $groupId, $group['name'], $actor, 'member_removed', $member, []
             );
-            $transaction->commit();
             return $this->result(204, []);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function myGroups($username)
@@ -274,8 +235,4 @@ class StaffGroupService
         return $description === '' ? null : $description;
     }
 
-    private function result($status, array $body)
-    {
-        return ['status' => $status, 'body' => $body];
-    }
 }

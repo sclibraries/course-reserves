@@ -42,31 +42,27 @@ class FlowRepository
 
     public function run($runId, $forUpdate = false)
     {
-        $sql = 'SELECT r.*, f.name AS flow_name, v.steps_json FROM item_flow_runs r '
-            . 'INNER JOIN flows f ON f.id = r.flow_id '
-            . 'INNER JOIN flow_versions v ON v.flow_id = r.flow_id AND v.version = r.version '
-            . 'WHERE r.id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
-        return Yii::$app->db->createCommand($sql, [':id' => (int)$runId])->queryOne() ?: null;
+        return $this->runWhere('r.id = :id', [':id' => (int)$runId], null, $forUpdate);
     }
 
     public function latestRun($kind, $itemId, $forUpdate = false)
     {
-        $sql = 'SELECT r.*, f.name AS flow_name, v.steps_json FROM item_flow_runs r '
-            . 'INNER JOIN flows f ON f.id = r.flow_id '
-            . 'INNER JOIN flow_versions v ON v.flow_id = r.flow_id AND v.version = r.version '
-            . 'WHERE r.item_kind = :kind AND r.item_id = :item_id ORDER BY r.id DESC LIMIT 1'
-            . ($forUpdate ? ' FOR UPDATE' : '');
-        return Yii::$app->db->createCommand($sql, [':kind' => $kind, ':item_id' => (int)$itemId])->queryOne() ?: null;
+        return $this->runWhere(
+            'r.item_kind = :kind AND r.item_id = :item_id',
+            [':kind' => $kind, ':item_id' => (int)$itemId],
+            'ORDER BY r.id DESC',
+            $forUpdate
+        );
     }
 
     public function openRun($kind, $itemId, $forUpdate = false)
     {
-        $sql = 'SELECT r.*, f.name AS flow_name, v.steps_json FROM item_flow_runs r '
-            . 'INNER JOIN flows f ON f.id = r.flow_id '
-            . 'INNER JOIN flow_versions v ON v.flow_id = r.flow_id AND v.version = r.version '
-            . 'WHERE r.item_kind = :kind AND r.item_id = :item_id AND r.closed_at IS NULL '
-            . 'ORDER BY r.id DESC LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
-        return Yii::$app->db->createCommand($sql, [':kind' => $kind, ':item_id' => (int)$itemId])->queryOne() ?: null;
+        return $this->runWhere(
+            'r.item_kind = :kind AND r.item_id = :item_id AND r.closed_at IS NULL',
+            [':kind' => $kind, ':item_id' => (int)$itemId],
+            'ORDER BY r.id DESC',
+            $forUpdate
+        );
     }
 
     public function runsForItem($kind, $itemId)
@@ -101,8 +97,8 @@ class FlowRepository
         $history = [];
         foreach ($rows as $row) {
             $runId = (int)$row['run_id'];
-            $step = $this->stepByKey($definitions[$runId], $row['step_key']);
-            $outcome = $this->outcomeByKey($step, $row['outcome_key']);
+            $step = FlowStepLookup::stepByKey($definitions[$runId], $row['step_key']);
+            $outcome = FlowStepLookup::outcomeByKey($step, $row['outcome_key']);
             $history[] = [
                 'step_key' => $row['step_key'],
                 'step_label' => $step['label'] ?? $row['step_key'],
@@ -244,23 +240,13 @@ class FlowRepository
         ])->execute();
     }
 
-    private function stepByKey(array $steps, $key)
+    private function runWhere($where, array $params, $order, $forUpdate)
     {
-        foreach ($steps as $step) {
-            if (($step['key'] ?? null) === $key) {
-                return $step;
-            }
-        }
-        return [];
-    }
-
-    private function outcomeByKey(array $step, $key)
-    {
-        foreach ($step['outcomes'] ?? [] as $outcome) {
-            if (($outcome['key'] ?? null) === $key) {
-                return $outcome;
-            }
-        }
-        return [];
+        $sql = 'SELECT r.*, f.name AS flow_name, v.steps_json FROM item_flow_runs r '
+            . 'INNER JOIN flows f ON f.id = r.flow_id '
+            . 'INNER JOIN flow_versions v ON v.flow_id = r.flow_id AND v.version = r.version '
+            . 'WHERE ' . $where . ($order ? ' ' . $order : '') . ' LIMIT 1'
+            . ($forUpdate ? ' FOR UPDATE' : '');
+        return Yii::$app->db->createCommand($sql, $params)->queryOne() ?: null;
     }
 }

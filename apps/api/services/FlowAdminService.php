@@ -2,12 +2,11 @@
 
 namespace app\services;
 
-use Yii;
-use yii\db\IntegrityException;
-
 /** Owns admin writes for flow definitions and the complete material type mapping. */
 class FlowAdminService
 {
+    use ServiceResult;
+
     private $flows;
     private $validator;
     private $events;
@@ -41,26 +40,16 @@ class FlowAdminService
         if ($errors) {
             return $this->result(400, ['error_code' => 'invalid_flow', 'errors' => $errors]);
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function () use ($name, $body, $actor, $steps) {
             $flowId = $this->flows->insertFlow($name, $body['description'] ?? null, $actor['username']);
             $this->flows->insertVersion($flowId, 1, $steps, $actor['username']);
             $this->events->record(null, null, $actor, 'flow_created', null, [], [
                 'flow_id' => $flowId, 'name' => $name, 'version' => 1,
             ]);
-            $transaction->commit();
             return $this->result(201, ['flow' => ['id' => $flowId, 'name' => $name, 'description' => $body['description'] ?? null]]);
-        } catch (IntegrityException $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+        }, function () {
             return $this->result(409, ['error_code' => 'flow_name_in_use']);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function createVersion($id, array $body, array $actor)
@@ -70,8 +59,7 @@ class FlowAdminService
         if ($errors) {
             return $this->result(400, ['error_code' => 'invalid_flow', 'errors' => $errors]);
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($id, $actor, $steps) {
             $flow = $this->flows->flow($id, true);
             if (!$flow) {
                 $transaction->rollBack();
@@ -83,14 +71,8 @@ class FlowAdminService
             $this->events->record(null, null, $actor, 'flow_version_created', null, [
                 'flow_id' => (int)$id, 'version' => (int)$latest['version'],
             ], ['flow_id' => (int)$id, 'version' => $version]);
-            $transaction->commit();
             return $this->result(201, ['version' => ['version' => $version, 'steps' => $steps]]);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function updateFlow($id, array $body, array $actor)
@@ -101,8 +83,7 @@ class FlowAdminService
                 'step_key' => null, 'message' => 'Flow name is required.',
             ]]]);
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($id, $name, $body, $actor) {
             $flow = $this->flows->flow($id, true);
             if (!$flow) {
                 $transaction->rollBack();
@@ -113,25 +94,15 @@ class FlowAdminService
             $this->events->record(null, null, $actor, 'flow_updated', null, [
                 'flow_id' => (int)$id, 'name' => $flow['name'], 'description' => $flow['description'],
             ], ['flow_id' => (int)$id, 'name' => $name, 'description' => $values['description']]);
-            $transaction->commit();
             return $this->result(200, ['flow' => ['id' => (int)$id, 'name' => $name, 'description' => $values['description']]]);
-        } catch (IntegrityException $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+        }, function () {
             return $this->result(409, ['error_code' => 'flow_name_in_use']);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function deleteFlow($id, array $actor)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($id, $actor) {
             $flow = $this->flows->flow($id, true);
             if (!$flow) {
                 $transaction->rollBack();
@@ -145,14 +116,8 @@ class FlowAdminService
                 'flow_id' => (int)$id, 'name' => $flow['name'], 'description' => $flow['description'],
             ], []);
             $this->flows->deleteFlow($id);
-            $transaction->commit();
             return $this->result(204, []);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function getMapping()
@@ -203,18 +168,11 @@ class FlowAdminService
         foreach ($types as $type) {
             $after[] = ['material_type' => $type['material_type'], 'flow_id' => $normalized[$type['material_type']]['flow_id']];
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function () use ($normalized, $before, $after, $actor) {
             $this->flows->replaceMappings(array_values($normalized));
             $this->events->record(null, null, $actor, 'flow_mapping_updated', null, ['mapping' => $before], ['mapping' => $after]);
-            $transaction->commit();
             return $this->result(200, ['mapping' => $after]);
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
+        });
     }
 
     private function validate(array $steps)
@@ -259,10 +217,5 @@ class FlowAdminService
             }
         }
         return 0;
-    }
-
-    private function result($status, array $body)
-    {
-        return ['status' => $status, 'body' => $body];
     }
 }

@@ -29,17 +29,11 @@ class FacultyDraftService
 
     public function create(array $actor, array $data)
     {
-        $context = $this->contexts->resolve($actor, $data);
-        if (isset($context['error_code'])) {
-            return [
-                'status_code' => $context['status_code'],
-                'body' => ['error_code' => $context['error_code']],
-            ];
+        $resolved = $this->resolveAndValidate($actor, $data);
+        if (isset($resolved['status_code'])) {
+            return $resolved;
         }
-        $this->payloads->validate(
-            $data['courseInfo'],
-            $this->payloads->validationResources($data['resources'] ?? $data['items'] ?? [])
-        );
+        $context = $resolved['context'];
         $existing = $this->contexts->findForCourse($context);
         if ($existing) {
             if ($existing->status !== FacultySubmission::STATUS_DRAFT) {
@@ -56,72 +50,65 @@ class FacultyDraftService
             ];
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        $submission = Transactional::run(function () use ($context, $data, $actor) {
             $submission = $this->contexts->newSubmission($context, FacultySubmission::STATUS_DRAFT);
             $submission->draft_version = 1;
             if (!$submission->save()) {
                 throw new \RuntimeException('Failed to save draft: ' . json_encode($submission->errors));
             }
             $this->payloads->replace($submission->submission_id, $data, $actor);
-            $transaction->commit();
-            return [
-                'status_code' => 201,
-                'body' => [
-                    'submission_uuid' => $submission->submission_uuid,
-                    'status' => FacultySubmission::STATUS_DRAFT,
-                    'draft_version' => 1,
-                ],
-            ];
-        } catch (\Exception $exception) {
-            $transaction->rollBack();
-            throw $exception;
-        }
+            return $submission;
+        });
+        return [
+            'status_code' => 201,
+            'body' => [
+                'submission_uuid' => $submission->submission_uuid,
+                'status' => FacultySubmission::STATUS_DRAFT,
+                'draft_version' => 1,
+            ],
+        ];
     }
 
     public function submitComplete(array $actor, array $data)
     {
-        $context = $this->contexts->resolve($actor, $data);
-        if (isset($context['error_code'])) {
-            Yii::$app->response->statusCode = $context['status_code'];
-            return ['error_code' => $context['error_code']];
+        $resolved = $this->resolveAndValidate($actor, $data);
+        if (isset($resolved['status_code'])) {
+            Yii::$app->response->statusCode = $resolved['status_code'];
+            return $resolved['body'];
         }
-        $this->payloads->validate(
-            $data['courseInfo'],
-            $this->payloads->validationResources($data['resources'] ?? $data['items'] ?? [])
-        );
+        $context = $resolved['context'];
         $existing = $this->contexts->findForCourse($context);
         if ($existing && $existing->status !== FacultySubmission::STATUS_DRAFT) {
             throw new BadRequestHttpException('Submission already exists for this course and section');
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
         try {
-            if ($existing) {
-                $submission = $existing;
-                $this->contexts->apply($submission, $context);
-                $submission->status = FacultySubmission::STATUS_SUBMITTED;
-                $submission->submitted_at = date('Y-m-d H:i:s');
-            } else {
-                $submission = $this->contexts->newSubmission($context, FacultySubmission::STATUS_SUBMITTED);
-            }
-            SubmissionConfirmationState::request(
-                $submission,
-                !empty(($data['metadata'] ?? [])['emailConfirmation'])
-            );
-            if (!$submission->save()) {
-                throw new \RuntimeException('Failed to save submission: ' . json_encode($submission->errors));
-            }
-            $this->payloads->replace($submission->submission_id, $data, $actor);
-            $transaction->commit();
-            return \app\services\FacultySubmissionPresenter::submitCompleteResponse([
+            $submission = Transactional::run(function () use ($existing, $context, $data, $actor) {
+                if ($existing) {
+                    $submission = $existing;
+                    $this->contexts->apply($submission, $context);
+                    $submission->status = FacultySubmission::STATUS_SUBMITTED;
+                    $submission->submitted_at = date('Y-m-d H:i:s');
+                } else {
+                    $submission = $this->contexts->newSubmission($context, FacultySubmission::STATUS_SUBMITTED);
+                }
+                SubmissionConfirmationState::request(
+                    $submission,
+                    !empty(($data['metadata'] ?? [])['emailConfirmation'])
+                );
+                if (!$submission->save()) {
+                    throw new \RuntimeException('Failed to save submission: ' . json_encode($submission->errors));
+                }
+                $this->payloads->replace($submission->submission_id, $data, $actor);
+                return $submission;
+            });
+            return FacultySubmissionPresenter::submitCompleteResponse([
                 'success' => true,
                 'message' => 'Submission completed successfully',
                 'submission' => SubmissionConfirmationState::projectResponse($submission),
                 'stats' => $this->payloads->submissionStats($data),
             ]);
         } catch (\Exception $exception) {
-            $transaction->rollBack();
             Yii::error('Submission creation failed: ' . $exception->getMessage(), __METHOD__);
             throw new BadRequestHttpException('Failed to create submission: ' . $exception->getMessage());
         }
@@ -129,8 +116,7 @@ class FacultyDraftService
 
     public function updateDraft($submission, array $actor, array $data)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($submission, $actor, $data) {
             $submission = FacultySubmission::findBySql(
                 'SELECT * FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
                 [':id' => $submission->submission_id]
@@ -178,12 +164,8 @@ class FacultyDraftService
             if (!$submission->save()) {
                 throw new \RuntimeException('Failed to save draft: ' . json_encode($submission->errors));
             }
-            $transaction->commit();
             return ['draft_version' => (int)$submission->draft_version];
-        } catch (\Exception $exception) {
-            $transaction->rollBack();
-            throw $exception;
-        }
+        });
     }
 
     public function submitDraft($submission, array $actor)
@@ -206,8 +188,7 @@ class FacultyDraftService
             $context['owner_id'] = $submission->shibboleth_user_id;
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function () use ($submission, $context, $payload) {
             $this->contexts->apply($submission, $context);
             $submission->status = FacultySubmission::STATUS_SUBMITTED;
             $submission->submitted_at = date('Y-m-d H:i:s');
@@ -218,12 +199,8 @@ class FacultyDraftService
             if (!$submission->save()) {
                 throw new \RuntimeException('Failed to submit draft: ' . json_encode($submission->errors));
             }
-            $transaction->commit();
             return ['status' => FacultySubmission::STATUS_SUBMITTED];
-        } catch (\Exception $exception) {
-            $transaction->rollBack();
-            throw $exception;
-        }
+        });
     }
 
     public function deleteDraft($uuid, array $actor)
@@ -244,17 +221,28 @@ class FacultyDraftService
             ($access['access'] !== 'proxy' || empty($access['proxy_can_edit']))) {
             throw new ForbiddenHttpException('Only the faculty owner or an editing proxy may discard a draft');
         }
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            $this->deletePayload($submission->submission_id);
+        Transactional::run(function () use ($submission) {
+            $this->payloads->deletePayload($submission->submission_id, true);
             $submission->delete();
-            $transaction->commit();
-            Yii::$app->response->statusCode = 204;
-            return null;
-        } catch (\Exception $exception) {
-            $transaction->rollBack();
-            throw $exception;
+        });
+        Yii::$app->response->statusCode = 204;
+        return null;
+    }
+
+    private function resolveAndValidate(array $actor, array $data)
+    {
+        $context = $this->contexts->resolve($actor, $data);
+        if (isset($context['error_code'])) {
+            return [
+                'status_code' => $context['status_code'],
+                'body' => ['error_code' => $context['error_code']],
+            ];
         }
+        $this->payloads->validate(
+            $data['courseInfo'],
+            $this->payloads->validationResources($data['resources'] ?? $data['items'] ?? [])
+        );
+        return ['context' => $context];
     }
 
     private function assertDraftEditable($submission, array $actor)
@@ -284,15 +272,6 @@ class FacultyDraftService
         }
         if (isset($payload['needed_by_date'])) {
             $submission->needed_by_date = $payload['needed_by_date'];
-        }
-    }
-
-    private function deletePayload($submissionId)
-    {
-        foreach ([
-            'submission_metadata', 'submission_new_resources', 'submission_reuse_resources', 'submission_folders',
-        ] as $table) {
-            Yii::$app->db->createCommand()->delete($table, ['submission_id' => $submissionId])->execute();
         }
     }
 }

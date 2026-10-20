@@ -25,7 +25,9 @@ class FlowStatePresenter
             ];
         }
         $steps = json_decode($run['steps_json'], true) ?: [];
-        $currentStep = $run['current_step_key'] === null ? null : $this->stepByKey($steps, $run['current_step_key']);
+        $currentStep = $run['current_step_key'] === null
+            ? null
+            : FlowStepLookup::stepByKey($steps, $run['current_step_key']);
         return [
             'flow' => ['id' => (int)$run['flow_id'], 'name' => $run['flow_name'], 'version' => (int)$run['version']],
             'run_id' => (int)$run['id'],
@@ -47,25 +49,5 @@ class FlowStatePresenter
             'current_step_key' => $run['current_step_key'],
             'finish_state' => $run['finish_state'],
         ];
-    }
-
-    public function stepByKey(array $steps, $key)
-    {
-        foreach ($steps as $step) {
-            if (($step['key'] ?? null) === $key) {
-                return $step;
-            }
-        }
-        return [];
-    }
-
-    public function outcomeByKey(array $step, $key)
-    {
-        foreach ($step['outcomes'] ?? [] as $outcome) {
-            if (($outcome['key'] ?? null) === $key) {
-                return $outcome;
-            }
-        }
-        return null;
     }
 }
