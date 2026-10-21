@@ -24,7 +24,7 @@ function SubmissionPage({
   renderSelectedItem,
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const isLinked = submission.linkState === 'linked' || Boolean(submission.folioCourseListingId);
+  const isLinked = submission.linkState === 'linked';
   const groups = useMemo(
     () => buildSubmissionItemGroups(folders, unfolderedItems, submission),
     [folders, submission, unfolderedItems],
@@ -34,12 +34,13 @@ function SubmissionPage({
   const selectedItem = items.find((item) => String(item.id) === searchParams.get('item'))
     || items.find((item) => !isItemDone(item))
     || null;
+  const selectedItemId = selectedItem?.id;
   const [mobilePaneOpen, setMobilePaneOpen] = useState(
     () => !isLinked || Boolean(searchParams.get('item')),
   );
 
   useEffect(() => {
-    const nextId = selectedItem ? String(selectedItem.id) : null;
+    const nextId = selectedItemId == null ? null : String(selectedItemId);
     const currentId = searchParams.get('item');
     if (nextId === currentId) return;
 
@@ -47,7 +48,7 @@ function SubmissionPage({
     if (nextId) nextParams.set('item', nextId);
     else nextParams.delete('item');
     setSearchParams(nextParams, { replace: true });
-  }, [searchParams, selectedItem?.id, setSearchParams]);
+  }, [searchParams, selectedItemId, setSearchParams]);
 
   const handleSelect = (item) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -102,7 +103,7 @@ SubmissionPage.propTypes = {
   submission: PropTypes.object.isRequired,
   folders: PropTypes.arrayOf(PropTypes.object).isRequired,
   unfolderedItems: PropTypes.arrayOf(PropTypes.object).isRequired,
-  currentUser: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  currentUser: PropTypes.object,
   onBack: PropTypes.func.isRequired,
   onLock: PropTypes.func.isRequired,
   onUnlock: PropTypes.func.isRequired,

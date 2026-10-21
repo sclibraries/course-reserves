@@ -28,16 +28,13 @@ const ItemCard = ({
   displayNumber, 
   onGoToWork,
   onReopen,
-  currentUserId,
   currentUsername = ''
 }) => {
   const processingBlockReason = getProcessingBlockReason(item);
   const fullRecordUrl = getHttpUrl(item.eds?.plink);
-  const claimedByUsername = item.claimedByUsername || item.claimedBy?.username;
-  const claimedByDisplay = item.claimedByDisplay || item.claimedBy?.display_name || claimedByUsername;
-  const isClaimed = Boolean(claimedByUsername || item.claimedBy);
-  const isClaimedByCurrentUser = Boolean(currentUsername && claimedByUsername === currentUsername)
-    || item.claimedBy?.id === currentUserId;
+  const claimedByDisplay = item.claimed_by_display || item.assigned_group?.name || item.claimed_by;
+  const isClaimed = Boolean(item.claimed_by || item.assigned_group);
+  const isClaimedByCurrentUser = Boolean(currentUsername && item.claimed_by === currentUsername);
 
   return (
     <div className="item-card browse-mode">
@@ -127,7 +124,7 @@ const ItemCard = ({
           </span>
         )}
         <span>
-          <strong>Type:</strong> {item.materialType}
+          <strong>Type:</strong> {item.material_type}
         </span>
         {item.isReuse && (
           <Badge color="info" pill>Reuse</Badge>
@@ -240,7 +237,7 @@ const ItemCard = ({
 
 ItemCard.propTypes = {
   item: PropTypes.shape({
-    id: PropTypes.string.isRequired,
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     title: PropTypes.string.isRequired,
     authors: PropTypes.string,
     barcode: PropTypes.string,
@@ -256,7 +253,7 @@ ItemCard.propTypes = {
       plink: PropTypes.string
     }),
     url: PropTypes.string,
-    materialType: PropTypes.string.isRequired,
+    material_type: PropTypes.string.isRequired,
     status: PropTypes.string.isRequired,
     priority: PropTypes.string.isRequired,
     facultyNotes: PropTypes.string,
@@ -267,18 +264,13 @@ ItemCard.propTypes = {
     unreadCommunications: PropTypes.number,
     displayOrder: PropTypes.number,
     positionInFolder: PropTypes.number,
-    claimedByUsername: PropTypes.string,
-    claimedByDisplay: PropTypes.string,
-    claimedBy: PropTypes.shape({
-      id: PropTypes.number,
-      username: PropTypes.string,
-      display_name: PropTypes.string
-    })
+    claimed_by: PropTypes.string,
+    claimed_by_display: PropTypes.string,
+    assigned_group: PropTypes.shape({ name: PropTypes.string }),
   }).isRequired,
   displayNumber: PropTypes.string.isRequired,
   onGoToWork: PropTypes.func.isRequired,
   onReopen: PropTypes.func.isRequired,
-  currentUserId: PropTypes.number.isRequired,
   currentUsername: PropTypes.string,
 };
 

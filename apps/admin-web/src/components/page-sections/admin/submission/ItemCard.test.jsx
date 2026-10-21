@@ -18,7 +18,7 @@ function renderItem(plink) {
         item={{
           id: 'synthetic-item-28',
           title: 'Synthetic Article',
-          materialType: 'article',
+          material_type: 'article',
           status: 'pending',
           priority: 'medium',
           doi: '10.1000/cx028',
@@ -31,7 +31,6 @@ function renderItem(plink) {
         displayNumber="1"
         onGoToWork={() => undefined}
         onReopen={() => undefined}
-        currentUserId={1}
       />
     );
   });
@@ -55,6 +54,7 @@ describe('ItemCard EDS record link', () => {
     expect(container.textContent).toContain('10.1000/cx028');
     expect(container.textContent).toContain('1234-5678');
     expect(container.textContent).toContain('Synthetic Journal');
+    expect(container.textContent).toContain('Type: article');
     expect(container.textContent).toContain('12');
     expect(container.textContent).toContain('3');
     expect(link?.getAttribute('href')).toBe('https://search.ebscohost.com/record/synthetic-cx028');

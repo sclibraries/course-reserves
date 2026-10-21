@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Alert, Button, Spinner } from 'reactstrap';
+import { Loader2, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import { buildProcessingHandoff, getProcessingBlockReason } from '../../../services/admin/processingHandoff';
-import { Button as UiButton } from '../../ui/button';
+import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
+import { Button } from '../../ui/button';
 import ClaimItemCard from './claims/ClaimItemCard';
 import LinkingPanel from './linking/LinkingPanel';
 import DraftSubmissionView from './submission/DraftSubmissionView';
+import ItemCard from './submission/ItemCard';
 import SubmissionPage from './submission-page/SubmissionPage';
-import { isItemClaimedByCurrentUser } from './submission-page/submissionPageUtils';
+import { getCurrentUsername } from './submission-page/submissionPageUtils';
 import '../../../css/SubmissionWorkflow.css';
 
 const submissionQueuePath = '/admin?tab=submissions';
@@ -26,6 +28,7 @@ function SubmissionDetail() {
     lockSubmission,
     unlockSubmission,
     clearError,
+    updateItemStatus,
   } = useSubmissionWorkflowStore();
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -39,8 +42,6 @@ function SubmissionDetail() {
         setCurrentUser(await submissionWorkflowService.getCurrentUser());
       } catch (userError) {
         console.error('Failed to load current user:', userError);
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
     };
     loadCurrentUser();
@@ -59,6 +60,17 @@ function SubmissionDetail() {
       if (result.success) await refreshSubmission();
     }
   };
+  const handleReopen = async (itemId) => {
+    if (confirm('Are you sure you want to reopen this item for processing?')) {
+      const result = await updateItemStatus(itemId, 'in_progress');
+      if (result.success) {
+        toast.success('Item reopened');
+        await fetchSubmissionDetail(submissionId);
+      } else {
+        toast.error(result.error || 'Failed to reopen item');
+      }
+    }
+  };
   const handleGoToWork = (item) => {
     const handoff = buildProcessingHandoff(item);
     if (!handoff) {
@@ -70,28 +82,37 @@ function SubmissionDetail() {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <Spinner color="primary" size="lg" />
-        <p className="text-muted">Loading submission details...</p>
+      <div className="tw-flex tw-items-center tw-gap-3 tw-py-8" role="status">
+        <Loader2 className="tw-size-6 tw-animate-spin tw-text-primary" aria-hidden="true" />
+        <span className="tw-text-muted-foreground">Loading submission details...</span>
       </div>
     );
   }
 
   if (error || !selectedSubmission) {
     return (
-      <div className="submission-detail">
-        <Alert color={error ? 'danger' : 'warning'} toggle={clearError}>
-          <h4 className="alert-heading">{error ? 'Error' : 'Not Found'}</h4>
-          <p>{error || 'The requested submission could not be found.'}</p>
+      <div className="tw-py-4">
+        <Alert variant={error ? 'destructive' : 'default'} className="tw-mb-4">
+          <AlertTitle className="tw-pr-8">{error ? 'Error' : 'Not Found'}</AlertTitle>
+          <AlertDescription className="tw-pr-8">{error || 'The requested submission could not be found.'}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="tw-absolute tw-right-2 tw-top-2"
+            aria-label="Dismiss message"
+            onClick={clearError}
+          >
+            <X aria-hidden="true" />
+          </Button>
         </Alert>
-        <Button color="secondary" onClick={() => navigate(submissionQueuePath)}>Back to Queue</Button>
+        <Button variant="outline" onClick={() => navigate(submissionQueuePath)}>Back to Queue</Button>
       </div>
     );
   }
 
   const { submission, folders, unfolderedItems } = selectedSubmission;
   const items = [...folders.flatMap((folder) => folder.items), ...unfolderedItems];
-  const currentUsername = currentUser?.username || currentUser?.user?.username || '';
+  const currentUsername = getCurrentUsername(currentUser);
   if (submission.status === 'draft') {
     return <DraftSubmissionView submission={submission} items={items} onBack={() => navigate(submissionQueuePath)} />;
   }
@@ -109,16 +130,16 @@ function SubmissionDetail() {
         onChanged={refreshSubmission}
         unlinkedContent={<LinkingPanel submission={submission} items={items} onChanged={refreshSubmission} />}
         renderSelectedItem={(item) => {
-          const canWork = isItemClaimedByCurrentUser(item, currentUser);
-          const blockedReason = getProcessingBlockReason(item);
           return (
             <div className="tw-space-y-3">
-              {canWork && (blockedReason ? (
-                <p className="tw-text-sm tw-text-muted-foreground">{blockedReason}</p>
-              ) : (
-                <UiButton variant="outline" size="sm" onClick={() => handleGoToWork(item)}>Work on This</UiButton>
-              ))}
               <ClaimItemCard item={item} currentUsername={currentUsername} onChanged={refreshSubmission} />
+              <ItemCard
+                item={item}
+                displayNumber={String(item.displayOrder)}
+                onGoToWork={handleGoToWork}
+                onReopen={handleReopen}
+                currentUsername={currentUsername}
+              />
             </div>
           );
         }}

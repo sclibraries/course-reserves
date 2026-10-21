@@ -6,7 +6,6 @@ import useItemFlow from '../../../../hooks/admin/useItemFlow';
 import useMutation from '../../../../hooks/admin/useMutation';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import {
-  countSubmissionItems,
   filterSubmissionItems,
   getClaimBadge,
   isItemDone,
@@ -33,7 +32,7 @@ function ItemFlowLine({ item }) {
   const state = isItemDone(item) || flow.flowState?.finished
     ? 'done'
     : flow.loading ? 'Loading workflow…' : step || 'not started';
-  const parts = [item.material_type || item.materialType, flowName, state].filter(Boolean);
+  const parts = [item.material_type, flowName, state].filter(Boolean);
 
   return <span className="tw-block tw-truncate tw-text-sm tw-text-muted-foreground">{parts.join(' · ')}</span>;
 }
@@ -70,7 +69,7 @@ function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
 
 ItemRow.propTypes = {
   item: PropTypes.object.isRequired,
-  currentUser: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  currentUser: PropTypes.object,
   selected: PropTypes.bool.isRequired,
   disabled: PropTypes.bool,
   onSelect: PropTypes.func.isRequired,
@@ -81,7 +80,6 @@ function ItemList({ groups, submission, currentUser, selectedItemId, disabled = 
   const [claimAllResult, setClaimAllResult] = useState(null);
   const { pending, error, run } = useMutation();
   const items = useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const counts = useMemo(() => countSubmissionItems(items), [items]);
   const visibleItems = useMemo(
     () => filterSubmissionItems(items, filter, currentUser),
     [currentUser, filter, items],
@@ -155,7 +153,7 @@ function ItemList({ groups, submission, currentUser, selectedItemId, disabled = 
 ItemList.propTypes = {
   groups: PropTypes.arrayOf(PropTypes.shape({ name: PropTypes.string, items: PropTypes.arrayOf(PropTypes.object) })).isRequired,
   submission: PropTypes.object.isRequired,
-  currentUser: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  currentUser: PropTypes.object,
   selectedItemId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   disabled: PropTypes.bool,
   onSelect: PropTypes.func.isRequired,

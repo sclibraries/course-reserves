@@ -15,14 +15,13 @@ export function isItemDone(item) {
   return Boolean(item.finish_state) || DONE_STATUSES.has(item.status);
 }
 
+export function getCurrentUsername(currentUser) {
+  return currentUser?.username || '';
+}
+
 export function isItemClaimedByCurrentUser(item, currentUser) {
-  const username = typeof currentUser === 'string'
-    ? currentUser
-    : currentUser?.username || currentUser?.user?.username || '';
-  const userId = typeof currentUser === 'object' ? currentUser?.id : null;
-  const claimedById = item.claimedBy?.id;
-  return Boolean((username && item.claimed_by === username)
-    || (userId && claimedById != null && String(claimedById) === String(userId)));
+  const username = getCurrentUsername(currentUser);
+  return Boolean(username && item.claimed_by === username);
 }
 
 export function getClaimBadge(item, currentUser) {
@@ -64,7 +63,7 @@ export function countSubmissionItems(items) {
 export function filterSubmissionItems(items, filter, currentUser) {
   if (filter === 'mine') return items.filter((item) => isItemClaimedByCurrentUser(item, currentUser));
   if (filter === 'unclaimed') {
-    return items.filter((item) => !isItemDone(item) && !item.claimed_by && !item.claimedBy && !item.assigned_group);
+    return items.filter((item) => !isItemDone(item) && !item.claimed_by && !item.assigned_group);
   }
   if (filter === 'done') return items.filter(isItemDone);
   return items;

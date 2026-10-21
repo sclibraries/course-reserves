@@ -29,7 +29,7 @@ const makeItem = (id, values = {}) => ({
 const pageProps = () => {
   const zetaFirst = makeItem(14, { title: 'Done first', status: 'complete', folderName: 'Zeta', displayOrder: 1 });
   const zetaNext = makeItem(11, {
-    title: 'Mine next', status: 'in_progress', folderName: 'Zeta', claimedBy: { id: 17 },
+    title: 'Mine next', status: 'in_progress', folderName: 'Zeta', claimedByUsername: 'staff',
   });
   const alpha = makeItem(12, {
     title: 'Other staff', displayOrder: 3, folderName: 'Alpha', materialType: 'Journal',

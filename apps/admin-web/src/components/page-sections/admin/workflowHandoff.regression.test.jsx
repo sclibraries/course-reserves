@@ -46,6 +46,7 @@ const submissionItem = {
   title: 'Handbook of Course Reserves',
   authors: 'A. Librarian',
   materialType: 'Book',
+  displayOrder: 1,
   status: 'in_progress',
   priority: 'normal',
   claimedBy: { id: 42, username: 'staff' },
@@ -90,7 +91,7 @@ describe('workflow processing handoff regression', () => {
     mocks.setSearchParams.mockReset();
     mocks.searchParams = new URLSearchParams();
     vi.spyOn(console, 'log').mockImplementation(mocks.consoleLog);
-    mocks.getCurrentUser.mockResolvedValue({ id: 42 });
+    mocks.getCurrentUser.mockResolvedValue({ id: 42, username: 'staff' });
     mocks.storeState = {
       selectedSubmission: {
         submission: {
@@ -102,6 +103,7 @@ describe('workflow processing handoff regression', () => {
           submittedAt: '2026-06-16T12:00:00Z',
           status: 'processing',
           isLocked: false,
+          linkState: 'linked',
           folioCourseListingId: 'folio-course-123',
         },
         folders: [],
@@ -154,6 +156,26 @@ describe('workflow processing handoff regression', () => {
       },
     });
 
+    view.unmount();
+  });
+
+  it('reopens a completed submission item from the work pane', async () => {
+    const updateItemStatus = vi.fn().mockResolvedValue({ success: true });
+    mocks.storeState.selectedSubmission.unfolderedItems = [{ ...submissionItem, status: 'complete' }];
+    mocks.storeState.updateItemStatus = updateItemStatus;
+    mocks.searchParams = new URLSearchParams('item=88');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const view = await renderComponent(<SubmissionDetail />);
+    const reopenButton = findButton(view.container, 'Reopen for Processing');
+
+    expect(reopenButton).toBeTruthy();
+    mocks.storeState.fetchSubmissionDetail.mockClear();
+    await click(reopenButton);
+
+    expect(confirm).toHaveBeenCalledWith('Are you sure you want to reopen this item for processing?');
+    expect(updateItemStatus).toHaveBeenCalledWith(88, 'in_progress');
+    expect(mocks.storeState.fetchSubmissionDetail).toHaveBeenCalledWith('31');
     view.unmount();
   });
 
