@@ -3,7 +3,7 @@ import { Button } from '../../../ui/button';
 
 function WorkPane({ isLinked, selectedItem, children, unlinkedContent, onBack }) {
   return (
-    <section className="tw-min-w-0 tw-rounded-lg tw-border tw-bg-card tw-p-4" aria-label="Work pane" data-testid="submission-work-pane">
+    <section className="tw-min-w-0 tw-break-words tw-rounded-lg tw-border tw-bg-card tw-p-4" aria-label="Work pane" data-testid="submission-work-pane">
       {isLinked ? (
         <>
           <Button variant="ghost" className="tw-mb-3 lg:tw-hidden" onClick={onBack}>

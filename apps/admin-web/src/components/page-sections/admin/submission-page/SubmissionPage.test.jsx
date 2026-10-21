@@ -121,6 +121,18 @@ afterEach(() => {
 });
 
 describe('SubmissionPage', () => {
+  it('constrains the page grid and work pane so content can reflow', async () => {
+    view = await renderPage();
+
+    const grid = view.container.querySelector('.tw-grid');
+    const workPane = view.container.querySelector('[data-testid="submission-work-pane"]');
+
+    expect(grid.className).toContain('lg:tw-grid-cols-[minmax(0,2fr)_minmax(0,3fr)]');
+    expect(view.container.querySelector('[data-testid="submission-item-list-pane"]').className).toContain('tw-min-w-0');
+    expect(workPane.parentElement.className).toContain('tw-min-w-0');
+    expect(workPane.className).toContain('tw-break-words');
+  });
+
   it('renders each item once in faculty folder order with header and claim states', async () => {
     view = await renderPage();
 

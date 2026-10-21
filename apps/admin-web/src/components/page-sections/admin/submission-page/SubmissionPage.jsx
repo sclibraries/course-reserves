@@ -68,9 +68,9 @@ function SubmissionPage({
         onUnlock={onUnlock}
         onChangeLink={onChangeLink}
       />
-      <div className="tw-grid tw-grid-cols-1 tw-gap-4 lg:tw-grid-cols-[2fr_3fr]">
+      <div className="tw-grid tw-grid-cols-1 tw-gap-4 lg:tw-grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <aside
-          className={`${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-opacity-50'}`}
+          className={`tw-min-w-0 ${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-opacity-50'}`}
           data-testid="submission-item-list-pane"
         >
           <ItemList
@@ -83,7 +83,7 @@ function SubmissionPage({
             onChanged={onChanged}
           />
         </aside>
-        <div className={isLinked && !mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''}>
+        <div className={`tw-min-w-0 ${isLinked && !mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''}`}>
           <WorkPane
             isLinked={isLinked}
             selectedItem={selectedItem}
