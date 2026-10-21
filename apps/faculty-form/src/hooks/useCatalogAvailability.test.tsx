@@ -109,7 +109,7 @@ describe('useCatalogAvailability', () => {
     expect(container.textContent).not.toContain('upstream body');
   });
 
-  it('asks only for accession numbers added by the next results page', async () => {
+  it('re-asks for shown accession numbers when results change so the service controls expiry', async () => {
     const request = vi.spyOn(catalogAvailabilityApi, 'getCatalogAvailability').mockImplementation(async (ans) => (
       Object.fromEntries(ans.map((an) => [an, { instanceId: null, copies: [] }]))
     ));
@@ -132,7 +132,7 @@ describe('useCatalogAvailability', () => {
 
     expect(request.mock.calls).toEqual([
       [['synthetic-page-one-an']],
-      [['synthetic-page-two-an']],
+      [['synthetic-page-one-an', 'synthetic-page-two-an']],
     ]);
   });
 
