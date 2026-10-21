@@ -88,7 +88,7 @@
   }
 
   /* Scope preflight behavior to the new stack so Bootstrap pages stay unchanged. */
-  :where([class*="tw-"]),
+  [class*="tw-"],
   :where([class*="tw-"])::before,
   :where([class*="tw-"])::after {
     box-sizing: border-box;
@@ -97,28 +97,23 @@
     border-color: hsl(var(--border));
   }
 
-  :where(button[class*="tw-"], input[class*="tw-"], textarea[class*="tw-"], select[class*="tw-"]) {
+  :where(button, input, textarea, select)[class*="tw-"] {
     font: inherit;
     color: inherit;
     margin: 0;
+    padding: 0;
     background-color: transparent;
   }
 
-  :where(h1[class*="tw-"], h2[class*="tw-"], h3[class*="tw-"], h4[class*="tw-"], h5[class*="tw-"], h6[class*="tw-"], p[class*="tw-"]) {
+  :where(h1, h2, h3, h4, h5, h6, p)[class*="tw-"] {
     margin: 0;
     font-size: inherit;
     font-weight: inherit;
   }
-}
 
-@layer components {
-  :where([class*="tw-"]) .search-container,
-  :where([class*="tw-"]).search-container {
-    @apply tw-flex tw-items-center tw-space-x-2 tw-p-4 tw-bg-white/90 tw-backdrop-blur-md tw-rounded-lg tw-shadow-sm tw-border tw-border-border;
-  }
-
-  :where([class*="tw-"]) .nav-link,
-  :where([class*="tw-"]).nav-link {
-    @apply tw-relative tw-text-foreground/80 hover:tw-text-foreground tw-transition-colors tw-duration-200 after:tw-content-[''] after:tw-absolute after:tw-left-0 after:tw-bottom-0 after:tw-h-[2px] after:tw-w-0 after:tw-bg-current after:tw-transition-all after:tw-duration-300 hover:after:tw-w-full;
+  :where(ul, ol)[class*="tw-"] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 }
