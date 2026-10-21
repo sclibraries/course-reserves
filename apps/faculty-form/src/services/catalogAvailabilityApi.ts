@@ -20,7 +20,7 @@ interface CatalogAvailabilityResponse {
   records?: Record<string, CatalogAvailability>;
 }
 
-export const CATALOG_AVAILABILITY_BATCH_SIZE = 20;
+const CATALOG_AVAILABILITY_BATCH_SIZE = 20;
 export const CATALOG_AVAILABILITY_CACHE_TTL_MS = 2 * 60 * 1000;
 
 interface CachedCatalogAvailability {
@@ -29,10 +29,6 @@ interface CachedCatalogAvailability {
 }
 
 const availabilityByAn = new Map<string, CachedCatalogAvailability>();
-
-export function getCatalogAvailabilityExpiresAt(accessionNumber: string): number | undefined {
-  return availabilityByAn.get(accessionNumber)?.expiresAt;
-}
 
 export async function getCatalogAvailability(accessionNumbers: string[]): Promise<Record<string, CatalogAvailability>> {
   const uniqueAccessionNumbers = Array.from(new Set(accessionNumbers));
@@ -48,17 +44,18 @@ export async function getCatalogAvailability(accessionNumbers: string[]): Promis
     const batch = uncached.slice(index, index + CATALOG_AVAILABILITY_BATCH_SIZE);
     const request = requestCatalogAvailability(batch);
     batch.forEach((an) => {
-      let cached: CachedCatalogAvailability;
-      const promise = request.then((records) => {
-        const entry = records[an];
-        if (!entry) throw new Error('Availability lookup failed');
-        cached.expiresAt = Date.now() + CATALOG_AVAILABILITY_CACHE_TTL_MS;
-        return entry;
-      }).catch((error: unknown) => {
-        if (availabilityByAn.get(an) === cached) availabilityByAn.delete(an);
-        throw error;
-      });
-      cached = { promise, expiresAt: Number.POSITIVE_INFINITY };
+      const cached: CachedCatalogAvailability = {
+        expiresAt: Number.POSITIVE_INFINITY,
+        promise: request.then((records) => {
+          const entry = records[an];
+          if (!entry) throw new Error('Availability lookup failed');
+          cached.expiresAt = Date.now() + CATALOG_AVAILABILITY_CACHE_TTL_MS;
+          return entry;
+        }).catch((error: unknown) => {
+          if (availabilityByAn.get(an) === cached) availabilityByAn.delete(an);
+          throw error;
+        }),
+      };
       availabilityByAn.set(an, cached);
     });
   }

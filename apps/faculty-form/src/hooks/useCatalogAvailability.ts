@@ -25,7 +25,7 @@ export function useCatalogAvailability(visibleResults: DiscoverySearchResult[]):
 
   useEffect(() => {
     if (accessionNumbers.length === 0) return;
-    const missing = accessionNumbers.filter((an) => !entriesRef.current[an]?.entry || entriesRef.current[an]?.failed);
+    const missing = accessionNumbers.filter((an) => !entriesRef.current[an]?.entry);
     if (missing.length) {
       setEntries((current) => ({
         ...current,
