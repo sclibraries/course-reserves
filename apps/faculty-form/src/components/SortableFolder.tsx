@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { useDndContext } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -87,6 +87,15 @@ export const SortableFolder = ({
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState(folder.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (isEditingTitle) inputRef.current?.focus();
+    else if (restoreFocusRef.current) editButtonRef.current?.focus();
+    restoreFocusRef.current = false;
+  }, [isEditingTitle]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -94,17 +103,19 @@ export const SortableFolder = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleSaveTitle = () => {
+  const handleSaveTitle = (restoreFocus = true) => {
     if (editingTitle.trim() && editingTitle !== folder.title) {
       onUpdateFolder(folder.id, { title: editingTitle.trim() });
     } else {
       setEditingTitle(folder.title);
     }
+    restoreFocusRef.current = restoreFocus;
     setIsEditingTitle(false);
   };
 
   const handleCancelEdit = () => {
     setEditingTitle(folder.title);
+    restoreFocusRef.current = true;
     setIsEditingTitle(false);
   };
 
@@ -123,14 +134,11 @@ export const SortableFolder = ({
     >
       <CardHeader ref={setNodeRef} className="relative pb-3">
         <div className="flex items-center gap-3">
-          {/* Position indicator and drag handle */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Position number */}
             <div className="bg-blue-500/10 text-blue-600 text-sm font-semibold rounded-full w-8 h-8 flex items-center justify-center">
               {index + 1}
             </div>
             
-            {/* Drag handle */}
             <button
               {...attributes}
               {...(!isDragDisabled ? listeners : {})}
@@ -146,7 +154,6 @@ export const SortableFolder = ({
             </button>
           </div>
 
-          {/* Folder toggle and icon */}
           <button
             onClick={handleToggle}
             aria-expanded={folder.isOpen}
@@ -169,7 +176,6 @@ export const SortableFolder = ({
             </span>
           </button>
 
-          {/* Action buttons */}
           <div className="flex gap-1">
             {onAddMaterials && (
               <Button
@@ -184,7 +190,6 @@ export const SortableFolder = ({
                 Add materials
               </Button>
             )}
-            {/* Move folder up/down buttons */}
             <Button
               variant="ghost"
               size="sm"
@@ -212,8 +217,8 @@ export const SortableFolder = ({
               <ArrowDown className="h-3 w-3" />
             </Button>
             
-            {/* Edit title button */}
             <Button
+              ref={editButtonRef}
               variant="ghost"
               size="sm"
               className="h-7 w-7 p-0"
@@ -235,10 +240,11 @@ export const SortableFolder = ({
                   handleSaveTitle();
                 }}
                 onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) handleSaveTitle();
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) handleSaveTitle(false);
                 }}
               >
                 <Input
+                  ref={inputRef}
                   aria-label="Folder name"
                   value={editingTitle}
                   onChange={(event) => setEditingTitle(event.target.value)}
@@ -256,7 +262,6 @@ export const SortableFolder = ({
               </form>
             )}
             
-            {/* Delete folder button */}
             <Button
               variant="ghost"
               size="sm"

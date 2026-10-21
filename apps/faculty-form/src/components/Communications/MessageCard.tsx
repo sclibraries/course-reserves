@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Message, CreateMessageRequest } from '@/services/api/communications';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,8 @@ interface Props {
 export default function MessageCard({ message, onMarkAsRead, onReply, onResolve }: Props) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const bodyId = useId();
+  const subject = message.subject || 'No Subject';
 
   const priorityConfig = {
     low: { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Low' },
@@ -56,43 +58,34 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
       <CardContent className="pt-6">
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-4 text-left"
-              aria-expanded={isExpanded}
-              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} message: ${message.subject || 'No Subject'}`}
-              onClick={handleToggleExpanded}
-            >
-              <span className="flex items-start gap-3">
-                <span className="mt-0.5" aria-hidden="true">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="mt-0.5" aria-hidden="true">
                 {categoryIcons[message.category]}
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span role="heading" aria-level={4} className="font-semibold text-base">
-                  {message.subject || 'No Subject'}
-                  {!message.is_read && (
-                      <span className="ml-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">NEW</span>
-                  )}
-                  </span>
-                  <span className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <span className="font-medium">{message.sender_name}</span>
-                    <span>•</span>
-                    <span className="capitalize">({message.sender_type})</span>
-                    <span>•</span>
-                    <span>{formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}</span>
-                  </span>
-                </span>
-              </span>
-
-              <span className={`text-sm ${isExpanded ? '' : 'line-clamp-2'}`}>
-                {message.message}
-              </span>
-              {message.resource_id && (
-                <span className="text-sm text-blue-600">
-                  📎 Related to Item #{message.resource_id}
-                </span>
-              )}
-            </button>
+              </div>
+              <div className="flex min-w-0 flex-col">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-base">
+                    <button
+                      type="button"
+                      className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      aria-expanded={isExpanded}
+                      aria-controls={bodyId}
+                      onClick={handleToggleExpanded}
+                    >
+                      {subject}
+                    </button>
+                  </h4>
+                  {!message.is_read && <Badge variant="destructive" className="text-xs">NEW</Badge>}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-medium">{message.sender_name}</span>
+                  <span>•</span>
+                  <span className="capitalize">({message.sender_type})</span>
+                  <span>•</span>
+                  <span>{formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}</span>
+                </div>
+              </div>
+            </div>
 
             <div className="flex items-center gap-2">
               <Badge 
@@ -108,6 +101,15 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
               </Badge>
             </div>
           </div>
+
+          <p id={bodyId} className={`text-sm ${isExpanded ? '' : 'line-clamp-2'}`}>
+            {message.message}
+          </p>
+          {message.resource_id && (
+            <div className="text-sm text-blue-600">
+              📎 Related to Item #{message.resource_id}
+            </div>
+          )}
 
           {/* Replies Section */}
           {isExpanded && message.replies && message.replies.length > 0 && (
@@ -138,10 +140,7 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
               <Button 
                 variant="outline"
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowReplyForm(!showReplyForm);
-                }}
+                onClick={() => setShowReplyForm(!showReplyForm)}
               >
                 Reply
               </Button>
@@ -149,10 +148,7 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
                 <Button 
                   variant="outline"
                   size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onResolve(message.id, 'resolved');
-                  }}
+                  onClick={() => onResolve(message.id, 'resolved')}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   Mark as Resolved

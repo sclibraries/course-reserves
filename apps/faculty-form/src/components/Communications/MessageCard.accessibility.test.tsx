@@ -1,8 +1,9 @@
-import { fireEvent, getByRole } from '@testing-library/dom';
+import { fireEvent, getByRole, getByText } from '@testing-library/dom';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from '@/services/api/communications';
+import { expectNoAxeViolations } from '@/test/expectNoAxeViolations';
 import MessageCard from './MessageCard';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,11 +19,11 @@ describe('MessageCard accessibility', () => {
     root = null;
   });
 
-  it('opens a message with a named keyboard-operable button', () => {
+  it('uses a subject disclosure button and keeps the message body outside it', async () => {
     const onMarkAsRead = vi.fn();
     const message: Message = {
       id: 37,
-      resource_id: null,
+      resource_id: 74,
       subject: 'Course reserve question',
       message: 'Can this item be added to the course reserves?',
       category: 'question',
@@ -40,20 +41,34 @@ describe('MessageCard accessibility', () => {
     root = createRoot(container);
 
     act(() => root?.render(
-      <MessageCard
-        message={message}
-        onMarkAsRead={onMarkAsRead}
-        onReply={async () => undefined}
-        onResolve={() => undefined}
-      />,
+      <main>
+        <MessageCard
+          message={message}
+          onMarkAsRead={onMarkAsRead}
+          onReply={async () => undefined}
+          onResolve={() => undefined}
+        />
+      </main>,
     ));
 
-    const toggle = getByRole(container, 'button', { name: 'Expand message: Course reserve question' });
+    const heading = getByRole(container, 'heading', { name: /Course reserve question/ });
+    const toggle = heading.querySelector('button');
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+    expect(toggle.textContent).toBe('Course reserve question');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    act(() => fireEvent.click(toggle));
+    const body = getByText(container, message.message);
+    const sender = getByText(container, 'Course staff');
+    const relatedItem = getByText(container, '📎 Related to Item #74');
+    expect(toggle.contains(body)).toBe(false);
+    expect(toggle.contains(sender)).toBe(false);
+    expect(toggle.contains(relatedItem)).toBe(false);
+    expect(body.id).toBe(toggle.getAttribute('aria-controls'));
+    act(() => fireEvent.click(toggle!));
 
     expect(onMarkAsRead).toHaveBeenCalledWith(message.id);
-    expect(getByRole(container, 'button', { name: 'Collapse message: Course reserve question' }).getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(getByRole(container, 'button', { name: 'Reply' })).toBeTruthy();
+    await expectNoAxeViolations(container);
   });
 });
