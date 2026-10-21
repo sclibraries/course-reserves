@@ -15,13 +15,8 @@ export function isItemDone(item) {
   return Boolean(item.finish_state) || DONE_STATUSES.has(item.status);
 }
 
-export function getCurrentUsername(currentUser) {
-  return currentUser?.username || '';
-}
-
 export function isItemClaimedByCurrentUser(item, currentUser) {
-  const username = getCurrentUsername(currentUser);
-  return Boolean(username && item.claimed_by === username);
+  return Boolean(currentUser?.username && item.claimed_by === currentUser.username);
 }
 
 export function getClaimBadge(item, currentUser) {

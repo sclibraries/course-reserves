@@ -12,7 +12,6 @@ import LinkingPanel from './linking/LinkingPanel';
 import DraftSubmissionView from './submission/DraftSubmissionView';
 import ItemCard from './submission/ItemCard';
 import SubmissionPage from './submission-page/SubmissionPage';
-import { getCurrentUsername } from './submission-page/submissionPageUtils';
 import '../../../css/SubmissionWorkflow.css';
 
 const submissionQueuePath = '/admin?tab=submissions';
@@ -65,7 +64,7 @@ function SubmissionDetail() {
       const result = await updateItemStatus(itemId, 'in_progress');
       if (result.success) {
         toast.success('Item reopened');
-        await fetchSubmissionDetail(submissionId);
+        await refreshSubmission();
       } else {
         toast.error(result.error || 'Failed to reopen item');
       }
@@ -112,7 +111,7 @@ function SubmissionDetail() {
 
   const { submission, folders, unfolderedItems } = selectedSubmission;
   const items = [...folders.flatMap((folder) => folder.items), ...unfolderedItems];
-  const currentUsername = getCurrentUsername(currentUser);
+  const currentUsername = currentUser?.username || '';
   if (submission.status === 'draft') {
     return <DraftSubmissionView submission={submission} items={items} onBack={() => navigate(submissionQueuePath)} />;
   }

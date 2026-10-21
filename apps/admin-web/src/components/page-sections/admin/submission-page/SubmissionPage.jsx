@@ -71,7 +71,6 @@ function SubmissionPage({
       <div className="tw-grid tw-grid-cols-1 tw-gap-4 lg:tw-grid-cols-[2fr_3fr]">
         <aside
           className={`${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-opacity-50'}`}
-          aria-disabled={!isLinked}
           data-testid="submission-item-list-pane"
         >
           <ItemList

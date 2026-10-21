@@ -186,7 +186,9 @@ describe('SubmissionPage', () => {
     view = await renderPage(props);
 
     const listPane = view.container.querySelector('[data-testid="submission-item-list-pane"]');
-    expect(listPane.getAttribute('aria-disabled')).toBe('true');
+    const itemButtons = Array.from(listPane.querySelectorAll('button[aria-label^="Select "]'));
+    expect(itemButtons.length).toBeGreaterThan(0);
+    expect(itemButtons.every((button) => button.disabled)).toBe(true);
     expect(listPane.className).toContain('tw-opacity-50');
     expect(view.container.textContent).toContain('Link the course to start working items');
     expect(view.container.textContent).toContain('Existing linking panel');
