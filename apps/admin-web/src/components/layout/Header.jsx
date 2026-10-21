@@ -142,7 +142,7 @@ function Header() {
   };
 
   return (
-    <header role="banner" tabIndex="0" className={collegeThemeClass}>
+    <header role="banner" className={collegeThemeClass}>
       <Navbar
         light
         expand="md"

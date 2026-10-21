@@ -55,7 +55,7 @@ function AdminCourseHeader({
 
             {/* Instructors */}
             <div className="mb-1">
-              <label className="text-muted small text-uppercase mb-2 d-block section-label">Instructors</label>
+              <span className="text-muted small text-uppercase mb-2 d-block section-label">Instructors</span>
               <div className="d-flex flex-wrap gap-2">
                 {folioCourseData?.courseListingObject.instructorObjects?.map((instructor, idx) => (
                   <span key={idx} className="custom-badge instructor-badge">
@@ -69,19 +69,20 @@ function AdminCourseHeader({
             {/* Linked Courses Badges - shown if any exist */}
             {linkedCourses.length > 0 && (
               <div className="mt-3">
-                <label className="text-muted small text-uppercase mb-2 d-block section-label">
+                <span className="text-muted small text-uppercase mb-2 d-block section-label">
                   <FontAwesomeIcon icon="fa-solid fa-link" className="me-2" />
                   Linked Courses ({linkedCourses.length})
-                </label>
+                </span>
                 <div className="d-flex flex-wrap gap-2">
                   {linkedCourses.slice(0, 3).map((linkedCourse) => (
-                    <span 
+                    <button
                       key={linkedCourse.course_id} 
+                      type="button"
                       className="custom-badge linked-course-badge"
                       onClick={() => navigate(`/admin/electronic/${linkedCourse.folio_course_id}`)}
                     >
                       {linkedCourse.course_name} ({linkedCourse.course_number})
-                    </span>
+                    </button>
                   ))}
                   {linkedCourses.length > 3 && (
                     <span className="custom-badge more-badge">

@@ -293,20 +293,6 @@ function WorkflowTemplateEditor({ templateId, onSave, onCancel }) {
     }));
   };
 
-  const handleUpdateConditions = (newConditions) => {
-    setTemplate(prev => ({
-      ...prev,
-      conditions: newConditions
-    }));
-  };
-
-  const handleUpdateTransitions = (newTransitions) => {
-    setTemplate(prev => ({
-      ...prev,
-      transitions: newTransitions
-    }));
-  };
-
   const validateTemplate = () => {
     if (!template.name.trim()) {
       return 'Template name is required';

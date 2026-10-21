@@ -14,8 +14,7 @@ import {
   Col,
   Card,
   CardBody,
-  Alert,
-  Badge
+  Alert
 } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
@@ -118,17 +117,6 @@ function StepConfigModal({ isOpen, step, allSteps, currentIndex, onSave, onClose
       ...prev,
       [name]: nextValue,
       ...(name === 'is_gate' && checked ? { is_required: true } : {})
-    }));
-  };
-
-  const handleDependenciesChange = (event) => {
-    const selected = Array.from(event.target.selectedOptions).map((option) => {
-      const numericValue = Number(option.value);
-      return Number.isNaN(numericValue) ? option.value : numericValue;
-    });
-    setFormData((prev) => ({
-      ...prev,
-      depends_on: selected
     }));
   };
 
@@ -243,44 +231,6 @@ function StepConfigModal({ isOpen, step, allSteps, currentIndex, onSave, onClose
 
     onSave(payload);
   };
-
-  const stepTypes = [
-    {
-      value: 'action',
-      label: 'Action',
-      icon: 'fa-play',
-      color: 'primary',
-      description: 'A task someone must do (default).'
-    },
-    {
-      value: 'decision',
-      label: 'Decision',
-      icon: 'fa-code-branch',
-      color: 'warning',
-      description: 'A choice that sends the workflow down different paths.'
-    },
-    {
-      value: 'notification',
-      label: 'Notification',
-      icon: 'fa-bell',
-      color: 'info',
-      description: 'Send an FYI or alert, no work needed.'
-    },
-    {
-      value: 'assignment',
-      label: 'Assignment',
-      icon: 'fa-user-check',
-      color: 'success',
-      description: 'Assign work to a person or role.'
-    },
-    {
-      value: 'approval',
-      label: 'Approval',
-      icon: 'fa-check-circle',
-      color: 'danger',
-      description: 'Someone must approve before things continue.'
-    }
-  ];
 
   return (
     <Modal isOpen={isOpen} toggle={onClose} size="lg">

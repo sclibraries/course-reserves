@@ -101,7 +101,6 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
               rows={6}
               placeholder="Add a quick note about this item..."
               required
-              autoFocus
             />
           </FormGroup>
 

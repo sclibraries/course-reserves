@@ -14,7 +14,6 @@ const LoginButton = ({ textColor = "#1A2C57" }) => {
       <a
         href={authUrl}
         className="staff-login-link"
-        role="link"
         aria-label="Admin Login (opens Shibboleth authentication page)"
         style={{ 
           color: textColor,

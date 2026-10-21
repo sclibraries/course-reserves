@@ -7,7 +7,11 @@ const CardHeader = React.forwardRef(
 );
 CardHeader.displayName = "CardHeader";
 const CardTitle = React.forwardRef(
-  ({ className, ...props }, ref) => <h3 ref={ref} className={cn("tw-text-2xl tw-font-semibold tw-leading-none tw-tracking-tight", className)} {...props} />
+  ({ className, children, ...props }, ref) => (
+    <h3 ref={ref} className={cn("tw-text-2xl tw-font-semibold tw-leading-none tw-tracking-tight", className)} {...props}>
+      {children}
+    </h3>
+  )
 );
 CardTitle.displayName = "CardTitle";
 const CardDescription = React.forwardRef(

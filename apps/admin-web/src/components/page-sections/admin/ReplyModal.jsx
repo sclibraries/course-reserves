@@ -213,7 +213,6 @@ const ReplyModal = ({ isOpen, toggle, parentMessage, submissionId, onReplySent }
               rows={6}
               placeholder="Type your reply here... Use @username to mention staff"
               required
-              autoFocus
             />
             
             {/* @Mention Autocomplete Dropdown */}

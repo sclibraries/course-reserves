@@ -39,11 +39,11 @@
 }
 
 /* Course name link styling */
-.item-results-table tbody td a {
+.item-results-table tbody td .course-name-link {
   transition: all 0.2s ease;
 }
 
-.item-results-table tbody td a:focus {
+.item-results-table tbody td .course-name-link:focus {
   outline: 2px solid #0066cc;
   outline-offset: 2px;
   border-radius: 2px;

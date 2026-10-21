@@ -5,14 +5,13 @@ import {
   DropdownToggle,
   DropdownMenu,
   DropdownItem,
-  Spinner,
-  Button
+  Spinner
 } from 'reactstrap';
-import { FaCodeBranch, FaExchangeAlt } from 'react-icons/fa';
+import { FaExchangeAlt } from 'react-icons/fa';
 import { workflowService } from '../../../../services/admin/workflowService';
 import { toast } from 'react-toastify';
 
-const WorkflowPathSelector = ({ itemId, currentWorkflowId, currentTemplateName, onWorkflowSwitch }) => {
+const WorkflowPathSelector = ({ itemId, currentTemplateName, onWorkflowSwitch }) => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState(false);

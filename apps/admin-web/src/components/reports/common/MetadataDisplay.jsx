@@ -54,14 +54,15 @@ const MetadataDisplay = ({
 
     return (
       <div>
-        <span 
-          className="text-primary" 
-          style={{ cursor: 'pointer' }}
+        <button
+          type="button"
+          className="text-primary border-0 bg-transparent p-0 text-start"
+          style={{ cursor: 'pointer', font: 'inherit' }}
           onClick={() => setIsModalOpen(true)}
           title="Click to view details"
         >
           {truncatedSummary}
-        </span>
+        </button>
         
         <Modal isOpen={isModalOpen} toggle={() => setIsModalOpen(false)} size="lg">
           <ModalHeader toggle={() => setIsModalOpen(false)}>

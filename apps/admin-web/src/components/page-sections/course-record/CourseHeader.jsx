@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Button, Badge } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowAltCircleLeft } from '@fortawesome/free-solid-svg-icons';
@@ -36,3 +37,7 @@ export default function CourseHeader({ onBack }) {
     </>
   );
 }
+
+CourseHeader.propTypes = {
+  onBack: PropTypes.func.isRequired,
+};

@@ -316,28 +316,30 @@ function ItemSearchResults({ reserves, loading, error }) {
                   </td>
                   <td>
                     {reserve.course?.name ? (
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleCourseClick(reserve);
-                        }}
+                      <button
+                        type="button"
+                        className="course-name-link"
+                        onClick={() => handleCourseClick(reserve)}
                         style={{
                           color: '#0066cc',
                           textDecoration: 'none',
                           cursor: 'pointer',
-                          fontWeight: '500'
+                          padding: 0,
+                          border: 0,
+                          background: 'none',
+                          font: 'inherit',
+                          fontWeight: '500',
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.textDecoration = 'underline';
+                          e.currentTarget.style.textDecoration = 'underline';
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.textDecoration = 'none';
+                          e.currentTarget.style.textDecoration = 'none';
                         }}
                         title={`View course materials for ${reserve.course.name}`}
                       >
                         {reserve.course.name}
-                      </a>
+                      </button>
                     ) : (
                       'N/A'
                     )}

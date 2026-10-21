@@ -87,7 +87,7 @@ function ResourceSortDropdown({
   return (
     <div className="resource-sort-dropdown mb-3">
       <div className="d-flex align-items-center">
-        <label className="me-2 mb-0 fw-bold">Sort by:</label>
+        <span className="me-2 mb-0 fw-bold">Sort by:</span>
         <Dropdown isOpen={isDropdownOpen} toggle={() => setDropdownOpen(!isDropdownOpen)}>
           <DropdownToggle caret color="outline-secondary" className="d-flex align-items-center">
             <FontAwesomeIcon icon={getCurrentSortIcon()} className="me-2" />

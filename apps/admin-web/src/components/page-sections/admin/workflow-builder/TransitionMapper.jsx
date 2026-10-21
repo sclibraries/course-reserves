@@ -11,7 +11,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
  * TransitionMapper - Visual workflow transition mapping
  * (Simplified initial version with auto-generation)
  */
-function TransitionMapper({ steps, conditions, transitions, onUpdateTransitions }) {
+function TransitionMapper({ steps, transitions, onUpdateTransitions }) {
 
   // Automatically generate default sequential transitions
   const generateDefaultTransitions = () => {

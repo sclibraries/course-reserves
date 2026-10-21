@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Button, Row, Col } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBook, faLaptop, faLayerGroup, faTableColumns, faTableList } from '@fortawesome/free-solid-svg-icons';
@@ -63,3 +64,11 @@ export default function ViewControls({ viewMode, setViewMode, filter, onFilterCh
     </div>
   );
 }
+
+ViewControls.propTypes = {
+  viewMode: PropTypes.string.isRequired,
+  setViewMode: PropTypes.func.isRequired,
+  filter: PropTypes.string.isRequired,
+  onFilterChange: PropTypes.func.isRequired,
+  records: PropTypes.array.isRequired,
+};

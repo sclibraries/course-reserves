@@ -35,7 +35,12 @@ function PriorityBadge({ priority }) {
 
 function ChannelItem({ active, onClick, icon: Icon, iconClass, label, count }) {
   return (
-    <div className={`channel-item ${active ? 'active' : ''}`} onClick={onClick}>
+    <button
+      type="button"
+      className={`channel-item ${active ? 'active' : ''}`}
+      aria-pressed={active}
+      onClick={onClick}
+    >
       <div className="d-flex align-items-center justify-content-between w-100">
         <div className="d-flex align-items-center gap-2">
           <Icon className={iconClass} />
@@ -43,7 +48,7 @@ function ChannelItem({ active, onClick, icon: Icon, iconClass, label, count }) {
         </div>
         {count > 0 && <Badge color="secondary" pill>{count}</Badge>}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -102,17 +107,21 @@ function WorkQueueSidebar({ selectedItem, selectedChannel, onChannelChange, chan
         <div className="panel-content">
           {selectedItem ? (
             <>
-              <div
+              <button
+                type="button"
                 className={`channel-item ${selectedChannel === 'details' ? 'active' : ''}`}
+                aria-pressed={selectedChannel === 'details'}
                 onClick={() => onChannelChange('details')}
               >
                 <div className="d-flex align-items-center gap-2">
                   <FaBook className="text-primary" />
                   <span className="channel-name">Item Details</span>
                 </div>
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 className={`channel-item ${selectedChannel === 'checklist' ? 'active' : ''}`}
+                aria-pressed={selectedChannel === 'checklist'}
                 onClick={() => onChannelChange('checklist')}
               >
                 <div className="d-flex align-items-center justify-content-between w-100">
@@ -121,7 +130,7 @@ function WorkQueueSidebar({ selectedItem, selectedChannel, onChannelChange, chan
                     <span className="channel-name">Checklist</span>
                   </div>
                 </div>
-              </div>
+              </button>
               <ChannelItem
                 active={selectedChannel === 'faculty'}
                 onClick={() => onChannelChange('faculty')}

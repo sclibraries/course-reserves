@@ -133,6 +133,7 @@
   border: 1px solid #e5e7eb;
   color: #374151;
   cursor: pointer;
+  font-family: inherit;
 }
 
 .linked-course-badge:hover {

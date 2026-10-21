@@ -179,5 +179,17 @@ export default function MaterialsDisplay({
 }
 
 MaterialsDisplay.propTypes = {
+  isLoading: PropTypes.bool.isRequired,
+  error: PropTypes.string,
+  materials: PropTypes.array.isRequired,
+  combinedResults: PropTypes.array.isRequired,
+  availability: PropTypes.object.isRequired,
+  openAccordions: PropTypes.object.isRequired,
+  toggleAccordion: PropTypes.func.isRequired,
+  displayMode: PropTypes.string.isRequired,
+  viewMode: PropTypes.string.isRequired,
+  hiddenCount: PropTypes.number.isRequired,
+  visibleCount: PropTypes.number.isRequired,
+  nextAvailableDate: PropTypes.instanceOf(Date),
   canBypassVisibility: PropTypes.bool,
 };

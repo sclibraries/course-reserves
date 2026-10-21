@@ -100,9 +100,12 @@ const findButton = (container, text) =>
   Array.from(container.querySelectorAll('button')).find((button) => button.textContent.includes(text));
 
 const clickChannel = async (container, text) => {
-  await click(Array.from(container.querySelectorAll('.channel-item')).find((item) =>
+  const button = Array.from(container.querySelectorAll('button.channel-item')).find((item) =>
     item.textContent.includes(text)
-  ));
+  );
+  expect(button).toBeTruthy();
+  expect(button.getAttribute('role') || 'button').toBe('button');
+  await click(button);
 };
 
 const findBadge = (container, text) =>
