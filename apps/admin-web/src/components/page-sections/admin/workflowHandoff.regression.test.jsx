@@ -8,12 +8,15 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   getCurrentUser: vi.fn(),
   consoleLog: vi.fn(),
+  setSearchParams: vi.fn(),
+  searchParams: null,
   storeState: {},
 }));
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mocks.navigate,
   useParams: () => ({ submissionId: '31' }),
+  useSearchParams: () => [mocks.searchParams, mocks.setSearchParams],
 }));
 
 vi.mock('../../../store/submissionWorkflowStore', () => ({
@@ -84,6 +87,8 @@ describe('workflow processing handoff regression', () => {
   beforeEach(() => {
     mocks.navigate.mockReset();
     mocks.consoleLog.mockReset();
+    mocks.setSearchParams.mockReset();
+    mocks.searchParams = new URLSearchParams();
     vi.spyOn(console, 'log').mockImplementation(mocks.consoleLog);
     mocks.getCurrentUser.mockResolvedValue({ id: 42 });
     mocks.storeState = {

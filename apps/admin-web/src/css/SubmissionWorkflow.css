@@ -123,76 +123,17 @@
   font-weight: 600;
 }
 
-.submission-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-/* Statistics Cards */
-.statistics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 8px;
-  padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.stat-card-label {
-  font-size: 0.875rem;
-  color: #495057;
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.stat-card-value {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
 /* Ensure accessible contrast for warning badges and text */
 .badge.bg-warning,
 .badge.badge-warning {
   color: #212529 !important;
 }
 
-.stat-card-value.text-warning,
 .text-warning {
   color: #856404 !important; /* Darker amber for contrast on white */
 }
 
-.stat-card-value.text-primary {
-  color: #007bff;
-}
-
-.stat-card-value.text-success {
-  color: #28a745;
-}
-
-.stat-card-value.text-danger {
-  color: #dc3545;
-}
-
 /* Folder Styles */
-.folder-section {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
 .folder-header {
   display: flex;
   align-items: center;
@@ -208,25 +149,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.folder-number {
-  font-weight: 700;
-  color: #007bff;
-  font-size: 1.5rem;
-  margin-right: 0.25rem;
-}
-
-.folder-icon {
-  color: #ffc107;
-  font-size: 1.5rem;
-}
-
-/* Item List */
-.item-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
 }
 
 .item-card {
@@ -315,10 +237,6 @@
   .submissions-table th,
   .submissions-table td {
     padding: 0.5rem;
-  }
-  
-  .statistics {
-    grid-template-columns: 1fr;
   }
   
   .submission-meta {

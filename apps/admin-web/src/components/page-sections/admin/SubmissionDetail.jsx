@@ -1,50 +1,23 @@
-/**
- * @file SubmissionDetail.jsx
- * @description Component for displaying detailed view of a single submission
- */
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Alert, 
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  Spinner
-} from 'reactstrap';
-import { 
-  FaArrowLeft, 
-  FaFolder,
-  FaBook,
-  FaClock,
-  FaCheckCircle,
-} from 'react-icons/fa';
+import { Alert, Button, Spinner } from 'reactstrap';
 import { toast } from 'react-toastify';
-
-// Stores & Services
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import { buildProcessingHandoff, getProcessingBlockReason } from '../../../services/admin/processingHandoff';
-
-// Styles
+import { Button as UiButton } from '../../ui/button';
+import ClaimItemCard from './claims/ClaimItemCard';
+import LinkingPanel from './linking/LinkingPanel';
+import DraftSubmissionView from './submission/DraftSubmissionView';
+import SubmissionPage from './submission-page/SubmissionPage';
+import { isItemClaimedByCurrentUser } from './submission-page/submissionPageUtils';
 import '../../../css/SubmissionWorkflow.css';
 
-// Components
-import SubmissionHeader from './submission/SubmissionHeader';
-import DraftSubmissionView from './submission/DraftSubmissionView';
-import LinkingPanel from './linking/LinkingPanel';
-import SubmissionClaimsPanel from './claims/SubmissionClaimsPanel';
-import ItemCard from './submission/ItemCard';
-import StatCard from './submission/shared/StatCard';
+const submissionQueuePath = '/admin?tab=submissions';
 
-/**
- * Main submission detail component
- */
 function SubmissionDetail() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
-  
   const {
     selectedSubmission,
     loading,
@@ -53,76 +26,47 @@ function SubmissionDetail() {
     lockSubmission,
     unlockSubmission,
     clearError,
-    updateItemStatus
   } = useSubmissionWorkflowStore();
-
   const [currentUser, setCurrentUser] = useState(null);
 
-
-  // --- Load Data ---
-
   useEffect(() => {
-    if (submissionId) {
-      fetchSubmissionDetail(submissionId);
-    }
+    if (submissionId) fetchSubmissionDetail(submissionId);
   }, [submissionId, fetchSubmissionDetail]);
-  
+
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
-        const user = await submissionWorkflowService.getCurrentUser();
-        setCurrentUser(user);
-      } catch (error) {
-        console.error('Failed to load current user:', error);
-        const userStr = localStorage.getItem('user');
-        if (userStr) setCurrentUser(JSON.parse(userStr));
+        setCurrentUser(await submissionWorkflowService.getCurrentUser());
+      } catch (userError) {
+        console.error('Failed to load current user:', userError);
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
     };
     loadCurrentUser();
   }, []);
 
-
-
-  // --- Submission Actions ---
-
+  const refreshSubmission = () => fetchSubmissionDetail(submissionId);
   const handleLock = async () => {
     if (selectedSubmission) {
       const result = await lockSubmission(selectedSubmission.submission.uuid, 'Processing items');
-      if (result.success) await fetchSubmissionDetail(submissionId);
+      if (result.success) await refreshSubmission();
     }
   };
-
   const handleUnlock = async () => {
     if (selectedSubmission) {
       const result = await unlockSubmission(selectedSubmission.submission.uuid);
-      if (result.success) await fetchSubmissionDetail(submissionId);
+      if (result.success) await refreshSubmission();
     }
   };
-  
   const handleGoToWork = (item) => {
     const handoff = buildProcessingHandoff(item);
-
     if (!handoff) {
       toast.error(getProcessingBlockReason(item));
       return;
     }
-
     navigate(handoff.pathname, { state: handoff.state });
   };
-
-  const handleReopen = async (itemId) => {
-    if (confirm('Are you sure you want to reopen this item for processing?')) {
-      const result = await updateItemStatus(itemId, 'in_progress');
-      if (result.success) {
-        toast.success('Item reopened');
-        await fetchSubmissionDetail(submissionId);
-      } else {
-        toast.error(result.error || 'Failed to reopen item');
-      }
-    }
-  };
-
-  // --- Render ---
 
   if (loading) {
     return (
@@ -140,111 +84,45 @@ function SubmissionDetail() {
           <h4 className="alert-heading">{error ? 'Error' : 'Not Found'}</h4>
           <p>{error || 'The requested submission could not be found.'}</p>
         </Alert>
-        <Button color="secondary" onClick={() => navigate('/admin?tab=submissions')}>
-          <FaArrowLeft className="me-2" /> Back to Queue
-        </Button>
+        <Button color="secondary" onClick={() => navigate(submissionQueuePath)}>Back to Queue</Button>
       </div>
     );
   }
 
-  const { submission, folders, unfolderedItems, statistics } = selectedSubmission;
-  const isCourseLinked = submission.linkState === 'linked' || Boolean(submission.folioCourseListingId);
+  const { submission, folders, unfolderedItems } = selectedSubmission;
+  const items = [...folders.flatMap((folder) => folder.items), ...unfolderedItems];
   const currentUsername = currentUser?.username || currentUser?.user?.username || '';
-  const submissionItems = [...folders.flatMap(folder => folder.items), ...unfolderedItems];
   if (submission.status === 'draft') {
-    return <DraftSubmissionView submission={submission} items={submissionItems} onBack={() => navigate('/admin?tab=submissions')} />;
+    return <DraftSubmissionView submission={submission} items={items} onBack={() => navigate(submissionQueuePath)} />;
   }
-
-  // Helper for numbering items
-  let currentNumber = 1;
-  const itemDisplayNumbers = {};
-  folders.forEach(folder => {
-    const fNum = currentNumber++;
-    folder.items.forEach((item, idx) => itemDisplayNumbers[item.id] = `${fNum}.${idx + 1}`);
-  });
-  unfolderedItems.forEach(item => itemDisplayNumbers[item.id] = `${currentNumber++}`);
 
   return (
     <div className="submission-detail">
-      <Button color="link" onClick={() => navigate('/admin?tab=submissions')} className="mb-3 ps-0">
-        <FaArrowLeft className="me-2" /> Back to Queue
-      </Button>
-
-      <SubmissionHeader 
-        submission={submission} 
-        onLock={handleLock} 
-        onUnlock={handleUnlock} 
-      />
-
-      <LinkingPanel
+      <SubmissionPage
         submission={submission}
-        items={submissionItems}
-        onChanged={() => fetchSubmissionDetail(submissionId)}
+        folders={folders}
+        unfolderedItems={unfolderedItems}
+        currentUser={currentUser}
+        onBack={() => navigate(submissionQueuePath)}
+        onLock={handleLock}
+        onUnlock={handleUnlock}
+        onChanged={refreshSubmission}
+        unlinkedContent={<LinkingPanel submission={submission} items={items} onChanged={refreshSubmission} />}
+        renderSelectedItem={(item) => {
+          const canWork = isItemClaimedByCurrentUser(item, currentUser);
+          const blockedReason = getProcessingBlockReason(item);
+          return (
+            <div className="tw-space-y-3">
+              {canWork && (blockedReason ? (
+                <p className="tw-text-sm tw-text-muted-foreground">{blockedReason}</p>
+              ) : (
+                <UiButton variant="outline" size="sm" onClick={() => handleGoToWork(item)}>Work on This</UiButton>
+              ))}
+              <ClaimItemCard item={item} currentUsername={currentUsername} onChanged={refreshSubmission} />
+            </div>
+          );
+        }}
       />
-
-      {/* Course processing dashboard is available only after linking. */}
-      {isCourseLinked && (
-        <>
-          <SubmissionClaimsPanel
-            submission={submission}
-            items={submissionItems}
-            currentUsername={currentUsername}
-            onChanged={() => fetchSubmissionDetail(submissionId)}
-          />
-
-          <div className="statistics mb-4">
-            <StatCard label="Total Items" value={statistics.totalItems} icon={FaBook} />
-            <StatCard label="Pending" value={statistics.byStatus.pending} color="warning" icon={FaClock} />
-            <StatCard label="In Progress" value={statistics.byStatus.inProgress} color="info" />
-            <StatCard label="Complete" value={statistics.byStatus.complete} color="success" icon={FaCheckCircle} />
-            <StatCard label="Progress" value={`${statistics.completionPercentage}%`} color="primary" />
-          </div>
-
-          {folders.map((folder, idx) => (
-            <Card key={folder.name} className="folder-section mb-3">
-              <CardBody>
-                <div className="folder-header">
-                  <h3><span className="folder-number">{idx + 1}.</span> <FaFolder className="ms-2"/> {folder.name}</h3>
-                  <Badge pill>{folder.items.length} items</Badge>
-                </div>
-                <div className="item-list">
-                  {folder.items.map(item => (
-                    <ItemCard 
-                      key={item.id} 
-                      item={item} 
-                      displayNumber={itemDisplayNumbers[item.id]} 
-                      onGoToWork={handleGoToWork} 
-                      onReopen={handleReopen} 
-                      currentUserId={currentUser?.id || 0} 
-                      currentUsername={currentUsername}
-                    />
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-
-          {unfolderedItems.length > 0 && (
-            <Card className="folder-section">
-              <CardBody>
-                <div className="item-list">
-                  {unfolderedItems.map(item => (
-                    <ItemCard 
-                      key={item.id} 
-                      item={item} 
-                      displayNumber={itemDisplayNumbers[item.id]} 
-                      onGoToWork={handleGoToWork} 
-                      onReopen={handleReopen} 
-                      currentUserId={currentUser?.id || 0} 
-                      currentUsername={currentUsername}
-                    />
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          )}
-        </>
-      )}
     </div>
   );
 }
