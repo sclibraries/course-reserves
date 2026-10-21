@@ -1,3 +1,10 @@
+Require all granted
+Options -Indexes
+
+<Files "index-test.php">
+  Require all denied
+</Files>
+
 RewriteEngine on
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f

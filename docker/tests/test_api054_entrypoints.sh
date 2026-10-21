@@ -4,8 +4,8 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 project_name=${1:-api054fr-entrypoints}
 case "$project_name" in
-    api054fr-*) ;;
-    *) printf 'Compose project name must start with api054fr-.\n' >&2; exit 2 ;;
+    api054fr-*|api093-*) ;;
+    *) printf 'Compose project name must start with api054fr- or api093-.\n' >&2; exit 2 ;;
 esac
 
 compose() {
@@ -22,6 +22,13 @@ trap cleanup EXIT
 
 compose up -d --build --wait
 compose exec -T backend php /app/yii migrate/up --interactive=0
+
+apache_status=$(compose exec -T backend curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/index-test.php)
+[ "$apache_status" = 403 ] || {
+    printf 'Apache /index-test.php returned %s; expected 403 from web/.htaccess\n' "$apache_status" >&2
+    exit 1
+}
+printf 'Apache /index-test.php -> 403 (web/.htaccess)\n'
 
 probe="require '/app/config/environment.php'; echo YII_ENV . ':' . (YII_DEBUG ? '1' : '0');"
 config_probe="require '/app/config/environment.php'; require '/app/vendor/yiisoft/yii2/Yii.php'; \$web = require '/app/config/web.php'; \$console = require '/app/config/console.php'; echo (isset(\$web['modules']['debug']) ? '1' : '0') . ':' . (isset(\$web['modules']['gii']) ? '1' : '0') . ':' . (in_array('gii', \$console['bootstrap'], true) ? '1' : '0');"

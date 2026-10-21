@@ -1,0 +1,11 @@
+Options -Indexes
+Require all denied
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# No uploads; PHP2Shell CVE-2026-109618/109619.
+<If "%{HTTP:Content-Type} =~ m#^multipart/#i">
+  Require all denied
+</If>
