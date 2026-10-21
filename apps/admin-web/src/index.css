@@ -87,22 +87,38 @@
     --status-canceled: 0 63% 31%;
   }
 
-  * {
-    @apply border-border;
+  /* Scope preflight behavior to the new stack so Bootstrap pages stay unchanged. */
+  :where([class*="tw-"]),
+  :where([class*="tw-"])::before,
+  :where([class*="tw-"])::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: hsl(var(--border));
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+  :where(button[class*="tw-"], input[class*="tw-"], textarea[class*="tw-"], select[class*="tw-"]) {
+    font: inherit;
+    color: inherit;
+    margin: 0;
+    background-color: transparent;
+  }
+
+  :where(h1[class*="tw-"], h2[class*="tw-"], h3[class*="tw-"], h4[class*="tw-"], h5[class*="tw-"], h6[class*="tw-"], p[class*="tw-"]) {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
   }
 }
 
 @layer components {
-  .search-container {
-    @apply flex items-center space-x-2 p-4 bg-white/90 backdrop-blur-md rounded-lg shadow-sm border border-border;
+  :where([class*="tw-"]) .search-container,
+  :where([class*="tw-"]).search-container {
+    @apply tw-flex tw-items-center tw-space-x-2 tw-p-4 tw-bg-white/90 tw-backdrop-blur-md tw-rounded-lg tw-shadow-sm tw-border tw-border-border;
   }
 
-  .nav-link {
-    @apply relative text-foreground/80 hover:text-foreground transition-colors duration-200 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[2px] after:w-0 after:bg-current after:transition-all after:duration-300 hover:after:w-full;
+  :where([class*="tw-"]) .nav-link,
+  :where([class*="tw-"]).nav-link {
+    @apply tw-relative tw-text-foreground/80 hover:tw-text-foreground tw-transition-colors tw-duration-200 after:tw-content-[''] after:tw-absolute after:tw-left-0 after:tw-bottom-0 after:tw-h-[2px] after:tw-w-0 after:tw-bg-current after:tw-transition-all after:tw-duration-300 hover:after:tw-w-full;
   }
 }

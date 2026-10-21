@@ -40,4 +40,10 @@ export default [
       }],
     },
   },
+  {
+    files: ['src/components/ui/**/*.{js,jsx}'],
+    rules: {
+      'react/prop-types': 'off',
+    },
+  },
 ]

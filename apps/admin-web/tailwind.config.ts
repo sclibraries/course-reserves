@@ -10,7 +10,7 @@ const config: Config = {
     "./app/**/*.{ts,tsx,js,jsx}",
     "./src/**/*.{ts,tsx,js,jsx}",
   ],
-  prefix: "",
+  prefix: "tw-",
   corePlugins: {
     preflight: false, // Bootstrap remains loaded until the last migration ticket.
   },

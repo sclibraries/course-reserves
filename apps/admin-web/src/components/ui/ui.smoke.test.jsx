@@ -51,9 +51,9 @@ describe('shadcn UI foundation', () => {
 
     const buttons = Array.from(container.querySelectorAll('button'));
     expect(buttons[0].textContent).toContain('Default action');
-    expect(buttons[0].className).toContain('bg-primary');
+    expect(buttons[0].className).toContain('tw-bg-primary');
     expect(buttons[1].textContent).toContain('Secondary action');
-    expect(buttons[1].className).toContain('border-input');
+    expect(buttons[1].className).toContain('tw-border-input');
     expect(container.textContent).toContain('Ready');
     expect(container.querySelector('[role="tab"]')?.textContent).toBe('Overview');
     expect(container.textContent).toContain('Overview content');
