@@ -149,6 +149,7 @@ export const SortableFolder = ({
           {/* Folder toggle and icon */}
           <button
             onClick={handleToggle}
+            aria-expanded={folder.isOpen}
             className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted/50 rounded p-1 -m-1"
           >
             {folder.isOpen ? (
@@ -163,32 +164,9 @@ export const SortableFolder = ({
               </>
             )}
             
-            {/* Folder title */}
-            {isEditingTitle ? (
-              <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
-                <Input
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  className="h-6 text-sm font-medium"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveTitle();
-                    if (e.key === 'Escape') handleCancelEdit();
-                  }}
-                  onBlur={handleSaveTitle}
-                />
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleSaveTitle}>
-                  <Check className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleCancelEdit}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <span className="font-medium text-sm flex-1 text-left truncate">
-                {folder.title} ({folder.items.length} items)
-              </span>
-            )}
+            <span className="font-medium text-sm flex-1 text-left truncate">
+              {folder.title} ({folder.items.length} items)
+            </span>
           </button>
 
           {/* Action buttons */}
@@ -243,10 +221,40 @@ export const SortableFolder = ({
                 e.stopPropagation();
                 setIsEditingTitle(true);
               }}
+              aria-label="Edit folder name"
               title="Edit folder name"
             >
               <Edit2 className="h-3 w-3" />
             </Button>
+
+            {isEditingTitle && (
+              <form
+                className="flex items-center gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleSaveTitle();
+                }}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) handleSaveTitle();
+                }}
+              >
+                <Input
+                  aria-label="Folder name"
+                  value={editingTitle}
+                  onChange={(event) => setEditingTitle(event.target.value)}
+                  className="h-6 w-40 text-sm font-medium"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') handleCancelEdit();
+                  }}
+                />
+                <Button type="submit" size="sm" variant="ghost" className="h-6 w-6 p-0" aria-label="Save folder name">
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleCancelEdit} aria-label="Cancel folder name edit">
+                  <X className="h-3 w-3" />
+                </Button>
+              </form>
+            )}
             
             {/* Delete folder button */}
             <Button

@@ -143,7 +143,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
             className={`min-w-0 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSplitView ? 'md:min-h-0 md:overflow-y-auto' : ''}`}
             role="region"
             aria-label="Search results"
-            tabIndex={0}
+            tabIndex={isSplitView && window.innerWidth >= 768 ? 0 : undefined}
           >
             {search.query && <p className="text-sm text-muted-foreground">Found {search.totalHits.toLocaleString()} results{search.results.length > 0 ? ` · showing ${search.results.length}` : ''}{search.searchTime ? ` · ${search.searchTime}ms` : ''}</p>}
             {search.error && <div role="alert" className="whitespace-pre-line rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{search.error}</div>}
@@ -173,7 +173,7 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
             className="md:min-h-0 md:overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             role="region"
             aria-label="Full record"
-            tabIndex={0}
+            tabIndex={isSplitView && window.innerWidth >= 768 ? 0 : undefined}
           >
             <DiscoveryRecordPanel
               record={record}
