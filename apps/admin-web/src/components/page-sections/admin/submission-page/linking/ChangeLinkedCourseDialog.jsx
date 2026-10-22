@@ -7,25 +7,23 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../../../../ui/dialog';
 import { Input } from '../../../../ui/input';
 import { Label } from '../../../../ui/label';
 import LinkingComparison from './LinkingComparison';
+import RequiredReasonForm from './RequiredReasonForm';
 
 function ChangeLinkedCourseDialog({ open, onOpenChange, submission, linking, returnFocusRef }) {
   const { clearError } = linking;
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState(submission.courseCode || '');
   const [unlinkOpen, setUnlinkOpen] = useState(false);
-  const [reason, setReason] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setSearchText(submission.courseCode || '');
-    setReason('');
     setUnlinkOpen(false);
     setSearchOpen(false);
     clearError();
@@ -35,12 +33,6 @@ function ChangeLinkedCourseDialog({ open, onOpenChange, submission, linking, ret
     event.preventDefault();
     linking.searchCandidates(searchText);
   };
-  const submitUnlink = async (event) => {
-    event.preventDefault();
-    if (!reason.trim()) return;
-    if (await linking.actions.unlink(reason.trim())) onOpenChange(false);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -89,21 +81,19 @@ function ChangeLinkedCourseDialog({ open, onOpenChange, submission, linking, ret
             {!unlinkOpen ? (
               <Button variant="ghost" disabled={linking.saving} onClick={() => setUnlinkOpen(true)}>Unlink</Button>
             ) : (
-              <form onSubmit={submitUnlink} className="tw-space-y-3 tw-rounded-md tw-border tw-p-3">
-                <div className="tw-space-y-2">
-                  <Label htmlFor="unlink-reason">Reason for unlinking (required)</Label>
-                  <Input
-                    id="unlink-reason"
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    required
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setUnlinkOpen(false)}>Cancel</Button>
-                  <Button type="submit" variant="destructive" disabled={linking.saving || !reason.trim()}>Confirm unlink</Button>
-                </DialogFooter>
-              </form>
+              <RequiredReasonForm
+                open={unlinkOpen}
+                onCancel={() => setUnlinkOpen(false)}
+                onSuccess={() => onOpenChange(false)}
+                onConfirm={linking.actions.unlink}
+                saving={linking.saving}
+                reasonId="unlink-reason"
+                reasonLabel="Reason for unlinking (required)"
+                submitLabel="Confirm unlink"
+                submitVariant="destructive"
+                multiline={false}
+                className="tw-space-y-3 tw-rounded-md tw-border tw-p-3"
+              />
             )}
           </div>
         )}
