@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { Submission } from '@/components/SubmissionCard';
+import { SubmissionAccessBadge } from './SubmissionAccessBadge';
 
 interface Props {
   code: string;
@@ -6,20 +8,20 @@ interface Props {
   section?: string;
   term: ReactNode;
   status: ReactNode;
-  badges?: ReactNode;
+  access?: Submission['access'];
   items: ReactNode;
   lastUpdated: string;
   actions: ReactNode;
 }
 
-export function DashboardCourseCard({ code, title, section, term, status, badges, items, lastUpdated, actions }: Props) {
+export function DashboardCourseCard({ code, title, section, term, status, access, items, lastUpdated, actions }: Props) {
   return (
     <article className="space-y-3 rounded-lg border bg-card p-4">
       <header className="min-w-0 space-y-2">
-        <h2 className="break-words font-medium">{code} · {title}</h2>
+        <h3 className="break-words font-medium">{code} · {title}</h3>
         <div className="flex flex-wrap items-center gap-2">
           {term}
-          {badges}
+          <SubmissionAccessBadge access={access} />
           {status}
         </div>
       </header>

@@ -1,16 +1,12 @@
-import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Edit, Eye } from 'lucide-react';
 import type { Submission } from '@/components/SubmissionCard';
-import { DraftDiscardButton } from './DraftDiscardButton';
 import { DashboardCourseCard } from './DashboardCourseCard';
+import { SubmissionActions } from './SubmissionActions';
+import { SubmissionAccessBadge } from './SubmissionAccessBadge';
 
 export const ReservesTable = ({ submissions }: { submissions: Submission[] }) => {
-  const navigate = useNavigate();
-
   return (
     <>
       <div className="space-y-3 lg:hidden">
@@ -21,21 +17,10 @@ export const ReservesTable = ({ submissions }: { submissions: Submission[] }) =>
             title={submission.courseTitle}
             term={<Badge variant="secondary" className="text-xs">{submission.term}</Badge>}
             status={<StatusBadge status={submission.status} />}
-            badges={submission.access === 'proxy' ? <Badge variant="outline">Proxy</Badge> : submission.access === 'co_instructor' ? <Badge variant="outline">Co-instructor</Badge> : undefined}
+            access={submission.access}
             items={<>{submission.totalItems} total · {submission.completeItems} complete</>}
             lastUpdated={submission.lastUpdated}
-            actions={submission.status === 'draft' && submission.proxyCanEdit !== false ? (
-              <>
-                <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
-                  <Edit className="mr-1 h-4 w-4" />Edit
-                </Button>
-                <DraftDiscardButton submissionId={submission.id} />
-              </>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => navigate(`/submission/${submission.id}`)}>
-                <Eye className="mr-1 h-4 w-4" />View
-              </Button>
-            )}
+            actions={<SubmissionActions submission={submission} />}
           />
         ))}
       </div>
@@ -55,8 +40,7 @@ export const ReservesTable = ({ submissions }: { submissions: Submission[] }) =>
               <TableCell>
                 <div className="font-medium">{submission.courseCode}</div>
                 <div className="text-sm text-muted-foreground truncate max-w-xs">{submission.courseTitle}</div>
-                {submission.access === 'proxy' && <Badge variant="outline">Proxy</Badge>}
-                {submission.access === 'co_instructor' && <Badge variant="outline">Co-instructor</Badge>}
+                <SubmissionAccessBadge access={submission.access} />
               </TableCell>
               <TableCell><Badge variant="secondary" className="text-xs">{submission.term}</Badge></TableCell>
               <TableCell><StatusBadge status={submission.status} /></TableCell>
@@ -66,18 +50,7 @@ export const ReservesTable = ({ submissions }: { submissions: Submission[] }) =>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{submission.lastUpdated}</TableCell>
               <TableCell className="text-right">
-                {submission.status === 'draft' && submission.proxyCanEdit !== false ? (
-                  <div className="inline-flex gap-2">
-                    <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
-                      <Edit className="h-4 w-4 mr-1" />Edit
-                    </Button>
-                    <DraftDiscardButton submissionId={submission.id} />
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/submission/${submission.id}`)}>
-                    <Eye className="h-4 w-4 mr-1" />View
-                  </Button>
-                )}
+                <div className="inline-flex gap-2"><SubmissionActions submission={submission} /></div>
               </TableCell>
             </TableRow>
           ))}
