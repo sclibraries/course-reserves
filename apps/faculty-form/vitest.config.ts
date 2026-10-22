@@ -19,6 +19,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@course-reserves/citations': path.resolve(__dirname, '../../packages/citations/src'),
+    },
+  },
+  server: {
+    fs: {
+      allow: [path.resolve(__dirname, './'), path.resolve(__dirname, '../../packages/citations')],
     },
   },
   // Disable PostCSS when running tests — postcss-selector-parser (a transitive
@@ -32,6 +38,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    include: ['src/**/*.test.{js,jsx,ts,tsx}'],
+    include: [
+      'src/**/*.test.{js,jsx,ts,tsx}',
+      path.resolve(__dirname, '../../packages/citations/src/**/*.test.ts'),
+    ],
   },
 });

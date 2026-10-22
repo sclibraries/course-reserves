@@ -1,30 +1,40 @@
-import type {
-  DiscoverySearchResult,
-  FieldQuery,
-  SearchLimiters,
-} from '@/services/discoverySearchService';
-
 import { parseCitation, type ParsedCitation } from './citationParser';
 import { extractCitationsFromSyllabus } from './syllabusCitationExtractor';
 
+export interface CitationSearchResult {
+  title: string;
+}
+
+export interface CitationFieldQuery {
+  field?: string;
+  term: string;
+  boolean?: 'AND' | 'OR' | 'NOT';
+}
+
+export interface CitationSearchResponse<TResult extends CitationSearchResult> {
+  results: TResult[];
+  totalHits: number;
+  searchTime: number;
+}
+
 export interface CitationSearchStrategy {
-  fieldQueries: FieldQuery[];
+  fieldQueries: CitationFieldQuery[];
   builtQuery: string;
-  queryToSearch: string | FieldQuery[];
+  queryToSearch: string | CitationFieldQuery[];
 }
 
 export interface PreparedCitationSearch {
   id: string;
   rawCitation: string;
   parsedCitation: ParsedCitation;
-  fieldQueries: FieldQuery[];
+  fieldQueries: CitationFieldQuery[];
   builtQuery: string;
-  queryToSearch: string | FieldQuery[];
+  queryToSearch: string | CitationFieldQuery[];
   queryStrategies: CitationSearchStrategy[];
 }
 
-export interface CitationBatchSearchGroup extends PreparedCitationSearch {
-  results: DiscoverySearchResult[];
+export interface CitationBatchSearchGroup<TResult extends CitationSearchResult = CitationSearchResult> extends PreparedCitationSearch {
+  results: TResult[];
   totalHits: number;
   searchTime: number;
   attemptedQueries: string[];
@@ -40,19 +50,13 @@ export interface CitationBatchSearchOptions {
 const MAX_CONCURRENT_CITATIONS = 3;
 const RATE_LIMIT_BACKOFF_MS = [250, 500];
 
-type SearchDiscoveryLike = (
-  query: string | FieldQuery[],
+type SearchDiscoveryLike<TResult extends CitationSearchResult, TLimiters> = (
+  query: string | CitationFieldQuery[],
   page?: number,
   queryString?: string,
-  limiters?: SearchLimiters,
+  limiters?: TLimiters,
   appliedLimiters?: string[]
-) => Promise<{
-  results: DiscoverySearchResult[];
-  totalHits: number;
-  searchTime: number;
-  queryString: string;
-  appliedLimiters: string[];
-}>;
+) => Promise<CitationSearchResponse<TResult>>;
 
 export function prepareCitationBatchSearches(rawText: string): PreparedCitationSearch[] {
   return prepareCitationSearches(extractCitationsFromSyllabus(rawText).citations);
@@ -76,13 +80,13 @@ export function prepareCitationSearches(citations: string[], ids?: string[]): Pr
   });
 }
 
-export async function executeCitationBatchSearch(
+export async function executeCitationBatchSearch<TResult extends CitationSearchResult, TLimiters = undefined>(
   searches: PreparedCitationSearch[],
-  searchFn: SearchDiscoveryLike,
-  limiters?: SearchLimiters,
+  searchFn: SearchDiscoveryLike<TResult, TLimiters>,
+  limiters?: TLimiters,
   options: CitationBatchSearchOptions = {}
-): Promise<CitationBatchSearchGroup[]> {
-  const groups = new Array<CitationBatchSearchGroup>(searches.length);
+): Promise<CitationBatchSearchGroup<TResult>[]> {
+  const groups = new Array<CitationBatchSearchGroup<TResult>>(searches.length);
   let nextSearchIndex = 0;
   let completed = 0;
   const wait = options.wait || delay;
@@ -104,12 +108,12 @@ export async function executeCitationBatchSearch(
   return groups;
 }
 
-async function executeOneCitationSearch(
+async function executeOneCitationSearch<TResult extends CitationSearchResult, TLimiters>(
   search: PreparedCitationSearch,
-  searchFn: SearchDiscoveryLike,
-  limiters: SearchLimiters | undefined,
+  searchFn: SearchDiscoveryLike<TResult, TLimiters>,
+  limiters: TLimiters | undefined,
   wait: (milliseconds: number) => Promise<void>
-): Promise<CitationBatchSearchGroup> {
+): Promise<CitationBatchSearchGroup<TResult>> {
   const attemptedQueries: string[] = [];
 
   try {
@@ -155,10 +159,10 @@ async function executeOneCitationSearch(
   };
 }
 
-async function searchWithRateLimitBackoff(
+async function searchWithRateLimitBackoff<TResult extends CitationSearchResult, TLimiters>(
   strategy: CitationSearchStrategy,
-  searchFn: SearchDiscoveryLike,
-  limiters: SearchLimiters | undefined,
+  searchFn: SearchDiscoveryLike<TResult, TLimiters>,
+  limiters: TLimiters | undefined,
   wait: (milliseconds: number) => Promise<void>
 ) {
   let retries = 0;

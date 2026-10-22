@@ -1,3 +1,5 @@
+import type { CitationFieldQuery, CitationSearchResult } from '@course-reserves/citations';
+
 export interface EBSCOItemGroup {
   Label: string;
   Group: string;
@@ -77,10 +79,9 @@ export interface DiscoveryFacets {
   publicationYears: string[];
 }
 
-export interface DiscoverySearchResult {
+export interface DiscoverySearchResult extends CitationSearchResult {
   id: string;
   dbId: string;
-  title: string;
   authors: string[];
   publicationType: string;
   publicationInfo?: string;
@@ -127,8 +128,4 @@ export interface SearchLimiters {
   publicationYear?: string;
 }
 
-export interface FieldQuery {
-  field?: string;
-  term: string;
-  boolean?: 'AND' | 'OR' | 'NOT';
-}
+export type FieldQuery = CitationFieldQuery;

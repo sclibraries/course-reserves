@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
-import type { CitationBatchSearchGroup } from '@/utils/citationBatchSearch';
-import { findCitationBestMatch } from '@/utils/citationBestMatch';
+import { findCitationBestMatch, type CitationBatchSearchGroup } from '@course-reserves/citations';
 import type { CitationChoice, EditableCitation } from './pasteCitationTypes';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { CatalogAvailabilityLookup } from '@/hooks/useCatalogAvailability';
@@ -12,7 +11,7 @@ import type { CourseItem } from '@/store/courseReservesStore';
 interface CitationReviewGroupProps {
   citation: EditableCitation;
   index: number;
-  group?: CitationBatchSearchGroup;
+  group?: CitationBatchSearchGroup<DiscoverySearchResult>;
   choice?: CitationChoice;
   addedItem?: CourseItem;
   writtenDuplicate?: boolean;

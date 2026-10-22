@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { CatalogAvailability } from '@/services/catalogAvailabilityApi';
-import { prepareCitationSearches } from '@/utils/citationBatchSearch';
+import { prepareCitationSearches } from '@course-reserves/citations';
 import CitationReviewGroup from './CitationReviewGroup';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;

@@ -1,27 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import { findCitationBestMatch } from './citationBestMatch';
 
-function makeResult(id: string, title: string): DiscoverySearchResult {
-  return {
-    id,
-    dbId: 'synthetic-database',
-    title,
-    authors: [],
-    publicationType: 'Academic Journal',
-    database: 'Synthetic Database',
-    pLink: `https://example.test/${id}`,
-    hasFullText: false,
-  };
+function makeResult(id: string, title: string) {
+  return { id, title };
 }
 
 describe('findCitationBestMatch', () => {
   it('ranks the quoted citation title above an earlier search result', () => {
     const first = makeResult('first', 'Synthetic Article');
-    const best = makeResult('best', 'The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean');
-    const last = makeResult('last', 'Race, Narrative, and Caribbean History');
+    const best = makeResult('best', 'A Synthetic Citation Parsing Title');
+    const last = makeResult('last', 'Example Narrative and Synthetic History');
 
-    expect(findCitationBestMatch('Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” 2014', [first, best, last]))
+    expect(findCitationBestMatch('Test Author, “A Synthetic Citation Parsing Title,” 2014', [first, best, last]))
       .toEqual({ best, others: [first, last] });
   });
 
@@ -29,7 +19,7 @@ describe('findCitationBestMatch', () => {
     const exact = makeResult('exact', 'Study of quantum-fields: a concise review');
     const partial = makeResult('partial', 'Quantum field notes');
 
-    expect(findCitationBestMatch('A Study of Quantum Fields. Journal of Physics, 2025.', [partial, exact]).best).toBe(exact);
+    expect(findCitationBestMatch('A Synthetic Fields Study. Example Journal of Science, 2025.', [partial, exact]).best).toBe(exact);
   });
 
   it('keeps the first result when top overlap scores tie', () => {

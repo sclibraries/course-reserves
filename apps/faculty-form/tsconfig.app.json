@@ -23,7 +23,8 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@course-reserves/citations": ["../../packages/citations/src"]
     }
   },
   "include": ["src"]

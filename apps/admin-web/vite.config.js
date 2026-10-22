@@ -21,6 +21,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '::',
       port: 5173,
+      fs: {
+        allow: [path.resolve(__dirname, './'), path.resolve(__dirname, '../../packages/citations')],
+      },
       // Allow HMR to work through the nginx proxy when running inside Docker.
       // Set VITE_HMR_HOST / VITE_HMR_PORT in .env.docker to override.
       hmr: process.env.VITE_HMR_HOST
@@ -40,6 +43,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@course-reserves/citations': path.resolve(__dirname, '../../packages/citations/src'),
       },
     },
 

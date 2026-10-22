@@ -1,13 +1,11 @@
-import type { DiscoverySearchResult } from '@/services/discoverySearchService';
-
 const STOP_WORDS = new Set(['a', 'an', 'and', 'at', 'from', 'in', 'of', 'on', 'the', 'to']);
 
-export interface CitationBestMatch {
-  best: DiscoverySearchResult | undefined;
-  others: DiscoverySearchResult[];
+export interface CitationBestMatch<TResult extends { title: string }> {
+  best: TResult | undefined;
+  others: TResult[];
 }
 
-export function findCitationBestMatch(citationText: string, results: DiscoverySearchResult[]): CitationBestMatch {
+export function findCitationBestMatch<TResult extends { title: string }>(citationText: string, results: TResult[]): CitationBestMatch<TResult> {
   if (results.length === 0) return { best: undefined, others: [] };
 
   const citationWords = new Set(normalizeWords(extractCitationTitle(citationText)));

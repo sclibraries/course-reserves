@@ -1,5 +1,6 @@
 import type { CourseItem } from '@/store/courseReservesStore';
-import type { CitationBatchSearchGroup } from '@/utils/citationBatchSearch';
+import type { CitationBatchSearchGroup } from '@course-reserves/citations';
+import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 
 export interface EditableCitation {
   id: string;
@@ -21,7 +22,7 @@ export interface CitationChoice {
 export interface PasteWorkspace {
   citations: EditableCitation[];
   skipped: SkippedCitationBlock[];
-  groups: CitationBatchSearchGroup[];
+  groups: CitationBatchSearchGroup<DiscoverySearchResult>[];
   choices: Record<string, CitationChoice>;
 }
 

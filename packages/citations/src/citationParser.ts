@@ -245,11 +245,11 @@ function cleanTitle(text: string): string {
  * Extract source (journal name or book title) from text after the quoted title.
  *
  * Example inputs (the text after the closing quote):
- *   ", Small Axe 41 (2013): 154-171."
- *   ", Caribbean Quarterly 60, 2 (June 2014): 5-28"
- *   ", in Kenneth Hall and Denis Benn eds., Contending with Destiny: The Caribbean in the 21st Century (Kingston, Jamaica: Ian Randle Publishers, 2000), 37-44"
- *   ". Translated by J. Michael Dash (Charlottesville, Virginia: University Press of Virginia, 1989), 221-224"
- *   " in Caribbean Discourse: Selected Essays. Translated by J. Michael Dash (Charlottesville, Virginia: University Press of Virginia, 1989), 221-224"
+ *   ", Example Journal 41 (2013): 154-171."
+ *   ", Example Journal 60, 2 (June 2014): 5-28"
+ *   ", in Example Editor One and Example Editor Two eds., A Synthetic Book on Modern Topics (Example City: Example University Press, 2000), 37-44"
+ *   ". Translated by Example Translator (Example City: Example University Press, 1989), 221-224"
+ *   " in Example Discourse: Selected Essays. Translated by Example Translator (Example City: Example University Press, 1989), 221-224"
  */
 function cleanSource(text: string): string {
   let cleaned = text.trim();
@@ -260,10 +260,10 @@ function cleanSource(text: string): string {
   // Remove leading "in" (for book chapters)
   cleaned = cleaned.replace(/^in\s+/iu, '').trim();
 
-  // Remove editor info: "Kenneth Hall and Denis Benn eds.," or similar
+  // Remove editor info: "Example Editor One and Example Editor Two eds.," or similar
   cleaned = cleaned.replace(/^[^,]*\beds\.?,?\s*/iu, '').trim();
 
-  // Remove "Translated by ..." prefix  (e.g. "Translated by J. Michael Dash.")
+  // Remove "Translated by ..." prefix  (e.g. "Translated by Example Translator.")
   cleaned = cleaned.replace(/^Translated by[^.]+\.\s*/iu, '').trim();
 
   const publisherInfoIndex = cleaned.indexOf('(');

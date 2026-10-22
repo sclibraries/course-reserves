@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { DiscoverySearchResult, FieldQuery } from '@/services/discoverySearchService';
+import type { CitationFieldQuery, CitationSearchResult } from './citationBatchSearch';
 
 import {
   executeCitationBatchSearch,
@@ -8,43 +8,32 @@ import {
   prepareCitationSearches,
 } from './citationBatchSearch';
 
-function makeResult(id: string, title: string): DiscoverySearchResult {
-  return {
-    id,
-    dbId: 'synthetic-database',
-    title,
-    authors: [],
-    publicationType: 'Academic Journal',
-    database: 'EBSCO Discovery Service',
-    pLink: `https://example.test/${id}`,
-    hasFullText: false,
-  };
+function makeResult(id: string, title: string): CitationSearchResult & { id: string } {
+  return { id, title };
 }
 
 describe('prepareCitationBatchSearches', () => {
   it('turns a multiline citation paste into per-citation field queries', () => {
-    const searches = prepareCitationBatchSearches(`Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28
+    const searches = prepareCitationBatchSearches(`Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (June 2014): 5-28
 
-Słupińska, K., Duda, J., & Biercewicz, K. (2021). Planning an experiment in a
-virtual environment reality as a place of research on human behaviour using
-methods of neuroscience measurement – bibliometric analysis and methodological
-approach. Procedia Computer Science, 192, 3123–3133.
-https://doi.org/10.1016/j.procs.2021.09.085`);
+Test Author A., Sample Author B., & Example Author C. (2021). Planning a synthetic study using example
+research methods. Example Computer Journal, 192, 3123–3133.
+https://doi.org/10.1234/example.2021.0001`);
 
     expect(searches).toHaveLength(2);
 
     expect(searches[0]).toMatchObject({
       rawCitation:
-        'Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28',
+        'Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (June 2014): 5-28',
       builtQuery:
-        'AU (Melanie Newton) AND TI (The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean) AND SO (Caribbean Quarterly)',
+        'AU (Test Author) AND TI (A Synthetic Citation Parsing Title) AND SO (Example Journal)',
     });
 
     expect(searches[1]).toMatchObject({
       rawCitation:
-        'Słupińska, K., Duda, J., & Biercewicz, K. (2021). Planning an experiment in a virtual environment reality as a place of research on human behaviour using methods of neuroscience measurement – bibliometric analysis and methodological approach. Procedia Computer Science, 192, 3123–3133. https://doi.org/10.1016/j.procs.2021.09.085',
+        'Test Author A., Sample Author B., & Example Author C. (2021). Planning a synthetic study using example research methods. Example Computer Journal, 192, 3123–3133. https://doi.org/10.1234/example.2021.0001',
       builtQuery:
-        'TI (Planning an experiment in a virtual environment reality as a place of research on human behaviour using methods of neuroscience measurement – bibliometric analysis and methodological approach) AND SO (Procedia Computer Science)',
+        'TI (Planning a synthetic study using example research methods) AND SO (Example Computer Journal)',
     });
 
     expect(searches[1].fieldQueries.map((query) => query.field)).toEqual(['TI', 'SO']);
@@ -52,42 +41,42 @@ https://doi.org/10.1016/j.procs.2021.09.085`);
 
   it('builds a title-plus-source query for slash-style edited book citations', () => {
     const [search] = prepareCitationBatchSearches(
-      'Vascular Mechanisms in CNS Trauma / edited by Eng H. Lo, Josephine Lok, MingMing Ning, Michael J. Whalen (1st ed. 2014.). Springer New York'
+      'Synthetic Research Topics / edited by Example Editor A., Sample Editor B., and Test Editor C. (1st ed. 2014.). Example Press New York'
     );
 
     expect(search).toMatchObject({
       rawCitation:
-        'Vascular Mechanisms in CNS Trauma / edited by Eng H. Lo, Josephine Lok, MingMing Ning, Michael J. Whalen (1st ed. 2014.). Springer New York',
-      builtQuery: 'TI (Vascular Mechanisms in CNS Trauma) AND SO (Springer New York)',
+        'Synthetic Research Topics / edited by Example Editor A., Sample Editor B., and Test Editor C. (1st ed. 2014.). Example Press New York',
+      builtQuery: 'TI (Synthetic Research Topics) AND SO (Example Press New York)',
     });
 
     expect(search.fieldQueries).toEqual([
-      { field: 'TI', term: 'Vascular Mechanisms in CNS Trauma', boolean: undefined },
-      { field: 'SO', term: 'Springer New York', boolean: 'AND' },
+      { field: 'TI', term: 'Synthetic Research Topics', boolean: undefined },
+      { field: 'SO', term: 'Example Press New York', boolean: 'AND' },
     ]);
   });
 
   it('drops the author-year preface when a citation title is a slash-style edited book', () => {
     const [search] = prepareCitationBatchSearches(
-      'Lo, E. H., Lok, J., Ning, M., Whalen, M. J., & SpringerLink (Online service). (2014). Vascular Mechanisms in CNS Trauma / edited by Eng H. Lo, Josephine Lok, MingMing Ning, Michael J. Whalen (1st ed. 2014.). Springer New York.'
+      'Example, A., Sample, B., Test, C., and Demo Catalog (online service). (2014). Synthetic Research Topics / edited by Example Editor A., Sample Editor B., and Test Editor C. (1st ed. 2014.). Example Press New York.'
     );
 
     expect(search).toMatchObject({
       rawCitation:
-        'Lo, E. H., Lok, J., Ning, M., Whalen, M. J., & SpringerLink (Online service). (2014). Vascular Mechanisms in CNS Trauma / edited by Eng H. Lo, Josephine Lok, MingMing Ning, Michael J. Whalen (1st ed. 2014.). Springer New York.',
-      builtQuery: 'TI (Vascular Mechanisms in CNS Trauma) AND SO (Springer New York)',
+        'Example, A., Sample, B., Test, C., and Demo Catalog (online service). (2014). Synthetic Research Topics / edited by Example Editor A., Sample Editor B., and Test Editor C. (1st ed. 2014.). Example Press New York.',
+      builtQuery: 'TI (Synthetic Research Topics) AND SO (Example Press New York)',
     });
 
     expect(search.fieldQueries).toEqual([
-      { field: 'TI', term: 'Vascular Mechanisms in CNS Trauma', boolean: undefined },
-      { field: 'SO', term: 'Springer New York', boolean: 'AND' },
+      { field: 'TI', term: 'Synthetic Research Topics', boolean: undefined },
+      { field: 'SO', term: 'Example Press New York', boolean: 'AND' },
     ]);
   });
 });
 
 describe('prepareCitationSearches', () => {
   it('prepares the edited citation lines directly without running extraction again', () => {
-    const editedCitation = 'Newton, M. (2014). A newly edited title. Caribbean Quarterly, 60(2), 5-28.';
+    const editedCitation = 'Example, A. (2014). A newly edited synthetic title. Example Journal, 60(2), 5-28.';
 
     expect(prepareCitationSearches([editedCitation])[0]).toMatchObject({
       id: 'citation-1', rawCitation: editedCitation,
@@ -97,14 +86,14 @@ describe('prepareCitationSearches', () => {
 
 describe('executeCitationBatchSearch', () => {
   it('returns grouped results for each prepared citation and preserves order', async () => {
-    const searches = prepareCitationBatchSearches(`Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28
+    const searches = prepareCitationBatchSearches(`Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (June 2014): 5-28
 
-Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
+Sample Author, “A Synthetic Research Topic,” Example Social Journal 22, 2 (2004): 117-139.`);
 
     const searchFn = vi
       .fn<
-        (query: string | FieldQuery[]) => Promise<{
-          results: DiscoverySearchResult[];
+        (query: string | CitationFieldQuery[]) => Promise<{
+          results: CitationSearchResult[];
           totalHits: number;
           searchTime: number;
           queryString: string;
@@ -138,14 +127,14 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
   });
 
   it('captures per-citation errors instead of aborting the whole batch', async () => {
-    const searches = prepareCitationBatchSearches(`Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28
+    const searches = prepareCitationBatchSearches(`Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (June 2014): 5-28
 
-Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
+Sample Author, “A Synthetic Research Topic,” Example Social Journal 22, 2 (2004): 117-139.`);
 
     const searchFn = vi
       .fn<
-        (query: string | FieldQuery[]) => Promise<{
-          results: DiscoverySearchResult[];
+        (query: string | CitationFieldQuery[]) => Promise<{
+          results: CitationSearchResult[];
           totalHits: number;
           searchTime: number;
           queryString: string;
@@ -173,13 +162,13 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
 
   it('limits concurrency to three, backs off after 429, keeps citation order, and continues', async () => {
     const citationPaste = Array.from({ length: 5 }, (_, index) =>
-      `Smith, A. (2020). Synthetic title ${index + 1}. Journal of Synthetic Studies, 1(2), 1-5.`
+      `Example Author (2020). Synthetic title ${index + 1}. Journal of Synthetic Studies, 1(2), 1-5.`
     ).join('\n\n');
     const searches = prepareCitationBatchSearches(citationPaste);
     const attempts = new Map<string, number>();
     let activeSearches = 0;
     let maximumConcurrent = 0;
-    const searchFn = vi.fn(async (query: string | FieldQuery[]) => {
+    const searchFn = vi.fn(async (query: string | CitationFieldQuery[]) => {
       const title = Array.isArray(query) ? query.find((part) => part.field === 'TI')?.term || '' : query;
       const attempt = attempts.get(title) || 0;
       attempts.set(title, attempt + 1);
@@ -213,9 +202,9 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
   });
 
   it('keeps a friendly failure reference with the affected citation and searches the rest', async () => {
-    const searches = prepareCitationBatchSearches(`Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenous Exile from the Caribbean,” Caribbean Quarterly 60, 2 (June 2014): 5-28
+    const searches = prepareCitationBatchSearches(`Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (June 2014): 5-28
 
-Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
+Sample Author, “A Synthetic Research Topic,” Example Social Journal 22, 2 (2004): 117-139.`);
     const searchFn = vi.fn()
       .mockRejectedValueOnce(new Error('Library search is temporarily unavailable. Please try again later, or add the item by citation.\nReference: 7F3K2Q'))
       .mockResolvedValueOnce({ results: [makeResult('2', 'Second result')], totalHits: 1, searchTime: 1, queryString: 'second', appliedLimiters: [] });
@@ -228,13 +217,13 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
 
   it('falls back from author-title-source to title-source to DOI to title-only when needed', async () => {
     const [search] = prepareCitationBatchSearches(
-      'Feng, Z. (2025). Electrical Brain Stimulation: Mechanisms and Modulation of Neuronal Activity. Springer Nature. https://doi.org/10.1007/978-981-95-4145-4'
+      'Example, Author (2025). Synthetic Neural Activity Research Methods. Example Press. https://doi.org/10.1234/test.neural.2025'
     );
 
     const searchFn = vi
       .fn<
-        (query: string | FieldQuery[]) => Promise<{
-          results: DiscoverySearchResult[];
+        (query: string | CitationFieldQuery[]) => Promise<{
+          results: CitationSearchResult[];
           totalHits: number;
           searchTime: number;
           queryString: string;
@@ -256,14 +245,14 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
         appliedLimiters: [],
       })
       .mockResolvedValueOnce({
-        results: [makeResult('feng-doi', 'Electrical Brain Stimulation via DOI')],
+        results: [makeResult('example-doi', 'Synthetic Neural Activity Research via DOI')],
         totalHits: 1,
         searchTime: 6,
         queryString: 'doi-match',
         appliedLimiters: [],
       })
       .mockResolvedValueOnce({
-        results: [makeResult('feng-1', 'Electrical Brain Stimulation')],
+        results: [makeResult('example-1', 'Synthetic Neural Activity Research')],
         totalHits: 1,
         searchTime: 5,
         queryString: 'title-only',
@@ -274,23 +263,23 @@ Sarah Ahmed, “Affective Economies,” Social Text 22, 2 (2004): 117-139.`);
 
     expect(searchFn).toHaveBeenCalledTimes(3);
     expect(searchFn).toHaveBeenNthCalledWith(1, [
-      { field: 'AU', term: 'Feng, Z.' },
-      { field: 'TI', term: 'Electrical Brain Stimulation: Mechanisms and Modulation of Neuronal Activity', boolean: 'AND' },
-      { field: 'SO', term: 'Springer Nature', boolean: 'AND' },
+      { field: 'AU', term: 'Example, Author' },
+      { field: 'TI', term: 'Synthetic Neural Activity Research Methods', boolean: 'AND' },
+      { field: 'SO', term: 'Example Press', boolean: 'AND' },
     ], 1, undefined, undefined, undefined);
     expect(searchFn).toHaveBeenNthCalledWith(2, [
-      { field: 'TI', term: 'Electrical Brain Stimulation: Mechanisms and Modulation of Neuronal Activity' },
-      { field: 'SO', term: 'Springer Nature', boolean: 'AND' },
+      { field: 'TI', term: 'Synthetic Neural Activity Research Methods' },
+      { field: 'SO', term: 'Example Press', boolean: 'AND' },
     ], 1, undefined, undefined, undefined);
-    expect(searchFn).toHaveBeenNthCalledWith(3, '10.1007/978-981-95-4145-4', 1, undefined, undefined, undefined);
+    expect(searchFn).toHaveBeenNthCalledWith(3, '10.1234/test.neural.2025', 1, undefined, undefined, undefined);
     expect(group.results).toHaveLength(1);
     expect(group.totalHits).toBe(1);
-    expect(group.results[0].title).toBe('Electrical Brain Stimulation via DOI');
-    expect(group.matchedQuery).toBe('DOI (10.1007/978-981-95-4145-4)');
+    expect(group.results[0].title).toBe('Synthetic Neural Activity Research via DOI');
+    expect(group.matchedQuery).toBe('DOI (10.1234/test.neural.2025)');
     expect(group.attemptedQueries).toEqual([
-      'AU (Feng, Z.) AND TI (Electrical Brain Stimulation: Mechanisms and Modulation of Neuronal Activity) AND SO (Springer Nature)',
-      'TI (Electrical Brain Stimulation: Mechanisms and Modulation of Neuronal Activity) AND SO (Springer Nature)',
-      'DOI (10.1007/978-981-95-4145-4)',
+      'AU (Example, Author) AND TI (Synthetic Neural Activity Research Methods) AND SO (Example Press)',
+      'TI (Synthetic Neural Activity Research Methods) AND SO (Example Press)',
+      'DOI (10.1234/test.neural.2025)',
     ]);
   });
 });

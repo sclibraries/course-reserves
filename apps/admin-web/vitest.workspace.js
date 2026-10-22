@@ -24,6 +24,12 @@ export default defineWorkspace([
     resolve: {
       alias: {
         '@': path.resolve(dirname, './src'),
+        '@course-reserves/citations': path.resolve(dirname, '../../packages/citations/src'),
+      },
+    },
+    server: {
+      fs: {
+        allow: [path.resolve(dirname, './'), path.resolve(dirname, '../../packages/citations')],
       },
     },
     // Override PostCSS so Vite doesn't load postcss.config.js. postcss-import

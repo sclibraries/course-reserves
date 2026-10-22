@@ -71,6 +71,7 @@ services:
     volumes:
       # Mount only the admin-web app (not the entire monorepo root)
       - ./apps/admin-web:/app:cached
+      - ./packages/citations:/packages/citations:ro
       # Prevent host node_modules from overriding container's
       - /app/node_modules
     environment:
@@ -94,6 +95,7 @@ services:
     command: sh -c "npm ci --workspaces=false && npm run dev -- --host 0.0.0.0 --port 5174 --mode docker"
     volumes:
       - ./apps/faculty-form:/app:cached
+      - ./packages/citations:/packages/citations:ro
       - /app/node_modules
     environment:
       - NODE_ENV=development
