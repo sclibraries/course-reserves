@@ -13,7 +13,7 @@ import {
 import { Input } from '../../../../ui/input';
 import { Label } from '../../../../ui/label';
 import LinkingComparison from './LinkingComparison';
-import RequiredReasonForm from './RequiredReasonForm';
+import RequiredReasonForm from '../RequiredReasonForm';
 
 function ChangeLinkedCourseDialog({ open, onOpenChange, submission, linking, returnFocusRef }) {
   const { clearError } = linking;

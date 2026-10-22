@@ -42,11 +42,10 @@ describe('useSwitchFlow', () => {
     expect(clearItemError).toHaveBeenCalledTimes(1);
 
     await act(async () => hook.current.setSelectedFlow('3'));
-    await act(async () => hook.current.submitSwitchFlow());
+    await act(async () => hook.current.submitSwitchFlow('   '));
     expect(mocks.switchFlow).not.toHaveBeenCalled();
 
-    await act(async () => hook.current.setReason('Use the article process'));
-    await act(async () => hook.current.submitSwitchFlow());
+    await act(async () => hook.current.submitSwitchFlow('  Use the article process  '));
     expect(mocks.switchFlow).toHaveBeenCalledWith('reuse', 99907812, {
       flow_id: 3, reason: 'Use the article process',
     });

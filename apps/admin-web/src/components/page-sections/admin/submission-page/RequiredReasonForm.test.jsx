@@ -8,7 +8,7 @@ import RequiredReasonForm from './RequiredReasonForm';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-function Harness({ onConfirm }) {
+function Harness({ onConfirm, showReason }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -22,19 +22,20 @@ function Harness({ onConfirm }) {
         reasonLabel="Reason (required)"
         helpText="This reason is recorded in the activity history."
         submitLabel="Confirm reason"
+        showReason={showReason}
       />
       {!open && <button type="button" onClick={() => setOpen(true)}>Reopen reason form</button>}
     </main>
   );
 }
 
-Harness.propTypes = { onConfirm: PropTypes.func.isRequired };
+Harness.propTypes = { onConfirm: PropTypes.func.isRequired, showReason: PropTypes.bool };
 
-async function renderForm(onConfirm) {
+async function renderForm(onConfirm, showReason = true) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  await act(async () => root.render(<Harness onConfirm={onConfirm} />));
+  await act(async () => root.render(<Harness onConfirm={onConfirm} showReason={showReason} />));
   return () => {
     act(() => root.unmount());
     container.remove();
@@ -69,6 +70,13 @@ describe('RequiredReasonForm', () => {
     expect(onConfirm).toHaveBeenCalledWith('Approved reason');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Reopen reason form' })));
     expect(screen.getByRole('textbox', { name: 'Reason (required)' }).value).toBe('');
+    unmount();
+  });
+
+  it('can hide the reason field while its child controls are loading', async () => {
+    const unmount = await renderForm(vi.fn(), false);
+
+    expect(screen.queryByRole('textbox', { name: 'Reason (required)' })).toBeNull();
     unmount();
   });
 });

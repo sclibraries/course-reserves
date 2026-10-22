@@ -1,15 +1,8 @@
 import PropTypes from 'prop-types';
-import { Button } from '../../../../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/dialog';
-import { Label } from '../../../../ui/label';
-import { Textarea } from '../../../../ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../../ui/dialog';
+import RequiredReasonForm from '../RequiredReasonForm';
 
 function TakeoverDialog({ claims, title }) {
-  const submit = (event) => {
-    event.preventDefault();
-    claims.submitTakeover();
-  };
-
   return (
     <Dialog open={claims.takeoverOpen} onOpenChange={(open) => { if (!open) claims.closeTakeover(); }}>
       <DialogContent>
@@ -17,22 +10,17 @@ function TakeoverDialog({ claims, title }) {
           <DialogTitle>Take over {title}</DialogTitle>
           <DialogDescription>Enter a reason so the current assignee can see why you took over this item.</DialogDescription>
         </DialogHeader>
-        <form className="tw-space-y-4" onSubmit={submit}>
-          <div className="tw-space-y-2">
-            <Label htmlFor="takeover-reason">Reason for taking over (required)</Label>
-            <Textarea
-              id="takeover-reason"
-              value={claims.takeoverReason}
-              onChange={(event) => claims.setTakeoverReason(event.target.value)}
-              required
-            />
-          </div>
-          {claims.error && <p className="tw-text-sm tw-text-destructive" role="alert">{claims.error}</p>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={claims.closeTakeover}>Cancel</Button>
-            <Button type="submit" disabled={claims.pending || !claims.takeoverReason.trim()}>Take over item</Button>
-          </DialogFooter>
-        </form>
+        <RequiredReasonForm
+          open={claims.takeoverOpen}
+          onCancel={claims.closeTakeover}
+          onSuccess={claims.closeTakeover}
+          onConfirm={claims.submitTakeover}
+          saving={claims.pending}
+          reasonId="takeover-reason"
+          reasonLabel="Reason for taking over (required)"
+          error={claims.error}
+          submitLabel="Take over item"
+        />
       </DialogContent>
     </Dialog>
   );

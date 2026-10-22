@@ -13,14 +13,12 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
   const [loading, setLoading] = useState(false);
   const [flows, setFlows] = useState([]);
   const [selectedFlow, setSelectedFlow] = useState('');
-  const [reason, setReason] = useState('');
   const { pending, error, setError, run } = useMutation(getFlowErrorMessage);
 
   const clearError = useCallback(() => setError(''), [setError]);
   const closeSwitchFlow = useCallback(() => {
     setOpen(false);
     setSelectedFlow('');
-    setReason('');
     clearError();
   }, [clearError]);
 
@@ -41,8 +39,9 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
     }
   }, [clearItemError, flows.length, loading, setError]);
 
-  const submitSwitchFlow = useCallback(async () => {
-    if (!selectedFlow || !reason.trim() || !canAct) return false;
+  const submitSwitchFlow = useCallback(async (reasonValue) => {
+    const reason = reasonValue.trim();
+    if (!selectedFlow || !reason || !canAct) return false;
 
     const result = await run(() => workflowFlowsApi.switchFlow(item.kind, item.id, {
         flow_id: parseFlowId(selectedFlow),
@@ -52,15 +51,14 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
       onSuccess: (flow) => {
         onFlowStateChange?.(flow);
         setOpen(false);
-        setReason('');
       },
     });
     return result !== null;
-  }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, reason, run, selectedFlow]);
+  }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, run, selectedFlow]);
 
   return {
-    open, loading, flows, selectedFlow, reason, pending, error, canAct,
-    openSwitchFlow, closeSwitchFlow, setSelectedFlow, setReason, submitSwitchFlow, clearError,
+    open, loading, flows, selectedFlow, pending, error, canAct,
+    openSwitchFlow, closeSwitchFlow, setSelectedFlow, submitSwitchFlow, clearError,
   };
 }
 

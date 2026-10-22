@@ -14,7 +14,6 @@ function useItemClaimActions({ item, currentUsername, onChanged }) {
   const [toUsername, setToUsername] = useState('');
   const [toGroupId, setToGroupId] = useState('');
   const [takeoverOpen, setTakeoverOpen] = useState(false);
-  const [takeoverReason, setTakeoverReason] = useState('');
   const isClaimed = Boolean(item.claimed_by);
   const isMine = Boolean(currentUsername && item.claimed_by === currentUsername);
 
@@ -53,20 +52,17 @@ function useItemClaimActions({ item, currentUsername, onChanged }) {
     if (await runAction('handoff', () => claimsApi.handoffItem(item.kind, item.id, body))) setHandoffOpen(false);
   };
 
-  const submitTakeover = async () => {
-    const reason = takeoverReason.trim();
-    if (!reason) return;
-    if (await runAction('takeover', () => claimsApi.takeoverItem(item.kind, item.id, { reason }))) {
-      setTakeoverOpen(false);
-      setTakeoverReason('');
-    }
+  const submitTakeover = async (reasonValue) => {
+    const reason = reasonValue.trim();
+    if (!reason) return false;
+    return Boolean(await runAction('takeover', () => claimsApi.takeoverItem(item.kind, item.id, { reason })));
   };
 
   return {
     pending, error, isClaimed, isMine,
     staff, groups,
     handoffOpen, handoffTargetType, toUsername, toGroupId,
-    takeoverOpen, takeoverReason,
+    takeoverOpen,
     claim: () => runAction('claim', () => claimsApi.claimItem(item.kind, item.id)),
     release: () => runAction('release', () => claimsApi.releaseItem(item.kind, item.id)),
     openHandoff,
@@ -77,7 +73,6 @@ function useItemClaimActions({ item, currentUsername, onChanged }) {
     submitHandoff,
     openTakeover: () => { setError(''); setTakeoverOpen(true); },
     closeTakeover: () => setTakeoverOpen(false),
-    setTakeoverReason,
     submitTakeover,
   };
 }

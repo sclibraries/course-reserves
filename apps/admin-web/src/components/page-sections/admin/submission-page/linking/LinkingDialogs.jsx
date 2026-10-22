@@ -10,7 +10,7 @@ import {
 } from '../../../../ui/dialog';
 import { Input } from '../../../../ui/input';
 import { Label } from '../../../../ui/label';
-import RequiredReasonForm from './RequiredReasonForm';
+import RequiredReasonForm from '../RequiredReasonForm';
 
 function MismatchLinkDialog({ open, onOpenChange, candidate, error, saving, onConfirm, returnFocusRef }) {
   const candidateName = candidate?.courses?.map((course) => course.name || course.courseNumber).filter(Boolean).join(' / ');
