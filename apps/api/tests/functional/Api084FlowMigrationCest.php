@@ -6,8 +6,6 @@ use PHPUnit\Framework\Assert;
 class Api084FlowMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000003_add_staff_workflow_flows';
-    private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
-    private $api094MigrationVersion = 'm261022_000001_create_submission_syllabi';
 
     public function alwaysSeedsPrintBookAndMapsBookCaseInsensitively(FunctionalTester $I)
     {
@@ -15,77 +13,54 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
         $originalTypes = $db->createCommand(
             'SELECT material_type_id, name, description, created_at FROM material_types ORDER BY material_type_id'
         )->queryAll();
-        $migrationIsDown = false;
-        $api086MigrationIsDown = false;
-        $api094MigrationIsDown = false;
+        Assert::assertSame(1, (int)$db->createCommand(
+            'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+            [':version' => $this->migrationVersion]
+        )->queryScalar());
 
-        try {
-            Assert::assertSame(1, (int)$db->createCommand(
-                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
-                [':version' => $this->migrationVersion]
-            )->queryScalar());
-            Assert::assertSame(1, (int)$db->createCommand(
-                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
-                [':version' => $this->api086MigrationVersion]
-            )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
-            Assert::assertSame(1, (int)$db->createCommand(
-                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
-                [':version' => $this->api094MigrationVersion]
-            )->queryScalar(), 'API-094 migration must be applied by test-stack setup.');
-
-            $this->runMigration('down');
-            $api094MigrationIsDown = true;
-            $this->runMigration('down');
-            $api086MigrationIsDown = true;
-            $this->runMigration('down');
+        MigrationRollback::withTargetDown($this->migrationVersion, function () use ($db, $originalTypes) {
             $migrationIsDown = true;
-            $this->replaceMaterialTypes([]);
+            try {
+                $this->replaceMaterialTypes([]);
+                MigrationRollback::migrate('up');
+                $migrationIsDown = false;
+                $flow = $this->printBookFlow();
+                Assert::assertNotEmpty($flow, 'Migration must always seed the Print book flow.');
+                Assert::assertSame(1, (int)$db->createCommand(
+                    'SELECT COUNT(*) FROM flow_versions WHERE flow_id = :flow_id',
+                    [':flow_id' => $flow['id']]
+                )->queryScalar());
+                Assert::assertSame(0, (int)$db->createCommand(
+                    'SELECT COUNT(*) FROM material_type_flows'
+                )->queryScalar(), 'A schema without material types must have no flow mappings.');
 
-            $this->runMigration('up');
-            $migrationIsDown = false;
-            $flow = $this->printBookFlow();
-            Assert::assertNotEmpty($flow, 'Migration must always seed the Print book flow.');
-            Assert::assertSame(1, (int)$db->createCommand(
-                'SELECT COUNT(*) FROM flow_versions WHERE flow_id = :flow_id',
-                [':flow_id' => $flow['id']]
-            )->queryScalar());
-            Assert::assertSame(0, (int)$db->createCommand(
-                'SELECT COUNT(*) FROM material_type_flows'
-            )->queryScalar(), 'A schema without material types must have no flow mappings.');
+                MigrationRollback::migrate('down');
+                $migrationIsDown = true;
+                $this->replaceMaterialTypes([[
+                    'material_type_id' => 0,
+                    'name' => 'Book',
+                    'description' => 'Synthetic API-084-fr1 case-insensitive migration fixture.',
+                    'created_at' => null,
+                ]]);
 
-            $this->runMigration('down');
-            $migrationIsDown = true;
-            $this->replaceMaterialTypes([[
-                'material_type_id' => 0,
-                'name' => 'Book',
-                'description' => 'Synthetic API-084-fr1 case-insensitive migration fixture.',
-                'created_at' => null,
-            ]]);
-
-            $this->runMigration('up');
-            $migrationIsDown = false;
-            $flow = $this->printBookFlow();
-            $bookId = $db->createCommand(
-                'SELECT material_type_id FROM material_types WHERE name = :name LIMIT 1', [':name' => 'Book']
-            )->queryScalar();
-            Assert::assertSame((int)$flow['id'], (int)$db->createCommand(
-                'SELECT flow_id FROM material_type_flows WHERE material_type_id = :type_id',
-                [':type_id' => $bookId]
-            )->queryScalar(), 'Migration must map a material type named Book.');
-        } finally {
-            if (!$migrationIsDown) {
-                $this->runMigration('down');
+                MigrationRollback::migrate('up');
+                $migrationIsDown = false;
+                $flow = $this->printBookFlow();
+                $bookId = $db->createCommand(
+                    'SELECT material_type_id FROM material_types WHERE name = :name LIMIT 1', [':name' => 'Book']
+                )->queryScalar();
+                Assert::assertSame((int)$flow['id'], (int)$db->createCommand(
+                    'SELECT flow_id FROM material_type_flows WHERE material_type_id = :type_id',
+                    [':type_id' => $bookId]
+                )->queryScalar(), 'Migration must map a material type named Book.');
+            } finally {
+                if (!$migrationIsDown) {
+                    MigrationRollback::migrate('down');
+                }
+                $this->replaceMaterialTypes($originalTypes);
+                MigrationRollback::migrate('up');
             }
-            $this->replaceMaterialTypes($originalTypes);
-            $this->runMigration('up');
-            if ($api086MigrationIsDown) {
-                $this->runMigration('up');
-                $db->schema->refreshTableSchema('faculty_submissions');
-            }
-            if ($api094MigrationIsDown) {
-                $this->runMigration('up');
-            }
-        }
+        });
     }
 
     private function printBookFlow()
@@ -117,21 +92,5 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
         } finally {
             $db->createCommand('SET FOREIGN_KEY_CHECKS = 1')->execute();
         }
-    }
-
-    private function runMigration($direction)
-    {
-        $db = \Yii::$app->db;
-        if ($db->isActive) {
-            $transaction = $db->getTransaction();
-            if ($transaction !== null && $transaction->isActive) {
-                $transaction->commit();
-            }
-            $db->close();
-        }
-        $output = [];
-        $status = 0;
-        exec('cd /app && php yii migrate/' . $direction . ' 1 --interactive=0 2>&1', $output, $status);
-        Assert::assertSame(0, $status, implode("\n", $output));
     }
 }

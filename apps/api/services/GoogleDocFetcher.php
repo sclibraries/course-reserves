@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use yii\httpclient\Client;
+
 /** Fetches a Google Doc text export while validating each redirect before requesting it. */
 class GoogleDocFetcher implements GoogleDocFetcherInterface
 {
@@ -23,7 +25,7 @@ class GoogleDocFetcher implements GoogleDocFetcherInterface
         }
 
         $url = GoogleDocUrl::exportUrl($this->baseUrl, $documentId);
-        if (!$this->isInitialUrl($url)) {
+        if (!GoogleDocUrl::isSafeUrl($url, ['docs.google.com'])) {
             return $this->failure('invalid_base_url');
         }
 
@@ -64,92 +66,108 @@ class GoogleDocFetcher implements GoogleDocFetcherInterface
 
     public static function isAllowedRedirectUrl($url)
     {
-        $parts = parse_url($url);
-        if (!$parts || strtolower($parts['scheme'] ?? '') !== 'https' ||
-            isset($parts['user']) || isset($parts['pass']) ||
-            (isset($parts['port']) && (int)$parts['port'] !== 443)) {
-            return false;
-        }
-
-        $host = strtolower($parts['host'] ?? '');
-        return $host === 'docs.google.com' || preg_match('/\.googleusercontent\.com$/', $host) === 1;
-    }
-
-    private function isInitialUrl($url)
-    {
-        $parts = parse_url($url);
-        return $parts && strtolower($parts['scheme'] ?? '') === 'https' &&
-            strtolower($parts['host'] ?? '') === 'docs.google.com' &&
-            !isset($parts['user']) && !isset($parts['pass']) &&
-            (!isset($parts['port']) || (int)$parts['port'] === 443);
+        return GoogleDocUrl::isSafeUrl($url, function ($host) {
+            return $host === 'docs.google.com' || preg_match('/\.googleusercontent\.com$/', $host) === 1;
+        });
     }
 
     private function resolveUrl($currentUrl, $location)
     {
         $location = trim((string)$location);
-        if (preg_match('#^https?://#i', $location)) {
+        $reference = parse_url($location);
+        if ($reference === false) {
+            return '';
+        }
+        if (isset($reference['scheme'])) {
             return $location;
         }
         $current = parse_url($currentUrl);
-        $origin = 'https://' . $current['host'] .
+        if (isset($reference['host'])) {
+            return $current['scheme'] . ':' . $location;
+        }
+        $path = $reference['path'] ?? '';
+        if ($path === '') {
+            $path = $current['path'] ?? '/';
+            $query = array_key_exists('query', $reference) ? $reference['query'] : ($current['query'] ?? null);
+        } else {
+            if (substr($path, 0, 1) !== '/') {
+                $currentPath = $current['path'] ?? '/';
+                $path = substr($currentPath, 0, strrpos($currentPath, '/') + 1) . $path;
+            }
+            $path = $this->removeDotSegments($path);
+            $query = $reference['query'] ?? null;
+        }
+        $origin = $current['scheme'] . '://' . $current['host'] .
             (isset($current['port']) ? ':' . $current['port'] : '');
-        if (substr($location, 0, 2) === '//') {
-            return 'https:' . $location;
+        return $origin . $path . ($query === null ? '' : '?' . $query) .
+            (isset($reference['fragment']) ? '#' . $reference['fragment'] : '');
+    }
+
+    private function removeDotSegments($path)
+    {
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($segments);
+            } else {
+                $segments[] = $segment;
+            }
         }
-        if (substr($location, 0, 1) === '/') {
-            return $origin . $location;
-        }
-        $path = $current['path'] ?? '/';
-        $directory = substr($path, 0, strrpos($path, '/') + 1);
-        return $origin . $directory . $location;
+        $normalized = '/' . implode('/', $segments);
+        return substr($path, -1) === '/' || substr($path, -2) === '/.' || substr($path, -3) === '/..'
+            ? rtrim($normalized, '/') . '/'
+            : $normalized;
     }
 
     private function normalizeHeaders(array $headers)
     {
         $normalized = [];
         foreach ($headers as $name => $value) {
-            $normalized[strtolower($name)] = $value;
+            $normalized[strtolower($name)] = is_array($value) ? end($value) : $value;
         }
         return $normalized;
     }
 
     private function sendRequest($url, $timeout)
     {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
+        $body = '';
+        $bodyExceededLimit = false;
+        $maxBytes = SyllabusUploadValidator::MAX_EXTRACTED_TEXT_BYTES + 1;
+        $request = (new Client(['transport' => 'yii\\httpclient\\CurlTransport']))
+            ->createRequest()
+            ->setMethod('GET')
+            ->setUrl($url)
+            ->setOptions([
                 'timeout' => $timeout,
-                'follow_location' => 0,
-                'ignore_errors' => true,
-                'header' => "Accept: text/plain\r\n",
-            ],
-        ]);
-        $body = @file_get_contents(
-            $url,
-            false,
-            $context,
-            0,
-            SyllabusUploadValidator::MAX_EXTRACTED_TEXT_BYTES + 1
-        );
-        $lastError = $body === false ? error_get_last() : null;
-        $responseHeaders = $http_response_header ?? [];
-        $status = 0;
-        $headers = [];
-        foreach ($responseHeaders as $header) {
-            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $match)) {
-                $status = (int)$match[1];
-                $headers = [];
-            } elseif (strpos($header, ':') !== false) {
-                list($name, $value) = explode(':', $header, 2);
-                $headers[strtolower(trim($name))] = trim($value);
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_WRITEFUNCTION => function ($resource, $chunk) use (&$body, &$bodyExceededLimit, $maxBytes) {
+                    $remaining = $maxBytes - strlen($body);
+                    if (strlen($chunk) > $remaining) {
+                        $body .= substr($chunk, 0, $remaining);
+                        $bodyExceededLimit = true;
+                        return 0;
+                    }
+                    $body .= $chunk;
+                    return strlen($chunk);
+                },
+            ])
+            ->addHeaders(['Accept' => 'text/plain']);
+        try {
+            $response = $request->send();
+        } catch (\yii\httpclient\Exception $error) {
+            if ($bodyExceededLimit) {
+                return ['status' => 0, 'headers' => [], 'body' => '', 'error' => 'body_too_large'];
             }
+            throw $error;
         }
         return [
-            'status' => $status,
-            'headers' => $headers,
-            'body' => $body === false ? '' : $body,
-            'error' => $body === false ? 'request_failed' : null,
-            'detail' => $lastError['message'] ?? null,
+            'status' => (int)$response->getStatusCode(),
+            'headers' => $response->getHeaders()->toArray(),
+            'body' => $body,
+            'error' => null,
         ];
     }
 

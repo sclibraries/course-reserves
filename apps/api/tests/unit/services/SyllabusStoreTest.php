@@ -26,6 +26,29 @@ class SyllabusStoreTest extends Unit
         }
     }
 
+    public function testSafeUrlPolicyChecksSchemeHostCredentialsAndPort()
+    {
+        $this->assertTrue(GoogleDocUrl::isSafeUrl(
+            'https://docs.google.com/document/d/example',
+            ['docs.google.com']
+        ));
+        $this->assertTrue(GoogleDocUrl::isSafeUrl(
+            'https://doc-123.googleusercontent.com/export',
+            function ($host) {
+                return preg_match('/\\.googleusercontent\\.com$/', $host) === 1;
+            }
+        ));
+
+        foreach ([
+            'http://docs.google.com/document/d/example',
+            'https://user@docs.google.com/document/d/example',
+            'https://docs.google.com:444/document/d/example',
+            'https://attacker.example/document/d/example',
+        ] as $unsafeUrl) {
+            $this->assertFalse(GoogleDocUrl::isSafeUrl($unsafeUrl, ['docs.google.com']), $unsafeUrl);
+        }
+    }
+
     public function testUploadTypeIsDeterminedFromBytesAndExtractedTextIsBounded()
     {
         $this->assertTrue(class_exists(SyllabusUploadValidator::class), 'SyllabusUploadValidator checks content bytes.');
@@ -158,6 +181,24 @@ class SyllabusStoreTest extends Unit
         $this->assertCount(2, $requests);
     }
 
+    public function testRelativeRedirectIsResolvedBeforeHostValidation()
+    {
+        $requests = [];
+        $responses = [
+            ['status' => 302, 'headers' => ['location' => '../download'], 'body' => ''],
+            ['status' => 200, 'headers' => ['content-type' => 'text/plain'], 'body' => 'Synthetic export'],
+        ];
+        $fetcher = new GoogleDocFetcher('https://docs.google.com', function ($url, $timeout) use (&$requests, &$responses) {
+            $requests[] = $url;
+            return array_shift($responses);
+        });
+
+        $result = $fetcher->fetch('Abcdefghijklmnopqrstuvwxyz_1234567890');
+
+        $this->assertSame('Synthetic export', $result['body']);
+        $this->assertSame('https://docs.google.com/document/d/download', $requests[1]);
+    }
+
     public function testFetcherStopsAfterThreeRedirects()
     {
         $requests = [];
@@ -186,6 +227,21 @@ class SyllabusStoreTest extends Unit
         try {
             $store->googleDocText('https://docs.google.com/document/d/Abcdefghijklmnopqrstuvwxyz_1234567890/edit');
             $this->fail('Google Doc text over one megabyte must be rejected.');
+        } catch (SyllabusException $error) {
+            $this->assertSame('syllabus_text_too_large', $error->getErrorCode());
+        }
+    }
+
+    public function testTransportBodyLimitMapsToTheTextSizeError()
+    {
+        $fetcher = new GoogleDocFetcher('https://docs.google.com', function ($url, $timeout) {
+            return ['status' => 0, 'headers' => [], 'body' => '', 'error' => 'body_too_large'];
+        });
+        $store = new SyllabusStore($fetcher, sys_get_temp_dir(), 10485760);
+
+        try {
+            $store->googleDocText('https://docs.google.com/document/d/Abcdefghijklmnopqrstuvwxyz_1234567890/edit');
+            $this->fail('A transport body limit must be reported as oversized text.');
         } catch (SyllabusException $error) {
             $this->assertSame('syllabus_text_too_large', $error->getErrorCode());
         }

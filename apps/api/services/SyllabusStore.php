@@ -117,6 +117,9 @@ class SyllabusStore
         $headers = $result['headers'] ?? [];
         $contentType = strtolower(trim(explode(';', $headers['content-type'] ?? '', 2)[0]));
         $body = (string)($result['body'] ?? '');
+        if (($result['error'] ?? null) === 'body_too_large') {
+            throw new SyllabusException('Syllabus text exceeds the one megabyte limit.', 'syllabus_text_too_large', 413);
+        }
         $isHtml = $contentType === 'text/html' || preg_match('/^\s*<(?:!doctype\s+html|html)\b/i', $body);
         $isSignInPage = $isHtml && preg_match('/(?:accounts\.google\.com|\bsign[\s-]?in\b|\brequest access\b)/i', $body);
         if ($status === 401 || $status === 403 || $isSignInPage) {

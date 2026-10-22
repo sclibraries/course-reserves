@@ -59,8 +59,8 @@ class SyllabusController extends BaseRestController
 
     public function actionGoogleDocText()
     {
-        list(, $actor) = $this->staffContext(0, false);
-        return $this->serviceResult(function () use ($actor) {
+        $this->staffContext(0, false);
+        return $this->serviceResult(function () {
             return ['extracted_text' => $this->store()->googleDocText(
                 Yii::$app->request->getBodyParams()['google_doc_url'] ?? null
             )];
