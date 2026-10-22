@@ -178,14 +178,15 @@ class SyllabusStoreTest extends Unit
         $result = $fetcher->fetch('Abcdefghijklmnopqrstuvwxyz_1234567890');
 
         $this->assertSame('Synthetic export', $result['body']);
+        $this->assertSame('https://doc-123.googleusercontent.com/export', $requests[1]);
         $this->assertCount(2, $requests);
     }
 
-    public function testRelativeRedirectIsResolvedBeforeHostValidation()
+    public function testProtocolRelativeRedirectToGoogleusercontentIsFollowed()
     {
         $requests = [];
         $responses = [
-            ['status' => 302, 'headers' => ['location' => '../download'], 'body' => ''],
+            ['status' => 302, 'headers' => ['location' => '//doc-123.googleusercontent.com/export'], 'body' => ''],
             ['status' => 200, 'headers' => ['content-type' => 'text/plain'], 'body' => 'Synthetic export'],
         ];
         $fetcher = new GoogleDocFetcher('https://docs.google.com', function ($url, $timeout) use (&$requests, &$responses) {
@@ -196,7 +197,39 @@ class SyllabusStoreTest extends Unit
         $result = $fetcher->fetch('Abcdefghijklmnopqrstuvwxyz_1234567890');
 
         $this->assertSame('Synthetic export', $result['body']);
-        $this->assertSame('https://docs.google.com/document/d/download', $requests[1]);
+        $this->assertSame('https://doc-123.googleusercontent.com/export', $requests[1]);
+    }
+
+    public function testRootRelativeRedirectUsesCurrentOrigin()
+    {
+        $requests = [];
+        $responses = [
+            ['status' => 302, 'headers' => ['location' => '/document/d/export?format=txt'], 'body' => ''],
+            ['status' => 200, 'headers' => ['content-type' => 'text/plain'], 'body' => 'Synthetic export'],
+        ];
+        $fetcher = new GoogleDocFetcher('https://docs.google.com', function ($url, $timeout) use (&$requests, &$responses) {
+            $requests[] = $url;
+            return array_shift($responses);
+        });
+
+        $result = $fetcher->fetch('Abcdefghijklmnopqrstuvwxyz_1234567890');
+
+        $this->assertSame('Synthetic export', $result['body']);
+        $this->assertSame('https://docs.google.com/document/d/export?format=txt', $requests[1]);
+    }
+
+    public function testRelativeRedirectPathIsRejected()
+    {
+        $requests = [];
+        $fetcher = new GoogleDocFetcher('https://docs.google.com', function ($url, $timeout) use (&$requests) {
+            $requests[] = $url;
+            return ['status' => 302, 'headers' => ['location' => 'download'], 'body' => ''];
+        });
+
+        $result = $fetcher->fetch('Abcdefghijklmnopqrstuvwxyz_1234567890');
+
+        $this->assertSame('redirect_host_not_allowed', $result['error']);
+        $this->assertCount(1, $requests);
     }
 
     public function testFetcherStopsAfterThreeRedirects()

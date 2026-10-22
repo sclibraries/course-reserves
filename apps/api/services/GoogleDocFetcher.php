@@ -79,47 +79,22 @@ class GoogleDocFetcher implements GoogleDocFetcherInterface
             return '';
         }
         if (isset($reference['scheme'])) {
-            return $location;
+            return strtolower($reference['scheme']) === 'https' && isset($reference['host']) ? $location : '';
         }
+        if (substr($location, 0, 2) === '//') {
+            return 'https:' . $location;
+        }
+        if (substr($location, 0, 1) !== '/') {
+            return '';
+        }
+
         $current = parse_url($currentUrl);
-        if (isset($reference['host'])) {
-            return $current['scheme'] . ':' . $location;
-        }
-        $path = $reference['path'] ?? '';
-        if ($path === '') {
-            $path = $current['path'] ?? '/';
-            $query = array_key_exists('query', $reference) ? $reference['query'] : ($current['query'] ?? null);
-        } else {
-            if (substr($path, 0, 1) !== '/') {
-                $currentPath = $current['path'] ?? '/';
-                $path = substr($currentPath, 0, strrpos($currentPath, '/') + 1) . $path;
-            }
-            $path = $this->removeDotSegments($path);
-            $query = $reference['query'] ?? null;
+        if ($current === false || !isset($current['scheme'], $current['host'])) {
+            return '';
         }
         $origin = $current['scheme'] . '://' . $current['host'] .
             (isset($current['port']) ? ':' . $current['port'] : '');
-        return $origin . $path . ($query === null ? '' : '?' . $query) .
-            (isset($reference['fragment']) ? '#' . $reference['fragment'] : '');
-    }
-
-    private function removeDotSegments($path)
-    {
-        $segments = [];
-        foreach (explode('/', $path) as $segment) {
-            if ($segment === '' || $segment === '.') {
-                continue;
-            }
-            if ($segment === '..') {
-                array_pop($segments);
-            } else {
-                $segments[] = $segment;
-            }
-        }
-        $normalized = '/' . implode('/', $segments);
-        return substr($path, -1) === '/' || substr($path, -2) === '/.' || substr($path, -3) === '/..'
-            ? rtrim($normalized, '/') . '/'
-            : $normalized;
+        return $origin . $location;
     }
 
     private function normalizeHeaders(array $headers)
