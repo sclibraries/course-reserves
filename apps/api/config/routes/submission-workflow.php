@@ -2,6 +2,13 @@
 
 // Staff workflow routes must precede the generic REST rule.
 return [
+    'POST workflow/syllabus/google-doc-text' => 'syllabus/google-doc-text',
+    'OPTIONS workflow/syllabus/google-doc-text' => 'syllabus/options',
+    'GET workflow/submission/<id:\d+>/syllabi' => 'syllabus/staff-list',
+    'POST workflow/submission/<id:\d+>/syllabi' => 'syllabus/staff-create',
+    'GET workflow/submission/<id:\d+>/syllabi/<sid:\d+>/file' => 'syllabus/staff-file',
+    'OPTIONS workflow/submission/<id:\d+>/syllabi' => 'syllabus/options',
+    'OPTIONS workflow/submission/<id:\d+>/syllabi/<sid:\d+>/file' => 'syllabus/options',
     'GET workflow/my-groups' => 'workflow-group/my-groups',
     'GET workflow/group/<id:\\d+>/queue' => 'workflow-group/group-queue',
     'GET workflow/groups' => 'workflow-group/groups',

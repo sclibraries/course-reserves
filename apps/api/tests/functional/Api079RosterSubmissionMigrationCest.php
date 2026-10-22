@@ -13,6 +13,7 @@ class Api079RosterSubmissionMigrationCest
     private $api083MigrationVersion = 'm261019_000002_add_staff_groups';
     private $api084MigrationVersion = 'm261019_000003_add_staff_workflow_flows';
     private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
+    private $api094MigrationVersion = 'm261022_000001_create_submission_syllabi';
     private $facultyId = 'test-api079-migration-faculty';
 
     public function addsNullableRosterCourseColumnsAndRollsBackCleanly(FunctionalTester $I)
@@ -25,6 +26,7 @@ class Api079RosterSubmissionMigrationCest
         $api083MigrationIsDown = false;
         $api084MigrationIsDown = false;
         $api086MigrationIsDown = false;
+        $api094MigrationIsDown = false;
         try {
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
@@ -38,6 +40,10 @@ class Api079RosterSubmissionMigrationCest
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api086MigrationVersion]
             )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api094MigrationVersion]
+            )->queryScalar(), 'API-094 migration must be applied by test-stack setup.');
             Assert::assertSame(1, (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api082MigrationVersion]
@@ -51,6 +57,8 @@ class Api079RosterSubmissionMigrationCest
                 [':version' => $this->api080MigrationVersion]
             )->queryScalar(), 'API-080 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api094MigrationIsDown = true;
             $this->runMigration('down');
             $api086MigrationIsDown = true;
             $this->runMigration('down');
@@ -124,6 +132,8 @@ class Api079RosterSubmissionMigrationCest
             $api084MigrationIsDown = false;
             $this->runMigration('up');
             $api086MigrationIsDown = false;
+            $this->runMigration('up');
+            $api094MigrationIsDown = false;
             $db->schema->refreshTableSchema('faculty_submissions');
         } finally {
             if ($migrationIsDown) {
@@ -153,6 +163,9 @@ class Api079RosterSubmissionMigrationCest
             if ($api086MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api094MigrationIsDown) {
+                $this->runMigration('up');
             }
             $db->createCommand()->delete('faculty_submissions', [
                 'shibboleth_user_id' => $this->facultyId,

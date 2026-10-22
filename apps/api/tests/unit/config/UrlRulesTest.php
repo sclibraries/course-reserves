@@ -101,19 +101,35 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'GET catalog-availability' => 'catalog-availability/index',
             'OPTIONS catalog-availability' => 'catalog-availability/options',
         ];
+        $syllabusRules = [
+            'GET faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi' => 'syllabus/faculty-list',
+            'POST faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi' => 'syllabus/faculty-create',
+            'GET faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi/<sid:\\d+>/file' => 'syllabus/faculty-file',
+            'OPTIONS faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi' => 'syllabus/options',
+            'OPTIONS faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi/<sid:\\d+>/file' => 'syllabus/options',
+            'POST workflow/syllabus/google-doc-text' => 'syllabus/google-doc-text',
+            'OPTIONS workflow/syllabus/google-doc-text' => 'syllabus/options',
+            'GET workflow/submission/<id:\\d+>/syllabi' => 'syllabus/staff-list',
+            'POST workflow/submission/<id:\\d+>/syllabi' => 'syllabus/staff-create',
+            'GET workflow/submission/<id:\\d+>/syllabi/<sid:\\d+>/file' => 'syllabus/staff-file',
+            'OPTIONS workflow/submission/<id:\\d+>/syllabi' => 'syllabus/options',
+            'OPTIONS workflow/submission/<id:\\d+>/syllabi/<sid:\\d+>/file' => 'syllabus/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
         $expectedDraftRules = array_intersect_key($mergedRules, $draftRules);
         $expectedAvailabilityRules = array_intersect_key($mergedRules, $availabilityRules);
-        $declaredRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules, $availabilityRules);
+        $expectedSyllabusRules = array_intersect_key($mergedRules, $syllabusRules);
+        $declaredRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules, $availabilityRules, $syllabusRules);
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(225, $mergedRules);
+        $this->assertCount(237, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
         $this->assertSame($draftRules, $expectedDraftRules);
         $this->assertSame($availabilityRules, $expectedAvailabilityRules);
+        $this->assertSame($syllabusRules, $expectedSyllabusRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -136,6 +152,26 @@ class UrlRulesTest extends \Codeception\Test\Unit
                 'faculty-submission/create-communication', ['id' => $uuid],
             ]],
             ['OPTIONS', 'faculty-submission/' . $uuid, ['faculty-submission/options', ['id' => $uuid]]],
+            ['GET', 'faculty-submission/' . $uuid . '/syllabi', ['syllabus/faculty-list', ['uuid' => $uuid]]],
+            ['POST', 'faculty-submission/' . $uuid . '/syllabi', ['syllabus/faculty-create', ['uuid' => $uuid]]],
+            ['GET', 'faculty-submission/' . $uuid . '/syllabi/999009401/file', [
+                'syllabus/faculty-file', ['uuid' => $uuid, 'sid' => '999009401'],
+            ]],
+            ['OPTIONS', 'faculty-submission/' . $uuid . '/syllabi', ['syllabus/options', ['uuid' => $uuid]]],
+            ['OPTIONS', 'faculty-submission/' . $uuid . '/syllabi/999009401/file', [
+                'syllabus/options', ['uuid' => $uuid, 'sid' => '999009401'],
+            ]],
+            ['POST', 'workflow/syllabus/google-doc-text', ['syllabus/google-doc-text', []]],
+            ['OPTIONS', 'workflow/syllabus/google-doc-text', ['syllabus/options', []]],
+            ['GET', 'workflow/submission/999009401/syllabi', ['syllabus/staff-list', ['id' => '999009401']]],
+            ['POST', 'workflow/submission/999009401/syllabi', ['syllabus/staff-create', ['id' => '999009401']]],
+            ['GET', 'workflow/submission/999009401/syllabi/999009402/file', [
+                'syllabus/staff-file', ['id' => '999009401', 'sid' => '999009402'],
+            ]],
+            ['OPTIONS', 'workflow/submission/999009401/syllabi', ['syllabus/options', ['id' => '999009401']]],
+            ['OPTIONS', 'workflow/submission/999009401/syllabi/999009402/file', [
+                'syllabus/options', ['id' => '999009401', 'sid' => '999009402'],
+            ]],
             ['GET', 'workflow/needs-linking', ['workflow-link/needs-linking', []]],
             ['OPTIONS', 'workflow/needs-linking', ['workflow-link/options', []]],
             ['GET', 'workflow/queue', ['workflow-claim/queue', []]],

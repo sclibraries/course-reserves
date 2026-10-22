@@ -8,6 +8,11 @@ return [
     'workflowClaimExpiryHours' => 72,
     'corsOrigins' => $listFromEnvironment('CORS_ALLOWED_ORIGINS'),
     'facultyFormUrl' => getenv('FACULTY_FORM_URL') ?: null,
+    'googleDocBaseUrl' => rtrim(getenv('GOOGLE_DOC_BASE_URL') ?: 'https://docs.google.com', '/'),
+    'syllabus' => [
+        'storagePath' => getenv('SYLLABUS_STORAGE_PATH') ?: '@runtime/syllabi',
+        'maxUploadBytes' => (int)(getenv('SYLLABUS_MAX_UPLOAD_BYTES') ?: 10485760),
+    ],
     'folio' => [
         'searchBaseUrl' => getenv('FOLIO_SEARCH_BASE_URL') ?: 'https://libtools2.smith.edu/folio/web/search',
         'timeoutSeconds' => (int)(getenv('FOLIO_TIMEOUT_SECONDS') ?: 5),

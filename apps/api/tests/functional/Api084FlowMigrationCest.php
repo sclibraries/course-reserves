@@ -7,6 +7,7 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
 {
     private $migrationVersion = 'm261019_000003_add_staff_workflow_flows';
     private $api086MigrationVersion = 'm261020_000001_add_submission_draft_version';
+    private $api094MigrationVersion = 'm261022_000001_create_submission_syllabi';
 
     public function alwaysSeedsPrintBookAndMapsBookCaseInsensitively(FunctionalTester $I)
     {
@@ -16,6 +17,7 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
         )->queryAll();
         $migrationIsDown = false;
         $api086MigrationIsDown = false;
+        $api094MigrationIsDown = false;
 
         try {
             Assert::assertSame(1, (int)$db->createCommand(
@@ -26,7 +28,13 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
                 'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
                 [':version' => $this->api086MigrationVersion]
             )->queryScalar(), 'API-086 migration must be applied by test-stack setup.');
+            Assert::assertSame(1, (int)$db->createCommand(
+                'SELECT COUNT(*) FROM {{%migration}} WHERE [[version]] = :version',
+                [':version' => $this->api094MigrationVersion]
+            )->queryScalar(), 'API-094 migration must be applied by test-stack setup.');
 
+            $this->runMigration('down');
+            $api094MigrationIsDown = true;
             $this->runMigration('down');
             $api086MigrationIsDown = true;
             $this->runMigration('down');
@@ -73,6 +81,9 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
             if ($api086MigrationIsDown) {
                 $this->runMigration('up');
                 $db->schema->refreshTableSchema('faculty_submissions');
+            }
+            if ($api094MigrationIsDown) {
+                $this->runMigration('up');
             }
         }
     }
