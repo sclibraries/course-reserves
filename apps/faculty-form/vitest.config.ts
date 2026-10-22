@@ -42,5 +42,6 @@ export default defineConfig({
       'src/**/*.test.{js,jsx,ts,tsx}',
       path.resolve(__dirname, '../../packages/citations/src/**/*.test.ts'),
     ],
+    exclude: ['src/**/*.browser.test.{js,jsx,ts,tsx}'],
   },
 });

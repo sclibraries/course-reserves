@@ -47,6 +47,7 @@ export default defineWorkspace([
       environment: 'jsdom',
       globals: true,
       include: ['src/**/*.test.{js,jsx,ts,tsx}'],
+      exclude: ['src/**/*.browser.test.{js,jsx,ts,tsx}'],
     },
   },
   {
@@ -65,6 +66,22 @@ export default defineWorkspace([
         provider: 'playwright',
       },
       setupFiles: ['.storybook/vitest.setup.js'],
+    },
+  },
+  {
+    extends: 'vite.config.js',
+    server: { host: '127.0.0.1', port: 5199, strictPort: true },
+    test: {
+      name: 'browser',
+      include: ['src/**/*.browser.test.{js,jsx}'],
+      browser: {
+        enabled: true,
+        headless: true,
+        provider: 'playwright',
+        instances: [{ browser: 'chromium' }],
+        screenshotFailures: false,
+      },
+      setupFiles: ['src/test/browser.setup.jsx'],
     },
   },
 ]);
