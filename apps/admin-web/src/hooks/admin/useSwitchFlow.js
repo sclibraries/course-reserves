@@ -17,6 +17,12 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
   const { pending, error, setError, run } = useMutation(getFlowErrorMessage);
 
   const clearError = useCallback(() => setError(''), [setError]);
+  const closeSwitchFlow = useCallback(() => {
+    setOpen(false);
+    setSelectedFlow('');
+    setReason('');
+    clearError();
+  }, [clearError]);
 
   const openSwitchFlow = useCallback(async () => {
     setOpen(true);
@@ -53,8 +59,8 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
   }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, reason, run, selectedFlow]);
 
   return {
-    open, loading, flows, selectedFlow, reason, pending, error,
-    openSwitchFlow, setSelectedFlow, setReason, submitSwitchFlow, clearError,
+    open, loading, flows, selectedFlow, reason, pending, error, canAct,
+    openSwitchFlow, closeSwitchFlow, setSelectedFlow, setReason, submitSwitchFlow, clearError,
   };
 }
 

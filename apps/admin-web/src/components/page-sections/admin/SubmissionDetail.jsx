@@ -8,11 +8,10 @@ import { buildProcessingHandoff, getProcessingBlockReason } from '../../../servi
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { Button } from '../../ui/button';
 import useSubmissionLinking from '../../../hooks/admin/useSubmissionLinking';
-import ClaimItemCard from './claims/ClaimItemCard';
 import DraftSubmissionView from './submission/DraftSubmissionView';
-import ItemCard from './submission/ItemCard';
 import SubmissionPage from './submission-page/SubmissionPage';
 import LinkingStep from './submission-page/linking/LinkingStep';
+import ItemWorkPane from './submission-page/item-pane/ItemWorkPane';
 import '../../../css/SubmissionWorkflow.css';
 
 const submissionQueuePath = '/admin?tab=submissions';
@@ -136,16 +135,15 @@ function SubmissionDetail() {
         unlinkedContent={<LinkingStep submission={submission} linking={linking} />}
         renderSelectedItem={(item) => {
           return (
-            <div className="tw-space-y-3">
-              <ClaimItemCard item={item} currentUsername={currentUsername} onChanged={refreshSubmission} />
-              <ItemCard
-                item={item}
-                displayNumber={String(item.displayOrder)}
-                onGoToWork={handleGoToWork}
-                onReopen={handleReopen}
-                currentUsername={currentUsername}
-              />
-            </div>
+            <ItemWorkPane
+              key={`${item.kind}/${item.id}`}
+              item={item}
+              submission={submission}
+              currentUsername={currentUsername}
+              onChanged={refreshSubmission}
+              onGoToWork={handleGoToWork}
+              onReopen={handleReopen}
+            />
           );
         }}
       />
