@@ -484,7 +484,6 @@ function AdminElectronicResources() {
           <AdminCourseHeader 
             folioCourseData={folioCourseData} 
             linkedCourses={linkedCourses}
-            navigate={navigate}
             copyToClipboard={copyToClipboard}
             copyStatus={copyStatus}
             course={course}

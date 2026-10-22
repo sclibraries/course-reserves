@@ -1,6 +1,8 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
+import { getByRole } from '@testing-library/dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AdminCourseHeader from './AdminCourseHeader';
 
 vi.mock('@fortawesome/react-fontawesome', () => ({ FontAwesomeIcon: () => null }));
@@ -17,39 +19,40 @@ afterEach(() => {
   container = null;
 });
 
-it('exposes linked courses as buttons by their course name and navigates when activated', async () => {
-  const navigate = vi.fn();
+it('exposes linked courses as named links to their course pages', async () => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
 
   await act(async () => {
     root.render(
-      <AdminCourseHeader
-        folioCourseData={{
-          name: 'Biology',
-          courseNumber: 'BIO 101',
-          courseListingObject: { instructorObjects: [] },
-        }}
-        linkedCourses={[{
-          course_id: 8,
-          folio_course_id: 42,
-          course_name: 'Chemistry',
-          course_number: 'CHEM 102',
-        }]}
-        navigate={navigate}
-        copyToClipboard={vi.fn()}
-        coursePermalink="/course/42"
-      />,
+      <MemoryRouter initialEntries={['/admin/electronic']}>
+        <AdminCourseHeader
+          folioCourseData={{
+            name: 'Biology',
+            courseNumber: 'BIO 101',
+            courseListingObject: { instructorObjects: [] },
+          }}
+          linkedCourses={[{
+            course_id: 8,
+            folio_course_id: 42,
+            course_name: 'Chemistry',
+            course_number: 'CHEM 102',
+          }]}
+          copyToClipboard={vi.fn()}
+          coursePermalink="/course/42"
+        />
+        <Routes>
+          <Route path="/admin/electronic" element={<p>Current route</p>} />
+          <Route path="/admin/electronic/42" element={<p>Course route reached</p>} />
+        </Routes>
+      </MemoryRouter>,
     );
   });
 
-  const button = Array.from(container.querySelectorAll('button')).find((element) =>
-    element.textContent.trim() === 'Chemistry (CHEM 102)'
-  );
-  expect(button).toBeTruthy();
-  expect(button.getAttribute('role') || 'button').toBe('button');
+  const link = getByRole(container, 'link', { name: 'Chemistry (CHEM 102)' });
+  expect(link.getAttribute('href')).toBe('/admin/electronic/42');
 
-  await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  expect(navigate).toHaveBeenCalledWith('/admin/electronic/42');
+  await act(async () => link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
+  expect(container.textContent).toContain('Course route reached');
 });

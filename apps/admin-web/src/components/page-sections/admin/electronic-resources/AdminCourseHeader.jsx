@@ -1,12 +1,12 @@
 import PropTypes from 'prop-types';
 import { Row, Col, Card, CardBody } from 'reactstrap';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { buildFolioCourseUrl, buildPublicCourseUrl } from '../../../../util/urlHelpers';
 
 function AdminCourseHeader({ 
   folioCourseData, 
   linkedCourses, 
-  navigate, 
   copyToClipboard, 
   copyStatus, 
   coursePermalink
@@ -75,14 +75,13 @@ function AdminCourseHeader({
                 </span>
                 <div className="d-flex flex-wrap gap-2">
                   {linkedCourses.slice(0, 3).map((linkedCourse) => (
-                    <button
+                    <Link
                       key={linkedCourse.course_id} 
-                      type="button"
+                      to={`/admin/electronic/${linkedCourse.folio_course_id}`}
                       className="custom-badge linked-course-badge"
-                      onClick={() => navigate(`/admin/electronic/${linkedCourse.folio_course_id}`)}
                     >
                       {linkedCourse.course_name} ({linkedCourse.course_number})
-                    </button>
+                    </Link>
                   ))}
                   {linkedCourses.length > 3 && (
                     <span className="custom-badge more-badge">
@@ -140,7 +139,6 @@ function AdminCourseHeader({
 AdminCourseHeader.propTypes = {
   folioCourseData: PropTypes.object,
   linkedCourses: PropTypes.array,
-  navigate: PropTypes.func.isRequired,
   copyToClipboard: PropTypes.func.isRequired,
   copyStatus: PropTypes.string,
   course: PropTypes.object,

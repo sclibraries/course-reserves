@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
+import { getByRole } from '@testing-library/dom';
 import { Badge } from './badge';
 import { Button } from './button';
 import { Alert, AlertDescription, AlertTitle } from './alert';
@@ -12,6 +13,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  DialogTrigger,
 } from './dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 
@@ -37,7 +39,7 @@ describe('shadcn UI foundation', () => {
     container.remove();
   });
 
-  it('renders button variants, badge, tabs and an accessible open dialog', async () => {
+  it('renders accessible UI foundations and scans the fixture and open dialog', async () => {
     await act(async () => {
       root.render(createElement('div', null,
         createElement(Button, null, 'Default action'),
@@ -58,7 +60,10 @@ describe('shadcn UI foundation', () => {
           ),
           createElement(TabsContent, { value: 'overview' }, 'Overview content'),
         ),
-        createElement(Dialog, { open: true },
+        createElement(Dialog, null,
+          createElement(DialogTrigger, { asChild: true },
+            createElement(Button, null, 'Open accessible dialog'),
+          ),
           createElement(DialogContent, null,
             createElement(DialogTitle, null, 'Accessible dialog title'),
             createElement(DialogDescription, null, 'Dialog description'),
@@ -67,22 +72,22 @@ describe('shadcn UI foundation', () => {
       ));
     });
 
-    const buttons = Array.from(container.querySelectorAll('button'));
-    expect(buttons[0].textContent).toContain('Default action');
-    expect(buttons[0].className).toContain('tw-bg-primary');
-    expect(buttons[1].textContent).toContain('Secondary action');
-    expect(buttons[1].className).toContain('tw-border-input');
+    const primaryButton = getByRole(container, 'button', { name: 'Default action' });
+    expect(primaryButton.className).toContain('tw-bg-primary');
+    const secondaryButton = getByRole(container, 'button', { name: 'Secondary action' });
+    expect(secondaryButton.className).toContain('tw-border-input');
     expect(container.textContent).toContain('Ready');
-    expect(container.querySelector('h5')?.textContent).toBe('Request saved');
-    expect(container.querySelector('h3')?.textContent).toBe('Course materials');
-    expect(container.querySelector('[role="tab"]')?.textContent).toBe('Overview');
-    expect(container.textContent).toContain('Overview content');
+    expect(getByRole(container, 'heading', { name: 'Request saved' })).toBeTruthy();
+    expect(getByRole(container, 'heading', { name: 'Course materials' })).toBeTruthy();
+    expect(getByRole(container, 'tab', { name: 'Overview' })).toBeTruthy();
+    expect(getByRole(container, 'tabpanel').textContent).toContain('Overview content');
 
-    const dialog = document.body.querySelector('[role="dialog"]');
-    expect(dialog).not.toBeNull();
-    const title = dialog.querySelector('h2');
-    expect(title.textContent).toBe('Accessible dialog title');
-    expect(dialog.getAttribute('aria-labelledby')).toBe(title.id);
+    await expectNoAxeViolations(container);
+
+    await act(async () => getByRole(container, 'button', { name: 'Open accessible dialog' }).click());
+    const dialog = getByRole(document.body, 'dialog', { name: 'Accessible dialog title' });
+    expect(getByRole(dialog, 'heading', { name: 'Accessible dialog title' })).toBeTruthy();
+    expect(dialog.textContent).toContain('Dialog description');
     await expectNoAxeViolations(document.body);
   });
 });

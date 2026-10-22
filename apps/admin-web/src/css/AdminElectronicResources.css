@@ -134,6 +134,11 @@
   color: #374151;
   cursor: pointer;
   font-family: inherit;
+  text-decoration: none;
+}
+
+.linked-course-badge:visited {
+  color: #374151;
 }
 
 .linked-course-badge:hover {

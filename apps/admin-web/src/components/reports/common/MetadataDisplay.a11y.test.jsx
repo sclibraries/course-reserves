@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { getAllByRole, getByRole } from '@testing-library/dom';
 import MetadataDisplay from './MetadataDisplay';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -13,9 +14,11 @@ afterEach(() => {
   container?.remove();
   root = null;
   container = null;
+  vi.useRealTimers();
 });
 
-it('opens inline metadata details from a button named with its summary', async () => {
+it('opens metadata details from a named button and returns focus when closed', async () => {
+  vi.useFakeTimers();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -31,12 +34,18 @@ it('opens inline metadata details from a button named with its summary', async (
     );
   });
 
-  const button = Array.from(container.querySelectorAll('button')).find((element) =>
-    element.textContent.includes('Search: "biology reserves"')
-  );
-  expect(button).toBeTruthy();
-  expect(button.getAttribute('role') || 'button').toBe('button');
+  const button = getByRole(container, 'button', { name: 'Search: "biology reserves"' });
 
+  await act(async () => button.focus());
   await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  expect(document.body.textContent).toContain('Event Details - search');
+  await act(async () => vi.runAllTimersAsync());
+  const dialog = getByRole(document.body, 'dialog');
+  expect(dialog.contains(document.activeElement)).toBe(true);
+  expect(getByRole(dialog, 'heading', { name: 'Event Details - search' })).toBeTruthy();
+
+  const closeButtons = getAllByRole(dialog, 'button', { name: 'Close' });
+  await act(async () => closeButtons.at(-1).dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await act(async () => vi.runAllTimersAsync());
+  expect(dialog.isConnected).toBe(false);
+  expect(document.activeElement).toBe(button);
 });

@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { Table, Spinner, Alert } from 'reactstrap';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { buildFriendlyCourseUrl } from '../../../util/urlHelpers';
 import { trackingService } from '../../../services/trackingService';
@@ -91,14 +91,15 @@ const getInstructorName = (course, isElectronic = false) => {
 function ItemSearchResults({ reserves, loading, error }) {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
-  const navigate = useNavigate();
   const college = useSearchStore((state) => state.college);
   const { setRecord } = useRecordStore();
 
   /**
    * Handles navigation to course page when course name is clicked
    */
-  const handleCourseClick = (reserve) => {
+  const handleCourseClick = (event, reserve) => {
+    if (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+
     const { course } = reserve;
     if (!course) return;
 
@@ -127,9 +128,6 @@ function ItemSearchResults({ reserves, loading, error }) {
       },
     }).catch((error) => console.error("Error tracking course access:", error));
 
-    // Build and navigate to friendly course URL
-    const targetUrl = buildFriendlyCourseUrl(course);
-    navigate(targetUrl);
   };
 
   if (loading) {
@@ -316,10 +314,10 @@ function ItemSearchResults({ reserves, loading, error }) {
                   </td>
                   <td>
                     {reserve.course?.name ? (
-                      <button
-                        type="button"
+                      <Link
+                        to={buildFriendlyCourseUrl(reserve.course)}
                         className="course-name-link"
-                        onClick={() => handleCourseClick(reserve)}
+                        onClick={(event) => handleCourseClick(event, reserve)}
                         style={{
                           color: '#0066cc',
                           textDecoration: 'none',
@@ -339,7 +337,7 @@ function ItemSearchResults({ reserves, loading, error }) {
                         title={`View course materials for ${reserve.course.name}`}
                       >
                         {reserve.course.name}
-                      </button>
+                      </Link>
                     ) : (
                       'N/A'
                     )}
