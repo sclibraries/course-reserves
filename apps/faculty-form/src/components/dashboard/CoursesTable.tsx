@@ -9,6 +9,7 @@ import type { CourseAssignment } from '@/store/courseAssignmentsStore';
 import type { Submission } from '@/components/SubmissionCard';
 import { getCourseTermLabel } from '@/utils/courseTermLabel';
 import { DraftDiscardButton } from './DraftDiscardButton';
+import { DashboardCourseCard } from './DashboardCourseCard';
 
 type CourseRow = {
   type: 'submission' | 'assignment';
@@ -40,7 +41,62 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
   };
 
   return (
-    <div className="border rounded-lg bg-card">
+    <>
+      <div className="space-y-3 lg:hidden">
+        {courses.map((item) => {
+          if (item.type === 'submission' && item.submission) {
+            const submission = item.submission;
+            const canEdit = submission.proxyCanEdit !== false;
+            return (
+              <DashboardCourseCard
+                key={item.key}
+                code={submission.courseCode}
+                title={submission.courseTitle}
+                section="—"
+                term={<Badge variant="secondary" className="text-xs">{submission.term}</Badge>}
+                status={<StatusBadge status={submission.status} />}
+                badges={submission.access === 'proxy' ? <Badge variant="outline">Proxy</Badge> : submission.access === 'co_instructor' ? <Badge variant="outline">Co-instructor</Badge> : undefined}
+                items={<>{submission.totalItems} total · {submission.completeItems} complete</>}
+                lastUpdated={submission.lastUpdated}
+                actions={submission.status === 'draft' && canEdit ? (
+                  <>
+                    <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
+                      <Edit className="mr-1 h-4 w-4" />Edit
+                    </Button>
+                    <DraftDiscardButton submissionId={submission.id} />
+                  </>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/submission/${submission.id}`)}>
+                    <Eye className="mr-1 h-4 w-4" />View
+                  </Button>
+                )}
+              />
+            );
+          }
+
+          if (item.type !== 'assignment' || !item.assignment?.assignment) return null;
+          const assignment = item.assignment;
+          const course = assignment.assignment;
+          const canEdit = assignment.canEdit !== false;
+          const termLabel = getCourseTermLabel(assignment.folio_term?.name, course.academic_period);
+          return (
+            <DashboardCourseCard
+              key={item.key}
+              code={assignment.folio_course?.courseNumber || assignment.parsed_course.courseNumber}
+              title={assignment.folio_course?.name || course.course_title}
+              section={assignment.parsed_course.sectionName}
+              term={<Badge variant="secondary" className="text-xs">{termLabel}</Badge>}
+              status={<Badge variant="outline" className="text-xs">Not Started</Badge>}
+              items="—"
+              lastUpdated="—"
+              actions={canEdit && <Button size="sm" onClick={() => handleAddReserves(assignment)}>
+                <Plus className="mr-1 h-4 w-4" />Add Reserves
+              </Button>}
+            />
+          );
+        })}
+      </div>
+      <div className="hidden rounded-lg border bg-card lg:block">
       <Table>
         <TableHeader><TableRow>
           <TableHead className="font-semibold">Course</TableHead>
@@ -116,6 +172,7 @@ export const CoursesTable = ({ courses }: { courses: CourseRow[] }) => {
           })}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </>
   );
 };

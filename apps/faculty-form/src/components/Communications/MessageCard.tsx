@@ -57,17 +57,17 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
     >
       <CardContent className="pt-6">
         <div className="space-y-4">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="mt-0.5" aria-hidden="true">
                 {categoryIcons[message.category]}
               </div>
-              <div className="flex min-w-0 flex-col">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-base">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h4 className="min-w-0 flex-1 font-semibold text-base">
                     <button
                       type="button"
-                      className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="min-w-0 whitespace-normal break-words rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-expanded={isExpanded}
                       aria-controls={bodyId}
                       onClick={handleToggleExpanded}
@@ -87,7 +87,7 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex basis-full flex-wrap items-center gap-2 sm:basis-auto sm:justify-end">
               <Badge 
                 variant="outline" 
                 className={priorityConfig[message.priority].color}
@@ -102,7 +102,7 @@ export default function MessageCard({ message, onMarkAsRead, onReply, onResolve 
             </div>
           </div>
 
-          <p id={bodyId} className={`text-sm ${isExpanded ? '' : 'line-clamp-2'}`}>
+          <p id={bodyId} className={`break-words text-sm ${isExpanded ? '' : 'line-clamp-2'}`}>
             {message.message}
           </p>
           {message.resource_id && (

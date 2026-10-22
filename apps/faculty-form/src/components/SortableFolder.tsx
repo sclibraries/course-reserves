@@ -7,10 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   GripVertical, 
-  ChevronDown, 
-  ChevronRight, 
-  FolderOpen, 
-  FolderClosed,
   Edit2, 
   Trash2, 
   Check,
@@ -19,6 +15,7 @@ import {
   ArrowDown
 } from "lucide-react";
 import { SortableFolderContent } from './SortableFolderContent';
+import { SortableFolderTitle } from './SortableFolderTitle';
 import { FolderDropZones } from './ListDropZones';
 import type { CourseFolder, CourseItem } from "../store/courseReservesStore";
 import type { DiscoveryRecordReference } from '@/hooks/useOpenDiscoveryRecord';
@@ -133,7 +130,7 @@ export const SortableFolder = ({
       }`}
     >
       <CardHeader ref={setNodeRef} className="relative pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="bg-blue-500/10 text-blue-600 text-sm font-semibold rounded-full w-8 h-8 flex items-center justify-center">
               {index + 1}
@@ -154,29 +151,9 @@ export const SortableFolder = ({
             </button>
           </div>
 
-          <button
-            onClick={handleToggle}
-            aria-expanded={folder.isOpen}
-            className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted/50 rounded p-1 -m-1"
-          >
-            {folder.isOpen ? (
-              <>
-                <ChevronDown className="h-4 w-4 text-blue-600" />
-                <FolderOpen className="h-5 w-5 text-blue-600" />
-              </>
-            ) : (
-              <>
-                <ChevronRight className="h-4 w-4 text-blue-600" />
-                <FolderClosed className="h-5 w-5 text-blue-600" />
-              </>
-            )}
-            
-            <span className="font-medium text-sm flex-1 text-left truncate">
-              {folder.title} ({folder.items.length} items)
-            </span>
-          </button>
+          <SortableFolderTitle folder={folder} onToggle={handleToggle} />
 
-          <div className="flex gap-1">
+          <div className="flex flex-wrap items-center gap-1 sm:flex-nowrap">
             {onAddMaterials && (
               <Button
                 variant="outline"

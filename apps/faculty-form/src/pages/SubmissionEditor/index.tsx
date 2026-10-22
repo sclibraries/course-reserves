@@ -2,7 +2,6 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Edit } from 'lucide-react';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
 import { useOrganizedContent, useFilteredContent } from '@/hooks/useContentOrganization';
@@ -28,6 +27,7 @@ import ContentList from './ContentList';
 import SubmitDialog from './SubmitDialog';
 import { DraftConflictNotice } from '@/components/SubmissionEditor/DraftConflictNotice';
 import AddMaterialsPage from '../AddMaterials/AddMaterialsPage';
+import CourseTitleRow from './CourseTitleRow';
 
 const SubmissionEditor = () => {
   const navigate = useNavigate();
@@ -171,17 +171,14 @@ const SubmissionEditor = () => {
           </main>
         ) : (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-6 pb-4 border-b">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">{reserve.courseCode} · {reserve.courseTitle}</h2>
-                <p className="text-sm text-muted-foreground mt-1">Section {reserve.section} · {reserve.term}</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={courseHandlers.handleEditCourse} disabled={isReadOnly}>
-                <Edit className="mr-2 h-3 w-3" />Edit Course Info
-              </Button>
-            </div>
-          </div>
+          <CourseTitleRow
+            courseCode={reserve.courseCode}
+            courseTitle={reserve.courseTitle}
+            section={reserve.section}
+            term={reserve.term}
+            isReadOnly={isReadOnly}
+            onEditCourse={courseHandlers.handleEditCourse}
+          />
           {hasRemoteItemsChanged && (
             <div role="status" className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               This submission was updated elsewhere. Your unsaved changes are kept.

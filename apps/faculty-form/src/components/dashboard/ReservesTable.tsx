@@ -6,12 +6,40 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Edit, Eye } from 'lucide-react';
 import type { Submission } from '@/components/SubmissionCard';
 import { DraftDiscardButton } from './DraftDiscardButton';
+import { DashboardCourseCard } from './DashboardCourseCard';
 
 export const ReservesTable = ({ submissions }: { submissions: Submission[] }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="border rounded-lg bg-card">
+    <>
+      <div className="space-y-3 lg:hidden">
+        {submissions.map((submission) => (
+          <DashboardCourseCard
+            key={submission.id}
+            code={submission.courseCode}
+            title={submission.courseTitle}
+            term={<Badge variant="secondary" className="text-xs">{submission.term}</Badge>}
+            status={<StatusBadge status={submission.status} />}
+            badges={submission.access === 'proxy' ? <Badge variant="outline">Proxy</Badge> : submission.access === 'co_instructor' ? <Badge variant="outline">Co-instructor</Badge> : undefined}
+            items={<>{submission.totalItems} total · {submission.completeItems} complete</>}
+            lastUpdated={submission.lastUpdated}
+            actions={submission.status === 'draft' && submission.proxyCanEdit !== false ? (
+              <>
+                <Button size="sm" onClick={() => navigate(`/submission/${submission.id}/edit`)}>
+                  <Edit className="mr-1 h-4 w-4" />Edit
+                </Button>
+                <DraftDiscardButton submissionId={submission.id} />
+              </>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => navigate(`/submission/${submission.id}`)}>
+                <Eye className="mr-1 h-4 w-4" />View
+              </Button>
+            )}
+          />
+        ))}
+      </div>
+      <div className="hidden rounded-lg border bg-card lg:block">
       <Table>
         <TableHeader><TableRow>
           <TableHead className="font-semibold">Course</TableHead>
@@ -55,6 +83,7 @@ export const ReservesTable = ({ submissions }: { submissions: Submission[] }) =>
           ))}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </>
   );
 };
