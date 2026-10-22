@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, X } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -7,11 +7,12 @@ import { submissionWorkflowService } from '../../../services/admin/submissionWor
 import { buildProcessingHandoff, getProcessingBlockReason } from '../../../services/admin/processingHandoff';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { Button } from '../../ui/button';
+import useSubmissionLinking from '../../../hooks/admin/useSubmissionLinking';
 import ClaimItemCard from './claims/ClaimItemCard';
-import LinkingPanel from './linking/LinkingPanel';
 import DraftSubmissionView from './submission/DraftSubmissionView';
 import ItemCard from './submission/ItemCard';
 import SubmissionPage from './submission-page/SubmissionPage';
+import LinkingStep from './submission-page/linking/LinkingStep';
 import '../../../css/SubmissionWorkflow.css';
 
 const submissionQueuePath = '/admin?tab=submissions';
@@ -31,6 +32,13 @@ function SubmissionDetail() {
   } = useSubmissionWorkflowStore();
   const [currentUser, setCurrentUser] = useState(null);
 
+  const refreshSubmission = useCallback(() => fetchSubmissionDetail(submissionId), [fetchSubmissionDetail, submissionId]);
+  const submission = selectedSubmission?.submission;
+  const folders = selectedSubmission?.folders || [];
+  const unfolderedItems = selectedSubmission?.unfolderedItems || [];
+  const items = [...folders.flatMap((folder) => folder.items), ...unfolderedItems];
+  const linking = useSubmissionLinking(submission?.status === 'draft' ? null : submission, items, refreshSubmission);
+
   useEffect(() => {
     if (submissionId) fetchSubmissionDetail(submissionId);
   }, [submissionId, fetchSubmissionDetail]);
@@ -46,7 +54,6 @@ function SubmissionDetail() {
     loadCurrentUser();
   }, []);
 
-  const refreshSubmission = () => fetchSubmissionDetail(submissionId);
   const handleLock = async () => {
     if (selectedSubmission) {
       const result = await lockSubmission(selectedSubmission.submission.uuid, 'Processing items');
@@ -109,8 +116,6 @@ function SubmissionDetail() {
     );
   }
 
-  const { submission, folders, unfolderedItems } = selectedSubmission;
-  const items = [...folders.flatMap((folder) => folder.items), ...unfolderedItems];
   const currentUsername = currentUser?.username || '';
   if (submission.status === 'draft') {
     return <DraftSubmissionView submission={submission} items={items} onBack={() => navigate(submissionQueuePath)} />;
@@ -127,7 +132,8 @@ function SubmissionDetail() {
         onLock={handleLock}
         onUnlock={handleUnlock}
         onChanged={refreshSubmission}
-        unlinkedContent={<LinkingPanel submission={submission} items={items} onChanged={refreshSubmission} />}
+        linking={linking}
+        unlinkedContent={<LinkingStep submission={submission} linking={linking} />}
         renderSelectedItem={(item) => {
           return (
             <div className="tw-space-y-3">

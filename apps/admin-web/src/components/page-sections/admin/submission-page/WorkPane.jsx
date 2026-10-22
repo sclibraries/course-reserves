@@ -12,10 +12,7 @@ function WorkPane({ isLinked, selectedItem, children, unlinkedContent, onBack })
           {selectedItem ? children : <p className="tw-text-sm tw-text-muted-foreground">Select an item to see its work pane.</p>}
         </>
       ) : (
-        <>
-          <p className="tw-mb-3 tw-font-medium">Link the course to start working items</p>
-          {unlinkedContent}
-        </>
+        unlinkedContent
       )}
     </section>
   );

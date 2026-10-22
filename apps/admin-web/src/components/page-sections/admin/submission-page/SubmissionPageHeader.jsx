@@ -1,6 +1,9 @@
+import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
+import ChangeLinkedCourseDialog from './linking/ChangeLinkedCourseDialog';
+import SubmissionActivitySheet from './linking/SubmissionActivitySheet';
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleDateString() : 'Not submitted';
@@ -14,8 +17,14 @@ function formatLockNotice(submission) {
   ].filter(Boolean).join(' · ') || 'This submission is locked.';
 }
 
-function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, onUnlock, onChangeLink }) {
+function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, onUnlock, linking }) {
+  const [changeOpen, setChangeOpen] = useState(false);
+  const changeTriggerRef = useRef(null);
   const course = `${submission.courseCode || 'Course'}${submission.section ? `-${submission.section}` : ''}`;
+  const handleChangeOpen = (open) => {
+    setChangeOpen(open);
+    linking.clearError();
+  };
 
   return (
     <header className="tw-mb-4 tw-rounded-lg tw-border tw-bg-card tw-p-5 tw-shadow-sm">
@@ -43,8 +52,9 @@ function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, on
             <Badge variant="secondary" className="tw-bg-amber-100 tw-text-amber-900">Needs linking</Badge>
           )}
           {isLinked && (
-            <Button variant="link" className="tw-h-auto tw-p-0" onClick={onChangeLink}>Change</Button>
+            <Button ref={changeTriggerRef} variant="link" className="tw-h-auto tw-p-0" onClick={() => handleChangeOpen(true)}>Change</Button>
           )}
+          <SubmissionActivitySheet linking={linking} />
         </div>
       </div>
       <p className="tw-mt-4 tw-text-sm" aria-label="Submission item counts">
@@ -58,6 +68,15 @@ function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, on
           <p role="status" className="tw-text-sm tw-text-muted-foreground">{formatLockNotice(submission)}</p>
         )}
       </div>
+      {isLinked && (
+        <ChangeLinkedCourseDialog
+          open={changeOpen}
+          onOpenChange={handleChangeOpen}
+          submission={submission}
+          linking={linking}
+          returnFocusRef={changeTriggerRef}
+        />
+      )}
     </header>
   );
 }
@@ -69,7 +88,7 @@ SubmissionPageHeader.propTypes = {
   onBack: PropTypes.func.isRequired,
   onLock: PropTypes.func.isRequired,
   onUnlock: PropTypes.func.isRequired,
-  onChangeLink: PropTypes.func,
+  linking: PropTypes.object.isRequired,
 };
 
 export default SubmissionPageHeader;

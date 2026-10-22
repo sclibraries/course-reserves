@@ -19,7 +19,7 @@ function SubmissionPage({
   onLock,
   onUnlock,
   onChanged,
-  onChangeLink,
+  linking,
   unlinkedContent,
   renderSelectedItem,
 }) {
@@ -66,11 +66,11 @@ function SubmissionPage({
         onBack={onBack}
         onLock={onLock}
         onUnlock={onUnlock}
-        onChangeLink={onChangeLink}
+        linking={linking}
       />
       <div className="tw-grid tw-grid-cols-1 tw-gap-4 lg:tw-grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <aside
-          className={`tw-min-w-0 ${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-opacity-50'}`}
+          className={`tw-min-w-0 ${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-rounded-lg tw-bg-muted/30 tw-p-2 tw-saturate-50'}`}
           data-testid="submission-item-list-pane"
         >
           <ItemList
@@ -107,7 +107,7 @@ SubmissionPage.propTypes = {
   onLock: PropTypes.func.isRequired,
   onUnlock: PropTypes.func.isRequired,
   onChanged: PropTypes.func,
-  onChangeLink: PropTypes.func,
+  linking: PropTypes.object.isRequired,
   unlinkedContent: PropTypes.node,
   renderSelectedItem: PropTypes.func,
 };

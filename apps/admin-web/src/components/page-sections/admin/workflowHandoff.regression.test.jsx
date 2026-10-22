@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SubmissionDetail from './SubmissionDetail';
 import MyWorkQueue from './MyWorkQueue';
@@ -7,13 +8,15 @@ import MyWorkQueue from './MyWorkQueue';
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   getCurrentUser: vi.fn(),
+  getCandidates: vi.fn(),
   consoleLog: vi.fn(),
   setSearchParams: vi.fn(),
   searchParams: null,
   storeState: {},
 }));
 
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...await importOriginal(),
   useNavigate: () => mocks.navigate,
   useParams: () => ({ submissionId: '31' }),
   useSearchParams: () => [mocks.searchParams, mocks.setSearchParams],
@@ -26,6 +29,7 @@ vi.mock('../../../store/submissionWorkflowStore', () => ({
 vi.mock('../../../services/admin/submissionWorkflowService', () => ({
   submissionWorkflowService: {
     getCurrentUser: mocks.getCurrentUser,
+    getCandidates: mocks.getCandidates,
   },
 }));
 
@@ -59,7 +63,7 @@ const renderComponent = async (ui) => {
   const root = createRoot(container);
 
   await act(async () => {
-    root.render(ui);
+    root.render(<MemoryRouter>{ui}</MemoryRouter>);
   });
 
   return {
@@ -92,6 +96,7 @@ describe('workflow processing handoff regression', () => {
     mocks.searchParams = new URLSearchParams();
     vi.spyOn(console, 'log').mockImplementation(mocks.consoleLog);
     mocks.getCurrentUser.mockResolvedValue({ id: 42, username: 'staff' });
+    mocks.getCandidates.mockResolvedValue({ items: [], checked_at: null });
     mocks.storeState = {
       selectedSubmission: {
         submission: {

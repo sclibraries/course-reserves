@@ -24,6 +24,13 @@ export function getLinkingErrorMessage(error, action) {
   const payload = error?.payload;
   const code = payload?.error_code;
 
+  if (code === 'folio_unavailable') {
+    return [
+      'FOLIO is temporarily unavailable. Try again in a moment.',
+      payload.reference && `Reference: ${payload.reference}`,
+    ].filter(Boolean).join(' ');
+  }
+
   if (code === 'not_exact_match') {
     const fields = payload.fields || {};
     const names = [
