@@ -1,5 +1,5 @@
 export { extractCitationsFromSyllabus } from './syllabusCitationExtractor';
-export type { CitationExtractionResult } from './syllabusCitationExtractor';
+export type { CitationExtractionResult, SyllabusEntry } from './syllabusCitationExtractor';
 export { parseCitation } from './citationParser';
 export type { ParsedCitation } from './citationParser';
 export { findCitationBestMatch } from './citationBestMatch';

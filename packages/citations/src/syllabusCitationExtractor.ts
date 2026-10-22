@@ -1,7 +1,8 @@
-const HEADER_PATTERN = /^(Textbook|Introduction|Tort Law|Contract Law|Property Law|Intellectual Property|Environmental Law|Legal Procedure|Free Speech|Reserves for|The Economics of|Reading[s]?:?|Required|Optional|Recommended|Syllabus|Course Materials|ECO \d+|ECON \d+|LAW \d+|Spring \d+|Fall \d+|Week \d+)s?\b/iu;
+const HEADER_PATTERN = /^.{1,80}$/u;
 const COPYRIGHT_PATTERN = /^©|^Copyright/iu;
 const JUNK_SUFFIX_PATTERN = /\s+(MN|paged|request|stacks|e-?book|acquisitions|acq|physical|item|link up|available online)\s*$/giu;
 const ACADEMIC_MARKER_PATTERN = /(?:^|[\s,;:])(?:vol|pp|no|journal|chapter|press|ed|eds|issue|pages?)\.?(?=[\s,;:]|$)/iu;
+const CITATION_MARKER_PATTERN = /["“”]|\b[12]\d{3}\b|https?:\/\/|\b(?:pp?|vol|no|issue|pages?|eds?)\.?\b|\d+\s*[-–—]\s*\d+|\b(?:university\s+press|press|publishing)\b/iu;
 const INLINE_CITATION_BOUNDARY_PATTERN = /(?<=[.;])\s+(?=(?:[\p{L}][\p{L}\p{M}'’-]+,\s+[\p{L}]|[\p{L}][\p{L}\p{M}'’.-]+(?:\s+[\p{L}][\p{L}\p{M}'’.-]+)+,\s*["“”]|In\s+re\s+[\p{Lu}]|Ex\s+parte\s+[\p{Lu}]|U\.?S\.?\s+v\.|[\p{Lu}][\p{L}\p{M}\s.'’-]+\s+v\.\s+[\p{Lu}]|\d+\s+[A-Z][\w.]+\s+\d+))/u;
 const AUTHOR_FIRST_PATTERN = /^[\p{L}][\p{L}\p{M}'’.-]+(?:\s+[\p{L}][\p{L}\p{M}'’.-]+)+,/u;
 const AUTHOR_FIRST_QUOTED_PATTERN = /^[\p{L}][\p{L}\p{M}'’.-]+(?:\s+[\p{L}][\p{L}\p{M}'’.-]+)+,\s*["“”]/u;
@@ -10,10 +11,21 @@ const QUOTED_TITLE_PATTERN = /["“”][^"“”]+["“”]/u;
 const EDITOR_PATTERN = /(?:\bedited\s+by\b|\beds?\.(?=[\s,;:]|$))/iu;
 const PUBLISHER_PATTERN = /\b(?:university\s+press|press|publishing)\b/iu;
 const PAGE_RANGE_PATTERN = /\b(?:pp?\.?\s*)?\d+\s*[-–—]\s*\d+\b/iu;
+const URL_PATTERN = /https?:\/\/[^\s\]]+/iu;
+const BRACKETED_URL_PATTERN = /^(?<text>.+?)\s*\[(?<url>https?:\/\/[^\]]+)\]\s*$/iu;
+const MEDIA_PATTERN = /^(?:Film\s*:|.*\(\s*film\s*\))/iu;
+
+export interface SyllabusEntry {
+  text: string;
+  heading: string | null;
+  type: 'citation' | 'media' | 'web';
+  url: string | null;
+}
 
 export interface CitationExtractionResult {
   citations: string[];
   skipped: string[];
+  entries: SyllabusEntry[];
 }
 
 export function extractCitationsFromSyllabus(syllabusText: string): CitationExtractionResult {
@@ -21,6 +33,11 @@ export function extractCitationsFromSyllabus(syllabusText: string): CitationExtr
 
   if (!rawText) {
     return { citations: [], skipped: [] };
+  }
+
+  const lines = rawText.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length > 1 && isOneEntryPerLineDocument(lines)) {
+    return extractOneEntryPerLine(lines);
   }
 
   let candidateBlocks = extractLineBasedBlocks(rawText);
@@ -35,10 +52,80 @@ export function extractCitationsFromSyllabus(syllabusText: string): CitationExtr
 
   return candidateBlocks.reduce<CitationExtractionResult>((result, block) => {
     const text = cleanCitationText(block);
-    if (looksLikeCitation(text)) result.citations.push(text);
+    if (looksLikeCitation(text)) {
+      result.citations.push(text);
+      result.entries.push({ text, heading: null, type: 'citation', url: findUrl(text) });
+    }
     else if (block.trim()) result.skipped.push(text || block.trim());
     return result;
-  }, { citations: [], skipped: [] });
+  }, { citations: [], skipped: [], entries: [] });
+}
+
+function isOneEntryPerLineDocument(lines: string[]): boolean {
+  return lines.filter(isEntryLine).length > lines.length / 2;
+}
+
+function isEntryLine(line: string): boolean {
+  return MEDIA_PATTERN.test(line)
+    || Boolean(BRACKETED_URL_PATTERN.test(line))
+    || (looksLikeCitation(line) && startsNewCitation(line) && !isContinuation(line));
+}
+
+function extractOneEntryPerLine(lines: string[]): CitationExtractionResult {
+  const result: CitationExtractionResult = { citations: [], skipped: [], entries: [] };
+  let heading: string | null = null;
+
+  lines.forEach((line, index) => {
+    if (isShortHeader(line) && isEntryLine(lines[index + 1] || '')) {
+      heading = line;
+      return;
+    }
+
+    const entry = extractEntry(line, heading);
+    if (!entry) {
+      result.skipped.push(cleanCitationText(line) || line);
+      return;
+    }
+
+    result.entries.push(entry);
+    if (entry.type === 'citation') result.citations.push(entry.text);
+  });
+
+  return result;
+}
+
+function extractEntry(line: string, heading: string | null): SyllabusEntry | null {
+  if (MEDIA_PATTERN.test(line)) {
+    const url = findUrl(line);
+    const text = line
+      .replace(/^Film\s*:\s*/iu, '')
+      .replace(/\(\s*film\s*\)/giu, '')
+      .replace(/\s*\[https?:\/\/[^\]]+\]/giu, '')
+      .replace(/https?:\/\/\S+/giu, '')
+      .replace(/\s+-\s+.*$/u, '')
+      .trim();
+    return { text, heading, type: 'media', url };
+  }
+
+  const web = line.match(BRACKETED_URL_PATTERN);
+  if (web?.groups) {
+    return { text: web.groups.text.trim(), heading, type: 'web', url: web.groups.url };
+  }
+
+  if (looksLikeCitation(line)) {
+    const text = cleanCitationText(line);
+    return { text, heading, type: 'citation', url: findUrl(text) };
+  }
+
+  return null;
+}
+
+function findUrl(text: string): string | null {
+  return text.match(URL_PATTERN)?.[0] || null;
+}
+
+function isShortHeader(line: string): boolean {
+  return HEADER_PATTERN.test(line) && !CITATION_MARKER_PATTERN.test(line);
 }
 
 function extractLineBasedBlocks(rawText: string): string[] {
@@ -60,7 +147,7 @@ function extractLineBasedBlocks(rawText: string): string[] {
       continue;
     }
 
-    if (HEADER_PATTERN.test(line) || COPYRIGHT_PATTERN.test(line)) {
+    if (isShortHeader(line) || COPYRIGHT_PATTERN.test(line)) {
       pushCurrent();
       blocks.push(line);
       continue;
@@ -118,7 +205,7 @@ function shouldMergeContributorSegment(previousSegment: string, currentSegment: 
 }
 
 function looksLikeCitation(text: string): boolean {
-  if (!text || text.length < 15 || HEADER_PATTERN.test(text)) {
+  if (!text || text.length < 15 || isShortHeader(text)) {
     return false;
   }
 

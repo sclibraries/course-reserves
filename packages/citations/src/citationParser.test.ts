@@ -40,13 +40,13 @@ describe('parseCitation', () => {
     });
   });
 
-  it('drops the author field for quoted citations with multiple authors', () => {
+  it('preserves multiple authors for quoted citations', () => {
     const parsed = parseCitation(
       'Example Author and Sample Author, "A Synthetic Topic, with the "Example Phrase"," Example Journal 41 (2013): 154-171.'
     );
 
     expect(parsed).toEqual({
-      author: '',
+      author: 'Example Author and Sample Author',
       title: 'A Synthetic Topic, with the "Example Phrase"',
       source: 'Example Journal',
     });

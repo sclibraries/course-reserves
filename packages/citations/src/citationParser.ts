@@ -214,26 +214,14 @@ function findTitleSourceBoundary(text: string): number {
 /** Clean author text extracted from before the quoted title */
 function cleanAuthor(text: string): string {
   const cleaned = text.trim().replace(/[,;:\s]+$/u, '').trim();
-  if (hasMultipleAuthors(cleaned)) {
-    return '';
-  }
-
+  if (hasMultipleAuthors(cleaned)) return '';
   return cleaned.replace(/^&\s+/u, '').trim();
 }
 
 function hasMultipleAuthors(text: string): boolean {
-  if (/\bet\s+al\.?/iu.test(text)) {
-    return true;
-  }
-
-  const normalized = text.replace(/\s+/gu, ' ').trim();
-  const invertedAuthors = normalized.match(/[^,]+,\s*[^,]+/gu);
-
-  if (invertedAuthors && invertedAuthors.length > 1) {
-    return true;
-  }
-
-  return /\s(?:&|and)\s/iu.test(normalized);
+  if (/\bet\s+al\.?$/iu.test(text)) return false;
+  if (/\s&\s/u.test(text)) return true;
+  return /\sand\s/iu.test(text) && text.includes(',');
 }
 
 /** Clean up the quoted title text */
