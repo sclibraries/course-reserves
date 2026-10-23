@@ -1,10 +1,28 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { MemoryRouter, useLocation } from 'react-router-dom';
+import { axe } from 'vitest-axe';
+import { toHaveNoViolations } from 'vitest-axe/matchers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SubmissionPage from './SubmissionPage';
 
-const mocks = vi.hoisted(() => ({ flowStates: {}, claimAllItems: vi.fn() }));
+expect.extend({ toHaveNoViolations });
+
+const mocks = vi.hoisted(() => ({
+  flowStates: {},
+  claimAllItems: vi.fn(),
+  getSyllabi: vi.fn(),
+  downloadOriginal: vi.fn(),
+}));
+
+vi.mock('../../../../services/admin/submissionSyllabiService', async (importOriginal) => ({
+  ...await importOriginal(),
+  submissionSyllabiService: {
+    getSyllabi: mocks.getSyllabi,
+    downloadOriginal: mocks.downloadOriginal,
+  },
+}));
 
 vi.mock('../../../../hooks/admin/useItemFlow', () => ({
   default: ({ item }) => ({ flowState: mocks.flowStates[`${item.kind}/${item.id}`] || null, loading: false }),
@@ -83,6 +101,33 @@ const pageProps = () => {
   };
 };
 
+const syllabusFixtures = () => ([
+  {
+    id: 41,
+    source: 'google_doc',
+    source_url: 'https://docs.google.com/document/d/synthetic-doc/edit',
+    original_filename: null,
+    mime_type: 'text/plain',
+    byte_size: null,
+    extracted_text: 'Synthetic folder\nAuthor, Synthetic article title.',
+    created_at: '2026-10-20T12:00:00Z',
+    added_by: 'Synthetic Faculty',
+    added_by_role: 'faculty',
+  },
+  {
+    id: 42,
+    source: 'upload',
+    source_url: null,
+    original_filename: 'test-syllabus.docx',
+    mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    byte_size: 2048,
+    extracted_text: 'Uploaded outline\n\nA citation on a new line.',
+    created_at: '2026-10-21T12:00:00Z',
+    added_by: 'Synthetic Staff',
+    added_by_role: 'staff',
+  },
+]);
+
 function LocationSearch() {
   return <output data-testid="location-search">{useLocation().search}</output>;
 }
@@ -119,6 +164,8 @@ const rowIds = (container) => Array.from(container.querySelectorAll('[data-item-
 let view;
 
 beforeEach(() => {
+  mocks.getSyllabi.mockReset().mockResolvedValue([]);
+  mocks.downloadOriginal.mockReset();
   mocks.flowStates = {
     'new/11': {
       flow: { name: 'Print book' },
@@ -129,12 +176,115 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   view?.unmount();
   view = null;
   document.body.innerHTML = '';
 });
 
 describe('SubmissionPage', () => {
+  it('hides the Syllabus count when no syllabi are attached', async () => {
+    view = await renderPage();
+
+    await waitFor(() => expect(mocks.getSyllabi).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: /syllabus/i })).toBeNull();
+  });
+
+  it('loads attached syllabi once and shows their count in the header', async () => {
+    mocks.getSyllabi.mockResolvedValueOnce(syllabusFixtures());
+    view = await renderPage();
+
+    const trigger = await screen.findByRole('button', { name: /syllabus.*2/i });
+    expect(trigger).toBeTruthy();
+    expect(mocks.getSyllabi).toHaveBeenCalledTimes(1);
+    expect(mocks.getSyllabi).toHaveBeenCalledWith(31);
+    expect(view.container.querySelectorAll('[data-item-row]')).toHaveLength(5);
+  });
+
+  it('shows both syllabus sources and keeps extracted text collapsed until requested', async () => {
+    mocks.getSyllabi.mockResolvedValueOnce(syllabusFixtures());
+    view = await renderPage();
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: /syllabus.*2/i })));
+
+    const sheet = await screen.findByRole('dialog', { name: 'Submission syllabi' });
+    const googleLink = screen.getByRole('link', { name: 'Google Doc' });
+    expect(googleLink.getAttribute('href')).toBe('https://docs.google.com/document/d/synthetic-doc/edit');
+    expect(googleLink.getAttribute('target')).toBe('_blank');
+    expect(googleLink.getAttribute('rel')).toContain('noreferrer');
+    expect(sheet.textContent).toContain('test-syllabus.docx');
+    expect(sheet.textContent).toContain('2 KB');
+    expect(sheet.textContent).toContain('Added by Synthetic Faculty (faculty) on');
+    expect(sheet.textContent).toContain('Added by Synthetic Staff (staff) on');
+
+    const details = Array.from(sheet.querySelectorAll('details'));
+    expect(details).toHaveLength(2);
+    expect(details.every((element) => !element.open)).toBe(true);
+    await act(async () => fireEvent.click(screen.getAllByText('Extracted text')[0]));
+    expect(details[0].open).toBe(true);
+    expect(details[0].querySelector('p').className).toContain('tw-whitespace-pre-wrap');
+  });
+
+  it('shows a generic load error with its reference', async () => {
+    mocks.getSyllabi.mockRejectedValueOnce({
+      payload: { error_code: 'syllabus_unavailable', message: 'Synthetic provider detail', reference: 'SYNTH-LOAD-1' },
+    });
+    view = await renderPage();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Syllabi could not be loaded');
+    expect(alert.textContent).toContain('SYNTH-LOAD-1');
+    expect(alert.textContent).not.toContain('Synthetic provider detail');
+  });
+
+  it('downloads an uploaded original and announces progress', async () => {
+    mocks.getSyllabi.mockResolvedValueOnce(syllabusFixtures());
+    let finishDownload;
+    mocks.downloadOriginal.mockReturnValueOnce(new Promise((resolve) => { finishDownload = resolve; }));
+    const createObjectURL = vi.fn().mockReturnValue('blob:synthetic-original');
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
+    const clickAnchor = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    view = await renderPage();
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: /syllabus.*2/i })));
+    await screen.findByRole('dialog', { name: 'Submission syllabi' });
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open original' })));
+    expect(screen.getByRole('status').textContent).toContain('Downloading test-syllabus.docx');
+    expect(mocks.downloadOriginal).toHaveBeenCalledWith(31, 42);
+    await act(async () => finishDownload(new Blob(['synthetic original'])));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+    expect(clickAnchor).toHaveBeenCalled();
+    expect(document.querySelector('a[download="test-syllabus.docx"]')).toBeNull();
+  });
+
+  it('shows a generic download error with its reference', async () => {
+    mocks.getSyllabi.mockResolvedValueOnce(syllabusFixtures());
+    mocks.downloadOriginal.mockRejectedValueOnce({
+      payload: { error_code: 'syllabus_unavailable', message: 'Synthetic provider detail', reference: 'SYNTH-DOWNLOAD-1' },
+    });
+    view = await renderPage();
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: /syllabus.*2/i })));
+    await screen.findByRole('dialog', { name: 'Submission syllabi' });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open original' })));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('original could not be downloaded');
+    expect(alert.textContent).toContain('SYNTH-DOWNLOAD-1');
+    expect(alert.textContent).not.toContain('Synthetic provider detail');
+  });
+
+  it('keeps the open sheet accessible and restores focus to its trigger on close', async () => {
+    mocks.getSyllabi.mockResolvedValueOnce(syllabusFixtures());
+    view = await renderPage();
+    const trigger = await screen.findByRole('button', { name: /syllabus.*2/i });
+    await act(async () => fireEvent.click(trigger));
+    await screen.findByRole('dialog', { name: 'Submission syllabi' });
+
+    expect(await axe(document.body)).toHaveNoViolations();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Close' })));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
   it('constrains the page grid and work pane so content can reflow', async () => {
     view = await renderPage();
 

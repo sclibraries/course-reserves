@@ -4,6 +4,7 @@ import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import ChangeLinkedCourseDialog from './linking/ChangeLinkedCourseDialog';
 import SubmissionActivitySheet from './linking/SubmissionActivitySheet';
+import SubmissionSyllabusSheet from './SubmissionSyllabusSheet';
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleDateString() : 'Not submitted';
@@ -55,6 +56,7 @@ function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, on
             <Button ref={changeTriggerRef} variant="link" className="tw-h-auto tw-p-0" onClick={() => handleChangeOpen(true)}>Change</Button>
           )}
           <SubmissionActivitySheet linking={linking} />
+          <SubmissionSyllabusSheet submissionId={submission.id} />
         </div>
       </div>
       <p className="tw-mt-4 tw-text-sm" aria-label="Submission item counts">
