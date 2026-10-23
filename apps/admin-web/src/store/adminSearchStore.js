@@ -18,8 +18,9 @@ const useAdminSearchStore = create(
       terms: [],
       sort: 'name', // Default sort by name ascending
       defaultsSet: false, // Track whether defaults have been set
+      termSelectionMade: false,
 
-      setTermId: (termId) => set({ termId }),
+      setTermId: (termId) => set({ termId, termSelectionMade: true }),
       setTerms: (terms) => set({ terms }),
       termsLoading: false,
 
@@ -42,7 +43,7 @@ const useAdminSearchStore = create(
           
           set({ 
             college: collegeKey,
-            termId: currentTermId,
+            termId: currentState.termSelectionMade ? currentState.termId : currentTermId,
             defaultsSet: true 
           });
         }
@@ -100,8 +101,13 @@ const useAdminSearchStore = create(
             termsLoading: false,
           };
           
-          // Only set termId if explicitly requested and none is already set
-          if (setDefaultTerm && currentState.termId === null) {
+          // A null termId may be an explicit All Terms choice.
+          if (
+            setDefaultTerm &&
+            currentState.termId === null &&
+            !currentState.termSelectionMade &&
+            !currentState.defaultsSet
+          ) {
             // Use 'admin' mode: prefer upcoming term as soon as it starts
             const currentTerm = getCurrentTerm(sortedTerms, 'admin');
             const defaultTermId = currentTerm?.id ?? null;
