@@ -52,7 +52,16 @@ Synthetic Web Resource Guide [https://example.test/guide]
 Example Scholar, “A Sample Newspaper Study,” Example Review 13 (2018): 4–17.
 Classroom Resources
 Test Author, “A Synthetic Classroom Article,” Example Journal 24 (2023): 25–42.
-Sample Author, “A Chapter for Example Courses.” In Sample Editors ed., Test Reader (Example City: Example Press, 2022), pp. 12–29.`;
+Sample Author, “A Chapter for Example Courses.” In Sample Editors ed., Test Reader (Example City: Example Press, 2022), pp. 12–29.
+Media and Moving Images
+Film: Sample Film Epsilon (link required on synthetic course site)
+Test Author, “A Citation After an Unlinked Film,” Example Journal 14 (2019): 1–10.
+Classroom Film Access
+Sample Film Zeta (film) - unavailable on the synthetic course site.
+Example Scholar, “A Citation After a Film Marker,” Example Quarterly 8 (2020): 4–15.
+Example Thought 20th century
+“An Invented Act Title” in Test Editor, Sample Editor and Example Editor eds., Example Book (Example Press, 2001): 105-113.
+Demo Author, “A Follow-up Synthetic Study,” Example Review 16 (2022): 15–25.`;
 
 describe('extractCitationsFromSyllabus', () => {
   it('detects a single-line quoted-title citation with author-first formatting', () => {
@@ -185,9 +194,12 @@ Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (Ju
       ...Array(3).fill('Public Stories'),
       ...Array(2).fill('Newspaper Collections'),
       ...Array(2).fill('Classroom Resources'),
+      ...Array(2).fill('Media and Moving Images'),
+      ...Array(2).fill('Classroom Film Access'),
+      ...Array(2).fill('Example Thought 20th century'),
     ];
 
-    expect(result.entries).toHaveLength(34);
+    expect(result.entries).toHaveLength(40);
     expect(result.entries.map(({ heading }) => heading)).toEqual(expectedHeadings);
     expect(result.skipped).toEqual([
       'Synthetic Course Title',
@@ -196,12 +208,23 @@ Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (Ju
       'Instructor: Synthetic Instructor',
     ]);
 
+    expect(result.entries.slice(-6).map(({ heading, text, type }) => [heading, text, type])).toEqual([
+      ['Media and Moving Images', 'Sample Film Epsilon (link required on synthetic course site)', 'media'],
+      ['Media and Moving Images', 'Test Author, “A Citation After an Unlinked Film,” Example Journal 14 (2019): 1–10.', 'citation'],
+      ['Classroom Film Access', 'Sample Film Zeta', 'media'],
+      ['Classroom Film Access', 'Example Scholar, “A Citation After a Film Marker,” Example Quarterly 8 (2020): 4–15.', 'citation'],
+      ['Example Thought 20th century', '“An Invented Act Title” in Test Editor, Sample Editor and Example Editor eds., Example Book (Example Press, 2001): 105-113.', 'citation'],
+      ['Example Thought 20th century', 'Demo Author, “A Follow-up Synthetic Study,” Example Review 16 (2022): 15–25.', 'citation'],
+    ]);
+
     const media = result.entries.filter(({ type }) => type === 'media');
     expect(media.map(({ text, url }) => [text, url])).toEqual([
       ['Sample Film Alpha', 'https://example.test/alpha'],
       ['Sample Film Beta', 'https://example.test/beta'],
       ['Sample Documentary Gamma', 'https://example.test/gamma'],
       ['Sample Movie Delta', 'https://example.test/delta'],
+      ['Sample Film Epsilon (link required on synthetic course site)', null],
+      ['Sample Film Zeta', null],
     ]);
     expect(result.entries.find(({ type }) => type === 'web')).toMatchObject({
       text: 'Synthetic Web Resource Guide',
@@ -210,7 +233,7 @@ Test Author, “A Synthetic Citation Parsing Title,” Example Journal 60, 2 (Ju
     });
     expect(result.entries.find(({ text }) => text.includes('A Two-Part Study'))?.text).toContain('Section Two');
     expect(result.citations).toEqual(result.entries.filter(({ type }) => type === 'citation').map(({ text }) => text));
-    expect(result.citations).toHaveLength(29);
+    expect(result.citations).toHaveLength(33);
 
     for (const entry of result.entries.filter(({ type }) => type === 'citation')) {
       const author = parseCitation(entry.text).author;

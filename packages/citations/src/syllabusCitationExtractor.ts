@@ -125,7 +125,7 @@ function findUrl(text: string): string | null {
 }
 
 function isShortHeader(line: string): boolean {
-  return HEADER_PATTERN.test(line) && !CITATION_MARKER_PATTERN.test(line);
+  return HEADER_PATTERN.test(line) && !MEDIA_PATTERN.test(line) && !CITATION_MARKER_PATTERN.test(line);
 }
 
 function extractLineBasedBlocks(rawText: string): string[] {
@@ -253,10 +253,11 @@ function startsNewCitation(line: string): boolean {
     /^[\p{Lu}][\p{L}\p{M}'’-]+\s+[\p{Lu}][\p{L}\p{M}'’-]+\s+\([12]\d{3}\)/u.test(line)
   );
   const hasQuotedAcademicStart = AUTHOR_FIRST_QUOTED_PATTERN.test(line);
+  const hasQuotedTitleStart = /^["“][^"”]+["”]/u.test(line);
 
   const hasYearStart = /^[12]\d{3}\b/u.test(line);
 
-  return hasLegalCaseStart || hasAcademicStart || hasQuotedAcademicStart || hasYearStart;
+  return hasLegalCaseStart || hasAcademicStart || hasQuotedAcademicStart || hasQuotedTitleStart || hasYearStart;
 }
 
 function isContinuation(line: string): boolean {
