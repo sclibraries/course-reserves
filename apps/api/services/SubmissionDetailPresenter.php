@@ -20,6 +20,13 @@ class SubmissionDetailPresenter
 
     public function present(array $submission)
     {
+        $entry = Yii::$app->db->createCommand(
+            'SELECT entered_by, entry_source FROM faculty_submissions WHERE submission_id = :id',
+            [':id' => (int)($submission['submission_id'] ?? 0)]
+        )->queryOne();
+        $submission['entered_by'] = $entry['entered_by'] ?? null;
+        $submission['entry_source'] = $entry['entry_source'] ?? null;
+
         $collections = ['newResources' => 'new', 'reuseResources' => 'reuse'];
         $instanceIds = [];
         $catalogInstanceIds = [];

@@ -115,21 +115,35 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS workflow/submission/<id:\\d+>/syllabi' => 'syllabus/options',
             'OPTIONS workflow/submission/<id:\\d+>/syllabi/<sid:\\d+>/file' => 'syllabus/options',
         ];
+        $staffEnteredRules = [
+            'POST workflow/submission/staff-entered' => 'staff-entered-submission/create',
+            'OPTIONS workflow/submission/staff-entered' => 'staff-entered-submission/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
         $expectedDraftRules = array_intersect_key($mergedRules, $draftRules);
         $expectedAvailabilityRules = array_intersect_key($mergedRules, $availabilityRules);
         $expectedSyllabusRules = array_intersect_key($mergedRules, $syllabusRules);
-        $declaredRules = array_merge($claimRules, $groupRules, $flowRules, $draftRules, $availabilityRules, $syllabusRules);
+        $expectedStaffEnteredRules = array_intersect_key($mergedRules, $staffEnteredRules);
+        $declaredRules = array_merge(
+            $claimRules,
+            $groupRules,
+            $flowRules,
+            $draftRules,
+            $availabilityRules,
+            $syllabusRules,
+            $staffEnteredRules
+        );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(237, $mergedRules);
+        $this->assertCount(239, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
         $this->assertSame($draftRules, $expectedDraftRules);
         $this->assertSame($availabilityRules, $expectedAvailabilityRules);
         $this->assertSame($syllabusRules, $expectedSyllabusRules);
+        $this->assertSame($staffEnteredRules, $expectedStaffEnteredRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -144,6 +158,8 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $cases = [
             ['POST', 'dev-auth/login', ['dev-auth/login', []]],
             ['OPTIONS', 'dev-auth/login', ['dev-auth/login', []]],
+            ['POST', 'workflow/submission/staff-entered', ['staff-entered-submission/create', []]],
+            ['OPTIONS', 'workflow/submission/staff-entered', ['staff-entered-submission/options', []]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
             ['POST', 'faculty-submission/draft', ['faculty-draft/create', []]],
             ['OPTIONS', 'faculty-submission/draft', ['faculty-draft/options', []]],

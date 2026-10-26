@@ -15,6 +15,7 @@ class FacultyDraftService
     private $ownership;
     private $payloads;
     private $contexts;
+    private $submittedSubmissions;
 
     public function __construct(
         ?SubmissionOwnershipPolicy $ownership = null,
@@ -25,6 +26,7 @@ class FacultyDraftService
         $this->ownership = $ownership ?: new SubmissionOwnershipPolicy();
         $this->payloads = $payloads ?: new SubmissionPayloadService();
         $this->contexts = $contexts ?: new FacultySubmissionContext($this->ownership);
+        $this->submittedSubmissions = new SubmittedSubmissionCreator($this->contexts, $this->payloads);
     }
 
     public function create(array $actor, array $data)
@@ -77,41 +79,21 @@ class FacultyDraftService
             return $resolved['body'];
         }
         $context = $resolved['context'];
-        $existing = $this->contexts->findForCourse($context);
-        if ($existing && $existing->status !== FacultySubmission::STATUS_DRAFT) {
-            throw new BadRequestHttpException('Submission already exists for this course and section');
-        }
-
         try {
-            $submission = Transactional::run(function () use ($existing, $context, $data, $actor) {
-                if ($existing) {
-                    $submission = $existing;
-                    $this->contexts->apply($submission, $context);
-                    $submission->status = FacultySubmission::STATUS_SUBMITTED;
-                    $submission->submitted_at = date('Y-m-d H:i:s');
-                } else {
-                    $submission = $this->contexts->newSubmission($context, FacultySubmission::STATUS_SUBMITTED);
-                }
-                SubmissionConfirmationState::request(
-                    $submission,
-                    !empty(($data['metadata'] ?? [])['emailConfirmation'])
-                );
-                if (!$submission->save()) {
-                    throw new \RuntimeException('Failed to save submission: ' . json_encode($submission->errors));
-                }
-                $this->payloads->replace($submission->submission_id, $data, $actor);
-                return $submission;
-            });
-            return FacultySubmissionPresenter::submitCompleteResponse([
-                'success' => true,
-                'message' => 'Submission completed successfully',
-                'submission' => SubmissionConfirmationState::projectResponse($submission),
-                'stats' => $this->payloads->submissionStats($data),
-            ]);
+            $result = $this->submittedSubmissions->create($context, $actor, $data);
         } catch (\Exception $exception) {
             Yii::error('Submission creation failed: ' . $exception->getMessage(), __METHOD__);
             throw new BadRequestHttpException('Failed to create submission: ' . $exception->getMessage());
         }
+        if ($result['duplicate']) {
+            throw new BadRequestHttpException('Submission already exists for this course and section');
+        }
+        return FacultySubmissionPresenter::submitCompleteResponse([
+            'success' => true,
+            'message' => 'Submission completed successfully',
+            'submission' => SubmissionConfirmationState::projectResponse($result['submission']),
+            'stats' => $this->payloads->submissionStats($data),
+        ]);
     }
 
     public function updateDraft($submission, array $actor, array $data)

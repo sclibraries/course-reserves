@@ -30,6 +30,22 @@ class SyllabusStore
         return $this->storeUpload($submissionId, $payload, $actor);
     }
 
+    public function removeStoredFileForSubmission($submissionId, $syllabusId)
+    {
+        $storedPath = Yii::$app->db->createCommand(
+            'SELECT stored_path FROM submission_syllabi WHERE submission_id = :submission_id AND id = :id',
+            [':submission_id' => (int)$submissionId, ':id' => (int)$syllabusId]
+        )->queryScalar();
+        if (!$storedPath) {
+            return;
+        }
+
+        $path = $this->storageDirectory() . DIRECTORY_SEPARATOR . basename($storedPath);
+        if (is_file($path) && !@unlink($path)) {
+            throw new \RuntimeException('Stored syllabus file could not be removed after transaction failure.');
+        }
+    }
+
     public function storeUpload($submissionId, array $payload, array $actor)
     {
         $upload = $this->uploadValidator->validate($payload);

@@ -89,7 +89,7 @@ class FacultySubmission extends ActiveRecord
     {
         return [
             [['shibboleth_user_id', 'term_code', 'course_code', 'course_title'], 'required'],
-            [['submission_notes', 'faculty_display_name', 'proxy_display_name', 'duplicate_note', 'lock_reason'], 'string'],
+            [['submission_notes', 'faculty_display_name', 'proxy_display_name', 'duplicate_note', 'lock_reason', 'entered_by', 'entry_source'], 'string'],
             [['needed_by_date', 'locked_at'], 'date'],
             [['created_at', 'updated_at', 'submitted_at'], 'safe'],
             [['email_confirmation_sent', 'is_duplicate_previous', 'is_locked', 'offering_id'], 'integer'],
@@ -97,7 +97,7 @@ class FacultySubmission extends ActiveRecord
             [['email_confirmation_status'], 'in', 'range' => SubmissionConfirmationState::allowedStatuses()],
             [['email_confirmation_status'], 'default', 'value' => SubmissionConfirmationState::NOT_REQUESTED],
             [['submission_uuid'], 'string', 'max' => 36],
-            [['shibboleth_user_id', 'proxy_shibboleth_user_id', 'folio_course_listing_id', 'faculty_display_name', 'proxy_display_name', 'assignee_staff_user_id', 'locked_by_staff_id'], 'string', 'max' => 255],
+            [['shibboleth_user_id', 'proxy_shibboleth_user_id', 'folio_course_listing_id', 'faculty_display_name', 'proxy_display_name', 'assignee_staff_user_id', 'locked_by_staff_id', 'entered_by'], 'string', 'max' => 255],
             [['term_code'], 'string', 'max' => 32],
             [['its_course_id', 'roster_term_id'], 'string', 'max' => 64],
             [['academic_period'], 'string', 'max' => 16],
@@ -150,7 +150,7 @@ class FacultySubmission extends ActiveRecord
     public function fields()
     {
         $fields = parent::fields();
-        unset($fields['email_confirmation_legacy_sent']);
+        unset($fields['email_confirmation_legacy_sent'], $fields['entered_by'], $fields['entry_source']);
         // Add related data fields
         $fields['reuseResources'] = 'reuseResources';
         $fields['newResources'] = 'newResources';
