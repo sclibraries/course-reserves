@@ -8,26 +8,35 @@ use Yii;
 class SubmissionDetailPresenter
 {
     private $folioService;
-    private $flowRunner;
+    private $flows;
+    private $flowStatePresenter;
 
-    public function __construct($folioService = null, $flowRunner = null)
+    public function __construct($folioService = null, $flows = null)
     {
         $this->folioService = $folioService ?: Yii::$container->get(FolioService::class);
-        $this->flowRunner = $flowRunner ?: Yii::$container->get(FlowRunner::class);
+        $this->flows = $flows ?: Yii::$container->get(FlowRepository::class);
+        $this->flowStatePresenter = new FlowStatePresenter($this->flows);
     }
 
-    public function present(array $submission, array $actor)
+    public function present(array $submission)
     {
         $collections = ['newResources' => 'new', 'reuseResources' => 'reuse'];
         $instanceIds = [];
+        $catalogInstanceIds = [];
+        $flowItems = [];
         foreach ($collections as $collection => $kind) {
-            foreach ($submission[$collection] ?? [] as $item) {
+            foreach ($submission[$collection] ?? [] as $index => $item) {
                 if (!is_array($item)) {
                     continue;
                 }
                 $instanceId = ItemReadiness::catalogInstanceId($item);
+                $catalogInstanceIds[$collection][$index] = $instanceId;
                 if ($instanceId !== null) {
                     $instanceIds[$instanceId] = true;
+                }
+                $itemId = (int)($item['id'] ?? 0);
+                if ($itemId > 0) {
+                    $flowItems[] = ['kind' => $kind, 'id' => $itemId];
                 }
             }
         }
@@ -42,12 +51,37 @@ class SubmissionDetailPresenter
                 }
                 $lookupFailures = array_diff_key($instanceIds, $availability);
                 if ($lookupFailures) {
-                    $this->logAvailabilityFailure();
+                    $this->logAvailabilityFailure('instance ids not returned=' . implode(', ', array_keys($lookupFailures)));
                 }
             } catch (\Throwable $exception) {
                 $availability = [];
                 $lookupFailures = $instanceIds;
-                $this->logAvailabilityFailure();
+                $this->logAvailabilityFailure('exception=' . $exception->getMessage());
+            }
+        }
+
+        $flowRuns = [];
+        if ($flowItems) {
+            foreach ($this->flows->latestRunsForItems($flowItems) as $run) {
+                $flowRuns[$run['item_kind'] . ':' . $run['item_id']] = $run;
+            }
+        }
+        $materialTypeIds = [];
+        foreach ($collections as $collection => $kind) {
+            foreach ($submission[$collection] ?? [] as $index => $item) {
+                if (!is_array($item) || isset($flowRuns[$kind . ':' . (int)($item['id'] ?? 0)])) {
+                    continue;
+                }
+                $materialTypeId = (int)($item['material_type_id'] ?? 0);
+                if ($materialTypeId > 0) {
+                    $materialTypeIds[$materialTypeId] = true;
+                }
+            }
+        }
+        $mappedFlows = [];
+        if ($materialTypeIds) {
+            foreach ($this->flows->mappedFlowsForMaterialTypes(array_keys($materialTypeIds)) as $mappedFlow) {
+                $mappedFlows[(int)$mappedFlow['material_type_id']] = $mappedFlow;
             }
         }
 
@@ -56,7 +90,7 @@ class SubmissionDetailPresenter
                 if (!is_array($item)) {
                     continue;
                 }
-                $instanceId = ItemReadiness::catalogInstanceId($item);
+                $instanceId = $catalogInstanceIds[$collection][$index] ?? null;
                 $itemAvailability = $instanceId !== null && !isset($lookupFailures[$instanceId])
                     ? ($availability[$instanceId] ?? null)
                     : null;
@@ -64,8 +98,14 @@ class SubmissionDetailPresenter
                     $itemAvailability = ['error' => true];
                 }
 
-                $item = array_merge($item, ItemReadiness::evaluate($item, $itemAvailability));
-                $item['flow'] = $this->flowSummary($kind, $item, $actor);
+                $item = array_merge(
+                    $item,
+                    ItemReadiness::evaluateWithCatalogInstanceId($item, $itemAvailability, $instanceId)
+                );
+                $flowKey = $kind . ':' . (int)($item['id'] ?? 0);
+                $run = $flowRuns[$flowKey] ?? null;
+                $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
+                $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
                 $submission[$collection][$index] = $item;
             }
         }
@@ -73,21 +113,10 @@ class SubmissionDetailPresenter
         return $submission;
     }
 
-    private function flowSummary($kind, array $item, array $actor)
-    {
-        $result = $this->flowRunner->getItemFlow($kind, (int)($item['id'] ?? 0), $actor);
-        $state = $result['body'] ?? [];
-
-        return [
-            'name' => $state['flow']['name'] ?? null,
-            'current_step_label' => $state['current_step']['step']['label'] ?? null,
-            'finish_state' => $state['finished']['finish_state'] ?? null,
-        ];
-    }
-
-    private function logAvailabilityFailure()
+    private function logAvailabilityFailure($detail)
     {
         $reference = Yii::$app->security->generateRandomString(12);
-        Yii::error('Submission detail FOLIO availability failed. reference=' . $reference);
+        $detail = str_replace(["\r", "\n"], ' ', $detail);
+        Yii::error('Submission detail FOLIO availability failed. reference=' . $reference . ' detail=' . $detail);
     }
 }

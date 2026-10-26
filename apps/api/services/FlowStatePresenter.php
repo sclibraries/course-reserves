@@ -24,10 +24,7 @@ class FlowStatePresenter
                 'can_act' => (bool)$canAct,
             ];
         }
-        $steps = json_decode($run['steps_json'], true) ?: [];
-        $currentStep = $run['current_step_key'] === null
-            ? null
-            : FlowStepLookup::stepByKey($steps, $run['current_step_key']);
+        $currentStep = $this->currentStep($run);
         return [
             'flow' => ['id' => (int)$run['flow_id'], 'name' => $run['flow_name'], 'version' => (int)$run['version']],
             'run_id' => (int)$run['id'],
@@ -40,6 +37,29 @@ class FlowStatePresenter
         ];
     }
 
+    public function summary($run, $mappedFlow = null)
+    {
+        if ($run) {
+            $currentStep = $this->currentStep($run);
+            return [
+                'name' => $run['flow_name'],
+                'current_step_label' => $currentStep['label'] ?? null,
+                'finish_state' => $run['finish_state'],
+            ];
+        }
+        if ($mappedFlow) {
+            $steps = json_decode($mappedFlow['steps_json'], true) ?: [];
+            $firstStep = $steps ? reset($steps) : [];
+            $firstStep = FlowStepLookup::stepByKey($steps, $firstStep['key'] ?? null);
+            return [
+                'name' => $mappedFlow['flow_name'],
+                'current_step_label' => $firstStep['label'] ?? null,
+                'finish_state' => null,
+            ];
+        }
+        return ['name' => null, 'current_step_label' => null, 'finish_state' => null];
+    }
+
     public function runSnapshot(array $run)
     {
         return [
@@ -49,5 +69,13 @@ class FlowStatePresenter
             'current_step_key' => $run['current_step_key'],
             'finish_state' => $run['finish_state'],
         ];
+    }
+
+    private function currentStep(array $run)
+    {
+        $steps = json_decode($run['steps_json'], true) ?: [];
+        return $run['current_step_key'] === null
+            ? []
+            : FlowStepLookup::stepByKey($steps, $run['current_step_key']);
     }
 }

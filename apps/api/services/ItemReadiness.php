@@ -9,12 +9,17 @@ class ItemReadiness
 {
     public static function evaluate(array $item, $availability = null)
     {
+        return self::evaluateWithCatalogInstanceId($item, $availability, self::catalogInstanceId($item));
+    }
+
+    public static function evaluateWithCatalogInstanceId(array $item, $availability, $instanceId)
+    {
         $data = self::resourceData($item['resource_data'] ?? null);
         if (self::hasOnlineAccess($item, $data)) {
             return self::result('ready', 'Online access is available.');
         }
 
-        if (self::catalogInstanceId($item, $data) === null) {
+        if ($instanceId === null) {
             return self::result('unknown', 'No catalog identity.');
         }
 

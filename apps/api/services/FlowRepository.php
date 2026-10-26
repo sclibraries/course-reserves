@@ -55,6 +55,54 @@ class FlowRepository
         );
     }
 
+    public function latestRunsForItems(array $items)
+    {
+        if (!$items) {
+            return [];
+        }
+        $conditions = [];
+        $params = [];
+        foreach ($items as $index => $item) {
+            $kind = ':kind' . $index;
+            $itemId = ':item_id' . $index;
+            $conditions[] = '(r.item_kind = ' . $kind . ' AND r.item_id = ' . $itemId . ')';
+            $params[$kind] = $item['kind'];
+            $params[$itemId] = (int)$item['id'];
+        }
+        return Yii::$app->db->createCommand(
+            'SELECT r.*, f.name AS flow_name, v.steps_json FROM item_flow_runs r '
+            . 'INNER JOIN flows f ON f.id = r.flow_id '
+            . 'INNER JOIN flow_versions v ON v.flow_id = r.flow_id AND v.version = r.version '
+            . 'WHERE (' . implode(' OR ', $conditions) . ') AND r.id = ('
+            . 'SELECT MAX(latest.id) FROM item_flow_runs latest '
+            . 'WHERE latest.item_kind = r.item_kind AND latest.item_id = r.item_id)',
+            $params
+        )->queryAll();
+    }
+
+    public function mappedFlowsForMaterialTypes(array $materialTypeIds)
+    {
+        $materialTypeIds = array_values(array_unique(array_map('intval', $materialTypeIds)));
+        if (!$materialTypeIds) {
+            return [];
+        }
+        $placeholders = [];
+        $params = [];
+        foreach ($materialTypeIds as $index => $materialTypeId) {
+            $placeholder = ':type' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $materialTypeId;
+        }
+        return Yii::$app->db->createCommand(
+            'SELECT m.material_type_id, f.name AS flow_name, v.steps_json '
+            . 'FROM material_type_flows m INNER JOIN flows f ON f.id = m.flow_id '
+            . 'INNER JOIN flow_versions v ON v.flow_id = f.id '
+            . 'WHERE m.material_type_id IN (' . implode(', ', $placeholders) . ') '
+            . 'AND v.version = (SELECT MAX(latest.version) FROM flow_versions latest WHERE latest.flow_id = f.id)',
+            $params
+        )->queryAll();
+    }
+
     public function openRun($kind, $itemId, $forUpdate = false)
     {
         return $this->runWhere(
