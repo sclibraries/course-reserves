@@ -19,9 +19,12 @@ class SubmittedSubmissionCreator
     }
 
     public function create(array $context, array $actor, array $data, array $attributes = [],
-        callable $afterCreate = null, callable $onFailure = null)
+        callable $afterCreate = null, callable $onFailure = null, bool $reuseDraft = true)
     {
         $existing = $this->contexts->findForCourse($context);
+        if ($existing && $existing->status === FacultySubmission::STATUS_DRAFT && !$reuseDraft) {
+            return ['draft_exists' => true];
+        }
         if ($existing && $existing->status !== FacultySubmission::STATUS_DRAFT) {
             return ['duplicate' => true];
         }

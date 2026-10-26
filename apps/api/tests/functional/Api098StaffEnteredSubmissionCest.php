@@ -148,6 +148,45 @@ class Api098StaffEnteredSubmissionCest extends BaseFunctionalCest
         Assert::assertSame(1, $this->submissionCount('test-api098-instructor'));
     }
 
+    public function staffEntryRejectsInstructorDraftWithoutSideEffects(FunctionalTester $I)
+    {
+        $payload = $this->payload('draft-conflict');
+        $submissionId = TestSubmissionFixture::create(
+            '10009800-0000-4000-8000-000000000098',
+            'test-api098-instructor',
+            [
+                'term_code' => $payload['courseInfo']['term'],
+                'course_code' => $payload['courseInfo']['courseCode'],
+                'section' => $payload['courseInfo']['section'],
+                'course_title' => $payload['courseInfo']['courseTitle'],
+                'faculty_display_name' => $payload['instructor_display_name'],
+                'status' => 'draft',
+            ]
+        );
+        \Yii::$app->db->createCommand()->update('submission_new_resources', [
+            'resource_data' => json_encode(['title' => 'Instructor draft reading']),
+            'folder_name' => 'Instructor draft folder',
+        ], ['submission_id' => $submissionId])->execute();
+        \Yii::$app->db->createCommand()->insert('submission_folders', [
+            'submission_id' => $submissionId,
+            'folder_name' => 'Instructor draft folder',
+            'display_order' => 0,
+        ])->execute();
+        $this->folio->addListing($this->listing($payload));
+        $before = $this->draftSnapshot($submissionId);
+        $filesBefore = $this->storedFiles();
+
+        $this->post($I, $payload);
+
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('instructor_draft_exists', $this->response($I)['error_code']);
+        Assert::assertSame($before, $this->draftSnapshot($submissionId));
+        Assert::assertSame(0, $this->rowCount('submission_syllabi', $submissionId));
+        Assert::assertSame(0, $this->rowCount('workflow_events', $submissionId));
+        Assert::assertSame($filesBefore, $this->storedFiles());
+        Assert::assertSame(1, $this->submissionCount('test-api098-instructor'));
+    }
+
     public function syllabusFailureLeavesNoSubmission(FunctionalTester $I)
     {
         $this->setGoogleFetcher([
@@ -179,7 +218,7 @@ class Api098StaffEnteredSubmissionCest extends BaseFunctionalCest
     {
         return [
             'folio_course_listing_id' => $this->prefix . 'listing-' . $suffix,
-            'instructor_username' => ' TEST-API098-INSTRUCTOR@smith.edu ',
+            'instructor_username' => ' TEST-API098-INSTRUCTOR@example.test ',
             'instructor_display_name' => 'Synthetic API098 Instructor',
             'courseInfo' => [
                 'courseCode' => 'API098-' . $suffix,
@@ -288,6 +327,21 @@ class Api098StaffEnteredSubmissionCest extends BaseFunctionalCest
             'SELECT COUNT(*) FROM ' . $table . ' WHERE submission_id = :id',
             [':id' => $submissionId]
         )->queryScalar();
+    }
+
+    private function draftSnapshot($submissionId)
+    {
+        return [
+            'submission' => (new Query())->select([
+                'status', 'entered_by', 'entry_source', 'link_state', 'folio_course_listing_id', 'offering_id',
+            ])->from('faculty_submissions')->where(['submission_id' => $submissionId])->one(),
+            'items' => (new Query())->select(['resource_data', 'folder_name', 'display_order'])
+                ->from('submission_new_resources')->where(['submission_id' => $submissionId])
+                ->orderBy(['display_order' => SORT_ASC])->all(),
+            'folders' => (new Query())->select(['folder_name', 'display_order'])
+                ->from('submission_folders')->where(['submission_id' => $submissionId])
+                ->orderBy(['display_order' => SORT_ASC])->all(),
+        ];
     }
 
     private function cleanup()

@@ -75,8 +75,12 @@ class StaffEnteredSubmissionService
                     'proxy_display_name' => null,
                 ],
                 $afterCreate,
-                $onFailure
+                $onFailure,
+                false
             );
+            if (!empty($result['draft_exists'])) {
+                return $this->error(409, 'instructor_draft_exists');
+            }
             if ($result['duplicate']) {
                 return $this->error(409, 'submission_already_exists');
             }
@@ -152,21 +156,7 @@ class StaffEnteredSubmissionService
             'listing_id' => trim($listingId),
             'syllabus' => $data['syllabus'],
             'data' => $submissionData,
-            'context' => [
-                'owner_id' => $username,
-                'is_proxy' => false,
-                'roster_course' => null,
-                'course_info' => $course,
-                'submitted_by' => [],
-                'folio_course_listing_id' => trim($listingId),
-                'actor_id' => $actor['user_id'],
-                'actor_name' => $actor['display_name'] ?? null,
-                'display_name' => trim($displayName),
-                'term_code' => $course['term'] ?? null,
-                'course_code' => $course['courseCode'] ?? null,
-                'section' => $course['section'] ?? '',
-                'course_title' => $course['courseTitle'] ?? null,
-            ],
+            'context' => $this->contexts->forOwner($actor, $username, $course, trim($listingId)),
         ];
     }
 

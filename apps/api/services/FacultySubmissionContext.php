@@ -43,20 +43,49 @@ class FacultySubmissionContext
             return $ownership;
         }
         $roster = $ownership['roster_course'] ?? null;
+        return $this->buildContext(
+            $actor,
+            $ownership['owner_id'],
+            $ownership['is_proxy'],
+            $roster,
+            $course,
+            ($data['metadata'] ?? [])['submittedBy'] ?? [],
+            $folioId,
+            $actor['display_name'] ?? null
+        );
+    }
+
+    public function forOwner(array $actor, $ownerId, array $courseInfo, $folioListingId)
+    {
+        return $this->buildContext(
+            $actor,
+            $ownerId,
+            false,
+            null,
+            $courseInfo,
+            [],
+            $folioListingId,
+            $courseInfo['instructors'] ?? ($actor['display_name'] ?? null)
+        );
+    }
+
+    private function buildContext(array $actor, $ownerId, $isProxy, $roster, array $course,
+        $submittedBy, $folioId, $displayName)
+    {
         return [
-            'owner_id' => $ownership['owner_id'],
-            'is_proxy' => $ownership['is_proxy'],
+            'owner_id' => $ownerId,
+            'is_proxy' => $isProxy,
             'roster_course' => $roster,
             'course_info' => $course,
-            'submitted_by' => ($data['metadata'] ?? [])['submittedBy'] ?? [],
+            'submitted_by' => $submittedBy,
             'folio_course_listing_id' => $folioId,
             'actor_id' => $actor['user_id'],
             'actor_name' => $actor['display_name'] ?? null,
-            'display_name' => $actor['display_name'] ?? null,
-            'term_code' => $roster['term_code'] ?? $course['term'],
-            'course_code' => $roster['course_code'] ?? $course['courseCode'],
+            'display_name' => $displayName,
+            'term_code' => $roster['term_code'] ?? ($course['term'] ?? null),
+            'course_code' => $roster['course_code'] ?? ($course['courseCode'] ?? null),
             'section' => $roster['section'] ?? $course['section'] ?? '',
-            'course_title' => $roster['course_title'] ?? $course['courseTitle'],
+            'course_title' => $roster['course_title'] ?? ($course['courseTitle'] ?? null),
         ];
     }
 
