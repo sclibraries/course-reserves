@@ -125,6 +125,41 @@ describe('admin course term selection', () => {
     expect(useAdminSearchStore.getState().termId).toBe('term-current');
   });
 
+  it('replaces a persisted term id missing from the loaded terms with the current term', async () => {
+    useAdminSearchStore.setState({
+      termId: 'term-removed',
+      defaultsSet: true,
+      termSelectionMade: true,
+    });
+
+    const loadTerms = useAdminSearchStore.getState().fetchTerms(true);
+    resolveDelayedTerms();
+    await loadTerms;
+
+    const currentTermId = useAdminSearchStore.getState().termId;
+    const query = useBuildQuery('smith', 'all', '', '', null, currentTermId);
+
+    expect(currentTermId).toBe('term-current');
+    expect(query).toContain('courseListing.termId=="term-current"');
+  });
+
+  it('keeps a persisted explicit All Terms choice after terms load', async () => {
+    useAdminSearchStore.setState({
+      termId: null,
+      defaultsSet: true,
+      termSelectionMade: true,
+    });
+
+    const loadTerms = useAdminSearchStore.getState().fetchTerms(true);
+    resolveDelayedTerms();
+    await loadTerms;
+
+    const query = useBuildQuery('smith', 'all', '', '', null, useAdminSearchStore.getState().termId);
+
+    expect(useAdminSearchStore.getState().termId).toBeNull();
+    expect(query).toBe('(department.name=="SC*")');
+  });
+
   it('does not replace an explicit All Terms choice with a delayed default', async () => {
     const delayedDefaultFetch = useAdminSearchStore.getState().fetchTerms(true);
     await useAdminSearchStore.getState().fetchTerms();

@@ -100,9 +100,15 @@ const useAdminSearchStore = create(
             terms: sortedTerms,
             termsLoading: false,
           };
+
+          const hasInvalidTerm = currentState.termId !== null &&
+            !sortedTerms.some((term) => term.id === currentState.termId);
           
           // A null termId may be an explicit All Terms choice.
-          if (
+          if (hasInvalidTerm) {
+            stateUpdate.termId = getCurrentTerm(sortedTerms, 'admin')?.id ?? null;
+            stateUpdate.termSelectionMade = false;
+          } else if (
             setDefaultTerm &&
             currentState.termId === null &&
             !currentState.termSelectionMade &&
