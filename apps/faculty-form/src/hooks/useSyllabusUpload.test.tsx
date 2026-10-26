@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, getByLabelText, getByRole } from '@testing-library/dom';
 
 const api = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn() }));
-const extract = vi.hoisted(() => ({ extractSyllabusText: vi.fn() }));
+const reader = vi.hoisted(() => ({ readSyllabusFile: vi.fn() }));
 
 vi.mock('@/services/api/facultySyllabusApi', () => ({
   createFacultySyllabus: api.create,
   listFacultySyllabi: api.list,
 }));
-vi.mock('@/services/syllabusTextExtractor', () => extract);
+vi.mock('@/services/syllabusTextExtractor', () => reader);
 
 import { useSyllabusUpload } from './useSyllabusUpload';
 
@@ -80,7 +80,23 @@ describe('useSyllabusUpload', () => {
       events.push('attach');
       return { ...record, original_filename: 'google_doc_url' in payload ? 'Google Doc' : payload.filename };
     });
-    extract.extractSyllabusText.mockResolvedValue('Week 1');
+    reader.readSyllabusFile.mockImplementation(async (file: File) => {
+      if (file.size > 10 * 1024 * 1024) {
+        throw Object.assign(new Error('Oversized synthetic syllabus'), { code: 'syllabus_file_too_large' });
+      }
+      if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type)) {
+        throw Object.assign(new Error('Unsupported synthetic syllabus'), { code: 'unsupported_syllabus_type' });
+      }
+      return {
+        text: 'Week 1',
+        payload: {
+          filename: file.name,
+          mime_type: file.type,
+          content_base64: 'AQID',
+          extracted_text: 'Week 1',
+        },
+      };
+    });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -104,26 +120,26 @@ describe('useSyllabusUpload', () => {
     expect(onReview).toHaveBeenCalledWith('Week 1');
   });
 
-  it('extracts and attaches a PDF as JSON after a draft UUID exists', async () => {
+  it('reads and attaches a PDF as JSON after a draft UUID exists', async () => {
     const input = getByLabelText(container, 'Syllabus file') as HTMLInputElement;
     const file = makeFile('sample.pdf', 'application/pdf');
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
     await act(async () => fireEvent.change(input, { target: { files: [file] } }));
 
-    expect(extract.extractSyllabusText).toHaveBeenCalledWith(expect.any(ArrayBuffer), 'application/pdf');
+    expect(reader.readSyllabusFile).toHaveBeenCalledWith(file);
     expect(api.create).toHaveBeenCalledWith('server-draft-1', {
       filename: 'sample.pdf', mime_type: 'application/pdf', content_base64: 'AQID', extracted_text: 'Week 1',
     });
     expect(onReview).toHaveBeenCalledWith('Week 1');
   });
 
-  it('extracts and attaches a DOCX', async () => {
+  it('reads and attaches a DOCX', async () => {
     const input = getByLabelText(container, 'Syllabus file') as HTMLInputElement;
     const file = makeFile('sample.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
     await act(async () => fireEvent.change(input, { target: { files: [file] } }));
 
-    expect(extract.extractSyllabusText).toHaveBeenCalledWith(expect.any(ArrayBuffer), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(reader.readSyllabusFile).toHaveBeenCalledWith(file);
     expect(api.create).toHaveBeenCalledWith('server-draft-1', expect.objectContaining({
       filename: 'sample.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       content_base64: 'AQID', extracted_text: 'Week 1',

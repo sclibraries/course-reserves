@@ -129,7 +129,7 @@ beforeEach(() => {
   mocks.getGoogleDocText.mockReset().mockResolvedValue(syllabusText);
   mocks.readSyllabusFile.mockReset().mockResolvedValue({
     text: syllabusText,
-    attachment: {
+    payload: {
       filename: 'synthetic.pdf',
       mime_type: 'application/pdf',
       content_base64: 'c3ludGhldGlj',
@@ -273,6 +273,22 @@ describe('StaffSyllabusRequestPage', () => {
     await screen.findByRole('heading', { name: 'Review matched items' });
     expect(mocks.readSyllabusFile).toHaveBeenCalledWith(uploaded);
     expect(mocks.searchSyllabusEntries).toHaveBeenCalled();
+  });
+
+  it('shows the familiar file type error when the shared reader rejects an unsupported file', async () => {
+    await renderPage();
+    await click(screen.getByRole('button', { name: 'Upload PDF or DOCX' }));
+    mocks.readSyllabusFile.mockRejectedValueOnce(Object.assign(new Error('unsupported_syllabus_type'), {
+      code: 'unsupported_syllabus_type',
+    }));
+    const uploaded = new File(['synthetic file'], 'synthetic.txt', { type: 'text/plain' });
+    await act(async () => fireEvent.change(screen.getByLabelText('PDF or DOCX file'), {
+      target: { files: [uploaded] },
+    }));
+    await click(screen.getByRole('button', { name: 'Extract and find matches' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Choose a PDF or DOCX file.');
+    expect(mocks.searchSyllabusEntries).not.toHaveBeenCalled();
   });
 
   it('keeps the Smith username required and announces the hint accessibly', async () => {

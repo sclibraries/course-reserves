@@ -55,10 +55,10 @@ export function useStaffSyllabusRequest(course) {
       }));
       setGroups(entries);
       setDecisions(initialDecisions);
-      setSyllabus(source === 'google' ? sourceResult.syllabus : sourceResult.attachment);
+      setSyllabus(source === 'google' ? sourceResult.syllabus : sourceResult.payload);
       setProgress('Matching complete. Review each syllabus entry below.');
     } catch (reason) {
-      setError(reason.message || 'Could not read this syllabus. Check the source and try again.');
+      setError(syllabusErrorMessage(reason));
       setProgress('');
     } finally {
       setBusy(false);
@@ -94,4 +94,12 @@ export function useStaffSyllabusRequest(course) {
     instructorUsername, setInstructorUsername, progress, error, submissionId, busy,
     entriesResolved, hasIncludedEntries, canSubmit: Boolean(canSubmit) && !busy, extractAndSearch, submit,
   };
+}
+
+function syllabusErrorMessage(reason) {
+  const fileErrors = {
+    syllabus_file_too_large: 'This file is over the 10 MB limit. Choose a smaller PDF or DOCX.',
+    unsupported_syllabus_type: 'Choose a PDF or DOCX file.',
+  };
+  return fileErrors[reason?.code] || reason?.message || 'Could not read this syllabus. Check the source and try again.';
 }

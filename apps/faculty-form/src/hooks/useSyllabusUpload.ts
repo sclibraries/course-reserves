@@ -5,13 +5,7 @@ import {
   type FacultySyllabus,
   type FacultySyllabusPayload,
 } from '@/services/api/facultySyllabusApi';
-import { extractSyllabusText } from '@/services/syllabusTextExtractor';
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MIME_BY_EXTENSION: Record<string, string> = {
-  pdf: 'application/pdf',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
+import { readSyllabusFile } from '@/services/syllabusTextExtractor';
 
 interface SyllabusUploadOptions {
   reserveId: string;
@@ -66,28 +60,9 @@ export function useSyllabusUpload({
   const attachFile = useCallback(async (file?: File) => {
     if (!file) return;
     setError(null);
-    if (file.size > MAX_FILE_BYTES) {
-      setError('This file is over the 10 MB limit. Choose a smaller PDF or DOCX.');
-      return;
-    }
-
-    const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    const mimeType = MIME_BY_EXTENSION[extension];
-    if (!mimeType || (file.type && file.type !== mimeType)) {
-      setError('Choose a PDF or DOCX file.');
-      return;
-    }
-
     setIsReading(true);
     try {
-      const content = await file.arrayBuffer();
-      const extractedText = await extractSyllabusText(content, mimeType);
-      const payload: FacultySyllabusPayload = {
-        filename: file.name,
-        mime_type: mimeType,
-        content_base64: toBase64(content),
-        extracted_text: extractedText,
-      };
+      const { payload } = await readSyllabusFile(file);
       await attach(payload);
     } catch (reason) {
       setError(friendlySyllabusError(reason));
@@ -103,15 +78,6 @@ export function useSyllabusUpload({
   return { syllabi, isReading, error, attachGoogleDoc, attachFile, reviewSyllabus };
 }
 
-function toBase64(content: ArrayBuffer): string {
-  const bytes = new Uint8Array(content);
-  let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  return btoa(binary);
-}
-
 function mergeSyllabi(records: FacultySyllabus[], local: FacultySyllabus[]): FacultySyllabus[] {
   const byId = new Map(records.map((syllabus) => [syllabus.id, syllabus]));
   local.forEach((syllabus) => byId.set(syllabus.id, syllabus));
@@ -120,6 +86,7 @@ function mergeSyllabi(records: FacultySyllabus[], local: FacultySyllabus[]): Fac
 
 function friendlySyllabusError(reason: unknown): string {
   const response = (reason as { response?: { data?: { error_code?: string; reference_id?: string } } })?.response;
+  const code = response?.data?.error_code || (reason as { code?: string })?.code || '';
   const messages: Record<string, string> = {
     google_doc_not_shared: 'This Google Doc is not shared for link viewing. Set General access to “Anyone with the link” and Viewer, then try again. You can upload the file instead.',
     google_doc_unavailable: 'We could not read that Google Doc. Check that the link works, or upload a PDF or DOCX instead.',
@@ -127,6 +94,6 @@ function friendlySyllabusError(reason: unknown): string {
     syllabus_file_too_large: 'This file is over the 10 MB limit. Choose a smaller PDF or DOCX.',
     unsupported_syllabus_type: 'Choose a PDF or DOCX file.',
   };
-  const message = messages[response?.data?.error_code || ''] || 'We could not attach this syllabus. Please try again.';
+  const message = messages[code] || 'We could not attach this syllabus. Please try again.';
   return response?.data?.reference_id ? `${message} Reference: ${response.data.reference_id}` : message;
 }

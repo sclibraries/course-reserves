@@ -58,7 +58,7 @@ describe('staffSyllabusRequestService', () => {
 
     expect(syllabus).toEqual({
       text: 'Week 1',
-      attachment: {
+      payload: {
         filename: 'synthetic.pdf',
         mime_type: 'application/pdf',
         content_base64: 'AQI=',
@@ -76,7 +76,7 @@ describe('staffSyllabusRequestService', () => {
 
     expect(syllabus.text).toBe('Week 2\nSynthetic reading');
     expect(mocks.mammoth.default.extractRawText).toHaveBeenCalledWith({ arrayBuffer: expect.any(ArrayBuffer) });
-    expect(syllabus.attachment).toMatchObject({ filename: 'synthetic.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    expect(syllabus.payload).toMatchObject({ filename: 'synthetic.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   });
 
   it('submits the API-098 payload on the staff-entered endpoint', async () => {

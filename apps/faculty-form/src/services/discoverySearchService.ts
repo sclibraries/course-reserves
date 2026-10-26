@@ -1,7 +1,8 @@
 import { API_ENDPOINTS, DEFAULT_CONFIG } from '@/config/endpoints';
 import { getAuthHeaders } from '@/store/authStore';
+import { parseEBSCORecord, parseEBSCORecords } from '@course-reserves/citations';
 import { DiscoveryRateLimitError, getDiscoverySearchErrorMessage } from './discoverySearchErrors';
-import { parseDiscoveryFacets, parseEBSCORecord, parseEBSCORecords } from './discoveryRecordParser';
+import { parseDiscoveryFacets } from './discoveryRecordParser';
 import type {
   DiscoverySearchResponse,
   DiscoverySearchResult,

@@ -12,7 +12,7 @@ vi.mock('@/services/api/facultySyllabusApi', () => ({
   createFacultySyllabus: api.create,
   listFacultySyllabi: api.list,
 }));
-vi.mock('@/services/syllabusTextExtractor', () => ({ extractSyllabusText: vi.fn() }));
+vi.mock('@/services/syllabusTextExtractor', () => ({ readSyllabusFile: vi.fn() }));
 
 import SyllabusUploadSection from './SyllabusUploadSection';
 

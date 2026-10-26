@@ -24,3 +24,18 @@ export { extractSyllabusText } from './syllabusTextExtractor';
 export type { SyllabusMammothModule, SyllabusPdfJsModule } from './syllabusTextExtractor';
 export { discoveryResultToCourseItem } from './discoveryResultToCourseItem';
 export type { DiscoveryCourseItem, DiscoveryResultLike } from './discoveryResultToCourseItem';
+export { parseEBSCORecord, parseEBSCORecords } from './ebscoRecordParser';
+export type {
+  DiscoverySearchResult,
+  EBSCOFullTextLink,
+  EBSCOItemGroup,
+  EBSCORecord,
+  EDSHoldingCopy,
+} from './ebscoRecordParser';
+export { readSyllabusFile, SyllabusFileError } from './syllabusFileReader';
+export type {
+  SyllabusFile,
+  SyllabusFileErrorCode,
+  SyllabusFileLoaders,
+  SyllabusFilePayload,
+} from './syllabusFileReader';
