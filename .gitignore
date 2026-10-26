@@ -26,6 +26,7 @@ dist-ssr
 
 # Isolated development worktrees
 .worktrees/
+__screenshots__/
 
 *storybook.log
 

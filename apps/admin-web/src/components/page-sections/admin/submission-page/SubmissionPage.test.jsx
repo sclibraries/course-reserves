@@ -6,6 +6,7 @@ import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SubmissionPage from './SubmissionPage';
+import { createLinkingState } from './SubmissionPage.testUtils';
 
 expect.extend({ toHaveNoViolations });
 
@@ -82,20 +83,12 @@ const pageProps = () => {
     onUnlock: vi.fn(),
     onChanged: vi.fn(),
     onBack: vi.fn(),
-    linking: {
+    linking: createLinkingState({
       clearError: vi.fn(),
       loadTimeline: vi.fn(),
-      timeline: [],
-      timelineLoading: false,
-      timelineError: '',
-      currentCandidate: null,
-      isPublished: false,
-      candidateLoading: false,
-      saving: false,
-      error: '',
       actions: { recheck: vi.fn(), unlink: vi.fn() },
       searchCandidates: vi.fn(),
-    },
+    }),
     renderSelectedItem: (item) => <div data-testid="selected-work-item">{item.title}</div>,
     unlinkedContent: <div>Existing linking panel</div>,
   };

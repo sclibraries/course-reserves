@@ -1,0 +1,15 @@
+export const createLinkingState = (overrides = {}) => ({
+  clearError: () => {},
+  loadTimeline: () => {},
+  timeline: [],
+  timelineLoading: false,
+  timelineError: '',
+  currentCandidate: null,
+  isPublished: false,
+  candidateLoading: false,
+  saving: false,
+  error: '',
+  actions: { recheck: () => {}, unlink: () => {} },
+  searchCandidates: () => {},
+  ...overrides,
+});

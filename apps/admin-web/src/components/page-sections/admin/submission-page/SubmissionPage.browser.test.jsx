@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SubmissionPage from './SubmissionPage';
+import { createLinkingState } from './SubmissionPage.testUtils';
 import { expectNoHorizontalOverflow } from '../../../../test/browser';
 
 const mocks = vi.hoisted(() => ({ claimAllItems: vi.fn() }));
@@ -51,6 +52,7 @@ function PageContent() {
       onBack={() => {}}
       onLock={() => {}}
       onUnlock={() => {}}
+      linking={createLinkingState()}
       renderSelectedItem={(selected) => (
         <div>
           <h2>{selected.title}</h2>

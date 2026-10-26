@@ -45,8 +45,7 @@ describe('SubmissionEditor Header in Chromium', () => {
     expect(container.textContent).toContain('Reuse last time’s list');
   };
 
-  // Finding: the header action row yields a 719px document at a 320px viewport.
-  it.fails('reflows the editor header at supported widths', async () => {
+  it('reflows the editor header at supported widths', async () => {
     await renderHeader();
     await expectNoHorizontalOverflow();
   });

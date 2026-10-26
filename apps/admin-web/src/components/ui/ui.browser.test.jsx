@@ -82,8 +82,7 @@ describe('UI components in Chromium', () => {
     await expectNoHorizontalOverflow();
   });
 
-  // CX-032 tracks the known destructive-token color contrast failure.
-  it.fails('has no axe violations, including rendered color contrast', async () => {
+  it('has no axe violations, including rendered color contrast', async () => {
     await renderControls(false);
     await expectNoAxeViolations(container);
   });
