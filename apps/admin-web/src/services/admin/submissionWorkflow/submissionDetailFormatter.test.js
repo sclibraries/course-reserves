@@ -2,6 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { formatSubmissionDetail } from './submissionDetailFormatter';
 
 describe('formatSubmissionDetail EDS fields', () => {
+  it('preserves readiness and flow summaries from the submission detail', () => {
+    const flow = {
+      name: 'Synthetic purchase flow',
+      current_step_label: 'Request purchase',
+      finish_state: null,
+    };
+    const result = formatSubmissionDetail({
+      newResources: [{
+        id: 99907831,
+        resource_data: '{"title":"Synthetic item"}',
+        readiness: 'missing',
+        readiness_reason: 'No Five College copy found',
+        flow,
+      }],
+      communications: [],
+    });
+
+    expect(result.unfolderedItems[0]).toMatchObject({
+      readiness: 'missing',
+      readinessReason: 'No Five College copy found',
+      flow,
+    });
+  });
+
   it('keeps structured identifiers and EDS record identity on staff items', () => {
     const resourceData = {
       title: 'Synthetic Article',

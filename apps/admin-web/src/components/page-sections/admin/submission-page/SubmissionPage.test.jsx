@@ -12,6 +12,7 @@ expect.extend({ toHaveNoViolations });
 
 const mocks = vi.hoisted(() => ({
   flowStates: {},
+  itemFlow: vi.fn(),
   claimAllItems: vi.fn(),
   getSyllabi: vi.fn(),
   downloadOriginal: vi.fn(),
@@ -26,7 +27,10 @@ vi.mock('../../../../services/admin/submissionSyllabiService', async (importOrig
 }));
 
 vi.mock('../../../../hooks/admin/useItemFlow', () => ({
-  default: ({ item }) => ({ flowState: mocks.flowStates[`${item.kind}/${item.id}`] || null, loading: false }),
+  default: ({ item }) => {
+    mocks.itemFlow(item);
+    return { flowState: mocks.flowStates[`${item.kind}/${item.id}`] || null, loading: false };
+  },
 }));
 
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({
@@ -40,23 +44,37 @@ const makeItem = (id, values = {}) => ({
   title: `Synthetic item ${id}`,
   materialType: 'Book',
   status: 'pending',
+  readiness: 'unknown',
+  readinessReason: 'No catalog identity',
+  flow: null,
   displayOrder: id,
   positionInFolder: 1,
   ...values,
 });
 
 const pageProps = () => {
-  const zetaFirst = makeItem(14, { title: 'Done first', status: 'complete', folderName: 'Zeta', displayOrder: 1 });
+  const zetaFirst = makeItem(14, {
+    title: 'Done first', status: 'complete', folderName: 'Zeta', displayOrder: 1,
+    readiness: 'ready', readinessReason: 'Available online',
+    flow: { name: 'Online access', current_step_label: null, finish_state: 'finished' },
+  });
   const zetaNext = makeItem(11, {
     title: 'Mine next', status: 'in_progress', folderName: 'Zeta', claimedByUsername: 'staff',
+    readiness: 'missing', readinessReason: 'No Five College copy found',
+    flow: { name: 'Purchase request', current_step_label: 'Request purchase', finish_state: null },
   });
   const alpha = makeItem(12, {
     title: 'Other staff', displayOrder: 3, folderName: 'Alpha', materialType: 'Journal',
     claimedByUsername: 'other', claimedByDisplay: 'Other Staff',
+    readiness: 'unknown', readinessReason: 'No catalog identity',
   });
-  const unclaimed = makeItem(13, { title: 'Unclaimed item', displayOrder: 4 });
+  const unclaimed = makeItem(13, {
+    title: 'Unclaimed item', displayOrder: 4,
+    readiness: 'missing', readinessReason: 'No Five College copy found',
+  });
   const group = makeItem(15, {
     title: 'Group item', displayOrder: 5, assignedGroup: { id: 7, name: 'Cataloguing' },
+    readiness: 'ready', readinessReason: 'Available at a Five College library',
   });
   return {
     submission: {
@@ -157,6 +175,7 @@ const rowIds = (container) => Array.from(container.querySelectorAll('[data-item-
 let view;
 
 beforeEach(() => {
+  mocks.itemFlow.mockReset();
   mocks.getSyllabi.mockReset().mockResolvedValue([]);
   mocks.downloadOriginal.mockReset();
   mocks.flowStates = {
@@ -299,12 +318,35 @@ describe('SubmissionPage', () => {
     expect(view.container.textContent).toContain('ENG 101');
     expect(view.container.textContent).toContain('Synthetic Literature');
     expect(view.container.textContent).toContain('Section: 01');
-    expect(view.container.textContent).toContain('Book · Print book · Request recall');
+    expect(view.container.textContent).toContain('Book · Purchase request · Request purchase');
     expect(view.container.textContent).toContain('You');
     expect(view.container.textContent).toContain('Other Staff');
     expect(view.container.textContent).toContain('Cataloguing');
     expect(view.container.textContent).toContain('Unclaimed');
     expect(view.container.textContent).toContain('Done');
+  });
+
+  it('shows detail flow and readiness without requesting a flow for each row', async () => {
+    view = await renderPage();
+
+    expect(screen.getByText('2 of 5 ready')).toBeTruthy();
+    expect(view.container.textContent).toContain('Ready: 2 · Missing: 2 · Unknown: 1');
+    expect(screen.getAllByText('Missing')).toHaveLength(2);
+    expect(view.container.querySelector('[data-item-row="11"]').textContent)
+      .toContain('Book · Purchase request · Request purchase');
+    expect(view.container.querySelector('[data-item-select="11"]').getAttribute('aria-description'))
+      .toBe('Readiness: Missing. No Five College copy found');
+    expect(mocks.itemFlow).not.toHaveBeenCalled();
+  });
+
+  it('filters the list to missing and unknown readiness without changing other filter counts', async () => {
+    view = await renderPage();
+
+    await click(screen.getByRole('button', { name: 'Not ready (3)' }));
+
+    expect(rowIds(view.container)).toEqual(['11', '12', '13']);
+    expect(view.container.textContent).toContain('Mine (1)');
+    expect(view.container.textContent).toContain('Done (1)');
   });
 
   it('filters items and shows each filter count', async () => {

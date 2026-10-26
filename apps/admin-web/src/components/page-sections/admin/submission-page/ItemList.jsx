@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
-import useItemFlow from '../../../../hooks/admin/useItemFlow';
 import useMutation from '../../../../hooks/admin/useMutation';
 import { claimsApi } from '../../../../services/admin/workflowClaims/claimsApi';
 import {
+  countReadiness,
+  filterNotReadyItems,
   filterSubmissionItems,
+  getReadinessStatus,
   getClaimBadge,
   isItemDone,
 } from './submissionPageUtils';
@@ -17,6 +19,8 @@ const filters = [
   { id: 'unclaimed', label: 'Unclaimed' },
   { id: 'done', label: 'Done' },
 ];
+const readinessLabels = { ready: 'Ready', missing: 'Missing', unknown: 'Unknown' };
+const readinessVariants = { ready: 'secondary', missing: 'destructive', unknown: 'outline' };
 
 function claimAllMessage(result) {
   const claimed = result.claimed || [];
@@ -26,13 +30,12 @@ function claimAllMessage(result) {
 }
 
 function ItemFlowLine({ item }) {
-  const flow = useItemFlow({ item });
-  const flowName = flow.flowState?.flow?.name;
-  const step = flow.flowState?.current_step?.step?.label || item.current_step_label;
-  const state = isItemDone(item) || flow.flowState?.finished
+  const flow = item.flow;
+  const step = flow?.current_step_label;
+  const state = isItemDone(item) || flow?.finish_state
     ? 'done'
-    : flow.loading ? 'Loading workflow…' : step || 'not started';
-  const parts = [item.material_type, flowName, state].filter(Boolean);
+    : step || 'not started';
+  const parts = [item.materialType, flow?.name, state].filter(Boolean);
 
   return <span className="tw-block tw-truncate tw-text-sm tw-text-muted-foreground">{parts.join(' · ')}</span>;
 }
@@ -41,6 +44,8 @@ ItemFlowLine.propTypes = { item: PropTypes.object.isRequired };
 
 function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
   const claim = getClaimBadge(item, currentUser);
+  const readiness = getReadinessStatus(item);
+  const readinessLabel = readinessLabels[readiness];
 
   return (
     <div
@@ -53,6 +58,7 @@ function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
         className="tw-h-auto tw-min-w-0 tw-flex-1 tw-justify-start tw-whitespace-normal tw-p-2 tw-text-left"
         aria-pressed={selected}
         aria-label={`Select ${item.title}`}
+        aria-description={`Readiness: ${readinessLabel}${item.readinessReason ? `. ${item.readinessReason}` : ''}`}
         data-item-select={item.id}
         disabled={disabled}
         onClick={() => onSelect(item)}
@@ -62,7 +68,12 @@ function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
           <ItemFlowLine item={item} />
         </span>
       </Button>
-      <Badge variant={claim.variant} className="tw-shrink-0">{claim.label}</Badge>
+      <div className="tw-flex tw-min-w-0 tw-max-w-28 tw-shrink-0 tw-flex-col tw-items-end tw-gap-1">
+        <Badge variant={readinessVariants[readiness]}>{readinessLabel}</Badge>
+        <Badge variant={claim.variant} className="tw-max-w-full tw-whitespace-normal tw-break-words tw-text-center">
+          {claim.label}
+        </Badge>
+      </div>
     </div>
   );
 }
@@ -77,12 +88,18 @@ ItemRow.propTypes = {
 
 function ItemList({ groups, submission, currentUser, selectedItemId, disabled = false, onSelect, onChanged }) {
   const [filter, setFilter] = useState('all');
+  const [notReadyOnly, setNotReadyOnly] = useState(false);
   const [claimAllResult, setClaimAllResult] = useState(null);
   const { pending, error, run } = useMutation();
   const items = useMemo(() => groups.flatMap((group) => group.items), [groups]);
+  const readiness = useMemo(() => countReadiness(items), [items]);
+  const readinessFilteredItems = useMemo(
+    () => (notReadyOnly ? filterNotReadyItems(items) : items),
+    [items, notReadyOnly],
+  );
   const visibleItems = useMemo(
-    () => filterSubmissionItems(items, filter, currentUser),
-    [currentUser, filter, items],
+    () => filterSubmissionItems(readinessFilteredItems, filter, currentUser),
+    [currentUser, filter, readinessFilteredItems],
   );
   const visibleKeys = useMemo(() => new Set(visibleItems.map((item) => `${item.kind}/${item.id}`)), [visibleItems]);
 
@@ -102,6 +119,13 @@ function ItemList({ groups, submission, currentUser, selectedItemId, disabled = 
           Claim all
         </Button>
       </div>
+      <section aria-labelledby="readiness-summary-title" className="tw-mb-3 tw-rounded-md tw-border tw-bg-muted/20 tw-p-3">
+        <h3 id="readiness-summary-title" className="tw-sr-only">Readiness summary</h3>
+        <p className="tw-font-semibold">{readiness.ready} of {readiness.total} ready</p>
+        <p className="tw-text-sm tw-text-muted-foreground">
+          Ready: {readiness.ready} · Missing: {readiness.missing} · Unknown: {readiness.unknown}
+        </p>
+      </section>
       <div className="tw-mb-3 tw-flex tw-flex-wrap tw-gap-2" role="group" aria-label="Filter items">
         {filters.map(({ id, label }) => {
           const count = id === 'all' ? items.length : filterSubmissionItems(items, id, currentUser).length;
@@ -119,6 +143,18 @@ function ItemList({ groups, submission, currentUser, selectedItemId, disabled = 
             </Button>
           );
         })}
+      </div>
+      <div className="tw-mb-3 tw-flex tw-flex-wrap tw-gap-2" role="group" aria-label="Filter by readiness">
+        <Button
+          type="button"
+          variant={notReadyOnly ? 'secondary' : 'outline'}
+          size="sm"
+          aria-pressed={notReadyOnly}
+          disabled={disabled}
+          onClick={() => setNotReadyOnly((current) => !current)}
+        >
+          Not ready ({readiness.missing + readiness.unknown})
+        </Button>
       </div>
       {error && <p role="alert" className="tw-mb-3 tw-text-sm tw-text-destructive">{error}</p>}
       {claimAllResult && <p role="status" className="tw-mb-3 tw-text-sm">{claimAllMessage(claimAllResult)}</p>}

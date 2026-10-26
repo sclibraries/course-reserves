@@ -1,6 +1,7 @@
 import { formatSubmissionClaimItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
 
 const DONE_STATUSES = new Set(['complete', 'unavailable', 'withdrawn']);
+const READINESS_STATES = new Set(['ready', 'missing', 'unknown']);
 
 function itemKey(item) {
   return `${item.kind || (item.isReuse ? 'reuse' : 'new')}/${item.id}`;
@@ -13,6 +14,21 @@ function folderOrder(folder, index) {
 
 export function isItemDone(item) {
   return Boolean(item.finish_state) || DONE_STATUSES.has(item.status);
+}
+
+export function getReadinessStatus(item) {
+  return READINESS_STATES.has(item.readiness) ? item.readiness : 'unknown';
+}
+
+export function countReadiness(items) {
+  return items.reduce((counts, item) => {
+    counts[getReadinessStatus(item)] += 1;
+    return counts;
+  }, { total: items.length, ready: 0, missing: 0, unknown: 0 });
+}
+
+export function filterNotReadyItems(items) {
+  return items.filter((item) => getReadinessStatus(item) !== 'ready');
 }
 
 export function isItemClaimedByCurrentUser(item, currentUser) {
