@@ -111,6 +111,7 @@ class SubmissionDetailPresenter
                     $item,
                     ItemReadiness::evaluate($item, $itemAvailability, $instanceId, $run)
                 );
+                $item['allowed_access_paths'] = AccessPathPolicy::allowedForItem($item);
                 $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
                 $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
                 $submission[$collection][$index] = $item;

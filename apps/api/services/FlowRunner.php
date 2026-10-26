@@ -197,8 +197,12 @@ class FlowRunner
             $currentPath = (string)($item['access_path'] ?? '');
             if ($currentPath === $accessPath) {
                 $this->claims->renewClaimLocked($kind, $itemId, $now);
-                $run = $this->flows->latestRun($kind, $itemId);
                 $mapping = $this->accessPathMappings->find($accessPath);
+                $hasFlowMapping = $mapping && $mapping['flow_id'] !== null;
+                if (!$hasFlowMapping && ($openRun = $this->flows->openRun($kind, $itemId, true))) {
+                    $this->closeOpenRun($openRun, $reason ?: 'access_path_unmapped', $now);
+                }
+                $run = $hasFlowMapping ? $this->flows->latestRun($kind, $itemId) : null;
                 return $this->result(200, $this->accessPathPresenter->present($accessPath, $run, $item, $mapping));
             }
             if ($currentPath !== '' && $reason === '') {
@@ -213,6 +217,11 @@ class FlowRunner
                     $transaction->rollBack();
                     return $replacement;
                 }
+            } else {
+                $openRun = $this->flows->openRun($kind, $itemId, true);
+                if ($openRun) {
+                    $this->closeOpenRun($openRun, $reason ?: 'access_path_unmapped', $now);
+                }
             }
             $this->claims->renewClaimLocked($kind, $itemId, $now);
             if ($groupId !== null) {
@@ -224,7 +233,7 @@ class FlowRunner
             }
             $this->items->setAccessPath($kind, $itemId, $accessPath);
             $item = $this->items->find($kind, $itemId);
-            $run = $this->flows->latestRun($kind, $itemId);
+            $run = $flowId === null ? null : $this->flows->latestRun($kind, $itemId);
             $after = $this->accessPathPresenter->present($accessPath, $run, $item, $mapping);
             $eventAfter = $after;
             unset($eventAfter['warning']);
@@ -256,13 +265,18 @@ class FlowRunner
         }
         $before = $oldRun ? $this->presenter->runSnapshot($oldRun) : null;
         if ($oldRun) {
-            $this->flows->updateRun($oldRun['id'], [
-                'current_step_key' => null, 'closed_at' => $now, 'closed_reason' => $reason,
-            ]);
+            $this->closeOpenRun($oldRun, $reason, $now);
         }
         $runId = $this->flows->insertRun($kind, $itemId, $flowId, $version['version'], $firstStep);
         return $this->result(200, [
             'run' => $this->flows->run($runId), 'changed' => true, 'before' => $before,
+        ]);
+    }
+
+    private function closeOpenRun(array $run, $reason, $now)
+    {
+        $this->flows->updateRun($run['id'], [
+            'current_step_key' => null, 'closed_at' => $now, 'closed_reason' => $reason,
         ]);
     }
 

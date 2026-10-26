@@ -18,8 +18,10 @@ class Api096AccessPathCest extends BaseFunctionalCest
         $this->cleanup();
         $this->insertUser('staff');
         $this->insertUser('admin');
+        $this->insertUser('faculty');
         $this->tokens['staff'] = $this->token('staff');
         $this->tokens['admin'] = $this->token('admin');
+        $this->tokens['faculty'] = $this->token('faculty');
         $this->submissionId = TestSubmissionFixture::create($this->uuid, $this->prefix . 'faculty', [
             'course_title' => 'Synthetic API-096 course',
             'link_state' => 'linked',
@@ -189,6 +191,98 @@ class Api096AccessPathCest extends BaseFunctionalCest
         Assert::assertNull($this->lastAccessPathEvent()['after']['flow_id']);
         Assert::assertNull($this->lastAccessPathEvent()['after']['run_id']);
         Assert::assertSame($this->prefix . 'staff', $this->lastAccessPathEvent()['actor_username']);
+    }
+
+    public function unmappedPathClosesOpenRunAndReadinessFallsBackToCatalog(FunctionalTester $I)
+    {
+        $flowId = $this->createFlow($this->prefix . 'unmapped', $this->steps('Old flow'));
+        $this->claim($I);
+        $this->switchFlow($I, $flowId);
+        $runId = $this->latestRunId();
+
+        $this->setPath($I, 'purchase');
+
+        $I->seeResponseCodeIs(200);
+        $run = \Yii::$app->db->createCommand(
+            'SELECT current_step_key, closed_at, closed_reason, finish_state FROM item_flow_runs WHERE id = :id',
+            [':id' => $runId]
+        )->queryOne();
+        Assert::assertNull($run['current_step_key']);
+        Assert::assertNotNull($run['closed_at']);
+        Assert::assertSame('access_path_unmapped', $run['closed_reason']);
+        Assert::assertNull($run['finish_state']);
+        Assert::assertNull($this->lastAccessPathEvent()['after']['run_id']);
+
+        $this->request($I, 'GET', 'submission-workflow/view-submission', [], [
+            'role' => 'staff', 'id' => $this->submissionId,
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('unknown', $this->response($I)['newResources'][0]['readiness']);
+    }
+
+    public function unmappedPathCloseUsesSuppliedReason(FunctionalTester $I)
+    {
+        $flowId = $this->createFlow($this->prefix . 'reason', $this->steps('Old flow'));
+        $this->claim($I);
+        $runId = (new \app\services\FlowRepository())->insertRun('new', $this->itemId, $flowId, 1, 'start');
+        $this->setStoredPath('purchase');
+
+        $this->setPath($I, 'faculty_supplies', 'Synthetic reason');
+
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('Synthetic reason', (string)\Yii::$app->db->createCommand(
+            'SELECT closed_reason FROM item_flow_runs WHERE id = :id', [':id' => $runId]
+        )->queryScalar());
+    }
+
+    public function resubmittingAnUnmappedPathClosesAnyOpenRun(FunctionalTester $I)
+    {
+        $flowId = $this->createFlow($this->prefix . 'same-path', $this->steps('Old flow'));
+        $this->claim($I);
+        $runId = (new \app\services\FlowRepository())->insertRun('new', $this->itemId, $flowId, 1, 'start');
+        $this->setStoredPath('purchase');
+
+        $this->setPath($I, 'purchase');
+
+        $I->seeResponseCodeIs(200);
+        $run = \Yii::$app->db->createCommand(
+            'SELECT current_step_key, closed_at, closed_reason FROM item_flow_runs WHERE id = :id',
+            [':id' => $runId]
+        )->queryOne();
+        Assert::assertNull($run['current_step_key']);
+        Assert::assertNotNull($run['closed_at']);
+        Assert::assertSame('access_path_unmapped', $run['closed_reason']);
+    }
+
+    public function staffDetailIncludesAllowedPathsAndFacultyDetailHidesAccessPathFields(FunctionalTester $I)
+    {
+        $this->setStoredPath('purchase');
+        \Yii::$app->db->createCommand()->insert('submission_new_resources', [
+            'submission_id' => $this->submissionId,
+            'resource_data' => json_encode(['title' => 'Synthetic article', 'materialType' => 'article']),
+            'access_path' => 'ill',
+            'item_status' => 'pending',
+        ])->execute();
+
+        $this->request($I, 'GET', 'submission-workflow/view-submission', [], [
+            'role' => 'staff', 'id' => $this->submissionId,
+        ]);
+        $I->seeResponseCodeIs(200);
+        $items = $this->response($I)['newResources'];
+        Assert::assertSame('purchase', $items[0]['access_path']);
+        Assert::assertSame(['purchase', 'faculty_supplies'], $items[0]['allowed_access_paths'] ?? null);
+        Assert::assertSame('ill', $items[1]['access_path']);
+        Assert::assertSame(
+            ['purchase', 'ags', 'ill', 'in_house_copy', 'faculty_supplies'],
+            $items[1]['allowed_access_paths'] ?? null
+        );
+
+        $this->request($I, 'GET', 'faculty-submission/view', [], ['role' => 'faculty', 'id' => $this->uuid]);
+        $I->seeResponseCodeIs(200);
+        foreach ($this->response($I)['newResources'] as $item) {
+            Assert::assertArrayNotHasKey('access_path', $item);
+            Assert::assertArrayNotHasKey('allowed_access_paths', $item);
+        }
     }
 
     public function invalidMappedFlowsReturnClearErrorsWithoutPartialWrites(FunctionalTester $I)
