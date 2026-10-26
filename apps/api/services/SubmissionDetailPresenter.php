@@ -100,7 +100,7 @@ class SubmissionDetailPresenter
 
                 $item = array_merge(
                     $item,
-                    ItemReadiness::evaluateWithCatalogInstanceId($item, $itemAvailability, $instanceId)
+                    ItemReadiness::evaluate($item, $itemAvailability, $instanceId)
                 );
                 $flowKey = $kind . ':' . (int)($item['id'] ?? 0);
                 $run = $flowRuns[$flowKey] ?? null;

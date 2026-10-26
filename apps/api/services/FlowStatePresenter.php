@@ -49,10 +49,9 @@ class FlowStatePresenter
         }
         if ($mappedFlow) {
             $steps = json_decode($mappedFlow['steps_json'], true) ?: [];
-            $firstStep = $steps ? reset($steps) : [];
-            $firstStep = FlowStepLookup::stepByKey($steps, $firstStep['key'] ?? null);
+            $firstStep = $steps[0] ?? [];
             return [
-                'name' => $mappedFlow['flow_name'],
+                'name' => $mappedFlow['name'],
                 'current_step_label' => $firstStep['label'] ?? null,
                 'finish_state' => null,
             ];

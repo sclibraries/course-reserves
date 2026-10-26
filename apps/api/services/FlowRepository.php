@@ -31,13 +31,7 @@ class FlowRepository
 
     public function mappedFlow($materialTypeId)
     {
-        return Yii::$app->db->createCommand(
-            'SELECT f.*, v.version, v.steps_json FROM material_type_flows m '
-            . 'INNER JOIN flows f ON f.id = m.flow_id '
-            . 'INNER JOIN flow_versions v ON v.flow_id = f.id '
-            . 'WHERE m.material_type_id = :type_id ORDER BY v.version DESC LIMIT 1',
-            [':type_id' => (int)$materialTypeId]
-        )->queryOne() ?: null;
+        return $this->mappedFlowsForMaterialTypes([(int)$materialTypeId])[0] ?? null;
     }
 
     public function run($runId, $forUpdate = false)
@@ -94,7 +88,7 @@ class FlowRepository
             $params[$placeholder] = $materialTypeId;
         }
         return Yii::$app->db->createCommand(
-            'SELECT m.material_type_id, f.name AS flow_name, v.steps_json '
+            'SELECT f.*, v.version, v.steps_json, m.material_type_id '
             . 'FROM material_type_flows m INNER JOIN flows f ON f.id = m.flow_id '
             . 'INNER JOIN flow_versions v ON v.flow_id = f.id '
             . 'WHERE m.material_type_id IN (' . implode(', ', $placeholders) . ') '
