@@ -1,7 +1,44 @@
-import type { CourseItem } from '@/store/courseReservesStore';
-import type { DiscoverySearchResult } from '@/services/discoverySearchService';
+import type { CitationMaterialType } from './citationToCourseItem';
 
-export function discoveryResultToCourseItem(result: DiscoverySearchResult): Partial<CourseItem> {
+export interface DiscoveryResultLike {
+  id: string;
+  dbId: string;
+  title: string;
+  authors: string[];
+  publicationType: string;
+  publicationInfo?: string;
+  isbn?: string;
+  doi?: string;
+  issn?: string;
+  journalTitle?: string;
+  volumeNumber?: string;
+  issueNumber?: string;
+  publicationDate?: { year?: string };
+  publisher?: string;
+  fullTextUrl?: string;
+  url?: string;
+  pLink: string;
+  fileDescription?: string;
+}
+
+export interface DiscoveryCourseItem {
+  title: string;
+  authors?: string;
+  isbn?: string;
+  doi?: string;
+  issn?: string;
+  journalTitle?: string;
+  volume?: string;
+  issue?: string;
+  publicationYear?: string;
+  publisher?: string;
+  eds: { dbId: string; an: string; plink: string };
+  url?: string;
+  materialType: CitationMaterialType;
+  status: 'draft';
+}
+
+export function discoveryResultToCourseItem(result: DiscoveryResultLike): DiscoveryCourseItem {
   return {
     title: result.title || 'Untitled',
     authors: result.authors.length > 0 ? result.authors.join('; ') : undefined,
@@ -20,7 +57,7 @@ export function discoveryResultToCourseItem(result: DiscoverySearchResult): Part
   };
 }
 
-function mapMaterialType(result: DiscoverySearchResult): CourseItem['materialType'] {
+function mapMaterialType(result: DiscoveryResultLike): CitationMaterialType {
   const type = result.publicationType.toLowerCase();
   if (type.includes('chapter') || type.includes('book section')) return 'chapter';
   if (['journal', 'article', 'periodical', 'magazine', 'academic'].some((term) => type.includes(term))) return 'article';

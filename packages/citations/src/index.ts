@@ -20,3 +20,7 @@ export type {
 } from './citationBatchSearch';
 export { citationToCourseItem, truncateCitationTitle } from './citationToCourseItem';
 export type { CitationCourseItem, CitationMaterialType } from './citationToCourseItem';
+export { extractSyllabusText } from './syllabusTextExtractor';
+export type { SyllabusMammothModule, SyllabusPdfJsModule } from './syllabusTextExtractor';
+export { discoveryResultToCourseItem } from './discoveryResultToCourseItem';
+export type { DiscoveryCourseItem, DiscoveryResultLike } from './discoveryResultToCourseItem';

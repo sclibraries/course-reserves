@@ -17,6 +17,7 @@ import ProtectedRoutePage from '../protected/ProtectedRoutePage';
 import ProtectedRoute from '../protected/ProtectedRoute';
 import Admin from '../../pages/Admin';
 import AdminElectronicResources from '../../pages/AdminElectronicResources';
+import StaffSyllabusRequestPage from '../../pages/StaffSyllabusRequestPage';
 import SubmissionDetail from '../page-sections/admin/SubmissionDetail';
 import WorkQueueDetail from '../../pages/WorkQueueDetail';
 import NotFound from '../../pages/NotFound';
@@ -97,6 +98,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute isAuthorized={isAuthorized}>
             <WorkQueueDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/electronic/:folioCourseId/syllabus-request"
+        element={
+          <ProtectedRoute isAuthorized={isAuthorized}>
+            <StaffSyllabusRequestPage />
           </ProtectedRoute>
         }
       />

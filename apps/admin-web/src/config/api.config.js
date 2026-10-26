@@ -134,6 +134,8 @@ export const apiConfig = {
     workflowSyllabi: {
       getSyllabi: '/workflow/submission/:submissionId/syllabi',
       downloadOriginal: '/workflow/submission/:submissionId/syllabi/:syllabusId/file',
+      googleDocText: '/workflow/syllabus/google-doc-text',
+      staffEnteredSubmission: '/workflow/submission/staff-entered',
     },
     workflowClaims: {
       queue: '/workflow/queue',

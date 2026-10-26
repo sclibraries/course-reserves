@@ -9,7 +9,10 @@ export default defineConfig({
   root: dirname,
   plugins: [react()],
   resolve: {
-    alias: { '@': path.resolve(dirname, './src') },
+    alias: {
+      '@': path.resolve(dirname, './src'),
+      '@course-reserves/citations': path.resolve(dirname, '../../packages/citations/src'),
+    },
   },
   server: { host: '127.0.0.1', port: 5199, strictPort: true },
   test: {

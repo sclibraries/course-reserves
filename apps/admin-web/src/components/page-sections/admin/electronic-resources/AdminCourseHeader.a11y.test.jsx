@@ -31,6 +31,7 @@ it('exposes linked courses as named links to their course pages', async () => {
           folioCourseData={{
             name: 'Biology',
             courseNumber: 'BIO 101',
+            courseListingId: 42,
             courseListingObject: { instructorObjects: [] },
           }}
           linkedCourses={[{
@@ -45,6 +46,7 @@ it('exposes linked courses as named links to their course pages', async () => {
         <Routes>
           <Route path="/admin/electronic" element={<p>Current route</p>} />
           <Route path="/admin/electronic/42" element={<p>Course route reached</p>} />
+          <Route path="/admin/electronic/42/syllabus-request" element={<p>Syllabus request route reached</p>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -55,4 +57,37 @@ it('exposes linked courses as named links to their course pages', async () => {
 
   await act(async () => link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
   expect(container.textContent).toContain('Course route reached');
+});
+
+it('links from the course header to the syllabus request route', async () => {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  await act(async () => {
+    root.render(
+      <MemoryRouter initialEntries={['/admin/electronic']}>
+        <AdminCourseHeader
+          folioCourseData={{
+            name: 'Biology',
+            courseNumber: 'BIO 101',
+            courseListingId: 42,
+            courseListingObject: { instructorObjects: [] },
+          }}
+          linkedCourses={[]}
+          copyToClipboard={vi.fn()}
+          coursePermalink="/course/42"
+        />
+        <Routes>
+          <Route path="/admin/electronic" element={<p>Current route</p>} />
+          <Route path="/admin/electronic/42/syllabus-request" element={<p>Syllabus request route reached</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  });
+
+  const link = getByRole(container, 'link', { name: 'Start a request from a syllabus' });
+  expect(link.getAttribute('href')).toBe('/admin/electronic/42/syllabus-request');
+  await act(async () => link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
+  expect(container.textContent).toContain('Syllabus request route reached');
 });

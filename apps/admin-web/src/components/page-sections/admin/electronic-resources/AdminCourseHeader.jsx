@@ -3,6 +3,7 @@ import { Row, Col, Card, CardBody } from 'reactstrap';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { buildFolioCourseUrl, buildPublicCourseUrl } from '../../../../util/urlHelpers';
+import SyllabusRequestLauncher from '../syllabus-request/SyllabusRequestLauncher';
 
 function AdminCourseHeader({ 
   folioCourseData, 
@@ -105,6 +106,8 @@ function AdminCourseHeader({
                 <FontAwesomeIcon icon="fa-solid fa-eye" className="me-2" />
                 View Public Page
               </a>
+
+              <SyllabusRequestLauncher courseListingId={folioCourseData?.courseListingId} />
               
               <a 
                 href={buildFolioCourseUrl(folioCourseData?.id)}

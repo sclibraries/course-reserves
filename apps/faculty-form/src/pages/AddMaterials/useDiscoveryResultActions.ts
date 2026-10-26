@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
-import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem';
+import { discoveryResultToCourseItem } from '@course-reserves/citations';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { AddMaterialOptions } from '@/handlers/addMaterialHandler';
 
