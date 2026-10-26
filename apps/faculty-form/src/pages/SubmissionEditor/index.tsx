@@ -67,7 +67,7 @@ const SubmissionEditor = () => {
 
   const draftSync = useSubmissionEditorDrafts(id, reserve, !!user, isReadOnly, navigate);
   const {
-    saveDraft, markChanged, lastSaveTime, saveError, hasUnsavedChanges, isSaving,
+    saveDraft, ensureServerUuid, markChanged, lastSaveTime, saveError, hasUnsavedChanges, isSaving,
     saveStatus, hasConflict, loadLatestVersion,
   } = draftSync;
   const addedMaterials = useAddedMaterialsVisitStore((state) => state.itemsByReserve[id || ''] || EMPTY_ADDED_MATERIALS);
@@ -94,10 +94,6 @@ const SubmissionEditor = () => {
     addItem,
     markChanged,
     defaultFolderId,
-    getLastAddedItem: () => {
-      const items = useReserveStore.getState().getReserveById(id || '')?.items || [];
-      return items[items.length - 1];
-    },
     onAdded: onAddedMaterial,
   });
   const hasLocalEdits = hasLocalMaterialEdits(reserve, serverReserveSnapshotRef.current);
@@ -144,7 +140,7 @@ const SubmissionEditor = () => {
     id: id!, reserve, isEditingSubmission: reserve.status === 'submitted',
     hasPreviousOffering: previousCourseDetection.hasExactMatchCourses,
     isReadOnly, lockInfo,
-    saveDraft, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
+    saveDraft, ensureServerUuid, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
     saveStatus,
     itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers,
     markChanged,

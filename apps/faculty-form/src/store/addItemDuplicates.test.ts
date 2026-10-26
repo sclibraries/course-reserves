@@ -60,6 +60,19 @@ describe('useReserveStore.addItem duplicate handling', () => {
     expect(useReserveStore.getState().getReserveById('reserve-1')?.items).toHaveLength(1);
   });
 
+  it('returns the inserted item and null when an item is rejected as a duplicate', () => {
+    const duplicate = useReserveStore.getState().addItem('reserve-1', {
+      title: 'Climate Change and Society', materialType: 'book', status: 'draft', barcode: '39099012345678',
+    });
+    const added = useReserveStore.getState().addItem('reserve-1', {
+      title: 'A unique synthetic title', materialType: 'book', status: 'draft',
+    });
+
+    expect(duplicate).toBe(false);
+    expect(added).toMatchObject({ id: expect.any(String), title: 'A unique synthetic title' });
+    expect(useReserveStore.getState().getReserveById('reserve-1')?.items).toContainEqual(added);
+  });
+
   it('preserves source metadata when adding a unique physical reserve item', () => {
     useReserveStore.getState().addItem('reserve-1', {
       title: 'New Book',

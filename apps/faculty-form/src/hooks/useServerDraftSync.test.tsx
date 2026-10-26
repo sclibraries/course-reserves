@@ -107,6 +107,18 @@ describe('useServerDraftSync', () => {
     expect(api.syncDraft).not.toHaveBeenCalled();
   });
 
+  it('saves a new local draft before returning its server UUID', async () => {
+    api.syncDraft.mockResolvedValue({ submission_uuid: 'server-draft-1', status: 'draft', draft_version: 1 });
+    let uuid: string | undefined;
+
+    await act(async () => { uuid = await sync?.ensureServerUuid(); });
+
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
+    expect(api.syncDraft.mock.calls[0][0]).toMatchObject({ id: 'reserve-local' });
+    expect(uuid).toBe('server-draft-1');
+    expect(useReserveStore.getState().getReserveById(initialReserve.id)?.submissionUuid).toBe('server-draft-1');
+  });
+
   it('creates once on the first change and saves later changes with the returned version', async () => {
     api.syncDraft
       .mockResolvedValueOnce({ submission_uuid: 'server-draft-1', status: 'draft', draft_version: 1 })

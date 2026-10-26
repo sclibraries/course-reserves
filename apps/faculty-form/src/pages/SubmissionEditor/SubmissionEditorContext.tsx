@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { CourseReserve, CourseItem } from '@/store/courseReservesStore';
+import type { AddMaterialOptions } from '@/handlers/addMaterialHandler';
 import type { LockInfo } from '@/hooks/useSubmissionLock';
 import type { AddedMaterialVisitItem } from '@/store/addedMaterialsVisitStore';
 
@@ -15,7 +16,8 @@ export interface SubmissionEditorContextValue {
   isReadOnly: boolean;
   lockInfo: LockInfo | null;
   // Draft saving
-  saveDraft: () => void;
+  saveDraft: () => Promise<boolean>;
+  ensureServerUuid: () => Promise<string | undefined>;
   isSaving: boolean;
   saveStatus?: 'idle' | 'saving' | 'saved' | 'retrying' | 'conflict' | 'error';
   hasUnsavedChanges: boolean;
@@ -34,7 +36,7 @@ export interface SubmissionEditorContextValue {
   addItemToFolder: (reserveId: string, folderId: string, itemId: string) => void;
   moveFolderPosition: (reserveId: string, folderId: string, direction: 'up' | 'down') => void;
   user: { full_name?: string } | null;
-  addItem: (reserveId: string, item: Partial<CourseItem>) => boolean;
+  addItem: (reserveId: string, item: Partial<CourseItem>, options?: AddMaterialOptions) => CourseItem | false;
   createFolder: (reserveId: string, title: string) => string;
   addedMaterials: AddedMaterialVisitItem[];
   undoAddedMaterial: (itemId: string) => void;

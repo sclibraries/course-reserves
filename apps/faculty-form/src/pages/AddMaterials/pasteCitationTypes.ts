@@ -5,6 +5,7 @@ import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 export interface EditableCitation {
   id: string;
   text: string;
+  heading?: string | null;
 }
 
 export interface SkippedCitationBlock {

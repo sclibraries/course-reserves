@@ -52,6 +52,7 @@ const editorContext: SubmissionEditorContextValue = {
   isReadOnly: false,
   lockInfo: null,
   saveDraft: vi.fn(),
+  ensureServerUuid: vi.fn().mockResolvedValue('server-draft-1'),
   isSaving: false,
   hasUnsavedChanges: false,
   lastSaveTime: null,

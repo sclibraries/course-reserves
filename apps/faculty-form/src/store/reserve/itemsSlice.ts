@@ -17,7 +17,7 @@ export const createItemsSlice: ReserveSlice<
     if (findDuplicateCourseItem(reserve.items || [], newItem)) return false;
 
     set((state) => updateReserveLayout(state, reserveId, (current) => addItem(current, newItem)));
-    return true;
+    return newItem;
   },
 
   updateItem: (reserveId, itemId, updates) => {

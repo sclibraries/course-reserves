@@ -144,6 +144,18 @@ export function useServerDraftSync(
     queueSave(autoSaveDelay);
   }, [autoSaveDelay, autoSaveEnabled, draftStore, queueSave, reserveId]);
 
+  const ensureServerUuid = useCallback(async (): Promise<string | undefined> => {
+    let current = useReserveStore.getState().getReserveById(reserveId || '') || reserveRef.current;
+    const uuid = serverUuid(current);
+    if (uuid) return uuid;
+    if (!reserveId || !autoSaveEnabled || current?.status !== 'draft') return undefined;
+
+    markChanged();
+    if (!(await saveDraft())) return undefined;
+    current = useReserveStore.getState().getReserveById(reserveId) || reserveRef.current;
+    return serverUuid(current);
+  }, [autoSaveEnabled, markChanged, reserveId, saveDraft]);
+
   const loadLatestVersion = useCallback(async () => {
     const current = reserveRef.current;
     const uuid = serverUuid(current);
@@ -209,6 +221,7 @@ export function useServerDraftSync(
 
   return {
     saveDraft,
+    ensureServerUuid,
     markChanged,
     saveStatus,
     lastSaveTime,

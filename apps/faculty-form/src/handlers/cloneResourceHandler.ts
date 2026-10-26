@@ -8,7 +8,7 @@ import type { CourseReserve, CourseItem, FolioLocation, FolioCopiedItem } from "
 export const createCloneResourceHandler = (
   reserve: CourseReserve | undefined,
   reserveId: string | undefined,
-  addItem: (id: string, item: Partial<CourseItem>) => boolean,
+  addItem: (id: string, item: Partial<CourseItem>) => CourseItem | false,
   showSuccessToast = true
 ) => {
   const handleAddSingleResource = (resource: PreviewResource) => {

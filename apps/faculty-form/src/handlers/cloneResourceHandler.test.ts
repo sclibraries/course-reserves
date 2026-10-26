@@ -20,7 +20,7 @@ describe('createCloneResourceHandler', () => {
       permanentLocationObject: { id: 'permanent-location', name: 'Permanent', code: 'PERM' },
     };
     const physicalReserve = { barcode: 'BC-026', copiedItem };
-    const addItem = vi.fn(() => true);
+    const addItem = vi.fn(() => ({ id: 'added-physical', title: 'Synthetic reserve book' } as never));
     const handler = createCloneResourceHandler(
       { courseCode: 'TEST 026' } as CourseReserve,
       'reserve-026',

@@ -56,22 +56,18 @@ function LiveEditorProvider({
 }) {
   const [reserveState, setReserveState] = useState(context.reserve);
   const [addedMaterials, setAddedMaterials] = useState(context.addedMaterials);
-  const lastAdded = useRef<CourseItem | undefined>(undefined);
   const itemSequence = useRef(0);
   const addItem = createAddMaterialHandler({
     reserveId: context.id,
     defaultFolderId: folderId,
     markChanged: context.markChanged,
-    getLastAddedItem: () => lastAdded.current,
     onAdded: (item) => setAddedMaterials((current) => [...current, { id: item.id, title: item.title }]),
     addItem: (reserveId, item) => {
       if (findDuplicateCourseItem(reserveState.items, item)) return false;
-      const accepted = context.addItem(reserveId, item);
-      if (!accepted) return false;
+      if (!context.addItem(reserveId, item)) return false;
       const addedItem = { ...item, id: `added-${++itemSequence.current}` } as CourseItem;
-      lastAdded.current = addedItem;
       setReserveState((current) => ({ ...current, items: [...current.items, addedItem] }));
-      return true;
+      return addedItem;
     },
   });
   const undoAddedMaterial = (itemId: string) => {
@@ -95,7 +91,7 @@ function createContext(overrides: Partial<SubmissionEditorContextValue> = {}) {
     itemHandlers: { handleAddItem: vi.fn() }, folderHandlers: {}, courseHandlers: {},
     dragHandlers: {}, submissionHandlers: {}, markChanged: vi.fn(), removeItemFromFolder: vi.fn(),
     moveItemInFolder: vi.fn(), addItemToFolder: vi.fn(), moveFolderPosition: vi.fn(), user: null,
-    addItem: vi.fn(() => true), createFolder: vi.fn(() => 'target-folder'),
+    addItem: vi.fn(() => ({ id: 'added-from-context', title: 'Synthetic', materialType: 'article', status: 'draft' } as CourseItem)), createFolder: vi.fn(() => 'target-folder'),
     addedMaterials: [], undoAddedMaterial: vi.fn(),
     ...overrides,
   } as unknown as SubmissionEditorContextValue;
@@ -410,6 +406,16 @@ describe('AddMaterialsPage', () => {
     expect(view.querySelector('[data-testid="location"]')?.textContent).toContain('/submission/reserve-test/edit/add?tab=search&q=climate+change');
   });
 
+  it('keeps syllabus headings above grouped citations during review', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add?tab=paste');
+    await enterCitation(view, `Week 1\n${validCitation}\nTest Author (2021). Synthetic reading one.`);
+
+    const section = Array.from(view.querySelectorAll('section')).find((node) => (
+      node.querySelector('h3')?.textContent === 'Week 1'
+    ));
+    expect(section?.querySelectorAll('[data-citation-id]')).toHaveLength(2);
+  });
+
   it('lets faculty edit and remove extracted citations before matching', async () => {
     vi.mocked(searchDiscovery).mockClear();
     const view = await renderAt('/submission/reserve-test/edit/add?tab=paste');
@@ -711,6 +717,13 @@ Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenou
     expect(card.textContent).toContain('In your list ✓');
     expect(useMatch.disabled).toBe(true);
     expect(context.addItem).not.toHaveBeenCalled();
+  });
+
+  it('hides the syllabus uploader on the full-record route', async () => {
+    const view = await renderAt('/submission/reserve-test/edit/add/record/synthetic-database/synthetic-an?tab=paste');
+
+    expect(view.querySelector('[aria-label="Add a syllabus"]')).toBeNull();
+    expect(view.querySelector('[aria-label="Paste a list record"]')).not.toBeNull();
   });
 
   it('keeps the added state and citation workspace after using a match on the phone record route', async () => {

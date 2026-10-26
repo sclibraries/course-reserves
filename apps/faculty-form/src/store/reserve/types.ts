@@ -181,7 +181,7 @@ export interface CourseReservesState {
   deleteReserve: (id: string) => void;
 
   // Item actions
-  addItem: (reserveId: string, item: Omit<CourseItem, 'id'>) => boolean;
+  addItem: (reserveId: string, item: Omit<CourseItem, 'id'>) => CourseItem | false;
   updateItem: (reserveId: string, itemId: string, updates: Partial<CourseItem>) => void;
   deleteItem: (reserveId: string, itemId: string) => void;
   moveItemInList: (reserveId: string, itemId: string, direction: 'up' | 'down') => boolean;

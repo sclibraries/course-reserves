@@ -8,7 +8,7 @@ import type { CourseItem, CourseReserve } from "../store/courseReservesStore";
  */
 export const createItemHandlers = (
   reserveId: string,
-  addItem: (id: string, item: Partial<CourseItem>) => boolean,
+  addItem: (id: string, item: Partial<CourseItem>) => CourseItem | false,
   updateItem: (id: string, itemId: string, updates: Partial<CourseItem>) => void,
   deleteItem: (id: string, itemId: string) => void,
   moveItemInList: (id: string, itemId: string, direction: 'up' | 'down') => boolean,

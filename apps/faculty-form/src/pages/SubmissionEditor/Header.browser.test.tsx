@@ -12,13 +12,14 @@ const context = {
   isEditingSubmission: false,
   hasPreviousOffering: true,
   isReadOnly: false,
-  saveDraft: () => {},
+  saveDraft: async () => true,
+  ensureServerUuid: async () => 'server-draft-1',
   isSaving: false,
   hasUnsavedChanges: false,
   lastSaveTime: null,
   saveError: null,
   submissionHandlers: { handleSubmit: () => {} },
-} as SubmissionEditorContextValue;
+} as unknown as SubmissionEditorContextValue;
 
 describe('SubmissionEditor Header in Chromium', () => {
   let container: HTMLDivElement | null = null;

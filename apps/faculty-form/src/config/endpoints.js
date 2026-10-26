@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
     FACULTY_SUBMISSION_UPDATE: '/faculty-submission/:uuid', // PUT endpoint for updates
     FACULTY_SUBMISSION_DELETE: '/faculty-submission/:uuid', // DELETE endpoint
     FACULTY_SUBMISSION_SUBMIT: '/faculty-submission/:uuid/submit',
+    FACULTY_SUBMISSION_SYLLABI: '/faculty-submission/:uuid/syllabi',
     GET_MERGED_RESOURCES: '/course/get-merged-resources',
     MOCK_LOGIN: '/faculty-submission/mock-login',
     // Communications endpoints

@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { citationToCourseItem } from '@/utils/citationToCourseItem';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
-import { discoveryResultToCourseItem } from '@/utils/discoveryResultToCourseItem';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { CitationChoice, EditableCitation, PasteWorkspace } from './pasteCitationTypes';
 import { useDiscoveryResultActions } from './useDiscoveryResultActions';
@@ -10,9 +9,11 @@ import { useDiscoveryResultActions } from './useDiscoveryResultActions';
 export function usePasteCitationActions(
   workspace: PasteWorkspace,
   setWorkspace: Dispatch<SetStateAction<PasteWorkspace>>,
+  keepUnheadedAtRoot = false,
 ) {
-  const { id, reserve, addItem, addedMaterials, undoAddedMaterial } = useSubmissionEditorContext();
+  const { id, reserve, addItem, createFolder, undoAddedMaterial } = useSubmissionEditorContext();
   const { isDuplicate: isResultDuplicate, addResult } = useDiscoveryResultActions();
+  const folderIdsByHeading = useRef(new Map<string, string>());
   const addedItemsByCitation = useMemo(() => new Map(
     Object.entries(workspace.choices).flatMap(([citationId, choice]) => {
       // Plain citations may have no duplicate key, so also confirm their saved list ID exists.
@@ -22,23 +23,6 @@ export function usePasteCitationActions(
     }),
   ), [reserve.items, workspace.choices]);
 
-  useEffect(() => {
-    const itemIds = new Set(reserve.items.map((item) => item.id));
-    const lastAdded = addedMaterials[addedMaterials.length - 1];
-    const updates = Object.entries(workspace.choices).flatMap(([citationId, choice]) => {
-      if (choice.addedItemId || !lastAdded || lastAdded.title !== choice.item.title || !itemIds.has(lastAdded.id)) return [];
-      return [[citationId, lastAdded.id] as const];
-    });
-    if (updates.length === 0) return;
-    setWorkspace((current) => ({
-      ...current,
-      choices: updates.reduce((choices, [citationId, addedItemId]) => {
-        const choice = choices[citationId];
-        if (choice && !choice.addedItemId) choices[citationId] = { ...choice, addedItemId };
-        return choices;
-      }, { ...current.choices }),
-    }));
-  }, [addedMaterials, reserve.items, setWorkspace, workspace.choices]);
 
   const isWrittenDuplicate = useCallback((citation: EditableCitation) => (
     Boolean(findDuplicateCourseItem(reserve.items, citationToCourseItem(citation.text)))
@@ -46,27 +30,49 @@ export function usePasteCitationActions(
 
   const addAsWritten = useCallback((citation: EditableCitation) => {
     const item = citationToCourseItem(citation.text);
-    if (!addItem(id, item)) return false;
+    const folderId = folderForHeading(citation.heading, reserve, id, createFolder, folderIdsByHeading.current);
+    const itemToAdd = folderId ? { ...item, folderId } : item;
+    const addOptions = folderId || keepUnheadedAtRoot ? { preserveFolder: true } : undefined;
+    const addedItem = addItem(id, itemToAdd, addOptions);
+    if (!addedItem) return false;
     setWorkspace((current) => withChoice(current, citation.id, {
-      item, source: 'written',
+      item: itemToAdd, source: 'written', addedItemId: addedItem.id,
     }));
     return true;
-  }, [addItem, id, setWorkspace]);
+  }, [addItem, createFolder, id, keepUnheadedAtRoot, reserve, setWorkspace]);
 
   const addMatch = useCallback((citationId: string, result: DiscoverySearchResult) => {
-    if (!addResult(result)) return false;
-    const choice: CitationChoice = {
-      item: discoveryResultToCourseItem(result),
-      source: 'match',
-      resultId: result.id,
-    };
+    const citation = workspace.citations.find((entry) => entry.id === citationId);
+    const folderId = folderForHeading(citation?.heading, reserve, id, createFolder, folderIdsByHeading.current);
+    const addOptions = folderId || keepUnheadedAtRoot ? { preserveFolder: true } : undefined;
+    const addedItem = addResult(result, folderId, addOptions);
+    if (!addedItem) return false;
+    const choice: CitationChoice = { item: addedItem, source: 'match', resultId: result.id, addedItemId: addedItem.id };
     setWorkspace((current) => withChoice(current, citationId, choice));
     return withChoice(workspace, citationId, choice);
-  }, [addResult, setWorkspace, workspace]);
+  }, [addResult, createFolder, id, keepUnheadedAtRoot, reserve, setWorkspace, workspace]);
 
   return { id, addedItemsByCitation, isWrittenDuplicate, isResultDuplicate, addAsWritten, addMatch, undoAddedMaterial };
 }
 
 function withChoice(workspace: PasteWorkspace, citationId: string, choice: PasteWorkspace['choices'][string]): PasteWorkspace {
   return { ...workspace, choices: { ...workspace.choices, [citationId]: choice } };
+}
+
+function folderForHeading(
+  heading: string | null | undefined,
+  reserve: ReturnType<typeof useSubmissionEditorContext>['reserve'],
+  reserveId: string,
+  createFolder: ReturnType<typeof useSubmissionEditorContext>['createFolder'],
+  folderIdsByHeading: Map<string, string>,
+): string | undefined {
+  const title = heading?.trim();
+  if (!title) return undefined;
+  const existing = reserve.folders.find((folder) => folder.title === title)?.id;
+  if (existing) return existing;
+  const remembered = folderIdsByHeading.get(title);
+  if (remembered) return remembered;
+  const folderId = createFolder(reserveId, title);
+  folderIdsByHeading.set(title, folderId);
+  return folderId;
 }

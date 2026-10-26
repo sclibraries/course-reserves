@@ -14,6 +14,8 @@ import PasteSkippedNotice from './PasteSkippedNotice';
 import { EMPTY_PASTE_WORKSPACE, type PasteWorkspace } from './pasteCitationTypes';
 import { useOnEscape } from './useOnEscape';
 import { usePasteCitationActions } from './usePasteCitationActions';
+import { groupCitationsByHeading } from './citationReviewSections';
+import SyllabusUploadSection from './SyllabusUploadSection';
 
 interface PasteTabProps {
   isRecordRoute?: boolean;
@@ -28,12 +30,13 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const [pasteText, setPasteText] = useState(() => restorePasteText(location.state));
   const [workspace, setWorkspace] = useState<PasteWorkspace>(() => restoreWorkspace(location.state));
   const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(() => workspace.citations.length > 0);
+  const [keepUnheadedAtRoot, setKeepUnheadedAtRoot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchProgress, setSearchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [searching, setSearching] = useState(false);
   const [activeCitationId, setActiveCitationId] = useState<string>();
   const { id, addedItemsByCitation, isWrittenDuplicate, isResultDuplicate, addAsWritten, addMatch, undoAddedMaterial } =
-    usePasteCitationActions(workspace, setWorkspace);
+    usePasteCitationActions(workspace, setWorkspace, keepUnheadedAtRoot);
   const { record, loading, error: recordError, loadRecord, clearSelection } = useSelection();
   const selectRecord = useCallback((selectedRecord: { dbId: string; an: string }, options: OpenDiscoveryRecordOptions) => {
     if (!options.citationId) return;
@@ -53,6 +56,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
     clearSelection();
   }, [clearSelection]);
   const groupsById = useMemo(() => new Map(workspace.groups.map((group) => [group.id, group])), [workspace.groups]);
+  const reviewSections = useMemo(() => groupCitationsByHeading(workspace.citations), [workspace.citations]);
   const citationResults = useMemo(() => workspace.groups.flatMap((group) => group.results), [workspace.groups]);
   const availabilityResults = useMemo(
     () => isRecordRoute && record ? [record] : citationResults,
@@ -67,10 +71,14 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
 
   useOnEscape(hasRecordPanel, closeRecordPanel);
 
-  const extractCitations = () => {
+  const extractCitations = useCallback((text = pasteText, fromSyllabus?: boolean) => {
+    if (fromSyllabus !== undefined) setKeepUnheadedAtRoot(fromSyllabus);
     setHasAttemptedExtraction(true);
-    const extraction = extractCitationsFromSyllabus(pasteText);
-    const citations = extraction.citations.map((text, index) => ({ id: 'citation-' + (index + 1), text }));
+    const extraction = extractCitationsFromSyllabus(text);
+    const citationEntries = extraction.entries?.filter((entry) => entry.type === 'citation') || [];
+    const citations = extraction.citations.map((citationText, index) => ({
+      id: 'citation-' + (index + 1), text: citationText, heading: citationEntries[index]?.heading || null,
+    }));
     const skipped = extraction.skipped.map((text, index) => ({ id: 'skipped-' + (index + 1), text }));
     setWorkspace((current) => ({
       citations,
@@ -84,7 +92,12 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
       }, {}),
     }));
     setError(citations.length ? null : 'No citations were detected. Paste a reading list with citation details and try again.');
-  };
+  }, [pasteText]);
+
+  const reviewSyllabusText = useCallback((text: string) => {
+    setPasteText(text);
+    extractCitations(text, true);
+  }, [extractCitations]);
 
   const addSkippedToList = (idToAdd: string) => {
     setError(null);
@@ -179,6 +192,7 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
 
   return (
     <section aria-label="Paste a list" className="space-y-4">
+      <SyllabusUploadSection onReviewText={reviewSyllabusText} />
       <div className="space-y-3 rounded-lg border p-4">
         <div>
           <h2 className="text-lg font-semibold">Paste a reading list</h2>
@@ -187,12 +201,15 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
         <Textarea
           aria-label="Paste a reading list"
           value={pasteText}
-          onChange={(event) => setPasteText(event.target.value)}
+          onChange={(event) => {
+            setPasteText(event.target.value);
+            setKeepUnheadedAtRoot(false);
+          }}
           placeholder="Paste citations here. Multi-line citations will be grouped together."
           rows={8}
           className="font-mono text-sm"
         />
-        <Button variant="outline" onClick={extractCitations} disabled={searching || !pasteText.trim()}>
+        <Button variant="outline" onClick={() => extractCitations()} disabled={searching || !pasteText.trim()}>
           {hasAttemptedExtraction ? 'Re-extract citations' : 'Extract citations'}
         </Button>
       </div>
@@ -207,25 +224,33 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
         <>
           <div className={hasRecordPanel ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)]' : 'space-y-3'}>
             <div className="min-w-0 space-y-3">
-              {workspace.citations.map((citation, index) => (
-                <CitationReviewGroup
-                  key={citation.id}
-                  citation={citation}
-                  index={index}
-                  group={groupsById.get(citation.id)}
-                  availability={availability.get}
-                  choice={addedItemsByCitation.has(citation.id) ? workspace.choices[citation.id] : undefined}
-                  addedItem={addedItemsByCitation.get(citation.id)}
-                  writtenDuplicate={isWrittenDuplicate(citation)}
-                  isResultDuplicate={isResultDuplicate}
-                  disabled={searching}
-                  onEdit={editCitation}
-                  onRemove={removeCitation}
-                  onAddAsWritten={addAsWritten}
-                  onOpenRecord={openRecord}
-                  onAddMatch={(citationId, result) => { if (addMatch(citationId, result)) closeRecordPanel(); }}
-                  onUndo={undoAddedMaterial}
-                />
+              {reviewSections.map((section) => (
+                <section
+                  key={section.heading === null ? 'unheaded' : `heading:${section.heading}`}
+                  className="min-w-0 space-y-3"
+                >
+                  {section.heading && <h3 className="text-base font-semibold">{section.heading}</h3>}
+                  {section.citations.map(({ citation, index }) => (
+                    <CitationReviewGroup
+                      key={citation.id}
+                      citation={citation}
+                      index={index}
+                      group={groupsById.get(citation.id)}
+                      availability={availability.get}
+                      choice={addedItemsByCitation.has(citation.id) ? workspace.choices[citation.id] : undefined}
+                      addedItem={addedItemsByCitation.get(citation.id)}
+                      writtenDuplicate={isWrittenDuplicate(citation)}
+                      isResultDuplicate={isResultDuplicate}
+                      disabled={searching}
+                      onEdit={editCitation}
+                      onRemove={removeCitation}
+                      onAddAsWritten={addAsWritten}
+                      onOpenRecord={openRecord}
+                      onAddMatch={(citationId, result) => { if (addMatch(citationId, result)) closeRecordPanel(); }}
+                      onUndo={undoAddedMaterial}
+                    />
+                  ))}
+                </section>
               ))}
             </div>
             {hasRecordPanel && (
@@ -256,10 +281,8 @@ function restoreWorkspace(locationState: unknown): PasteWorkspace {
   if (!locationState || typeof locationState !== 'object' || !('pasteWorkspace' in locationState)) return EMPTY_PASTE_WORKSPACE;
   const workspace = locationState.pasteWorkspace;
   if (!workspace || typeof workspace !== 'object' || !('citations' in workspace) || !Array.isArray(workspace.citations)) return EMPTY_PASTE_WORKSPACE;
-  return {
-    ...workspace,
-    skipped: Array.isArray(workspace.skipped) ? workspace.skipped : [],
-  } as PasteWorkspace;
+  const restored = workspace as PasteWorkspace;
+  return { ...restored, skipped: Array.isArray(restored.skipped) ? restored.skipped : [] };
 }
 
 function restorePasteText(locationState: unknown): string {
