@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiConfig } from '../../config/api.config';
+import { WorkflowRequestError } from './workflowRequest';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -7,7 +8,6 @@ vi.mock('../http/authFetch', () => ({ authFetch: mocks.authFetch }));
 
 import {
   getSubmissionSyllabusError,
-  SubmissionSyllabusRequestError,
   submissionSyllabiService,
 } from './submissionSyllabiService';
 
@@ -22,7 +22,7 @@ describe('submissionSyllabiService', () => {
     await expect(submissionSyllabiService.getSyllabi(31)).resolves.toEqual(syllabi);
     expect(mocks.authFetch).toHaveBeenCalledWith(
       `${apiConfig.urls.courseReserves}/workflow/submission/31/syllabi`,
-      { headers: { 'Content-Type': 'application/json' } },
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
     );
   });
 
@@ -34,7 +34,7 @@ describe('submissionSyllabiService', () => {
     await expect(submissionSyllabiService.downloadOriginal(31, 41)).resolves.toBe(file);
     expect(mocks.authFetch).toHaveBeenCalledWith(
       `${apiConfig.urls.courseReserves}/workflow/submission/31/syllabi/41/file`,
-      { headers: { 'Content-Type': 'application/json' } },
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
     );
     expect(blob).toHaveBeenCalledOnce();
   });
@@ -43,7 +43,7 @@ describe('submissionSyllabiService', () => {
     const payload = { error_code: 'syllabus_unavailable', message: 'Synthetic provider detail', reference: 'SYNTH-API-1' };
     mocks.authFetch.mockResolvedValue({ ok: false, status: 503, json: async () => payload });
 
-    await expect(submissionSyllabiService.getSyllabi(31)).rejects.toBeInstanceOf(SubmissionSyllabusRequestError);
+    await expect(submissionSyllabiService.getSyllabi(31)).rejects.toBeInstanceOf(WorkflowRequestError);
     await expect(submissionSyllabiService.getSyllabi(31)).rejects.toMatchObject({ payload });
     expect(getSubmissionSyllabusError({ payload }, 'load')).toBe(
       'Syllabi could not be loaded. Please try again later. Reference: SYNTH-API-1',

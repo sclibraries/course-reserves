@@ -16,12 +16,14 @@ export function workflowPath(group, name) {
   return path;
 }
 
-export async function requestWorkflow(path, { method = 'GET', body } = {}) {
+export async function requestWorkflow(path, { method = 'GET', body, responseType = 'json' } = {}) {
   const response = await authFetch(`${apiConfig.urls.courseReserves}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+
+  if (response.ok && responseType === 'blob') return response.blob();
 
   let payload = null;
   try {

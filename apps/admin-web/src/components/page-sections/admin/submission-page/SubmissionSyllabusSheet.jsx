@@ -55,7 +55,7 @@ function SyllabusEntry({ syllabus, onDownload, downloading }) {
                 Google Doc
               </a>
             ) : (
-              <>{syllabus.original_filename} · {formatFileSize(syllabus.byte_size)}</>
+              <>Uploaded file · {formatFileSize(syllabus.byte_size)}</>
             )}
           </dd>
         </div>

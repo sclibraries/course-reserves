@@ -131,6 +131,10 @@ export const apiConfig = {
       submissionRecheck: '/workflow/submission/:uuid/recheck',
       submissionTimeline: '/workflow/submission/:uuid/timeline',
     },
+    workflowSyllabi: {
+      getSyllabi: '/workflow/submission/:submissionId/syllabi',
+      downloadOriginal: '/workflow/submission/:submissionId/syllabi/:syllabusId/file',
+    },
     workflowClaims: {
       queue: '/workflow/queue',
       myItems: '/workflow/my-items',

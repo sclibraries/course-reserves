@@ -212,7 +212,7 @@ describe('SubmissionPage', () => {
     expect(googleLink.getAttribute('href')).toBe('https://docs.google.com/document/d/synthetic-doc/edit');
     expect(googleLink.getAttribute('target')).toBe('_blank');
     expect(googleLink.getAttribute('rel')).toContain('noreferrer');
-    expect(sheet.textContent).toContain('test-syllabus.docx');
+    expect(sheet.textContent.match(/test-syllabus\.docx/g)).toHaveLength(1);
     expect(sheet.textContent).toContain('2 KB');
     expect(sheet.textContent).toContain('Added by Synthetic Faculty (faculty) on');
     expect(sheet.textContent).toContain('Added by Synthetic Staff (staff) on');
