@@ -29,6 +29,7 @@ class WorkflowFlowAdminController extends Controller
             'flow' => ['admin'],
             'versions' => ['admin'],
             'mapping' => ['admin'],
+            'access-path-mapping' => ['admin'],
             'options' => ['admin'],
         ]);
     }
@@ -82,6 +83,18 @@ class WorkflowFlowAdminController extends Controller
             return $this->respond($this->service()->putMapping(Yii::$app->request->getBodyParams(), $this->actor()));
         }
         throw new MethodNotAllowedHttpException('Use GET or PUT for the flow mapping.');
+    }
+
+    public function actionAccessPathMapping()
+    {
+        $service = Yii::$container->get(\app\services\AccessPathMappingService::class);
+        if (Yii::$app->request->isGet) {
+            return $service->getMapping();
+        }
+        if (Yii::$app->request->isPut) {
+            return $this->respond($service->putMapping(Yii::$app->request->getBodyParams(), $this->actor()));
+        }
+        throw new MethodNotAllowedHttpException('Use GET or PUT for the access path mapping.');
     }
 
     private function service()

@@ -76,9 +76,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/flow' => 'workflow-flow/item-flow',
             'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/step-result' => 'workflow-flow/step-result',
             'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/switch-flow' => 'workflow-flow/switch-flow',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/access-path' => 'workflow-flow/access-path',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/flow' => 'workflow-flow/options',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/step-result' => 'workflow-flow/options',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/switch-flow' => 'workflow-flow/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/access-path' => 'workflow-flow/options',
             'GET workflow/admin/flows' => 'workflow-flow-admin/flows',
             'POST workflow/admin/flows' => 'workflow-flow-admin/flows',
             'GET workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/flow',
@@ -87,10 +89,13 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'POST workflow/admin/flows/<id:\\d+>/versions' => 'workflow-flow-admin/versions',
             'GET workflow/admin/flow-mapping' => 'workflow-flow-admin/mapping',
             'PUT workflow/admin/flow-mapping' => 'workflow-flow-admin/mapping',
+            'GET workflow/admin/access-path-mapping' => 'workflow-flow-admin/access-path-mapping',
+            'PUT workflow/admin/access-path-mapping' => 'workflow-flow-admin/access-path-mapping',
             'OPTIONS workflow/admin/flows' => 'workflow-flow-admin/options',
             'OPTIONS workflow/admin/flows/<id:\\d+>' => 'workflow-flow-admin/options',
             'OPTIONS workflow/admin/flows/<id:\\d+>/versions' => 'workflow-flow-admin/options',
             'OPTIONS workflow/admin/flow-mapping' => 'workflow-flow-admin/options',
+            'OPTIONS workflow/admin/access-path-mapping' => 'workflow-flow-admin/options',
         ];
         $draftRules = [
             'POST faculty-submission/draft' => 'faculty-draft/create',
@@ -136,7 +141,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $staffEnteredRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(239, $mergedRules);
+        $this->assertCount(244, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -214,6 +219,10 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['POST', 'workflow/item/new/999007213/switch-flow', [
                 'workflow-flow/switch-flow', ['kind' => 'new', 'id' => '999007213'],
             ]],
+            ['POST', 'workflow/item/reuse/999007215/access-path', [
+                'workflow-flow/access-path', ['kind' => 'reuse', 'id' => '999007215'],
+            ]],
+            ['GET', 'workflow/admin/access-path-mapping', ['workflow-flow-admin/access-path-mapping', []]],
             ['POST', 'workflow/admin/flows', ['workflow-flow-admin/flows', []]],
             ['GET', 'workflow/admin/flows/999007214', [
                 'workflow-flow-admin/flow', ['id' => '999007214'],

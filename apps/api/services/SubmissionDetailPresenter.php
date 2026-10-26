@@ -105,12 +105,12 @@ class SubmissionDetailPresenter
                     $itemAvailability = ['error' => true];
                 }
 
-                $item = array_merge(
-                    $item,
-                    ItemReadiness::evaluate($item, $itemAvailability, $instanceId)
-                );
                 $flowKey = $kind . ':' . (int)($item['id'] ?? 0);
                 $run = $flowRuns[$flowKey] ?? null;
+                $item = array_merge(
+                    $item,
+                    ItemReadiness::evaluate($item, $itemAvailability, $instanceId, $run)
+                );
                 $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
                 $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
                 $submission[$collection][$index] = $item;

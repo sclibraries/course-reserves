@@ -7,8 +7,13 @@ use app\components\FolioInstanceId;
 /** Applies the course-reserve item readiness rule to stored item data. */
 class ItemReadiness
 {
-    public static function evaluate(array $item, $availability, $instanceId)
+    public static function evaluate(array $item, $availability, $instanceId, array $currentRun = null)
     {
+        if (!empty($item['access_path']) && $currentRun
+            && $currentRun['finish_state'] === null && $currentRun['closed_at'] === null
+        ) {
+            return self::result('in_progress', 'The access path is being processed.');
+        }
         $data = self::resourceData($item['resource_data'] ?? null);
         if (self::hasOnlineAccess($item, $data)) {
             return self::result('ready', 'Online access is available.');

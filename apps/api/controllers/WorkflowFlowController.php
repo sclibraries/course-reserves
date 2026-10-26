@@ -28,6 +28,7 @@ class WorkflowFlowController extends \yii\rest\Controller
             'item-flow' => Roles::STAFF,
             'step-result' => Roles::STAFF,
             'switch-flow' => Roles::STAFF,
+            'access-path' => Roles::STAFF,
             'flows' => Roles::STAFF,
             'options' => Roles::STAFF,
         ]);
@@ -52,6 +53,11 @@ class WorkflowFlowController extends \yii\rest\Controller
     public function actionSwitchFlow($kind, $id)
     {
         return $this->respond($this->runner()->switchFlow($kind, $id, $this->actor(), Yii::$app->request->getBodyParams()));
+    }
+
+    public function actionAccessPath($kind, $id)
+    {
+        return $this->respond($this->runner()->setAccessPath($kind, $id, $this->actor(), Yii::$app->request->getBodyParams()));
     }
 
     public function actionFlows()
