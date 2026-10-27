@@ -34,11 +34,17 @@ vi.mock('../../../store', () => ({ default: () => mocks.courseStore }));
 vi.mock('../../../store/resourceSearchStore', () => ({ default: () => mocks.resourceStore }));
 vi.mock('../../../hooks/useBuildQuery', () => ({ useBuildQuery: () => '' }));
 vi.mock('../../../hooks/useCurrentTermId', () => ({ useCurrentTermId: () => ({ termId: null, loading: false }) }));
-vi.mock('../../../services/admin/navPinsService', () => ({ navPinsService: {
-  getPins: mocks.getPins,
-  savePins: mocks.savePins,
-  resetPins: mocks.resetPins,
-} }));
+vi.mock('../../../services/admin/navPinsService', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    navPinsService: {
+      getPins: mocks.getPins,
+      savePins: mocks.savePins,
+      resetPins: mocks.resetPins,
+    },
+  };
+});
 vi.mock('../../../services/admin/adminResourceService', () => ({ adminResourceService: { getAllResources: vi.fn() } }));
 vi.mock('../../../components/page-sections/admin/MyWorkQueue', () => ({ default: () => <h1>Admin home fixture</h1> }));
 vi.mock('../../../pages/WorkQueueDetail', () => ({ default: () => <h1>Work queue detail fixture</h1> }));

@@ -4,6 +4,7 @@ import { Pin, RotateCcw } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Separator } from '../../ui/separator';
+import { MAX_NAV_PINS } from '../../../services/admin/navPinsService';
 import { getTabCount, getTabCountLabel } from './adminNavigationUtils';
 import { groupPropType, navigationPropType, tabPropType } from './navigationPropTypes';
 
@@ -45,7 +46,7 @@ function PinButton({ tab, navigation }) {
       aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${tab.label}`}
       aria-pressed={isPinned}
       aria-describedby={atLimit ? 'admin-nav-pin-limit' : undefined}
-      title={atLimit ? 'You can pin up to 10 pages.' : undefined}
+      title={atLimit ? `You can pin up to ${MAX_NAV_PINS} pages.` : undefined}
       disabled={!navigation.pinsLoaded || navigation.isSaving || atLimit}
       onClick={() => navigation.togglePin(tab.key)}
       className="tw-h-10 tw-w-10 tw-shrink-0 tw-text-muted-foreground"
@@ -130,7 +131,7 @@ export default function AdminNavigationSections({
         )}
       </div>
 
-      {navigation.isPinLimitReached && <span id="admin-nav-pin-limit" className="tw-sr-only">You can pin up to 10 pages.</span>}
+      {navigation.isPinLimitReached && <span id="admin-nav-pin-limit" className="tw-sr-only">You can pin up to {MAX_NAV_PINS} pages.</span>}
       {navigation.statusMessage && <p role="status" className="tw-sr-only">{navigation.statusMessage}</p>}
       {navigation.saveError && <p role="alert" className="tw-mx-3 tw-my-2 tw-rounded-md tw-bg-destructive/10 tw-p-2 tw-text-sm tw-text-destructive">{navigation.saveError}</p>}
       <Separator className="tw-mt-2" />

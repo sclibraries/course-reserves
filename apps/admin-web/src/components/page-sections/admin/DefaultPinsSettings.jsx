@@ -6,12 +6,10 @@ import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '../../ui/card';
 import { Label } from '../../ui/label';
-import { navPinsService } from '../../../services/admin/navPinsService';
+import { MAX_NAV_PINS, navPinsService } from '../../../services/admin/navPinsService';
 import { groupPropType } from '../../layout/admin-nav/navigationPropTypes';
 
-const MAX_DEFAULT_PINS = 10;
-
-export default function DefaultPinsSettings({ groups, isAdmin }) {
+export default function DefaultPinsSettings({ groups }) {
   const [pins, setPins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -20,7 +18,6 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    if (!isAdmin) return undefined;
     let mounted = true;
     navPinsService.getDefaultPins()
       .then((response) => {
@@ -33,9 +30,7 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
         if (mounted) setLoading(false);
       });
     return () => { mounted = false; };
-  }, [isAdmin]);
-
-  if (!isAdmin) return null;
+  }, []);
 
   const tabs = groups.flatMap((group) => group.tabs);
   const selectedTabs = pins.map((key) => tabs.find((tab) => tab.key === key)).filter(Boolean);
@@ -43,7 +38,7 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
   const togglePin = (key, checked) => {
     setPins((current) => {
       if (checked) {
-        return current.length < MAX_DEFAULT_PINS ? [...current, key] : current;
+        return current.length < MAX_NAV_PINS ? [...current, key] : current;
       }
       return current.filter((pin) => pin !== key);
     });
@@ -88,7 +83,7 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
                     <ul className="tw-m-0 tw-list-none tw-space-y-1 tw-p-0">
                       {group.tabs.map((tab) => {
                         const checked = pins.includes(tab.key);
-                        const atLimit = !checked && pins.length >= MAX_DEFAULT_PINS;
+                        const atLimit = !checked && pins.length >= MAX_NAV_PINS;
                         const id = `default-pin-${tab.key}`;
                         return (
                           <li key={tab.key} className="tw-min-w-0">
@@ -115,9 +110,9 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
                 ))}
               </div>
 
-              {pins.length >= MAX_DEFAULT_PINS && (
+              {pins.length >= MAX_NAV_PINS && (
                 <p id="default-pins-limit" role="note" className="tw-mt-3 tw-text-sm tw-text-muted-foreground">
-                  Choose up to 10 pages. Remove a selected page to choose another.
+                  Choose up to {MAX_NAV_PINS} pages. Remove a selected page to choose another.
                 </p>
               )}
 
@@ -148,5 +143,4 @@ export default function DefaultPinsSettings({ groups, isAdmin }) {
 
 DefaultPinsSettings.propTypes = {
   groups: PropTypes.arrayOf(groupPropType).isRequired,
-  isAdmin: PropTypes.bool.isRequired,
 };

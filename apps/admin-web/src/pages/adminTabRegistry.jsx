@@ -160,7 +160,7 @@ export function createAdminTabRegistry({
         renderContent: ({ userInstitution, tabRegistry }) => (
           <div className="fade-in">
             <AdminCustomizations userInstitution={userInstitution} isAdmin={isAdmin} />
-            {isAdmin && <DefaultPinsSettings isAdmin groups={getVisibleAdminGroups(tabRegistry)} />}
+            {isAdmin && <DefaultPinsSettings groups={getVisibleAdminGroups(tabRegistry)} />}
           </div>
         ),
       },

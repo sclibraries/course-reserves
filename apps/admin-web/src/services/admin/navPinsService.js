@@ -1,6 +1,8 @@
 import { apiConfig } from '../../config/api.config';
 import { authFetch } from '../http/authFetch';
 
+export const MAX_NAV_PINS = 10;
+
 const endpoint = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.admin.staffNavPins}`;
 const defaultsEndpoint = `${endpoint}/defaults`;
 

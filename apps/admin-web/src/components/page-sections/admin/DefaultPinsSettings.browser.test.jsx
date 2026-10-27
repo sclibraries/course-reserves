@@ -9,10 +9,16 @@ import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../pages/adminTabRegistry';
 
 const mocks = vi.hoisted(() => ({ getDefaultPins: vi.fn(), saveDefaultPins: vi.fn() }));
-vi.mock('../../../services/admin/navPinsService', () => ({ navPinsService: {
-  getDefaultPins: mocks.getDefaultPins,
-  saveDefaultPins: mocks.saveDefaultPins,
-} }));
+vi.mock('../../../services/admin/navPinsService', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    navPinsService: {
+      getDefaultPins: mocks.getDefaultPins,
+      saveDefaultPins: mocks.saveDefaultPins,
+    },
+  };
+});
 
 import DefaultPinsSettings from './DefaultPinsSettings';
 

@@ -30,11 +30,17 @@ vi.mock('../useUnreadMessages', () => ({
   useUnreadMessages: () => ({ unreadCount: mocks.unreadCount }),
   default: () => ({ unreadCount: mocks.unreadCount }),
 }));
-vi.mock('../../services/admin/navPinsService', () => ({ navPinsService: {
-  getPins: mocks.getPins,
-  savePins: mocks.savePins,
-  resetPins: mocks.resetPins,
-} }));
+vi.mock('../../services/admin/navPinsService', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    navPinsService: {
+      getPins: mocks.getPins,
+      savePins: mocks.savePins,
+      resetPins: mocks.resetPins,
+    },
+  };
+});
 
 import { renderHook } from './testUtils/renderHook';
 import { useAdminNavigation } from './useAdminNavigation';

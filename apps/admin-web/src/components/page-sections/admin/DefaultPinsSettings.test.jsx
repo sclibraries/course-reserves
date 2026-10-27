@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, getAllByRole, getByRole, queryByRole } from '@testing-library/dom';
+import { fireEvent, getAllByRole, getByRole } from '@testing-library/dom';
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../pages/adminTabRegistry';
 
 const mocks = vi.hoisted(() => ({
@@ -9,10 +9,16 @@ const mocks = vi.hoisted(() => ({
   saveDefaultPins: vi.fn(),
 }));
 
-vi.mock('../../../services/admin/navPinsService', () => ({ navPinsService: {
-  getDefaultPins: mocks.getDefaultPins,
-  saveDefaultPins: mocks.saveDefaultPins,
-} }));
+vi.mock('../../../services/admin/navPinsService', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    navPinsService: {
+      getDefaultPins: mocks.getDefaultPins,
+      saveDefaultPins: mocks.saveDefaultPins,
+    },
+  };
+});
 
 import DefaultPinsSettings from './DefaultPinsSettings';
 
@@ -37,7 +43,7 @@ async function render(props = {}) {
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => root.render(
-    <DefaultPinsSettings isAdmin groups={groups} {...props} />,
+    <DefaultPinsSettings groups={groups} {...props} />,
   ));
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 }
@@ -98,12 +104,5 @@ describe('DefaultPinsSettings', () => {
 
     expect(getByRole(container, 'alert').textContent).toBe('Could not save default pins. Please try again.');
     expect(container.textContent).not.toContain('private server detail');
-  });
-
-  it('does not render or fetch defaults for non-admins', async () => {
-    await render({ isAdmin: false });
-
-    expect(queryByRole(container, 'heading', { name: 'Default pins' })).toBeNull();
-    expect(mocks.getDefaultPins).not.toHaveBeenCalled();
   });
 });

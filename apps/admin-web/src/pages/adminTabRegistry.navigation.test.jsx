@@ -69,6 +69,13 @@ describe('admin navigation registry', () => {
     });
   });
 
+  it('keeps default-pin settings behind the registry admin gate', () => {
+    const registry = registryFor({ isAdmin: false });
+    const customizations = registry.tabs.find(({ key }) => key === 'customizations');
+
+    expect(customizations.renderContent({ tabRegistry: registry }).props.children[1]).toBe(false);
+  });
+
   it('opens My Work Queue by default and retains the previous allowed fallback', () => {
     expect(getDefaultAdminTab(registryFor())).toBe('my-work');
     expect(getDefaultAdminTab(registryFor({

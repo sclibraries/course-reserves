@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnreadMessages } from '../useUnreadMessages';
 import useSubmissionWorkflowStore from '../../store/submissionWorkflowStore';
-import { navPinsService } from '../../services/admin/navPinsService';
+import { MAX_NAV_PINS, navPinsService } from '../../services/admin/navPinsService';
 import {
   canAccessProxyTab,
   createAdminTabRegistry,
@@ -16,7 +16,6 @@ import {
 
 export const NAV_COLLAPSED_KEY = 'admin-navigation-collapsed';
 export const ELECTRONIC_NAV_COLLAPSED_KEY = 'admin-navigation-electronic-collapsed';
-const MAX_PINS = 10;
 const SAVE_ERROR = 'Could not save your pinned pages. Your previous pins were restored.';
 
 function readCollapsed(key, defaultValue) {
@@ -82,7 +81,7 @@ export function useAdminNavigation() {
   const visibleGroups = getVisibleAdminGroups(tabRegistry);
   const pinnedTabs = pins.map((key) => getAdminTab(tabRegistry, key))
     .filter((tab) => tab?.canAccess);
-  const isPinLimitReached = pins.length >= MAX_PINS;
+  const isPinLimitReached = pins.length >= MAX_NAV_PINS;
   const routeTab = getAdminTabForPath(location.pathname);
   const requestedTab = searchParams.get('tab');
   const requestedDefinition = getAdminTab(tabRegistry, requestedTab);
