@@ -1,7 +1,20 @@
 import { formatSubmissionClaimItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
 
 const DONE_STATUSES = new Set(['complete', 'unavailable', 'withdrawn']);
-const READINESS_STATES = new Set(['ready', 'missing', 'unknown']);
+const READINESS_STATES = new Set(['ready', 'in_progress', 'missing', 'unknown']);
+const NOT_READY_STATES = new Set(['missing', 'unknown']);
+export const READINESS_LABELS = {
+  ready: 'Ready',
+  in_progress: 'In progress',
+  missing: 'Missing',
+  unknown: 'Unknown',
+};
+export const READINESS_VARIANTS = {
+  ready: 'secondary',
+  in_progress: 'outline',
+  missing: 'destructive',
+  unknown: 'outline',
+};
 
 function itemKey(item) {
   return `${item.kind || (item.isReuse ? 'reuse' : 'new')}/${item.id}`;
@@ -20,15 +33,19 @@ export function getReadinessStatus(item) {
   return READINESS_STATES.has(item.readiness) ? item.readiness : 'unknown';
 }
 
+export function getReadinessLabel(status) {
+  return READINESS_LABELS[status] || READINESS_LABELS.unknown;
+}
+
 export function countReadiness(items) {
   return items.reduce((counts, item) => {
     counts[getReadinessStatus(item)] += 1;
     return counts;
-  }, { total: items.length, ready: 0, missing: 0, unknown: 0 });
+  }, { total: items.length, ready: 0, in_progress: 0, missing: 0, unknown: 0 });
 }
 
 export function filterNotReadyItems(items) {
-  return items.filter((item) => getReadinessStatus(item) !== 'ready');
+  return items.filter((item) => NOT_READY_STATES.has(getReadinessStatus(item)));
 }
 
 export function isItemClaimedByCurrentUser(item, currentUser) {

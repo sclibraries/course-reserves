@@ -51,12 +51,15 @@ function RequiredReasonForm({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             required
-            aria-describedby={helpText ? `${reasonId}-help` : undefined}
+            aria-describedby={[
+              helpText && `${reasonId}-help`,
+              error && `${reasonId}-error`,
+            ].filter(Boolean).join(' ') || undefined}
           />
           {helpText && <p id={`${reasonId}-help`} className="tw-text-sm tw-text-muted-foreground">{helpText}</p>}
         </div>
       )}
-      {error && <p className="tw-text-sm tw-text-destructive" role="alert">{error}</p>}
+      {error && <p id={`${reasonId}-error`} className="tw-text-sm tw-text-destructive" role="alert">{error}</p>}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>{cancelLabel}</Button>
         <Button type="submit" variant={submitVariant} disabled={saving || !reason.trim()}>{submitLabel}</Button>

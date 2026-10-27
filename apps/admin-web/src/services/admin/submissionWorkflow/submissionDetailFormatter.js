@@ -82,6 +82,8 @@ export function formatSubmissionDetail(response) {
       status: resource.item_status || 'pending',
       readiness: resource.readiness,
       readinessReason: resource.readiness_reason,
+      ...('access_path' in resource ? { accessPath: resource.access_path } : {}),
+      ...('allowed_access_paths' in resource ? { allowedAccessPaths: resource.allowed_access_paths } : {}),
       flow: resource.flow,
       folderName: resource.folder_name,
       displayOrder: resource.display_order || 0,

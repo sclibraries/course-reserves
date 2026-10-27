@@ -19,7 +19,23 @@ export const workflowFlowsApi = {
     return requestWorkflow(itemPath('switchFlow', kind, id), { method: 'POST', body });
   },
 
+  setAccessPath(kind, id, body) {
+    return requestWorkflow(itemPath('itemAccessPath', kind, id), { method: 'POST', body });
+  },
+
   getFlows() {
     return requestWorkflow(workflowPath('workflowFlows', 'flows'));
+  },
+
+  getAdminFlows() {
+    return requestWorkflow(workflowPath('workflowFlows', 'adminFlows'));
+  },
+
+  getAccessPathMapping() {
+    return requestWorkflow(workflowPath('workflowFlows', 'accessPathMapping'));
+  },
+
+  putAccessPathMapping(body) {
+    return requestWorkflow(workflowPath('workflowFlows', 'accessPathMapping'), { method: 'PUT', body });
   },
 };

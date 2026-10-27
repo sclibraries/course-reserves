@@ -16,6 +16,7 @@ import ClaimQueue from '../components/page-sections/admin/claims/ClaimQueue';
 import MyClaimedItems from '../components/page-sections/admin/claims/MyClaimedItems';
 import MyGroups from '../components/page-sections/admin/groups/MyGroups';
 import AdminGroups from '../components/page-sections/admin/groups/AdminGroups';
+import AccessPathRoutingTab from '../components/page-sections/admin/access-path-routing/AccessPathRoutingTab';
 import { isStaffOrAdminRole } from '../util/roles';
 
 export const canAccessProxyTab = (role) => isStaffOrAdminRole(role);
@@ -35,7 +36,7 @@ export function createAdminTabRegistry({
     workflowVisible: isDevelopment && canManageSubmissions,
     navigationOrder: [
       'courses', 'resources', 'workflow', 'tracking', 'workflow-templates',
-      'customizations', 'users', 'groups', 'proxy-access',
+      'customizations', 'users', 'access-path-routing', 'groups', 'proxy-access',
     ],
     tabs: [
       {
@@ -167,6 +168,13 @@ export function createAdminTabRegistry({
         ariaLabel: 'User Management Tab',
         canAccess: isAdmin,
         renderContent: () => <div className="fade-in"><UserManagement /></div>,
+      },
+      {
+        key: 'access-path-routing',
+        label: 'Access path routing',
+        ariaLabel: 'Access path routing Tab',
+        canAccess: isAdmin,
+        renderContent: () => <div className="fade-in"><AccessPathRoutingTab /></div>,
       },
       {
         key: 'groups',

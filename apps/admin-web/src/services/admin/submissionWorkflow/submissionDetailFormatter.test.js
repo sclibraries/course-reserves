@@ -75,6 +75,8 @@ describe('formatSubmissionDetail EDS fields', () => {
         last_activity_at: '2026-10-19T12:00:00Z',
         expires_at: '2026-10-22T12:00:00Z',
         assigned_group: { id: 4, name: 'Acquisitions' },
+        access_path: 'purchase',
+        allowed_access_paths: ['purchase', 'faculty_supplies'],
       }],
       communications: [],
     });
@@ -87,6 +89,8 @@ describe('formatSubmissionDetail EDS fields', () => {
       lastActivityAt: '2026-10-19T12:00:00Z',
       expiresAt: '2026-10-22T12:00:00Z',
       assignedGroup: { id: 4, name: 'Acquisitions' },
+      accessPath: 'purchase',
+      allowedAccessPaths: ['purchase', 'faculty_supplies'],
     });
   });
 

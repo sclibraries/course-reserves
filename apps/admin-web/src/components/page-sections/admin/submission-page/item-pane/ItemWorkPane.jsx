@@ -53,6 +53,7 @@ function ItemWorkPane({ item, submission, currentUsername = '', onChanged, onGoT
             switchFlow={switchFlow}
             onGoToWork={onGoToWork}
             onReopen={onReopen}
+            onChanged={onChanged}
           />
         </TabsContent>
         <TabsContent value="messages" className="tw-min-w-0">

@@ -47,4 +47,13 @@ describe('Needs linking workflow tab', () => {
     expect(settingsForStaff).toEqual(expect.objectContaining({ label: 'Groups', canAccess: false }));
     expect(settingsForAdmin).toEqual(expect.objectContaining({ label: 'Groups', canAccess: true }));
   });
+
+  it('shows Access path routing to admins only', () => {
+    const staffRegistry = registryFor(true, false);
+    const adminRegistry = registryFor(true, true);
+
+    expect(staffRegistry.tabs.find((entry) => entry.key === 'access-path-routing').canAccess).toBe(false);
+    expect(adminRegistry.tabs.find((entry) => entry.key === 'access-path-routing'))
+      .toEqual(expect.objectContaining({ label: 'Access path routing', canAccess: true }));
+  });
 });

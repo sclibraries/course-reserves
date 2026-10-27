@@ -6,6 +6,7 @@ import { Textarea } from '../../../../ui/textarea';
 import { formatFinishState } from '../../../../../services/admin/workflowFlows/flowFormatters';
 import { getProcessingBlockReason } from '../../../../../services/admin/processingHandoff';
 import SwitchFlowDialog from './SwitchFlowDialog';
+import AccessPathSection from './AccessPathSection';
 
 function ProcessAction({ item, currentUsername, onGoToWork, onReopen }) {
   if (item.status === 'complete') {
@@ -37,7 +38,7 @@ ProcessAction.propTypes = {
   onReopen: PropTypes.func.isRequired,
 };
 
-function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReopen }) {
+function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReopen, onChanged }) {
   const step = flow.flowState?.current_step?.step;
   const canAct = Boolean(flow.flowState?.can_act);
 
@@ -65,6 +66,8 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
       {flow.loading && !flow.flowState && <p className="tw-text-sm tw-text-muted-foreground" role="status">Loading item flow...</p>}
       {(flow.error || switchFlow.error) && <p className="tw-text-sm tw-text-destructive" role="alert">{flow.error || switchFlow.error}</p>}
       {flow.notice && <p className="tw-text-sm tw-text-muted-foreground" role="status">{flow.notice}</p>}
+
+      <AccessPathSection item={item} currentUsername={currentUsername} flow={flow} onChanged={onChanged} />
 
       {flow.flowState?.flow === null && <p className="tw-text-sm">No flow is set for this material type.</p>}
       {flow.flowState?.finished && (
@@ -152,6 +155,7 @@ ProcessTab.propTypes = {
   switchFlow: PropTypes.object.isRequired,
   onGoToWork: PropTypes.func.isRequired,
   onReopen: PropTypes.func.isRequired,
+  onChanged: PropTypes.func,
 };
 
 export default ProcessTab;

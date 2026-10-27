@@ -161,7 +161,10 @@ export const apiConfig = {
       itemFlow: '/workflow/item/:kind/:id/flow',
       stepResult: '/workflow/item/:kind/:id/step-result',
       switchFlow: '/workflow/item/:kind/:id/switch-flow',
+      itemAccessPath: '/workflow/item/:kind/:id/access-path',
       flows: '/workflow/flows',
+      adminFlows: '/workflow/admin/flows',
+      accessPathMapping: '/workflow/admin/access-path-mapping',
     },
     workflow: {
       // Template Management

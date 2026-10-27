@@ -85,7 +85,9 @@ function SubmissionDetail() {
     navigate(handoff.pathname, { state: handoff.state });
   };
 
-  if (loading) {
+  // Keep the pane mounted on same-submission refreshes so local state and status messages survive.
+  const isCurrentSubmissionLoaded = String(submission?.id) === String(submissionId);
+  if (loading && !isCurrentSubmissionLoaded) {
     return (
       <div className="tw-flex tw-items-center tw-gap-3 tw-py-8" role="status">
         <Loader2 className="tw-size-6 tw-animate-spin tw-text-primary" aria-hidden="true" />

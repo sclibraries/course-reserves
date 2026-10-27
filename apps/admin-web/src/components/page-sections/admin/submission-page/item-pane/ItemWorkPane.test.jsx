@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   getItemTimeline: vi.fn(),
   getItemFlow: vi.fn(),
   getFlows: vi.fn(),
+  setAccessPath: vi.fn(),
+  getAdminFlows: vi.fn(),
+  getAccessPathMapping: vi.fn(),
+  putAccessPathMapping: vi.fn(),
   submitStepResult: vi.fn(),
   switchFlow: vi.fn(),
   createCommunication: vi.fn(),
@@ -166,6 +170,10 @@ beforeEach(() => {
   }] });
   mocks.getItemFlow.mockResolvedValue(flowState());
   mocks.getFlows.mockResolvedValue({ flows: [{ id: 3, name: 'Article', latest_version: 2 }] });
+  mocks.setAccessPath.mockResolvedValue({ access_path: 'purchase', flow_id: 3, run_id: 92, group_id: 7, warning: null });
+  mocks.getAdminFlows.mockResolvedValue({ flows: [{ id: 3, name: 'Article', latest_version: 2 }] });
+  mocks.getAccessPathMapping.mockResolvedValue({ mapping: [] });
+  mocks.putAccessPathMapping.mockResolvedValue({ mapping: [] });
   mocks.submitStepResult.mockResolvedValue(flowState({
     current_step: { step: { key: 'available', kind: 'question', label: 'Is it available?', outcomes: [] } },
   }));
@@ -262,6 +270,120 @@ describe('ItemWorkPane claim actions', () => {
 });
 
 describe('ItemWorkPane process and history', () => {
+  it.each([
+    ['book', ['purchase', 'faculty_supplies']],
+    ['article', ['purchase', 'ags', 'ill', 'in_house_copy', 'faculty_supplies']],
+  ])('offers only API-allowed access paths for a %s', async (materialType, allowedPaths) => {
+    const allowedLabels = {
+      purchase: 'Purchase',
+      ags: 'Article Galaxy Scholar',
+      ill: 'ILL',
+      in_house_copy: 'In-house copy/scan',
+      faculty_supplies: 'Faculty supplies a copy',
+    };
+    const { container: pane } = await renderPane({ item: {
+      ...item,
+      material_type: materialType,
+      readiness: 'missing',
+      allowedAccessPaths: allowedPaths,
+    } });
+    const section = getByRole(pane, 'region', { name: 'Access path' });
+    const select = within(section).getByRole('combobox', { name: 'Access path' });
+
+    expect(getByRole(section, 'heading', { name: 'How will we get it?' })).toBeTruthy();
+    expect(Array.from(select.options).slice(1).map((option) => [option.value, option.textContent]))
+      .toEqual(allowedPaths.map((path) => [path, allowedLabels[path]]));
+    await expectAccessible(section);
+  });
+
+  it('sets a first access path without a reason, reloads item details, and announces destinations', async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    mocks.getItemFlow.mockResolvedValue(flowState({ flow: { id: 3, name: 'Article', version: 2 } }));
+    const { user } = await renderPane({
+      item: { ...item, readiness: 'missing', allowedAccessPaths: ['purchase', 'faculty_supplies'] },
+      onChanged,
+    });
+    const select = getByRole(container, 'combobox', { name: 'Access path' });
+    await user.selectOptions(select, 'purchase');
+    await user.click(getByRole(container, 'button', { name: 'Save access path' }));
+
+    await waitFor(() => expect(mocks.setAccessPath).toHaveBeenCalledWith('new', item.id, { access_path: 'purchase' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    await waitFor(() => expect(getByRole(container, 'status').textContent)
+      .toContain('Routed to Article and Synthetic acquisitions'));
+    expect(mocks.getItemFlow).toHaveBeenCalledTimes(2);
+    expect(mocks.getGroupsForHandoff).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires a reason when changing an existing access path', async () => {
+    const { user } = await renderPane({ item: {
+      ...item,
+      material_type: 'article',
+      readiness: 'in_progress',
+      accessPath: 'purchase',
+      allowedAccessPaths: ['purchase', 'ags', 'ill', 'in_house_copy', 'faculty_supplies'],
+    } });
+    await user.selectOptions(getByRole(container, 'combobox', { name: 'Access path' }), 'ags');
+    await user.click(getByRole(container, 'button', { name: 'Save access path' }));
+    const reason = getByRole(container, 'textbox', { name: 'Reason for changing access path (required)' });
+    const submit = getByRole(container, 'button', { name: 'Save access path' });
+
+    expect(submit.disabled).toBe(true);
+    expect(mocks.setAccessPath).not.toHaveBeenCalled();
+    await user.type(reason, 'Faculty supplied the article');
+    await user.click(submit);
+
+    await waitFor(() => expect(mocks.setAccessPath).toHaveBeenCalledWith('new', item.id, {
+      access_path: 'ags', reason: 'Faculty supplied the article',
+    }));
+  });
+
+  it('disables access path controls when another person holds the claim and explains why', async () => {
+    const { container: pane } = await renderPane({ item: {
+      ...item,
+      claimed_by: 'test-api078-owner',
+      readiness: 'missing',
+      allowedAccessPaths: ['purchase'],
+    } });
+    const section = getByRole(pane, 'region', { name: 'Access path' });
+
+    expect(getByRole(section, 'combobox', { name: 'Access path' }).disabled).toBe(true);
+    expect(getByRole(section, 'button', { name: 'Save access path' }).disabled).toBe(true);
+    expect(getByRole(section, 'status').textContent).toContain('Only the staff member who holds the claim can set the access path.');
+  });
+
+  it.each([
+    ['no_flow_mapped', 'No workflow is set up for this path yet; ask an admin to map it.'],
+    ['no_group_mapped', 'No group is set up for this path yet; ask an admin to map it.'],
+  ])('explains the %s routing warning in words', async (warning, message) => {
+    mocks.setAccessPath.mockResolvedValueOnce({ access_path: 'purchase', flow_id: null, run_id: null, group_id: null, warning });
+    const { user } = await renderPane({ item: {
+      ...item,
+      readiness: 'missing',
+      allowedAccessPaths: ['purchase'],
+    } });
+    await user.selectOptions(getByRole(container, 'combobox', { name: 'Access path' }), 'purchase');
+    await user.click(getByRole(container, 'button', { name: 'Save access path' }));
+
+    await waitFor(() => expect(getByRole(container, 'status').textContent).toContain(message));
+  });
+
+  it('announces access path request errors in words', async () => {
+    mocks.setAccessPath.mockRejectedValueOnce({ payload: { error_code: 'flow_has_no_steps' } });
+    const { user } = await renderPane({ item: {
+      ...item,
+      readiness: 'missing',
+      allowedAccessPaths: ['purchase'],
+    } });
+    await user.selectOptions(getByRole(container, 'combobox', { name: 'Access path' }), 'purchase');
+    await user.click(getByRole(container, 'button', { name: 'Save access path' }));
+
+    await waitFor(() => expect(getByRole(container, 'alert').textContent)
+      .toContain('The flow mapped to this access path has no steps. Ask an admin to update the flow.'));
+    expect(getByRole(container, 'combobox', { name: 'Access path' }).getAttribute('aria-describedby'))
+      .toContain('access-path-new-99907851-error');
+  });
+
   it('shows the flow question and posts the selected outcome', async () => {
     const { user } = await renderPane();
 

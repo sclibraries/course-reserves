@@ -8,9 +8,12 @@ import {
   countReadiness,
   filterNotReadyItems,
   filterSubmissionItems,
+  getReadinessLabel,
   getReadinessStatus,
   getClaimBadge,
   isItemDone,
+  READINESS_LABELS,
+  READINESS_VARIANTS,
 } from './submissionPageUtils';
 
 const filters = [
@@ -19,9 +22,6 @@ const filters = [
   { id: 'unclaimed', label: 'Unclaimed' },
   { id: 'done', label: 'Done' },
 ];
-const readinessLabels = { ready: 'Ready', missing: 'Missing', unknown: 'Unknown' };
-const readinessVariants = { ready: 'secondary', missing: 'destructive', unknown: 'outline' };
-
 function claimAllMessage(result) {
   const claimed = result.claimed || [];
   const skipped = result.skipped || [];
@@ -45,7 +45,7 @@ ItemFlowLine.propTypes = { item: PropTypes.object.isRequired };
 function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
   const claim = getClaimBadge(item, currentUser);
   const readiness = getReadinessStatus(item);
-  const readinessLabel = readinessLabels[readiness];
+  const readinessLabel = getReadinessLabel(readiness);
 
   return (
     <div
@@ -69,7 +69,7 @@ function ItemRow({ item, currentUser, selected, disabled, onSelect }) {
         </span>
       </Button>
       <div className="tw-flex tw-min-w-0 tw-max-w-28 tw-shrink-0 tw-flex-col tw-items-end tw-gap-1">
-        <Badge variant={readinessVariants[readiness]}>{readinessLabel}</Badge>
+        <Badge variant={READINESS_VARIANTS[readiness]}>{readinessLabel}</Badge>
         <Badge variant={claim.variant} className="tw-max-w-full tw-whitespace-normal tw-break-words tw-text-center">
           {claim.label}
         </Badge>
@@ -123,7 +123,7 @@ function ItemList({ groups, submission, currentUser, selectedItemId, disabled = 
         <h3 id="readiness-summary-title" className="tw-sr-only">Readiness summary</h3>
         <p className="tw-font-semibold">{readiness.ready} of {readiness.total} ready</p>
         <p className="tw-text-sm tw-text-muted-foreground">
-          Ready: {readiness.ready} · Missing: {readiness.missing} · Unknown: {readiness.unknown}
+          {Object.entries(READINESS_LABELS).map(([status, label]) => `${label}: ${readiness[status]}`).join(' · ')}
         </p>
       </section>
       <div className="tw-mb-3 tw-flex tw-flex-wrap tw-gap-2" role="group" aria-label="Filter items">

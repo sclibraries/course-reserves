@@ -74,4 +74,12 @@ describe('SubmissionDetail drafts', () => {
     expect(container.textContent).not.toContain('Work on This');
     expect(container.querySelector('button[data-action]')).toBeNull();
   });
+
+  it('keeps the current submission rendered during a detail refresh', async () => {
+    mocks.storeState.loading = true;
+    await renderDetail();
+
+    expect(container.textContent).toContain('Draft - not submitted yet.');
+    expect(container.textContent).not.toContain('Loading submission details...');
+  });
 });

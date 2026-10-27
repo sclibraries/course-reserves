@@ -8,7 +8,7 @@ import RequiredReasonForm from './RequiredReasonForm';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-function Harness({ onConfirm, showReason }) {
+function Harness({ onConfirm, showReason, error }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -21,6 +21,7 @@ function Harness({ onConfirm, showReason }) {
         reasonId="shared-reason"
         reasonLabel="Reason (required)"
         helpText="This reason is recorded in the activity history."
+        error={error}
         submitLabel="Confirm reason"
         showReason={showReason}
       />
@@ -29,13 +30,13 @@ function Harness({ onConfirm, showReason }) {
   );
 }
 
-Harness.propTypes = { onConfirm: PropTypes.func.isRequired, showReason: PropTypes.bool };
+Harness.propTypes = { onConfirm: PropTypes.func.isRequired, showReason: PropTypes.bool, error: PropTypes.string };
 
-async function renderForm(onConfirm, showReason = true) {
+async function renderForm(onConfirm, showReason = true, error = '') {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  await act(async () => root.render(<Harness onConfirm={onConfirm} showReason={showReason} />));
+  await act(async () => root.render(<Harness onConfirm={onConfirm} showReason={showReason} error={error} />));
   return () => {
     act(() => root.unmount());
     container.remove();
@@ -77,6 +78,15 @@ describe('RequiredReasonForm', () => {
     const unmount = await renderForm(vi.fn(), false);
 
     expect(screen.queryByRole('textbox', { name: 'Reason (required)' })).toBeNull();
+    unmount();
+  });
+
+  it('associates request errors with the reason field', async () => {
+    const unmount = await renderForm(vi.fn(), true, 'The reason was not accepted.');
+    const reason = screen.getByRole('textbox', { name: 'Reason (required)' });
+
+    expect(reason.getAttribute('aria-describedby')).toBe('shared-reason-help shared-reason-error');
+    expect(screen.getByRole('alert').id).toBe('shared-reason-error');
     unmount();
   });
 });

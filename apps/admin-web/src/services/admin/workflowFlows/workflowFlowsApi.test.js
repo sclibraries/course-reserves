@@ -37,4 +37,21 @@ describe('workflowFlowsApi contract', () => {
       method: 'POST', body: JSON.stringify({ flow_id: 7, reason: 'Use the article flow' }),
     }));
   });
+
+  it('sets an item access path and reads and saves admin routing', async () => {
+    const mapping = [{ access_path: 'purchase', flow_id: 7, group_id: 2 }];
+    await workflowFlowsApi.setAccessPath('new', 99907811, { access_path: 'purchase' });
+    await workflowFlowsApi.getAdminFlows();
+    await workflowFlowsApi.getAccessPathMapping();
+    await workflowFlowsApi.putAccessPathMapping({ mapping });
+
+    expect(mocks.authFetch).toHaveBeenNthCalledWith(1, `${baseUrl}/workflow/item/new/99907811/access-path`, expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ access_path: 'purchase' }),
+    }));
+    expect(mocks.authFetch).toHaveBeenNthCalledWith(2, `${baseUrl}/workflow/admin/flows`, expect.objectContaining({ method: 'GET' }));
+    expect(mocks.authFetch).toHaveBeenNthCalledWith(3, `${baseUrl}/workflow/admin/access-path-mapping`, expect.objectContaining({ method: 'GET' }));
+    expect(mocks.authFetch).toHaveBeenNthCalledWith(4, `${baseUrl}/workflow/admin/access-path-mapping`, expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ mapping }),
+    }));
+  });
 });

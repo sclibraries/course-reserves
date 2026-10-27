@@ -330,13 +330,26 @@ describe('SubmissionPage', () => {
     view = await renderPage();
 
     expect(screen.getByText('2 of 5 ready')).toBeTruthy();
-    expect(view.container.textContent).toContain('Ready: 2 · Missing: 2 · Unknown: 1');
+    expect(view.container.textContent).toContain('Ready: 2 · In progress: 0 · Missing: 2 · Unknown: 1');
     expect(screen.getAllByText('Missing')).toHaveLength(2);
     expect(view.container.querySelector('[data-item-row="11"]').textContent)
       .toContain('Book · Purchase request · Request purchase');
     expect(view.container.querySelector('[data-item-select="11"]').getAttribute('aria-description'))
       .toBe('Readiness: Missing. No Five College copy found');
     expect(mocks.itemFlow).not.toHaveBeenCalled();
+  });
+
+  it('shows and counts In progress without including it in Not ready', async () => {
+    const props = pageProps();
+    props.folders[1].items[0].readiness = 'in_progress';
+    view = await renderPage(props);
+
+    expect(view.container.textContent).toContain('Ready: 1 · In progress: 1 · Missing: 2 · Unknown: 1');
+    expect(screen.getByRole('button', { name: 'Not ready (3)' })).toBeTruthy();
+    expect(screen.getAllByText('In progress')).toHaveLength(1);
+
+    await click(screen.getByRole('button', { name: 'Not ready (3)' }));
+    expect(rowIds(view.container)).toEqual(['11', '12', '13']);
   });
 
   it('filters the list to missing and unknown readiness without changing other filter counts', async () => {
