@@ -8,6 +8,7 @@ import { apiConfig } from '../../config/api.config';
 import { navPinsService } from './navPinsService';
 
 const endpoint = `${apiConfig.urls.courseReserves}/staff-nav-pins`;
+const defaultsEndpoint = `${apiConfig.urls.courseReserves}/staff-nav-pins/defaults`;
 const response = (payload) => ({ ok: true, json: async () => payload });
 
 beforeEach(() => {
@@ -35,5 +36,21 @@ describe('navPinsService', () => {
     await navPinsService.resetPins();
 
     expect(mocks.authFetch).toHaveBeenCalledWith(endpoint, { method: 'DELETE' });
+  });
+
+  it('reads the admin default pins', async () => {
+    await navPinsService.getDefaultPins();
+
+    expect(mocks.authFetch).toHaveBeenCalledWith(defaultsEndpoint, { method: 'GET' });
+  });
+
+  it('replaces the ordered admin default pins, including an empty list', async () => {
+    await navPinsService.saveDefaultPins([]);
+
+    expect(mocks.authFetch).toHaveBeenCalledWith(defaultsEndpoint, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pins: [] }),
+    });
   });
 });

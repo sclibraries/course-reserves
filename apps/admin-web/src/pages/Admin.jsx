@@ -78,6 +78,7 @@ function Admin() {
     resourceLoading,
     resourcePagination,
     refreshResources: fetchResources,
+    tabRegistry,
     userInstitution: user?.institution,
   };
 

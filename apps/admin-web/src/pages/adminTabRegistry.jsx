@@ -8,6 +8,7 @@ import HorizontalResourceSidebar from '../components/layout/HorizontalResourceSi
 import AdminCourseList from '../components/page-sections/admin/AdminCourseList';
 import ResourceListTable from '../components/page-sections/admin/ResourceListTable';
 import AdminCustomizations from '../components/page-sections/admin/AdminCustomizations';
+import DefaultPinsSettings from '../components/page-sections/admin/DefaultPinsSettings';
 import UserManagement from '../components/page-sections/admin/UserManagement';
 import ChecklistTemplateManager from '../components/page-sections/admin/ChecklistTemplateManager';
 import SubmissionQueue from '../components/page-sections/admin/SubmissionQueue';
@@ -156,9 +157,10 @@ export function createAdminTabRegistry({
       {
         key: 'customizations', label: 'Customizations', group: 'settings', icon: Settings2,
         ariaLabel: 'Customizations Tab', canAccess: canCustomize,
-        renderContent: ({ userInstitution }) => (
+        renderContent: ({ userInstitution, tabRegistry }) => (
           <div className="fade-in">
             <AdminCustomizations userInstitution={userInstitution} isAdmin={isAdmin} />
+            {isAdmin && <DefaultPinsSettings isAdmin groups={getVisibleAdminGroups(tabRegistry)} />}
           </div>
         ),
       },

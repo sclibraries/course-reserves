@@ -2,9 +2,10 @@ import { apiConfig } from '../../config/api.config';
 import { authFetch } from '../http/authFetch';
 
 const endpoint = `${apiConfig.urls.courseReserves}${apiConfig.endpoints.admin.staffNavPins}`;
+const defaultsEndpoint = `${endpoint}/defaults`;
 
-async function request(method, body) {
-  const response = await authFetch(endpoint, {
+async function request(url, method, body) {
+  const response = await authFetch(url, {
     method,
     ...(body ? {
       headers: { 'Content-Type': 'application/json' },
@@ -17,7 +18,9 @@ async function request(method, body) {
 }
 
 export const navPinsService = {
-  getPins: () => request('GET'),
-  savePins: (pins) => request('PUT', { pins }),
-  resetPins: () => request('DELETE'),
+  getPins: () => request(endpoint, 'GET'),
+  savePins: (pins) => request(endpoint, 'PUT', { pins }),
+  resetPins: () => request(endpoint, 'DELETE'),
+  getDefaultPins: () => request(defaultsEndpoint, 'GET'),
+  saveDefaultPins: (pins) => request(defaultsEndpoint, 'PUT', { pins }),
 };
