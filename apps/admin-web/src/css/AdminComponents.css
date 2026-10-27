@@ -318,12 +318,6 @@
 
 /* Admin Components Styling - matching AdminElectronicResources theme */
 
-/* Base container styling */
-.admin-container {
-  background-color: #f8fafb;
-  padding-bottom: 2rem;
-}
-
 /* Course List View Toggle */
 .view-toggle-container {
   display: flex;

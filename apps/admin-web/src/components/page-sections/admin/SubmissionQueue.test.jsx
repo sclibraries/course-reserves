@@ -95,7 +95,11 @@ describe('SubmissionQueue', () => {
     expect(rows[0].textContent).toContain('Urgent');
     expect(rows[0].textContent).toContain('Assigned to Synthetic Staff');
     expect(rows[0].textContent).toContain('Locked by Synthetic Staff');
-    expect(rows[0].textContent).toContain('Assigned to Synthetic Staff · Locked by Synthetic Staff · 1 unread');
+    const details = getAllByRole(rows[0], 'cell')[4].querySelector('.tw-flex-col > .tw-text-xs');
+    expect(details.textContent).toContain('Assigned to Synthetic Staff');
+    expect(details.textContent).toContain('Locked by Synthetic Staff');
+    expect(details.textContent).toContain('1 unread');
+    expect(details.textContent).not.toContain('·');
     expect(getAllByRole(rows[0], 'cell')[4].querySelectorAll('.tw-rounded-full')).toHaveLength(2);
     expect(rows[1].textContent).toContain('Not submitted');
     expect(rows[1].textContent).toContain('Draft');

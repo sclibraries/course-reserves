@@ -67,25 +67,19 @@ function SubmissionQueueRow({ submission }) {
             <SubmissionStatusBadge status={submission.status} />
             <PriorityIndicator priority={submission.priority} />
           </div>
-          <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-break-words tw-text-xs tw-text-muted-foreground">
+          <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-x-2 tw-break-words tw-text-xs tw-text-muted-foreground">
             <span>{submission.assignedTo ? `Assigned to ${submission.assignedTo}` : 'Unassigned'}</span>
             {submission.isLocked && (
-              <>
-                <span aria-hidden="true"> · </span>
-                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
-                  <LockKeyhole aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
-                  Locked by {submission.lockedBy || 'staff'}
-                </span>
-              </>
+              <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+                <LockKeyhole aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
+                Locked by {submission.lockedBy || 'staff'}
+              </span>
             )}
             {submission.unreadCommunications > 0 && (
-              <>
-                <span aria-hidden="true"> · </span>
-                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+              <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
                 <MessageSquareText aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
-                  {submission.unreadCommunications} unread
-                </span>
-              </>
+                {submission.unreadCommunications} unread
+              </span>
             )}
           </div>
         </div>

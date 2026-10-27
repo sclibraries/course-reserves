@@ -50,7 +50,7 @@ function ProgressBar({ percentage, completeItems, totalItems }) {
         aria-valuemin="0"
         aria-valuemax="100"
         aria-valuenow={percentage}
-        className="tw-h-1.5 tw-w-full tw-overflow-hidden tw-rounded-full tw-bg-border-strong"
+        className="tw-h-1.5 tw-w-full tw-overflow-hidden tw-rounded-full tw-bg-border"
       >
         <div className="tw-h-full tw-rounded-full tw-bg-primary" style={{ width: `${percentage}%` }} />
       </div>

@@ -16,9 +16,19 @@ const mocks = vi.hoisted(() => ({
     claimedItems: [{ id: 1 }, { id: 2 }],
     fetchPendingSubmissions: vi.fn(), fetchClaimedItems: vi.fn(), setPage: vi.fn(), clearError: vi.fn(),
   },
-  adminSearch: { fetchTerms: vi.fn(), initializeDefaults: vi.fn(), defaultsSet: true },
+  adminSearch: {
+    college: 'all', type: 'all', query: '', department: '', sort: 'name', termId: null, terms: [],
+    fetchTerms: vi.fn(), initializeDefaults: vi.fn(), defaultsSet: true,
+    setCollege: vi.fn(), setType: vi.fn(), setQuery: vi.fn(), setDepartment: vi.fn(),
+    setSort: vi.fn(), setTermId: vi.fn(),
+  },
   courseStore: { fetchResults: vi.fn(), results: [], error: null, loading: false },
-  resourceStore: { results: [], pagination: {}, error: null, loading: false, setSearchResults: vi.fn() },
+  resourceStore: {
+    results: [], pagination: {}, error: null, loading: false,
+    filters: { name: '', materialTypeId: '', metadata: {}, startDate: '', endDate: '', page: 1, perPage: 20 },
+    setSearchResults: vi.fn(), setPagination: vi.fn(), setFilters: vi.fn(), resetFilters: vi.fn(),
+  },
+  getAllResources: vi.fn().mockResolvedValue([]),
   getPins: vi.fn(),
   savePins: vi.fn(),
   resetPins: vi.fn(),
@@ -36,6 +46,9 @@ vi.mock('../../../store', () => ({ default: () => mocks.courseStore }));
 vi.mock('../../../store/resourceSearchStore', () => ({ default: () => mocks.resourceStore }));
 vi.mock('../../../hooks/useBuildQuery', () => ({ useBuildQuery: () => '' }));
 vi.mock('../../../hooks/useCurrentTermId', () => ({ useCurrentTermId: () => ({ termId: null, loading: false }) }));
+vi.mock('../../../services/folioSearchService', () => ({
+  folioSearchService: { getDepartments: vi.fn().mockResolvedValue({ json: async () => ({ data: { departments: [] } }) }) },
+}));
 vi.mock('../../../services/admin/navPinsService', async (importOriginal) => {
   const original = await importOriginal();
   return {
@@ -47,7 +60,12 @@ vi.mock('../../../services/admin/navPinsService', async (importOriginal) => {
     },
   };
 });
-vi.mock('../../../services/admin/adminResourceService', () => ({ adminResourceService: { getAllResources: vi.fn() } }));
+vi.mock('../../../services/admin/adminResourceService', () => ({
+  adminResourceService: { getAllResources: mocks.getAllResources, searchResources: vi.fn() },
+}));
+vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
+  adminMaterialTypeService: { getMaterialTypes: vi.fn().mockResolvedValue({ data: [] }) },
+}));
 vi.mock('../../../components/page-sections/admin/MyWorkQueue', () => ({ default: () => <h1>Admin home fixture</h1> }));
 vi.mock('../../../pages/WorkQueueDetail', () => ({ default: () => <h1>Work queue detail fixture</h1> }));
 
@@ -174,15 +192,18 @@ describe('admin navigation in Chromium', () => {
     expect(rows).toHaveLength(3);
     expect(queue.textContent).toContain('6 days ago');
     expect(queue.textContent).toContain('Apr 29');
-    expect(queue.textContent).toContain('Assigned to test-staff · 1 unread');
     expect(queue.textContent).toContain('Locked by test-staff');
     expect(getAllByRole(rows[0], 'cell')[0].textContent).toContain('Test Course One');
+    const details = getAllByRole(rows[1], 'cell')[4].querySelector('.tw-flex-col > .tw-text-xs');
+    expect(details.textContent).toContain('Assigned to test-staff');
+    expect(details.textContent).toContain('1 unread');
     const fadeIn = queue.closest('.fade-in')?.getAnimations()[0];
     if (fadeIn) await fadeIn.finished;
     await expectNoAxeViolations(queue);
     const viewportMeasurements = [];
     for (const [width, expectedColumns] of [[320, 1], [768, 5], [1280, 5]]) {
       await page.viewport(width, 900);
+      expect(details.textContent.trim()).not.toMatch(/^·/);
       const measurement = {
         width,
         innerWidth: window.innerWidth,
@@ -206,10 +227,27 @@ describe('admin navigation in Chromium', () => {
     const statusCell = getAllByRole(rows[0], 'cell')[4];
     const statusChip = statusCell.querySelector('.tw-rounded-full');
     const track = getByRole(getAllByRole(rows[0], 'cell')[3], 'progressbar');
+    const card = queue.closest('.tw-overflow-hidden');
     expect(getComputedStyle(statusChip).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
     expect(getComputedStyle(statusChip).borderWidth).toBe('0px');
     expect(getComputedStyle(track).height).toBe('6px');
     expect(getComputedStyle(track).borderWidth).toBe('0px');
-    await page.screenshot({ path: '../../../../dist/test-results/AW-071-fr1-queue-1280.png' });
+    expect(getComputedStyle(track).backgroundColor).toBe(getComputedStyle(card).borderTopColor);
+    await page.screenshot({ path: '../../../../dist/test-results/AW-071-fr2-queue-1280.png' });
+  });
+
+  it.each([
+    ['/admin?tab=courses', 'Course Management'],
+    ['/admin?tab=resources', 'Resource Management'],
+  ])('keeps the %s tab on the page background', async (path, title) => {
+    await renderRoute(path);
+
+    const heading = getByRole(container, 'heading', { name: title });
+    const adminContent = heading.closest('.admin-container');
+    expect(adminContent).toBeTruthy();
+    expect(getComputedStyle(adminContent).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(getComputedStyle(adminContent).paddingBottom).toBe('0px');
+    await page.viewport(1280, 900);
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
   });
 });

@@ -46,18 +46,18 @@ const pairs = [
 it("checks status and priority chip contrast and retains shared faculty theme tokens", () => {
   for (const mode of [":root", ".dark"]) {
     const tokens = readTokens(css, mode);
-    const adminOnly = /^(status-(draft|submitted|review|partial|complete|canceled)-fg|priority-(normal|high|urgent)(-fg)?|border-strong)$/;
+    const adminOnly = /^(status-(draft|submitted|review|partial|complete|canceled)-fg|priority-(normal|high|urgent)(-fg)?)$/;
     expect(Object.fromEntries(Object.entries(tokens).filter(([name]) => !adminOnly.test(name))))
       .toEqual(readTokens(formCss, mode));
     for (const [foreground, background] of pairs) {
       expect(contrastRatio(tokens[foreground], tokens[background]), `${mode} ${foreground}/${background}`).toBeGreaterThanOrEqual(4.6);
     }
+    expect(contrastRatio(tokens.primary, tokens.card), `${mode} progress fill/card`).toBeGreaterThanOrEqual(3);
     for (const status of ["draft", "submitted", "review", "partial", "complete", "canceled"]) {
       expect(contrastOnTint(tokens[`status-${status}-fg`], tokens[`status-${status}`], tokens.card), `${mode} status-${status} tint`).toBeGreaterThanOrEqual(4.5);
     }
     for (const priority of ["normal", "high", "urgent"]) {
       expect(contrastOnTint(tokens[`priority-${priority}-fg`], tokens[`priority-${priority}`], tokens.card), `${mode} priority-${priority} tint`).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrastRatio(tokens["border-strong"], tokens.card), `${mode} progress track/card`).toBeGreaterThanOrEqual(3);
   }
 });
