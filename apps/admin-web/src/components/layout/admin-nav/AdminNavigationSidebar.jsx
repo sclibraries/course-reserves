@@ -20,27 +20,15 @@ import {
 } from '../../ui/tooltip';
 import AdminNavigationSections from './AdminNavigationSections';
 import { getTabCount, getTabCountLabel } from './adminNavigationUtils';
+import {
+  countsPropType,
+  groupPropType,
+  navigationPropType,
+  tabPropType,
+} from './navigationPropTypes';
 
-const tabPropType = PropTypes.shape({
-  key: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-}).isRequired;
-const groupPropType = PropTypes.shape({
-  key: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-}).isRequired;
-const navigationPropType = PropTypes.shape({
-  isCollapsed: PropTypes.bool.isRequired,
-  setCollapsed: PropTypes.func.isRequired,
-  counts: PropTypes.objectOf(PropTypes.number).isRequired,
-  pinnedTabs: PropTypes.arrayOf(tabPropType).isRequired,
-  visibleGroups: PropTypes.arrayOf(groupPropType).isRequired,
-}).isRequired;
-
-function RailLink({ tab, navigation }) {
-  const count = getTabCount(tab.key, navigation.counts);
+function RailLink({ tab, counts }) {
+  const count = getTabCount(tab.key, counts);
   const countLabel = getTabCountLabel(tab.key, count);
   return (
     <Tooltip>
@@ -60,7 +48,7 @@ function RailLink({ tab, navigation }) {
 }
 RailLink.propTypes = {
   tab: tabPropType,
-  navigation: PropTypes.shape({ counts: PropTypes.objectOf(PropTypes.number).isRequired }).isRequired,
+  counts: countsPropType,
 };
 
 function RailGroup({ group, onExpand }) {
@@ -117,7 +105,7 @@ export default function AdminNavigationSidebar({ navigation }) {
         >
           {navigation.isCollapsed ? (
             <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col tw-items-center tw-gap-2 tw-overflow-y-auto tw-px-2 tw-py-3">
-              {navigation.pinnedTabs.map((tab) => <RailLink key={tab.key} tab={tab} navigation={navigation} />)}
+              {navigation.pinnedTabs.map((tab) => <RailLink key={tab.key} tab={tab} counts={navigation.counts} />)}
               {navigation.visibleGroups.map((group) => (
                 <RailGroup key={group.key} group={group} onExpand={expandGroup} />
               ))}

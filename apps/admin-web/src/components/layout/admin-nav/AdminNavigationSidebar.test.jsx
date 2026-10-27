@@ -75,6 +75,7 @@ describe('AdminNavigationSidebar', () => {
     await render({ pins: [] });
     const nav = getByRole(container, 'navigation', { name: 'Admin' });
 
+    expect(nav.textContent).toContain('No pinned pages.');
     expect(getByRole(nav, 'heading', { name: 'My work' })).toBeTruthy();
     expect(getByRole(nav, 'link', { name: /My Work Queue/ }).getAttribute('aria-current')).toBe('page');
     expect(getByRole(nav, 'link', { name: /Submissions Queue, 3 items/ }).textContent).toContain('3');

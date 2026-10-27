@@ -5,36 +5,7 @@ import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Separator } from '../../ui/separator';
 import { getTabCount, getTabCountLabel } from './adminNavigationUtils';
-
-const tabPropType = PropTypes.shape({
-  key: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-}).isRequired;
-const groupPropType = PropTypes.shape({
-  key: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  tabs: PropTypes.arrayOf(tabPropType).isRequired,
-}).isRequired;
-const navigationPropType = PropTypes.shape({
-  activeTab: PropTypes.string,
-  counts: PropTypes.shape({
-    'my-work': PropTypes.number,
-    submissions: PropTypes.number,
-    mentions: PropTypes.number,
-  }),
-  isPinLimitReached: PropTypes.bool,
-  isSaving: PropTypes.bool,
-  pins: PropTypes.arrayOf(PropTypes.string),
-  pinsLoaded: PropTypes.bool,
-  pinnedTabs: PropTypes.arrayOf(tabPropType),
-  resetPins: PropTypes.func,
-  saveError: PropTypes.string,
-  statusMessage: PropTypes.string,
-  togglePin: PropTypes.func,
-  visibleGroups: PropTypes.arrayOf(groupPropType),
-}).isRequired;
+import { groupPropType, navigationPropType, tabPropType } from './navigationPropTypes';
 
 function PageLink({ tab, navigation, onNavigate }) {
   const count = getTabCount(tab.key, navigation.counts);

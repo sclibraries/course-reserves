@@ -14,18 +14,10 @@ import {
   hasAdminTabAccess,
 } from '../../pages/adminTabRegistry';
 
-export const DEFAULT_NAV_PINS = ['my-work', 'submissions'];
 export const NAV_COLLAPSED_KEY = 'admin-navigation-collapsed';
 export const ELECTRONIC_NAV_COLLAPSED_KEY = 'admin-navigation-electronic-collapsed';
 const MAX_PINS = 10;
 const SAVE_ERROR = 'Could not save your pinned pages. Your previous pins were restored.';
-
-function resolvePins(response) {
-  if (response?.is_default) {
-    return response.defaults?.length ? response.defaults : DEFAULT_NAV_PINS;
-  }
-  return Array.isArray(response?.pins) ? response.pins : DEFAULT_NAV_PINS;
-}
 
 function readCollapsed(key, defaultValue) {
   try {
@@ -108,7 +100,7 @@ export function useAdminNavigation() {
     let mounted = true;
     navPinsService.getPins()
       .then((response) => {
-        if (mounted) setPins(resolvePins(response));
+        if (mounted) setPins(response.pins);
       })
       .catch(() => {
         if (mounted) setSaveError('Could not load your pinned pages.');
@@ -140,16 +132,15 @@ export function useAdminNavigation() {
     fallbackTab, searchParams, setSearchParams,
   ]);
 
-  const savePins = useCallback(async (nextPins, successMessage, request) => {
+  const savePins = useCallback(async (request, successMessage) => {
     if (savingRef.current) return false;
     savingRef.current = true;
     setIsSaving(true);
     setSaveError('');
     setStatusMessage('');
     try {
-      const response = await request(nextPins);
-      if (response && Array.isArray(response.pins)) setPins(resolvePins(response));
-      else setPins(nextPins);
+      const response = await request();
+      setPins(response.pins);
       setStatusMessage(successMessage);
       return true;
     } catch {
@@ -169,14 +160,13 @@ export function useAdminNavigation() {
     const nextPins = isPinned ? pins.filter((pin) => pin !== key) : [...pins, key];
     setPins(nextPins);
     const label = getAdminTab(tabRegistry, key)?.label || 'Page';
-    return savePins(nextPins, `${label} ${isPinned ? 'unpinned' : 'pinned'}.`, () => navPinsService.savePins(nextPins));
+    return savePins(() => navPinsService.savePins(nextPins), `${label} ${isPinned ? 'unpinned' : 'pinned'}.`);
   }, [pins, isPinLimitReached, tabRegistry, savePins]);
 
-  const resetPins = useCallback(() => savePins(
-    pins,
-    'Pins reset to defaults.',
-    () => navPinsService.resetPins(),
-  ), [pins, savePins]);
+  const resetPins = useCallback(
+    () => savePins(() => navPinsService.resetPins(), 'Pins reset to defaults.'),
+    [savePins],
+  );
 
   return {
     activeTab,

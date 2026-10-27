@@ -103,16 +103,36 @@ describe('useAdminNavigation', () => {
     hook.unmount();
   });
 
-  it('uses default pins for first-time users and preserves an explicitly empty list', async () => {
-    mocks.getPins.mockResolvedValueOnce({ pins: [], is_default: true, defaults: [] });
-    const defaultsHook = await renderHook(() => useAdminNavigation(), {});
-    expect(defaultsHook.current.pins).toEqual(['my-work', 'submissions']);
-    defaultsHook.unmount();
+  it('uses API-resolved pins for first-time users and empty defaults', async () => {
+    mocks.getPins.mockResolvedValueOnce({
+      pins: ['resources'], is_default: true, defaults: ['my-work', 'submissions'],
+    });
+    const firstTimeHook = await renderHook(() => useAdminNavigation(), {});
+    expect(firstTimeHook.current.pins).toEqual(['resources']);
+    firstTimeHook.unmount();
 
-    mocks.getPins.mockResolvedValueOnce({ pins: [], is_default: false, defaults: ['my-work'] });
+    mocks.getPins.mockResolvedValueOnce({ pins: [], is_default: true, defaults: [] });
     const emptyHook = await renderHook(() => useAdminNavigation(), {});
     expect(emptyHook.current.pins).toEqual([]);
+    expect(emptyHook.current.pinnedTabs).toEqual([]);
     emptyHook.unmount();
+  });
+
+  it('uses pins returned from save and reset responses', async () => {
+    const hook = await renderHook(() => useAdminNavigation(), {});
+    mocks.savePins.mockResolvedValueOnce({ pins: ['resources'], is_default: true, defaults: ['my-work'] });
+
+    await act(async () => hook.current.togglePin('submissions'));
+
+    expect(mocks.savePins).toHaveBeenCalledWith(['my-work', 'submissions']);
+    expect(hook.current.pins).toEqual(['resources']);
+
+    mocks.resetPins.mockResolvedValueOnce({ pins: [], is_default: true, defaults: [] });
+    await act(async () => hook.current.resetPins());
+
+    expect(mocks.resetPins).toHaveBeenCalledWith();
+    expect(hook.current.pins).toEqual([]);
+    hook.unmount();
   });
 
   it('blocks an eleventh pin and restores saved pins with a generic error on failure', async () => {
