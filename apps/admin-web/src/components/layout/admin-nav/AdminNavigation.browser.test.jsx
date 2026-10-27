@@ -140,7 +140,7 @@ describe('admin navigation in Chromium', () => {
   it('keeps the submissions queue readable beside navigation at narrow widths', async () => {
     mocks.workflow.submissions = [{
       submissionId: 99907809,
-      status: 'submitted',
+      status: 'in_review',
       courseCode: 'LONG 999',
       section: '99',
       courseTitle: 'SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData',
@@ -163,6 +163,9 @@ describe('admin navigation in Chromium', () => {
 
     expect(getByRole(container, 'navigation', { name: 'Admin' })).toBeTruthy();
     const queue = getByRole(container, 'table', { name: 'Faculty submissions' });
+    const heading = getByRole(container, 'heading', { name: 'Faculty Submissions' });
+    const contentArea = heading.closest('.admin-container').parentElement;
+    expect(heading.closest('.admin-container').classList.contains('container-fluid')).toBe(false);
     const row = getAllByRole(queue, 'row')[1];
     expect(queue.textContent).toContain('SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData');
     const fadeIn = queue.closest('.fade-in')?.getAnimations()[0];
@@ -170,10 +173,17 @@ describe('admin navigation in Chromium', () => {
     await expectNoAxeViolations(document.body);
     for (const [width, expectedColumns] of [[320, 1], [768, 5], [1280, 5]]) {
       await page.viewport(width, 900);
+      const headingLeft = heading.getBoundingClientRect().left;
+      const contentRect = contentArea.getBoundingClientRect();
+      expect(headingLeft, `${width}px heading left`).toBeGreaterThanOrEqual(contentRect.left + 16);
+      expect(headingLeft, `${width}px heading inside viewport`).toBeGreaterThanOrEqual(0);
+      expect(contentRect.left, `${width}px content left`).toBeGreaterThanOrEqual(0);
+      expect(contentRect.right, `${width}px content right`).toBeLessThanOrEqual(width);
       const template = getComputedStyle(row).gridTemplateColumns;
       const columnCount = template === 'none' ? 0 : template.trim().split(/\s+/).length;
       expect(columnCount, `${width}px row layout: ${template}; classes: ${row.className}`).toBe(expectedColumns);
     }
     await measureAllWidths();
+    await page.screenshot({ path: '../../../../dist/test-results/AW-071-submissions-queue-1280.png' });
   });
 });

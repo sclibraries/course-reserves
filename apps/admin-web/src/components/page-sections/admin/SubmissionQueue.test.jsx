@@ -17,7 +17,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const submissions = [
   {
-    submissionId: 99907802, status: 'in_progress', courseCode: 'TST 101', courseTitle: 'Synthetic Testing',
+    submissionId: 99907802, status: 'in_review', courseCode: 'TST 101', courseTitle: 'Synthetic Testing',
     section: '02', facultyName: 'Synthetic Faculty', term: '2026FA', submittedAt: '2026-10-15T12:00:00Z',
     totalItems: 2, completionPercentage: 50, completeItems: 1, priority: 'urgent', isLocked: true,
     lockedBy: 'Synthetic Staff', communicationsCount: 2, unreadCommunications: 1, assignedTo: 'Synthetic Staff',
@@ -81,9 +81,9 @@ describe('SubmissionQueue', () => {
     expect(rows).toHaveLength(2);
     expect(getAllByRole(rows[0], 'cell')).toHaveLength(5);
     expect(getAllByRole(rows[1], 'cell')).toHaveLength(5);
-    expect(getAllByRole(table, 'link').map((link) => link.textContent)).toEqual(['TST 101 - 02', 'BIO 110 - 01']);
+    expect(getAllByRole(table, 'link').map((link) => link.textContent)).toEqual(['TST 101-02', 'BIO 110-01']);
 
-    const courseLink = getByRole(rows[0], 'link', { name: 'TST 101 - 02' });
+    const courseLink = getByRole(rows[0], 'link', { name: 'TST 101-02' });
     expect(courseLink.getAttribute('href')).toBe('/admin/submissions/99907802');
     expect(rows[0].textContent).toContain('Synthetic Testing');
     expect(rows[0].textContent).toContain('2026FA');
@@ -91,11 +91,11 @@ describe('SubmissionQueue', () => {
     expect(container.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-15T12:00:00Z');
     expect(getByRole(rows[0], 'progressbar', { name: '1 of 2 items done' })).toBeTruthy();
     expect(rows[0].textContent).toContain('1 of 2 done');
-    expect(rows[0].textContent).toContain('In Progress');
+    expect(rows[0].textContent).toContain('In Review');
     expect(rows[0].textContent).toContain('Urgent');
     expect(rows[0].textContent).toContain('Assigned to Synthetic Staff');
     expect(rows[0].textContent).toContain('Locked by Synthetic Staff');
-    expect(rows[0].textContent).toContain('2 messages, 1 unread');
+    expect(rows[0].textContent).toContain('1 unread · 2 messages');
     expect(rows[1].textContent).toContain('Not submitted');
     expect(rows[1].textContent).toContain('Draft');
     expect(rows[1].textContent).toContain('Unassigned');
@@ -107,15 +107,15 @@ describe('SubmissionQueue', () => {
     const table = getByRole(container, 'table', { name: 'Faculty submissions' });
     const showDrafts = getByRole(container, 'checkbox', { name: 'Show drafts' });
     expect(showDrafts.checked).toBe(true);
-    expect(getByRole(table, 'link', { name: 'BIO 110 - 01' })).toBeTruthy();
-    expect(container.textContent).toContain('15 total submissions');
+    expect(getByRole(table, 'link', { name: 'BIO 110-01' })).toBeTruthy();
+    expect(container.textContent).toContain('15 submissions · newest first');
     expect(mocks.storeState.fetchPendingSubmissions).toHaveBeenCalledWith(1, 20);
 
     await act(async () => fireEvent.click(showDrafts));
 
-    expect(queryByRole(table, 'link', { name: 'BIO 110 - 01' })).toBeNull();
-    expect(getByRole(table, 'link', { name: 'TST 101 - 02' })).toBeTruthy();
-    expect(container.textContent).toContain('15 total submissions');
+    expect(queryByRole(table, 'link', { name: 'BIO 110-01' })).toBeNull();
+    expect(getByRole(table, 'link', { name: 'TST 101-02' })).toBeTruthy();
+    expect(container.textContent).toContain('15 submissions · newest first');
   });
 
   it('announces the loading state', async () => {

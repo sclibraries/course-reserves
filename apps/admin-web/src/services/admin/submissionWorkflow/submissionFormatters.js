@@ -7,13 +7,21 @@ const submissionStatusLabels = {
   draft: 'Draft',
   pending: 'Pending',
   submitted: 'Submitted',
+  in_review: 'In Review',
   in_progress: 'In Progress',
+  partially_complete: 'Partially Complete',
   complete: 'Complete',
+  canceled: 'Canceled',
   unavailable: 'Unavailable',
 };
 
 export function formatSubmissionStatusLabel(status) {
   return submissionStatusLabels[status] || status;
+}
+
+export function formatSubmissionCommunicationSummary(messageCount, unreadCount) {
+  const messageLabel = messageCount === 1 ? 'message' : 'messages';
+  return `${unreadCount} unread · ${messageCount} ${messageLabel}`;
 }
 
 export function formatSubmissionForDisplay(submission) {
@@ -72,7 +80,7 @@ export function formatSubmissionForDisplay(submission) {
     courseTitle: submission.course_title,
     section: submission.section || '',
     term: submission.term_code,
-    facultyName: submission.faculty_display_name,
+    facultyName: submission.faculty_display_name || submission.shibboleth_user_id,
     facultyId: submission.shibboleth_user_id,
     status: submission.status,
     submittedAt: submission.submitted_at,

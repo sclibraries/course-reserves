@@ -83,7 +83,7 @@ function Admin() {
   };
 
   return (
-    <Container fluid className="admin-container p-0">
+    <div className="admin-container tw-min-w-0 tw-w-full">
       {(courseError || resourceError) && activeTab !== 'tracking' && (
         <Alert color="danger" className="mt-3 fade-in" role="alert">
           {courseError?.message || resourceError?.message}
@@ -97,7 +97,7 @@ function Admin() {
           </Alert>
         </div>
       )}
-    </Container>
+    </div>
   );
 }
 
