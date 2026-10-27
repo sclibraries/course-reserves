@@ -109,7 +109,7 @@ class SubmissionWorkflowController extends Controller
         $dataProvider = new ActiveDataProvider([
             'query' => (new \app\services\SubmittedSubmissionScope())->staffSubmissionList(FacultySubmission::find())
                 ->with(['reuseResources', 'newResources'])
-                ->orderBy(['submitted_at' => SORT_ASC]),
+                ->orderBy(new \yii\db\Expression('COALESCE([[submitted_at]], [[updated_at]]) DESC, [[submission_id]] DESC')),
             'pagination' => [
                 'pageSize' => 20,
             ],
