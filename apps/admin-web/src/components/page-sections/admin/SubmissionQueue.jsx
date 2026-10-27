@@ -1,208 +1,172 @@
-/**
- * @file SubmissionQueue.jsx
- * @description Component for displaying the queue of pending faculty submissions
- */
-
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, FormGroup, Input, Label, Spinner, Table } from 'reactstrap';
-import { FaLock, FaEye, FaComments } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
+import { LockKeyhole, MessageSquareText, X } from 'lucide-react';
+import { Alert } from '../../ui/alert';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { Label } from '../../ui/label';
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
-import SubmissionStatusBadge from './submission/shared/SubmissionStatusBadge';
+import { formatSubmissionStatusLabel } from '../../../services/admin/submissionWorkflow/submissionFormatters';
 import { PriorityIndicator, ProgressBar } from './submission/queue/SubmissionQueueDisplay';
 import SubmissionQueuePagination from './submission/queue/SubmissionQueuePagination';
 import { formatSubmissionQueueDate } from './submission/queue/submissionQueueFormatters';
-import '../../../css/SubmissionWorkflow.css';
 
-/**
- * Main submission queue component
- */
+const gridColumns = 'md:tw-grid-cols-[minmax(0,1.5fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,2fr)]';
+
+function SubmissionCell({ label, children }) {
+  return (
+    <div role="cell" className="tw-grid tw-min-w-0 tw-grid-cols-[6rem_minmax(0,1fr)] tw-gap-2 md:tw-block">
+      <span className="tw-font-medium md:tw-sr-only">{label}</span>
+      <div className="tw-min-w-0 tw-break-words">{children}</div>
+    </div>
+  );
+}
+
+SubmissionCell.propTypes = { label: PropTypes.string.isRequired, children: PropTypes.node.isRequired };
+
+function SubmissionQueueRow({ submission }) {
+  const fullDateTime = submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : '';
+  const courseLabel = submission.section
+    ? `${submission.courseCode} - ${submission.section}`
+    : submission.courseCode;
+
+  return (
+    <div
+      role="row"
+      className={`tw-grid tw-min-w-0 tw-grid-cols-1 tw-gap-3 tw-rounded-lg tw-border tw-bg-card tw-p-4 md:tw-gap-0 md:tw-rounded-none md:tw-border-x-0 md:tw-border-t-0 md:tw-bg-transparent md:tw-px-3 md:tw-py-4 md:tw-border-b ${gridColumns}`}
+    >
+      <SubmissionCell label="Course">
+        <Link
+          to={`/admin/submissions/${submission.submissionId}`}
+          className="tw-break-words tw-font-semibold tw-text-primary tw-underline-offset-4 hover:tw-underline focus-visible:tw-rounded-sm focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring"
+        >
+          {courseLabel}
+        </Link>
+        <p className="tw-m-0 tw-mt-1 tw-break-words tw-text-sm">{submission.courseTitle}</p>
+        <p className="tw-m-0 tw-break-words tw-text-sm tw-text-muted-foreground">{submission.term}</p>
+      </SubmissionCell>
+      <SubmissionCell label="Faculty">{submission.facultyName}</SubmissionCell>
+      <SubmissionCell label="Submitted">
+        {submission.submittedAt ? (
+          <time dateTime={submission.submittedAt} title={fullDateTime} aria-label={fullDateTime}>
+            {formatSubmissionQueueDate(submission.submittedAt)}
+          </time>
+        ) : 'Not submitted'}
+      </SubmissionCell>
+      <SubmissionCell label="Progress">
+        <ProgressBar
+          percentage={submission.completionPercentage}
+          completeItems={submission.completeItems}
+          totalItems={submission.totalItems}
+        />
+      </SubmissionCell>
+      <SubmissionCell label="Status">
+        <div className="tw-flex tw-min-w-0 tw-flex-col tw-items-start tw-gap-1">
+          <Badge variant="secondary">{formatSubmissionStatusLabel(submission.status)}</Badge>
+          <PriorityIndicator priority={submission.priority} />
+          <span className="tw-break-words">{submission.assignedTo ? `Assigned to ${submission.assignedTo}` : 'Unassigned'}</span>
+          {submission.isLocked && (
+            <span className="tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+              <LockKeyhole aria-hidden="true" className="tw-h-4 tw-w-4 tw-shrink-0" />
+              Locked by {submission.lockedBy || 'staff'}
+            </span>
+          )}
+          {submission.communicationsCount > 0 && (
+            <span className="tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+              <MessageSquareText aria-hidden="true" className="tw-h-4 tw-w-4 tw-shrink-0" />
+              {submission.communicationsCount} messages, {submission.unreadCommunications} unread
+            </span>
+          )}
+        </div>
+      </SubmissionCell>
+    </div>
+  );
+}
+
+SubmissionQueueRow.propTypes = { submission: PropTypes.object.isRequired };
+
 function SubmissionQueue() {
-  const navigate = useNavigate();
   const [showDrafts, setShowDrafts] = useState(true);
   const {
-    submissions,
-    loading,
-    error,
-    pagination,
-    fetchPendingSubmissions,
-    setPage,
-    clearError
+    submissions, loading, error, pagination, fetchPendingSubmissions, setPage, clearError,
   } = useSubmissionWorkflowStore();
   const visibleSubmissions = showDrafts
     ? submissions
     : submissions.filter((submission) => submission.status !== 'draft');
 
-  // Load submissions on mount
   useEffect(() => {
     fetchPendingSubmissions(1, 20);
   }, [fetchPendingSubmissions]);
 
-  const handleViewSubmission = (submissionId) => {
-    navigate(`/admin/submissions/${submissionId}`);
-  };
-
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-  };
-
   return (
-    <div className="submission-queue">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2 className="h4 mb-1">Faculty Submissions</h2>
-          <p className="text-muted mb-0">
+    <section aria-labelledby="faculty-submissions-title" className="tw-min-w-0 tw-w-full tw-py-4">
+      <header className="tw-mb-4 tw-flex tw-min-w-0 tw-flex-wrap tw-items-end tw-justify-between tw-gap-3">
+        <div className="tw-min-w-0">
+          <h2 id="faculty-submissions-title" className="tw-m-0 tw-text-xl tw-font-semibold">Faculty Submissions</h2>
+          <p className="tw-m-0 tw-mt-1 tw-text-sm tw-text-muted-foreground">
             {pagination.totalCount} total submission{pagination.totalCount !== 1 ? 's' : ''}
           </p>
         </div>
-      </div>
-
-      <FormGroup check className="mb-3">
-        <Input
-          id="show-drafts"
-          name="show-drafts"
-          type="checkbox"
-          checked={showDrafts}
-          onChange={(event) => setShowDrafts(event.target.checked)}
-        />
-        <Label check for="show-drafts">Show drafts</Label>
-      </FormGroup>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert color="danger" toggle={clearError} className="mb-3">
-          <strong>Error:</strong> {error}
-        </Alert>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-5">
-          <Spinner color="primary" />
-          <p className="mt-2 text-muted">Loading submissions...</p>
+        <div className="tw-flex tw-min-h-10 tw-items-center tw-gap-2">
+          <input
+            id="show-drafts"
+            name="show-drafts"
+            type="checkbox"
+            checked={showDrafts}
+            onChange={(event) => setShowDrafts(event.target.checked)}
+            className="tw-h-6 tw-w-6 tw-rounded tw-border-input tw-accent-primary focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring"
+          />
+          <Label htmlFor="show-drafts" className="tw-inline-flex tw-min-h-10 tw-cursor-pointer tw-items-center">Show drafts</Label>
         </div>
-      )}
+      </header>
 
-      {/* Empty State */}
-      {!loading && visibleSubmissions.length === 0 && (
-        <Alert color="info">
-          <h5 className="alert-heading">No Submissions Found</h5>
-          <p className="mb-0">{showDrafts ? 'There are currently no pending faculty submissions to process.' : 'No submissions match the current filter.'}</p>
+      {error && (
+        <Alert variant="destructive" className="tw-mb-4 tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <p className="tw-m-0 tw-break-words">Could not load submissions. Please try again.</p>
+          <Button type="button" variant="ghost" size="icon" aria-label="Dismiss error" onClick={clearError}>
+            <X aria-hidden="true" />
+          </Button>
         </Alert>
       )}
 
-      {/* Submissions Table */}
-      {!loading && visibleSubmissions.length > 0 && (
+      {loading ? (
+        <p role="status" aria-live="polite" className="tw-py-8 tw-text-center tw-text-muted-foreground">
+          Loading submissions...
+        </p>
+      ) : visibleSubmissions.length === 0 ? (
+        <div role="status" className="tw-rounded-lg tw-border tw-p-6 tw-text-center">
+          <h3 className="tw-m-0 tw-text-base tw-font-semibold">No submissions found</h3>
+          <p className="tw-m-0 tw-mt-2 tw-text-sm tw-text-muted-foreground">
+            {showDrafts
+              ? 'There are currently no pending faculty submissions to process.'
+              : 'No submissions match the current filter.'}
+          </p>
+        </div>
+      ) : (
         <>
-          <div className="table-responsive">
-            <Table hover className="submissions-table">
-              <thead>
-                <tr>
-                  <th>Priority</th>
-                  <th>Course</th>
-                  <th>Faculty</th>
-                  <th>Term</th>
-                  <th>Submitted</th>
-                  <th>Items</th>
-                  <th>Progress</th>
-                  <th>Status</th>
-                  <th>Assigned</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleSubmissions.map((sub) => (
-                  <tr key={sub.submissionId} className={sub.isLocked ? 'locked-row' : ''}>
-                    <td>
-                      <PriorityIndicator priority={sub.priority} />
-                    </td>
-                    <td>
-                      <div>
-                        <strong>{sub.courseCode}</strong>
-                        {sub.section && <span className="text-muted"> - {sub.section}</span>}
-                      </div>
-                      <div className="text-sm text-muted">{sub.courseTitle}</div>
-                    </td>
-                    <td>{sub.facultyName}</td>
-                    <td>{sub.term}</td>
-                    <td>
-                      {sub.submittedAt ? (
-                        <span title={new Date(sub.submittedAt).toLocaleString()}>
-                          {formatSubmissionQueueDate(sub.submittedAt)}
-                        </span>
-                      ) : 'Not submitted'}
-                    </td>
-                    <td>
-                      <Badge color="secondary" pill>
-                        {sub.totalItems}
-                      </Badge>
-                    </td>
-                    <td style={{ minWidth: '150px' }}>
-                      <ProgressBar 
-                        percentage={sub.completionPercentage}
-                        completeItems={sub.completeItems}
-                        totalItems={sub.totalItems}
-                      />
-                    </td>
-                    <td>
-                      <SubmissionStatusBadge status={sub.status} />
-                    </td>
-                    <td>
-                      {sub.assignedTo ? (
-                        <span>{sub.assignedTo}</span>
-                      ) : (
-                        <span className="text-muted">Unassigned</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="d-flex gap-2 align-items-center">
-                        <Button
-                          size="sm"
-                          color="primary"
-                          onClick={() => handleViewSubmission(sub.submissionId)}
-                        >
-                          <FaEye className="me-1" />
-                          View
-                        </Button>
-                        {sub.isLocked && (
-                          <FaLock 
-                            className="text-warning" 
-                            title={`Locked by ${sub.lockedBy || 'staff'}`}
-                          />
-                        )}
-                        {sub.communicationsCount > 0 && (
-                          <span className="position-relative">
-                            <FaComments 
-                              className="text-info" 
-                              title={`${sub.communicationsCount} message(s)`}
-                            />
-                            {sub.unreadCommunications > 0 && (
-                              <Badge 
-                                color="danger" 
-                                pill 
-                                className="position-absolute top-0 start-100 translate-middle"
-                                style={{ fontSize: '0.6rem', padding: '0.15rem 0.35rem' }}
-                              >
-                                {sub.unreadCommunications}
-                              </Badge>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+          <div role="table" aria-label="Faculty submissions" className="tw-min-w-0 tw-w-full">
+            <div role="rowgroup">
+              <div role="row" className={`tw-sr-only ${gridColumns} md:tw-not-sr-only md:tw-grid md:tw-rounded-md md:tw-bg-muted md:tw-px-3 md:tw-py-2`}>
+                {['Course', 'Faculty', 'Submitted', 'Progress', 'Status'].map((heading) => (
+                  <div key={heading} role="columnheader" className="tw-min-w-0 tw-break-words tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-muted-foreground">
+                    {heading}
+                  </div>
                 ))}
-              </tbody>
-            </Table>
+              </div>
+            </div>
+            <div role="rowgroup" className="tw-grid tw-min-w-0 tw-gap-3 md:tw-gap-0">
+              {visibleSubmissions.map((submission) => (
+                <SubmissionQueueRow key={submission.submissionId} submission={submission} />
+              ))}
+            </div>
           </div>
-
-          {/* Pagination */}
           {pagination.pageCount > 1 && (
-            <SubmissionQueuePagination pagination={pagination} onPageChange={handlePageChange} />
+            <SubmissionQueuePagination pagination={pagination} onPageChange={setPage} />
           )}
         </>
       )}
-    </div>
+    </section>
   );
 }
 

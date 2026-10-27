@@ -2,92 +2,6 @@
  * Submission Workflow Styles
  */
 
-.submission-queue {
-  padding: 1rem 0;
-}
-
-.submissions-table {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.submissions-table thead {
-  background-color: #f8f9fa;
-}
-
-.submissions-table th {
-  font-weight: 600;
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  color: #495057;
-  border-bottom: 2px solid #dee2e6;
-  padding: 1rem 0.75rem;
-}
-
-.submissions-table td {
-  vertical-align: middle;
-  padding: 0.75rem;
-}
-
-.submissions-table tbody tr {
-  transition: background-color 0.2s ease;
-}
-
-.submissions-table tbody tr:hover {
-  background-color: #f8f9fa;
-}
-
-.submissions-table tbody tr.locked-row {
-  background-color: #fff3cd;
-}
-
-/* Priority Indicators */
-.priority-indicator {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-}
-
-.priority-urgent {
-  color: #dc3545;
-  background-color: #f8d7da;
-}
-
-.priority-high {
-  color: #856404;
-  background-color: #fff3cd;
-}
-
-.priority-normal {
-  color: #6c757d;
-}
-
-/* Progress Bar Wrapper */
-.progress-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.progress-wrapper .progress {
-  height: 20px;
-  margin-bottom: 0.25rem;
-}
-
-.progress-wrapper small {
-  font-size: 0.75rem;
-  text-align: center;
-}
-
-/* Text Utilities */
-.text-sm {
-  font-size: 0.875rem;
-}
-
 /* Submission Detail Styles */
 .submission-detail {
   padding: 1rem 0;
@@ -153,15 +67,6 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .submissions-table {
-    font-size: 0.875rem;
-  }
-  
-  .submissions-table th,
-  .submissions-table td {
-    padding: 0.5rem;
-  }
-  
   .submission-meta {
     flex-direction: column;
     gap: 0.5rem;

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
-import { Pagination, PaginationItem, PaginationLink } from 'reactstrap';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '../../../../ui/button';
 
 function SubmissionQueuePagination({ pagination, onPageChange }) {
   const { currentPage, pageCount } = pagination;
@@ -8,27 +9,54 @@ function SubmissionQueuePagination({ pagination, onPageChange }) {
   for (let page = 1; page <= pageCount; page += 1) {
     if (page === 1 || page === pageCount || (page >= currentPage - 1 && page <= currentPage + 1)) {
       pageItems.push(
-        <PaginationItem key={page} active={page === currentPage}>
-          <PaginationLink onClick={() => onPageChange(page)}>{page}</PaginationLink>
-        </PaginationItem>,
+        <li key={page}>
+          <Button
+            type="button"
+            size="icon"
+            variant={page === currentPage ? 'default' : 'outline'}
+            aria-label={`Page ${page}`}
+            aria-current={page === currentPage ? 'page' : undefined}
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </Button>
+        </li>,
       );
     } else if (page === currentPage - 2 || page === currentPage + 2) {
-      pageItems.push(<PaginationItem key={page} disabled><PaginationLink>...</PaginationLink></PaginationItem>);
+      pageItems.push(<li key={page} aria-hidden="true" className="tw-px-2">…</li>);
     }
   }
 
   return (
-    <div className="d-flex justify-content-center mt-4">
-      <Pagination>
-        <PaginationItem disabled={currentPage === 1}>
-          <PaginationLink previous onClick={() => onPageChange(currentPage - 1)} />
-        </PaginationItem>
+    <nav aria-label="Submission pages" className="tw-mt-6 tw-flex tw-justify-center">
+      <ul className="tw-m-0 tw-flex tw-list-none tw-items-center tw-gap-2 tw-p-0">
+        <li>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Previous page"
+            disabled={currentPage === 1}
+            onClick={() => onPageChange(currentPage - 1)}
+          >
+            <ChevronLeft aria-hidden="true" />
+          </Button>
+        </li>
         {pageItems}
-        <PaginationItem disabled={currentPage === pageCount}>
-          <PaginationLink next onClick={() => onPageChange(currentPage + 1)} />
-        </PaginationItem>
-      </Pagination>
-    </div>
+        <li>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Next page"
+            disabled={currentPage === pageCount}
+            onClick={() => onPageChange(currentPage + 1)}
+          >
+            <ChevronRight aria-hidden="true" />
+          </Button>
+        </li>
+      </ul>
+    </nav>
   );
 }
 

@@ -11,8 +11,10 @@ import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test
 const mocks = vi.hoisted(() => ({
   auth: { user: { role: 'admin', permissions: [] }, isAdmin: true, isAuthenticated: true },
   workflow: {
-    pagination: { totalCount: 3 }, claimedItems: [{ id: 1 }, { id: 2 }],
-    fetchPendingSubmissions: vi.fn(), fetchClaimedItems: vi.fn(),
+    submissions: [], loading: false, error: null,
+    pagination: { currentPage: 1, pageCount: 1, perPage: 20, totalCount: 3 },
+    claimedItems: [{ id: 1 }, { id: 2 }],
+    fetchPendingSubmissions: vi.fn(), fetchClaimedItems: vi.fn(), setPage: vi.fn(), clearError: vi.fn(),
   },
   adminSearch: { fetchTerms: vi.fn(), initializeDefaults: vi.fn(), defaultsSet: true },
   courseStore: { fetchResults: vi.fn(), results: [], error: null, loading: false },
@@ -132,6 +134,46 @@ describe('admin navigation in Chromium', () => {
     expect(getAllByRole(adminNav, 'link', { name: /My Work Queue/ })
       .every((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
     await expectNoAxeViolations(document.body);
+    await measureAllWidths();
+  });
+
+  it('keeps the submissions queue readable beside navigation at narrow widths', async () => {
+    mocks.workflow.submissions = [{
+      submissionId: 99907809,
+      status: 'submitted',
+      courseCode: 'LONG 999',
+      section: '99',
+      courseTitle: 'SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData',
+      facultyName: 'Synthetic Faculty',
+      term: '2026FA',
+      submittedAt: '2026-10-20T12:00:00Z',
+      totalItems: 3,
+      completionPercentage: 33,
+      completeItems: 1,
+      priority: 'high',
+      isLocked: false,
+      lockedBy: null,
+      communicationsCount: 0,
+      unreadCommunications: 0,
+      assignedTo: null,
+    }];
+    mocks.workflow.pagination = { currentPage: 1, pageCount: 1, perPage: 20, totalCount: 1 };
+
+    await renderRoute('/admin?tab=submissions');
+
+    expect(getByRole(container, 'navigation', { name: 'Admin' })).toBeTruthy();
+    const queue = getByRole(container, 'table', { name: 'Faculty submissions' });
+    const row = getAllByRole(queue, 'row')[1];
+    expect(queue.textContent).toContain('SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData');
+    const fadeIn = queue.closest('.fade-in')?.getAnimations()[0];
+    if (fadeIn) await fadeIn.finished;
+    await expectNoAxeViolations(document.body);
+    for (const [width, expectedColumns] of [[320, 1], [768, 5], [1280, 5]]) {
+      await page.viewport(width, 900);
+      const template = getComputedStyle(row).gridTemplateColumns;
+      const columnCount = template === 'none' ? 0 : template.trim().split(/\s+/).length;
+      expect(columnCount, `${width}px row layout: ${template}; classes: ${row.className}`).toBe(expectedColumns);
+    }
     await measureAllWidths();
   });
 });
