@@ -95,10 +95,33 @@ describe('SubmissionQueue', () => {
     expect(rows[0].textContent).toContain('Urgent');
     expect(rows[0].textContent).toContain('Assigned to Synthetic Staff');
     expect(rows[0].textContent).toContain('Locked by Synthetic Staff');
-    expect(rows[0].textContent).toContain('1 unread · 2 messages');
+    expect(rows[0].textContent).toContain('Assigned to Synthetic Staff · Locked by Synthetic Staff · 1 unread');
+    expect(getAllByRole(rows[0], 'cell')[4].querySelectorAll('.tw-rounded-full')).toHaveLength(2);
     expect(rows[1].textContent).toContain('Not submitted');
     expect(rows[1].textContent).toContain('Draft');
     expect(rows[1].textContent).toContain('Unassigned');
+  });
+
+  it('falls back to a muted username and keeps faculty and submitted values at body size', async () => {
+    await renderQueue({ submissions: [{
+      ...submissions[0], facultyName: 'test-faculty-a', facultyId: 'test-faculty-a',
+      submittedAt: '2026-10-21T12:00:00Z', isLocked: false, communicationsCount: 0,
+    }] });
+
+    const row = getAllByRole(getByRole(container, 'table', { name: 'Faculty submissions' }), 'row')[1];
+    expect(row.textContent).toContain('test-faculty-a');
+    expect(row.querySelector('time').textContent).toBe('6 days ago');
+    expect(getAllByRole(row, 'cell')[1].querySelector('span').className).toContain('text-muted-foreground');
+    expect(getAllByRole(row, 'cell')[2].querySelector('time').className).toContain('text-sm');
+  });
+
+  it('uses a standard checkbox with a full-size label target', async () => {
+    await renderQueue();
+
+    const checkbox = getByRole(container, 'checkbox', { name: 'Show drafts' });
+    expect(checkbox.className).toContain('tw-h-4');
+    expect(checkbox.className).toContain('tw-w-4');
+    expect(getByRole(container, 'checkbox', { name: 'Show drafts' }).labels[0].className).toContain('tw-min-h-6');
   });
 
   it('keeps drafts visible by default and filters them without changing total count', async () => {

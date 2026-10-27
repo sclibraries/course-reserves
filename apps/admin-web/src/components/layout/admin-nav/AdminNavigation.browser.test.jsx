@@ -137,27 +137,31 @@ describe('admin navigation in Chromium', () => {
     await measureAllWidths();
   });
 
-  it('keeps the submissions queue readable beside navigation at narrow widths', async () => {
-    mocks.workflow.submissions = [{
-      submissionId: 99907809,
-      status: 'in_review',
-      courseCode: 'LONG 999',
-      section: '99',
-      courseTitle: 'SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData',
-      facultyName: 'Synthetic Faculty',
-      term: '2026FA',
-      submittedAt: '2026-10-20T12:00:00Z',
-      totalItems: 3,
-      completionPercentage: 33,
-      completeItems: 1,
-      priority: 'high',
-      isLocked: false,
-      lockedBy: null,
-      communicationsCount: 0,
-      unreadCommunications: 0,
-      assignedTo: null,
-    }];
-    mocks.workflow.pagination = { currentPage: 1, pageCount: 1, perPage: 20, totalCount: 1 };
+  it('matches the three-row submissions table at desktop and reflows without overflow', async () => {
+    mocks.workflow.submissions = [
+      {
+        submissionId: 99907809, status: 'submitted', courseCode: 'TST 101', section: '01',
+        courseTitle: 'Test Course One', facultyName: 'test-faculty-a', facultyId: 'test-faculty-a',
+        term: 'Fall 2026', submittedAt: '2026-10-21T12:00:00Z', totalItems: 11,
+        completionPercentage: 0, completeItems: 0, priority: 'normal', isLocked: false,
+        communicationsCount: 0, unreadCommunications: 0, assignedTo: null,
+      },
+      {
+        submissionId: 99907810, status: 'in_progress', courseCode: 'NSC 230', section: '01',
+        courseTitle: 'Experimental Methods in Neuroscience', facultyName: 'Sandbox Faculty',
+        facultyId: 'sandbox-faculty', term: 'Spring 2026', submittedAt: '2026-04-29T12:00:00Z',
+        totalItems: 9, completionPercentage: 35, completeItems: 3, priority: 'high', isLocked: false,
+        communicationsCount: 1, unreadCommunications: 1, assignedTo: 'test-staff',
+      },
+      {
+        submissionId: 99907811, status: 'submitted', courseCode: 'AFR 175', section: '01',
+        courseTitle: 'African Amer Lit 1900-pres', facultyName: 'test-faculty-b', facultyId: 'test-faculty-b',
+        term: 'Spring 2026', submittedAt: '2026-04-02T12:00:00Z', totalItems: 1,
+        completionPercentage: 100, completeItems: 1, priority: 'urgent', isLocked: true,
+        lockedBy: 'test-staff', communicationsCount: 0, unreadCommunications: 0, assignedTo: null,
+      },
+    ];
+    mocks.workflow.pagination = { currentPage: 1, pageCount: 1, perPage: 20, totalCount: 10 };
 
     await renderRoute('/admin?tab=submissions');
 
@@ -166,24 +170,46 @@ describe('admin navigation in Chromium', () => {
     const heading = getByRole(container, 'heading', { name: 'Faculty Submissions' });
     const contentArea = heading.closest('.admin-container').parentElement;
     expect(heading.closest('.admin-container').classList.contains('container-fluid')).toBe(false);
-    const row = getAllByRole(queue, 'row')[1];
-    expect(queue.textContent).toContain('SyntheticQueueTitleThatIsIntentionallyAnUnbrokenWordToCheckResponsiveWrappingWithoutRealCourseData');
+    const rows = getAllByRole(queue, 'row').slice(1);
+    expect(rows).toHaveLength(3);
+    expect(queue.textContent).toContain('6 days ago');
+    expect(queue.textContent).toContain('Apr 29');
+    expect(queue.textContent).toContain('Assigned to test-staff · 1 unread');
+    expect(queue.textContent).toContain('Locked by test-staff');
+    expect(getAllByRole(rows[0], 'cell')[0].textContent).toContain('Test Course One');
     const fadeIn = queue.closest('.fade-in')?.getAnimations()[0];
     if (fadeIn) await fadeIn.finished;
-    await expectNoAxeViolations(document.body);
+    await expectNoAxeViolations(queue);
+    const viewportMeasurements = [];
     for (const [width, expectedColumns] of [[320, 1], [768, 5], [1280, 5]]) {
       await page.viewport(width, 900);
+      const measurement = {
+        width,
+        innerWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+      expect(measurement.innerWidth, `${width}px viewport`).toBe(width);
+      expect(measurement.scrollWidth, `${width}px page scroll width`).toBeLessThanOrEqual(measurement.innerWidth);
+      viewportMeasurements.push(measurement);
       const headingLeft = heading.getBoundingClientRect().left;
       const contentRect = contentArea.getBoundingClientRect();
       expect(headingLeft, `${width}px heading left`).toBeGreaterThanOrEqual(contentRect.left + 16);
       expect(headingLeft, `${width}px heading inside viewport`).toBeGreaterThanOrEqual(0);
       expect(contentRect.left, `${width}px content left`).toBeGreaterThanOrEqual(0);
       expect(contentRect.right, `${width}px content right`).toBeLessThanOrEqual(width);
-      const template = getComputedStyle(row).gridTemplateColumns;
+      const template = getComputedStyle(rows[0]).gridTemplateColumns;
       const columnCount = template === 'none' ? 0 : template.trim().split(/\s+/).length;
-      expect(columnCount, `${width}px row layout: ${template}; classes: ${row.className}`).toBe(expectedColumns);
+      expect(columnCount, `${width}px row layout: ${template}; classes: ${rows[0].className}`).toBe(expectedColumns);
     }
-    await measureAllWidths();
-    await page.screenshot({ path: '../../../../dist/test-results/AW-071-submissions-queue-1280.png' });
+    expect(viewportMeasurements.map(({ innerWidth, scrollWidth }) => `${scrollWidth} <= ${innerWidth}`))
+      .toEqual(['320 <= 320', '768 <= 768', '1280 <= 1280']);
+    const statusCell = getAllByRole(rows[0], 'cell')[4];
+    const statusChip = statusCell.querySelector('.tw-rounded-full');
+    const track = getByRole(getAllByRole(rows[0], 'cell')[3], 'progressbar');
+    expect(getComputedStyle(statusChip).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(getComputedStyle(statusChip).borderWidth).toBe('0px');
+    expect(getComputedStyle(track).height).toBe('6px');
+    expect(getComputedStyle(track).borderWidth).toBe('0px');
+    await page.screenshot({ path: '../../../../dist/test-results/AW-071-fr1-queue-1280.png' });
   });
 });

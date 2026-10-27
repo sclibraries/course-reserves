@@ -6,7 +6,6 @@ import { Alert } from '../../ui/alert';
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
-import { formatSubmissionCommunicationSummary } from '../../../services/admin/submissionWorkflow/submissionFormatters';
 import { PriorityIndicator, ProgressBar, SubmissionStatusBadge } from './submission/queue/SubmissionQueueDisplay';
 import SubmissionQueuePagination from './submission/queue/SubmissionQueuePagination';
 import { formatSubmissionQueueDate } from './submission/queue/submissionQueueFormatters';
@@ -31,7 +30,7 @@ function SubmissionQueueRow({ submission }) {
   return (
     <div
       role="row"
-      className={`tw-grid tw-min-w-0 tw-grid-cols-1 tw-gap-3 tw-rounded-lg tw-border tw-bg-card tw-p-3 hover:tw-bg-muted/40 md:tw-gap-0 md:tw-rounded-none md:tw-border-x-0 md:tw-border-t-0 md:tw-bg-transparent md:tw-px-3 md:tw-py-3 md:tw-border-b md:hover:tw-bg-muted/40 ${gridColumns}`}
+      className={`tw-grid tw-min-w-0 tw-grid-cols-1 tw-gap-3 tw-rounded-lg tw-border tw-bg-card tw-p-3 hover:tw-bg-muted/40 md:tw-items-center md:tw-gap-3 md:tw-rounded-none md:tw-border-x-0 md:tw-border-t-0 md:tw-bg-transparent md:tw-px-[18px] md:tw-py-3 md:tw-border-b md:tw-border-muted md:hover:tw-bg-muted/40 ${gridColumns}`}
     >
       <SubmissionCell label="Course">
         <Link
@@ -40,10 +39,14 @@ function SubmissionQueueRow({ submission }) {
         >
           {courseLabel}
         </Link>
-        <span className="tw-ml-1 tw-text-xs tw-text-muted-foreground">· {submission.term}</span>
+        <span className="tw-ml-1 tw-text-sm tw-text-muted-foreground">· {submission.term}</span>
         <p className="tw-m-0 tw-mt-1 tw-break-words tw-text-xs tw-text-muted-foreground">{submission.courseTitle}</p>
       </SubmissionCell>
-      <SubmissionCell label="Faculty"><span className="tw-text-sm">{submission.facultyName}</span></SubmissionCell>
+      <SubmissionCell label="Faculty">
+        <span className={`tw-text-sm ${submission.facultyId && submission.facultyName === submission.facultyId ? 'tw-text-muted-foreground' : ''}`}>
+          {submission.facultyName}
+        </span>
+      </SubmissionCell>
       <SubmissionCell label="Submitted">
         {submission.submittedAt ? (
           <time className="tw-text-sm" dateTime={submission.submittedAt} title={fullDateTime} aria-label={fullDateTime}>
@@ -59,26 +62,30 @@ function SubmissionQueueRow({ submission }) {
         />
       </SubmissionCell>
       <SubmissionCell label="Status">
-        <div className="tw-flex tw-min-w-0 tw-flex-col tw-items-start tw-gap-1.5">
+        <div className="tw-flex tw-min-w-0 tw-flex-col tw-items-start tw-gap-1">
           <div className="tw-flex tw-flex-wrap tw-items-center tw-gap-1.5">
             <SubmissionStatusBadge status={submission.status} />
             <PriorityIndicator priority={submission.priority} />
           </div>
-          <div className="tw-space-y-0.5 tw-break-words tw-text-xs tw-text-muted-foreground">
-            <p className="tw-m-0 tw-break-words">
-              {submission.assignedTo ? `Assigned to ${submission.assignedTo}` : 'Unassigned'}
-            </p>
+          <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-break-words tw-text-xs tw-text-muted-foreground">
+            <span>{submission.assignedTo ? `Assigned to ${submission.assignedTo}` : 'Unassigned'}</span>
             {submission.isLocked && (
-              <p className="tw-m-0 tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
-                <LockKeyhole aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
-                Locked by {submission.lockedBy || 'staff'}
-              </p>
+              <>
+                <span aria-hidden="true"> · </span>
+                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+                  <LockKeyhole aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
+                  Locked by {submission.lockedBy || 'staff'}
+                </span>
+              </>
             )}
-            {submission.communicationsCount > 0 && (
-              <p className="tw-m-0 tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
+            {submission.unreadCommunications > 0 && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-1 tw-break-words">
                 <MessageSquareText aria-hidden="true" className="tw-h-3.5 tw-w-3.5 tw-shrink-0" />
-                {formatSubmissionCommunicationSummary(submission.communicationsCount, submission.unreadCommunications)}
-              </p>
+                  {submission.unreadCommunications} unread
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -105,23 +112,25 @@ function SubmissionQueue() {
   return (
     <section aria-labelledby="faculty-submissions-title" className="tw-min-w-0 tw-w-full tw-py-4 tw-text-sm">
       <div className="tw-overflow-hidden tw-rounded-lg tw-border tw-border-border tw-bg-card">
-        <header className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-end tw-justify-between tw-gap-3 tw-border-b tw-border-border tw-px-4 tw-py-3">
+        <header className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-border-b tw-border-border tw-px-[18px] tw-py-4">
           <div className="tw-min-w-0">
             <h2 id="faculty-submissions-title" className="tw-m-0 tw-text-lg tw-font-semibold">Faculty Submissions</h2>
             <p className="tw-m-0 tw-mt-1 tw-text-sm tw-text-muted-foreground">
               {pagination.totalCount} submission{pagination.totalCount !== 1 ? 's' : ''} · newest first
             </p>
           </div>
-          <div className="tw-flex tw-min-h-10 tw-items-center tw-gap-2">
-            <input
-              id="show-drafts"
-              name="show-drafts"
-              type="checkbox"
-              checked={showDrafts}
-              onChange={(event) => setShowDrafts(event.target.checked)}
-              className="tw-h-6 tw-w-6 tw-rounded tw-border-input tw-accent-primary focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring"
-            />
-            <Label htmlFor="show-drafts" className="tw-inline-flex tw-min-h-10 tw-cursor-pointer tw-items-center">Show drafts</Label>
+          <div className="tw-flex tw-min-h-6 tw-items-center tw-gap-2">
+            <Label htmlFor="show-drafts" className="tw-inline-flex tw-min-h-6 tw-cursor-pointer tw-items-center tw-gap-2 tw-text-sm tw-text-muted-foreground">
+              <input
+                id="show-drafts"
+                name="show-drafts"
+                type="checkbox"
+                checked={showDrafts}
+                onChange={(event) => setShowDrafts(event.target.checked)}
+                className="tw-h-4 tw-w-4 tw-shrink-0 tw-rounded tw-border-input tw-accent-primary focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring"
+              />
+              Show drafts
+            </Label>
           </div>
         </header>
 
@@ -149,9 +158,9 @@ function SubmissionQueue() {
           </div>
         ) : (
           <>
-            <div role="table" aria-label="Faculty submissions" className="tw-min-w-0 tw-w-full tw-pb-1">
+            <div role="table" aria-label="Faculty submissions" className="tw-min-w-0 tw-w-full">
               <div role="rowgroup">
-                <div role="row" className={`tw-sr-only ${gridColumns} md:tw-not-sr-only md:tw-grid md:tw-bg-muted md:tw-px-3 md:tw-py-2`}>
+                <div role="row" className={`tw-sr-only ${gridColumns} md:tw-not-sr-only md:tw-grid md:tw-items-center md:tw-gap-3 md:tw-bg-muted md:tw-px-[18px] md:tw-py-2`}>
                   {['Course', 'Faculty', 'Submitted', 'Progress', 'Status'].map((heading) => (
                     <div key={heading} role="columnheader" className="tw-min-w-0 tw-break-words tw-text-xs tw-font-semibold tw-text-muted-foreground">
                       {heading}

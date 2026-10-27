@@ -24,7 +24,10 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          strong: "hsl(var(--border-strong))",
+        },
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -58,12 +61,17 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
         status: {
-          draft: "hsl(var(--status-draft))",
-          submitted: "hsl(var(--status-submitted))",
-          review: "hsl(var(--status-review))",
-          partial: "hsl(var(--status-partial))",
-          complete: "hsl(var(--status-complete))",
-          canceled: "hsl(var(--status-canceled))",
+          draft: { DEFAULT: "hsl(var(--status-draft))", fg: "hsl(var(--status-draft-fg))" },
+          submitted: { DEFAULT: "hsl(var(--status-submitted))", fg: "hsl(var(--status-submitted-fg))" },
+          review: { DEFAULT: "hsl(var(--status-review))", fg: "hsl(var(--status-review-fg))" },
+          partial: { DEFAULT: "hsl(var(--status-partial))", fg: "hsl(var(--status-partial-fg))" },
+          complete: { DEFAULT: "hsl(var(--status-complete))", fg: "hsl(var(--status-complete-fg))" },
+          canceled: { DEFAULT: "hsl(var(--status-canceled))", fg: "hsl(var(--status-canceled-fg))" },
+        },
+        priority: {
+          normal: { DEFAULT: "hsl(var(--priority-normal))", fg: "hsl(var(--priority-normal-fg))" },
+          high: { DEFAULT: "hsl(var(--priority-high))", fg: "hsl(var(--priority-high-fg))" },
+          urgent: { DEFAULT: "hsl(var(--priority-urgent))", fg: "hsl(var(--priority-urgent-fg))" },
         },
       },
       borderRadius: {

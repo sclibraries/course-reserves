@@ -29,6 +29,7 @@
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 32% 91%;
+    --border-strong: 215 16% 55%;
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
 
@@ -41,6 +42,19 @@
     --status-partial: 142 76% 30.19%;
     --status-complete: 142 76% 30.19%;
     --status-canceled: 0 84% 49.55%;
+    --status-draft-fg: 215 25% 27%;
+    --status-submitted-fg: 221 83% 32%;
+    --status-review-fg: 25 90% 25%;
+    --status-partial-fg: 142 76% 23%;
+    --status-complete-fg: 142 76% 23%;
+    --status-canceled-fg: 0 84% 32%;
+
+    --priority-normal: 215 16% 47%;
+    --priority-high: 24 94% 45%;
+    --priority-urgent: 0 84% 49.55%;
+    --priority-normal-fg: 215 25% 27%;
+    --priority-high-fg: 24 90% 25%;
+    --priority-urgent-fg: 0 84% 32%;
 
     /* Gradients */
     --gradient-hero: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(221 83% 63%) 100%);
@@ -75,6 +89,7 @@
     --destructive-foreground: 0 0% 9%;
 
     --border: 217 33% 22%;
+    --border-strong: 215 20% 62%;
     --input: 217 33% 22%;
     --ring: 221 83% 53%;
 
@@ -85,6 +100,19 @@
     --status-partial: 142 76% 46%;
     --status-complete: 142 76% 46%;
     --status-canceled: 0 63% 59.23%;
+    --status-draft-fg: 215 20% 84%;
+    --status-submitted-fg: 221 100% 82%;
+    --status-review-fg: 38 100% 80%;
+    --status-partial-fg: 142 76% 76%;
+    --status-complete-fg: 142 76% 76%;
+    --status-canceled-fg: 0 90% 80%;
+
+    --priority-normal: 215 20% 55%;
+    --priority-high: 24 94% 54%;
+    --priority-urgent: 0 63% 59.23%;
+    --priority-normal-fg: 215 20% 84%;
+    --priority-high-fg: 24 100% 82%;
+    --priority-urgent-fg: 0 90% 80%;
   }
 
   /* Scope preflight behavior to the new stack so Bootstrap pages stay unchanged. */

@@ -9,8 +9,16 @@ describe('submission queue date formatting', () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it('uses singular and plural week labels', () => {
-    expect(formatSubmissionQueueDate('2026-10-20T12:00:00Z')).toBe('1 week ago');
-    expect(formatSubmissionQueueDate('2026-10-13T12:00:00Z')).toBe('2 weeks ago');
+  it('keeps relative labels for the last seven days', () => {
+    expect(formatSubmissionQueueDate('2026-10-21T12:00:00Z')).toBe('6 days ago');
+  });
+
+  it('uses short dates and includes the year only outside the current year', () => {
+    expect(formatSubmissionQueueDate('2026-04-29T12:00:00Z')).toBe('Apr 29');
+    expect(formatSubmissionQueueDate('2025-04-29T12:00:00Z')).toBe('Apr 29, 2025');
+  });
+
+  it('does not describe future dates as elapsed time', () => {
+    expect(formatSubmissionQueueDate('2026-10-28T12:00:00Z')).toBe('Oct 28');
   });
 });
