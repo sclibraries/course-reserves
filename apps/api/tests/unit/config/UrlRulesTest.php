@@ -106,6 +106,15 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'GET catalog-availability' => 'catalog-availability/index',
             'OPTIONS catalog-availability' => 'catalog-availability/options',
         ];
+        $navPinRules = [
+            'GET staff-nav-pins' => 'staff-nav-pin/index',
+            'PUT staff-nav-pins' => 'staff-nav-pin/index',
+            'DELETE staff-nav-pins' => 'staff-nav-pin/index',
+            'OPTIONS staff-nav-pins' => 'staff-nav-pin/options',
+            'GET staff-nav-pins/defaults' => 'staff-nav-pin/defaults',
+            'PUT staff-nav-pins/defaults' => 'staff-nav-pin/defaults',
+            'OPTIONS staff-nav-pins/defaults' => 'staff-nav-pin/options',
+        ];
         $syllabusRules = [
             'GET faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi' => 'syllabus/faculty-list',
             'POST faculty-submission/<uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>/syllabi' => 'syllabus/faculty-create',
@@ -129,6 +138,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
         $expectedDraftRules = array_intersect_key($mergedRules, $draftRules);
         $expectedAvailabilityRules = array_intersect_key($mergedRules, $availabilityRules);
+        $expectedNavPinRules = array_intersect_key($mergedRules, $navPinRules);
         $expectedSyllabusRules = array_intersect_key($mergedRules, $syllabusRules);
         $expectedStaffEnteredRules = array_intersect_key($mergedRules, $staffEnteredRules);
         $declaredRules = array_merge(
@@ -138,15 +148,17 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $draftRules,
             $availabilityRules,
             $syllabusRules,
-            $staffEnteredRules
+            $staffEnteredRules,
+            $navPinRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(244, $mergedRules);
+        $this->assertCount(251, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
         $this->assertSame($draftRules, $expectedDraftRules);
         $this->assertSame($availabilityRules, $expectedAvailabilityRules);
+        $this->assertSame($navPinRules, $expectedNavPinRules);
         $this->assertSame($syllabusRules, $expectedSyllabusRules);
         $this->assertSame($staffEnteredRules, $expectedStaffEnteredRules);
         $this->assertSame($baseline, $existingRules);
@@ -270,6 +282,13 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['GET', 'tracking/course-detail', ['tracking/course-detail', []]],
             ['GET', 'catalog-availability', ['catalog-availability/index', []]],
             ['OPTIONS', 'catalog-availability', ['catalog-availability/options', []]],
+            ['GET', 'staff-nav-pins', ['staff-nav-pin/index', []]],
+            ['PUT', 'staff-nav-pins', ['staff-nav-pin/index', []]],
+            ['DELETE', 'staff-nav-pins', ['staff-nav-pin/index', []]],
+            ['OPTIONS', 'staff-nav-pins', ['staff-nav-pin/options', []]],
+            ['GET', 'staff-nav-pins/defaults', ['staff-nav-pin/defaults', []]],
+            ['PUT', 'staff-nav-pins/defaults', ['staff-nav-pin/defaults', []]],
+            ['OPTIONS', 'staff-nav-pins/defaults', ['staff-nav-pin/options', []]],
             ['OPTIONS', 'material-type/all', ['material-type/options', []]],
             ['GET', 'material-type/fields', ['material-type/fields', []]],
             ['GET', 'checklist/get-template/999007204', [
