@@ -30,6 +30,7 @@ export const apiConfig = {
         courses: '/cr/courses/',
     },
     admin: {
+        staffNavPins: '/staff-nav-pins',
         courseExists: '/course/exists',
         createCourse: '/course/create-from-folio',
         courseResources: '/course/:id/resources',

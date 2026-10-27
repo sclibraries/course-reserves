@@ -151,79 +151,6 @@
   padding-bottom: 1px;
 }
 
-/* Tab button styling */
-.tab-button {
-  background: none;
-  border: none;
-  padding: 0.75rem 1rem;
-  font-weight: 500;
-  color: #6b7280;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tab-button:hover {
-  color: #4338ca;
-}
-
-.tab-button.active {
-  color: #4f46e5;
-  border-bottom: 2px solid #4f46e5;
-}
-
-/* Badge styling in tabs */
-.tab-button .badge {
-  font-size: 0.7rem;
-  padding: 0.25rem 0.5rem;
-  font-weight: 600;
-  vertical-align: middle;
-}
-
-/* Mobile tabs dropdown */
-.mobile-tabs-dropdown .dropdown-toggle {
-  background-color: white;
-  color: #4f46e5;
-  border: 1px solid #e5e7eb;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-.mobile-tabs-dropdown .dropdown-toggle:focus,
-.mobile-tabs-dropdown .dropdown-toggle:hover {
-  background-color: #f9fafb;
-  color: #4f46e5;
-  box-shadow: none;
-  border-color: #4f46e5;
-}
-
-.mobile-tabs-dropdown .dropdown-menu {
-  border-radius: 8px;
-  margin-top: 5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
-}
-
-.mobile-tabs-dropdown .dropdown-item {
-  padding: 0.75rem 1rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.mobile-tabs-dropdown .dropdown-item:hover {
-  background-color: #f9fafb;
-  color: #4f46e5;
-}
-
-.mobile-tabs-dropdown .dropdown-item.active {
-  background-color: #f3f4f6;
-  color: #4f46e5;
-}
-
 /* Animation classes */
 .fade-in {
   animation: fadeIn 0.3s ease-in;
@@ -232,42 +159,6 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* Workflow dropdown styling */
-.workflow-dropdown.dropdown-toggle {
-  background: none !important;
-  border: none !important;
-  padding: 0.75rem 1.25rem !important;
-  position: relative;
-}
-
-.workflow-dropdown.dropdown-toggle::after {
-  margin-left: 0.5rem;
-}
-
-.workflow-dropdown .dropdown-menu {
-  margin-top: 0.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e5e7eb;
-  min-width: 220px;
-}
-
-.workflow-dropdown .dropdown-item {
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  transition: background-color 0.2s ease;
-}
-
-.workflow-dropdown .dropdown-item:hover {
-  background-color: #f3f4f6;
-}
-
-.workflow-dropdown .dropdown-item.active {
-  background-color: #e0e7ff;
-  color: #4f46e5;
-  font-weight: 500;
 }
 
 /* Responsive adjustments */

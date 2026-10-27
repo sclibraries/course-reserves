@@ -1,59 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { createAdminTabRegistry } from './adminTabRegistry';
 
-const registryFor = (isDevelopment, isAdmin = false) => createAdminTabRegistry({
+const registryFor = (isAdmin = false) => createAdminTabRegistry({
   canManageCourses: false,
   canManageResources: false,
   canManageSubmissions: true,
   canViewReports: false,
-  canManageWorkflows: false,
+  canManageWorkflows: isAdmin,
   canCustomize: false,
   isAdmin,
   canManageProxyAccess: false,
-  isDevelopment,
 });
 
-describe('Needs linking workflow tab', () => {
-  it('is available to staff with submission access inside Workflow', () => {
-    const registry = registryFor(true);
-    const tab = registry.tabs.find((entry) => entry.key === 'needs-linking');
+describe('workflow pages in the admin navigation', () => {
+  it('puts daily-work pages and team queues in their design groups', () => {
+    const registry = registryFor();
 
-    expect(registry.workflowVisible).toBe(true);
-    expect(tab).toEqual(expect.objectContaining({ canAccess: true, navigationGroup: 'workflow' }));
+    expect(registry.tabs.find(({ key }) => key === 'needs-linking'))
+      .toMatchObject({ canAccess: true, group: 'team-queues' });
+    expect(registry.tabs.find(({ key }) => key === 'item-queue'))
+      .toMatchObject({ label: 'Item Queue', canAccess: true, group: 'team-queues' });
+    expect(registry.tabs.find(({ key }) => key === 'my-items'))
+      .toMatchObject({ label: 'My Items', canAccess: true, group: 'my-work' });
+    expect(registry.tabs.find(({ key }) => key === 'my-groups'))
+      .toMatchObject({ label: 'My Groups', canAccess: true, group: 'my-work' });
   });
 
-  it('keeps the existing production workflow visibility gate', () => {
-    expect(registryFor(false).workflowVisible).toBe(false);
+  it('shows Workflow Templates to admins in every build', () => {
+    expect(registryFor(true).tabs.find(({ key }) => key === 'workflow-templates'))
+      .toMatchObject({ canAccess: true, group: 'settings' });
   });
 
-  it('adds the item queue and My items to the dev-only Workflow area', () => {
-    const registry = registryFor(true);
-    const queue = registry.tabs.find((entry) => entry.key === 'item-queue');
-    const myItems = registry.tabs.find((entry) => entry.key === 'my-items');
+  it('places admin groups and access-path routing under Settings', () => {
+    const tabs = registryFor(true).tabs;
 
-    expect(queue).toEqual(expect.objectContaining({ label: 'Item Queue', canAccess: true, navigationGroup: 'workflow' }));
-    expect(myItems).toEqual(expect.objectContaining({ label: 'My Items', canAccess: true, navigationGroup: 'workflow' }));
-    expect(registryFor(false).workflowVisible).toBe(false);
-  });
-
-  it('shows My groups to submission staff and restricts group settings to admins', () => {
-    const staffRegistry = registryFor(true, false);
-    const adminRegistry = registryFor(true, true);
-    const staffGroups = staffRegistry.tabs.find((entry) => entry.key === 'my-groups');
-    const settingsForStaff = staffRegistry.tabs.find((entry) => entry.key === 'groups');
-    const settingsForAdmin = adminRegistry.tabs.find((entry) => entry.key === 'groups');
-
-    expect(staffGroups).toEqual(expect.objectContaining({ label: 'My Groups', canAccess: true, navigationGroup: 'workflow' }));
-    expect(settingsForStaff).toEqual(expect.objectContaining({ label: 'Groups', canAccess: false }));
-    expect(settingsForAdmin).toEqual(expect.objectContaining({ label: 'Groups', canAccess: true }));
-  });
-
-  it('shows Access path routing to admins only', () => {
-    const staffRegistry = registryFor(true, false);
-    const adminRegistry = registryFor(true, true);
-
-    expect(staffRegistry.tabs.find((entry) => entry.key === 'access-path-routing').canAccess).toBe(false);
-    expect(adminRegistry.tabs.find((entry) => entry.key === 'access-path-routing'))
-      .toEqual(expect.objectContaining({ label: 'Access path routing', canAccess: true }));
+    expect(tabs.find(({ key }) => key === 'groups')).toMatchObject({ label: 'Staff groups', group: 'settings' });
+    expect(tabs.find(({ key }) => key === 'access-path-routing'))
+      .toMatchObject({ label: 'Access path routing', canAccess: true, group: 'settings' });
   });
 });

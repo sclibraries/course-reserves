@@ -16,6 +16,7 @@ import CourseRecords from '../../pages/CourseRecords';
 import ProtectedRoutePage from '../protected/ProtectedRoutePage';
 import ProtectedRoute from '../protected/ProtectedRoute';
 import Admin from '../../pages/Admin';
+import AdminLayout from './AdminLayout';
 import AdminElectronicResources from '../../pages/AdminElectronicResources';
 import StaffSyllabusRequestPage from '../../pages/StaffSyllabusRequestPage';
 import SubmissionDetail from '../page-sections/admin/SubmissionDetail';
@@ -87,52 +88,19 @@ const AppRoutes = () => {
       {/* Protected Admin Routes */}
       <Route
         path="/admin"
-        element={
+        element={(
           <ProtectedRoute isAuthorized={isAuthorized}>
-            <Admin />
+            <AdminLayout />
           </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/work-queue/:itemId"
-        element={
-          <ProtectedRoute isAuthorized={isAuthorized}>
-            <WorkQueueDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/electronic/:folioCourseId/syllabus-request"
-        element={
-          <ProtectedRoute isAuthorized={isAuthorized}>
-            <StaffSyllabusRequestPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/electronic/:folioCourseId"
-        element={
-          <ProtectedRoute isAuthorized={isAuthorized}>
-            <AdminElectronicResources />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/submissions/:submissionId"
-        element={
-          <ProtectedRoute isAuthorized={isAuthorized}>
-            <SubmissionDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route 
-        path="/admin/reports"
-        element={
-          <ProtectedRoute isAuthorized={isAuthorized}>
-            <TrackingReport />
-          </ProtectedRoute>
-        }
-      />
+        )}
+      >
+        <Route index element={<Admin />} />
+        <Route path="work-queue/:itemId" element={<WorkQueueDetail />} />
+        <Route path="electronic/:folioCourseId/syllabus-request" element={<StaffSyllabusRequestPage />} />
+        <Route path="electronic/:folioCourseId" element={<AdminElectronicResources />} />
+        <Route path="submissions/:submissionId" element={<SubmissionDetail />} />
+        <Route path="reports" element={<TrackingReport />} />
+      </Route>
       
       {/* Catch-all 404 route */}
       <Route path="*" element={<NotFound />} />

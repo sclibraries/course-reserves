@@ -17,7 +17,6 @@ import useCustomizationStore from '../../store/customizationStore';
 import useSearchStore from '../../store/searchStore';
 import { useAuth } from '../../contexts/AuthContext';
 import useUnreadMessages from '../../hooks/useUnreadMessages';
-import { apiConfig } from '../../config/api.config';
 import '../../css/Header.css';
 import LoginButton from '../ui/LoginButton';
 
@@ -68,7 +67,6 @@ function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const isAdminPath = location.pathname.startsWith('/admin');
-  const isDevelopment = apiConfig.environment !== 'production';
 
   const currentCollege = useCustomizationStore((state) => state.currentCollege);
   const setSearchStoreCollege = useSearchStore((state) => state.setCollege);
@@ -77,8 +75,7 @@ function Header() {
 
   const { isAuthenticated, logout, user } = useAuth();
   
-  // Poll for unread @mentions (only when authenticated and in development)
-  const { unreadCount } = useUnreadMessages(30000, isAuthenticated && isDevelopment);
+  const { unreadCount } = useUnreadMessages(30000, isAuthenticated);
 
   const toggleUserMenu = () => setUserMenuOpen(!userMenuOpen);
 
@@ -199,13 +196,13 @@ function Header() {
             {isAuthenticated && (
               <>
                 <Link
-                  to="/admin?tab=courses"
+                  to="/admin"
                   className={`nav-link me-3 position-relative ${isAdminPath ? 'active' : ''}`}
                   aria-label="Go to admin page"
                   style={isAdminPath ? activeNavLinkStyle : navLinkStyle}
                 >
                   Admin
-                  {isDevelopment && unreadCount > 0 && (
+                  {unreadCount > 0 && (
                     <Badge 
                       color="danger" 
                       pill 
@@ -218,7 +215,7 @@ function Header() {
                 </Link>
                 
                 {/* Notifications Bell - Only in development */}
-                {isDevelopment && unreadCount > 0 && (
+                {unreadCount > 0 && (
                   <Link
                     to="/admin?tab=mentions"
                     className="nav-link me-3 position-relative"
