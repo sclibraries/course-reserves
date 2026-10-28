@@ -28,6 +28,9 @@ class SubmissionDetailPresenter
         $submission['entry_source'] = $entry['entry_source'] ?? null;
 
         $collections = ['newResources' => 'new', 'reuseResources' => 'reuse'];
+        $claimFields = Yii::$container->get(ItemClaimService::class)->claimsForSubmission(
+            (int)($submission['submission_id'] ?? 0)
+        );
         $instanceIds = [];
         $catalogInstanceIds = [];
         $flowItems = [];
@@ -36,12 +39,17 @@ class SubmissionDetailPresenter
                 if (!is_array($item)) {
                     continue;
                 }
+                $itemId = (int)($item['id'] ?? 0);
+                if (isset($claimFields[$kind][$itemId])) {
+                    unset($item['claimed_by_staff_id'], $item['assigned_group_id']);
+                    $item = array_merge($item, $claimFields[$kind][$itemId]);
+                    $submission[$collection][$index] = $item;
+                }
                 $instanceId = ItemReadiness::catalogInstanceId($item);
                 $catalogInstanceIds[$collection][$index] = $instanceId;
                 if ($instanceId !== null) {
                     $instanceIds[$instanceId] = true;
                 }
-                $itemId = (int)($item['id'] ?? 0);
                 if ($itemId > 0) {
                     $flowItems[] = ['kind' => $kind, 'id' => $itemId];
                 }

@@ -87,6 +87,6 @@ class SubmissionReuseResource extends ActiveRecord
      */
     public function getSourceResource()
     {
-        return $this->hasOne(Resource::class, ['resource_id' => 'source_resource_id']);
+        return $this->hasOne(Resources::class, ['resource_id' => 'source_resource_id']);
     }
 }

@@ -129,7 +129,7 @@ class ItemClaimListRepository
             . 'i.item_status AS status, i.claimed_by, i.claimed_at, i.last_activity_at, i.assigned_group_id, '
             . 'mt.material_type_id, flow_run.current_step_key, flow_run.finish_state AS flow_finish_state, '
             . 'flow_version.steps_json AS flow_steps_json, '
-            . 's.submitted_at, COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
+            . 's.submitted_at, ' . ItemClaimRepository::claimedByDisplayNameSql() . ' AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '

@@ -3,6 +3,7 @@
 namespace app\services;
 
 use Yii;
+use app\models\FacultySubmission;
 
 /** Coordinates atomic item claims and exposes one shared read shape to staff controllers. */
 class ItemClaimService
@@ -234,6 +235,41 @@ class ItemClaimService
     public function expireDueClaims()
     {
         return $this->expiry->expireDueClaims();
+    }
+
+    public function claimsForSubmission($submissionId)
+    {
+        $transaction = Yii::$app->db->beginTransaction();
+        $notifications = [];
+        try {
+            $rows = $this->repository->claimsBySubmission($submissionId);
+            $now = $this->expiry->now();
+            $claims = [];
+            foreach ($rows as $kind => $items) {
+                foreach ($items as $id => $row) {
+                    if ($row['link_state'] === 'linked' && $row['submission_status'] !== FacultySubmission::STATUS_DRAFT) {
+                        $notification = $this->expiry->expireLocked($kind, $row, $now);
+                        if ($notification) {
+                            $row['claimed_by'] = null;
+                            $row['claimed_at'] = null;
+                            $row['last_activity_at'] = $now;
+                            $notifications[] = $notification;
+                        }
+                    }
+                    $claims[$kind][$id] = $this->presenter->claimFields($row, $this->expiry->hours());
+                }
+            }
+            $transaction->commit();
+        } catch (\Throwable $exception) {
+            if ($transaction->isActive) {
+                $transaction->rollBack();
+            }
+            throw $exception;
+        }
+        foreach ($notifications as $notification) {
+            $this->expiry->notify($notification);
+        }
+        return $claims;
     }
 
     private function presentRows(array $rows)

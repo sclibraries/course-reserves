@@ -7,19 +7,13 @@ class ItemClaimPresenter
 {
     public function present(array $row, $expiryHours)
     {
-        $claimedBy = $row['claimed_by'] === null ? null : (string)$row['claimed_by'];
-        $lastActivity = $row['last_activity_at'] ?: $row['claimed_at'];
-        $expiresAt = $claimedBy !== null && $lastActivity
-            ? date('Y-m-d H:i:s', strtotime($lastActivity) + ((int)$expiryHours * 3600))
-            : null;
-        $assignedGroupId = empty($row['assigned_group_id']) ? null : (int)$row['assigned_group_id'];
         $title = $row['title'] ?? null;
         if (!$title && !empty($row['resource_data'])) {
             $resourceData = json_decode($row['resource_data'], true);
             $title = is_array($resourceData) ? ($resourceData['title'] ?? null) : null;
         }
 
-        return [
+        return array_merge([
             'kind' => $row['item_kind'] ?? $row['kind'],
             'id' => (int)$row['id'],
             'submission_id' => (int)$row['submission_id'],
@@ -31,17 +25,29 @@ class ItemClaimPresenter
             'material_type' => $row['material_type'] ?? null,
             'position' => (int)$row['position'],
             'status' => $row['status'],
+        ], $this->claimFields($row, $expiryHours), [
+            'current_step_label' => $this->currentStepLabel($row),
+            'finish_state' => $row['flow_finish_state'] ?? null,
+        ]);
+    }
+
+    public function claimFields(array $row, $expiryHours)
+    {
+        $claimedBy = $row['claimed_by'] === null ? null : (string)$row['claimed_by'];
+        $lastActivity = $row['last_activity_at'] ?: $row['claimed_at'];
+        $assignedGroupId = empty($row['assigned_group_id']) ? null : (int)$row['assigned_group_id'];
+        return [
             'claimed_by' => $claimedBy,
             'claimed_by_display' => $claimedBy === null ? null : ($row['claimed_by_display'] ?? null),
             'claimed_at' => $row['claimed_at'],
             'last_activity_at' => $row['last_activity_at'],
-            'expires_at' => $expiresAt,
+            'expires_at' => $claimedBy !== null && $lastActivity
+                ? date('Y-m-d H:i:s', strtotime($lastActivity) + ((int)$expiryHours * 3600))
+                : null,
             'assigned_group' => $assignedGroupId === null ? null : [
                 'id' => $assignedGroupId,
                 'name' => $row['assigned_group_name'] ?? null,
             ],
-            'current_step_label' => $this->currentStepLabel($row),
-            'finish_state' => $row['flow_finish_state'] ?? null,
         ];
     }
 

@@ -21,6 +21,11 @@ class ItemClaimRepository
         throw new BadRequestHttpException('Item kind must be new or reuse.');
     }
 
+    public static function claimedByDisplayNameSql()
+    {
+        return 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username)';
+    }
+
     public function find($kind, $id, $forUpdate = false)
     {
         $table = $this->table($kind);
@@ -35,7 +40,7 @@ class ItemClaimRepository
             . 'flow_run.finish_state AS flow_finish_state, flow_version.steps_json AS flow_steps_json, '
             . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, '
             . 's.status AS submission_status, s.submitted_at, '
-            . 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username) AS claimed_by_display, '
+            . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
@@ -52,6 +57,29 @@ class ItemClaimRepository
             $row['item_kind'] = $kind;
         }
         return $row ?: null;
+    }
+
+    public function claimsBySubmission($submissionId)
+    {
+        $claims = ['new' => [], 'reuse' => []];
+        foreach (['new', 'reuse'] as $kind) {
+            $rows = Yii::$app->db->createCommand(
+                'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
+                . 'i.assigned_group_id, i.item_status AS status, s.status AS submission_status, s.link_state, '
+                . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
+                . 'group_ref.name AS assigned_group_name '
+                . 'FROM ' . $this->table($kind) . ' i '
+                . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
+                . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
+                . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
+                . 'WHERE i.submission_id = :submission_id FOR UPDATE',
+                [':submission_id' => (int)$submissionId]
+            )->queryAll();
+            foreach ($rows as $row) {
+                $claims[$kind][(int)$row['id']] = $row;
+            }
+        }
+        return $claims;
     }
 
     public function claimIfUnclaimed($kind, $id, $username, $now)
