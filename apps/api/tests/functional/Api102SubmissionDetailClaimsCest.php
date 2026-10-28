@@ -177,13 +177,13 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
     {
         $two = $this->createSubmission('two-items');
         $this->createNewItem($two['submission_id'], 2, 0);
-        Assert::assertSame(2, $this->claimReadCount($I, $two['submission_id']));
+        Assert::assertSame(2, $this->claimReadCount($two['submission_id']));
 
         $six = $this->createSubmission('six-items');
         for ($position = 2; $position <= 6; $position++) {
             $this->createNewItem($six['submission_id'], $position, 0);
         }
-        Assert::assertSame(2, $this->claimReadCount($I, $six['submission_id']));
+        Assert::assertSame(2, $this->claimReadCount($six['submission_id']));
     }
 
     private function createSubmission($suffix)
@@ -302,7 +302,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         return $this->response($I);
     }
 
-    private function claimReadCount(FunctionalTester $I, $submissionId)
+    private function claimReadCount($submissionId)
     {
         $db = \Yii::$app->db;
         $wasLogging = $db->enableLogging;
@@ -310,7 +310,8 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         $logger = \Yii::getLogger();
         $firstMessage = count($logger->messages);
         try {
-            $this->staffDetail($I, $submissionId);
+            (new \app\controllers\SubmissionWorkflowController('submission-workflow', \Yii::$app))
+                ->actionViewSubmission($submissionId);
             $messages = array_slice($logger->messages, $firstMessage);
         } finally {
             $db->enableLogging = $wasLogging;
