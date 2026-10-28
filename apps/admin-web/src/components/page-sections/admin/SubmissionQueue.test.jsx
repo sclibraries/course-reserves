@@ -59,6 +59,8 @@ async function renderQueue(overrides = {}) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-27T12:00:00Z'));
   mocks.storeState = {};
 });
 
@@ -67,6 +69,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  vi.useRealTimers();
 });
 
 describe('SubmissionQueue', () => {
