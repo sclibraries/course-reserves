@@ -149,7 +149,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         $submission = $this->createSubmission('expiry');
         $this->claim($I, 'new', $submission['new_item_id'], 'staff-a');
 
-        $this->request($I, 'GET', 'faculty-submission/' . $submission['uuid'], [], 'faculty');
+        $this->request($I, 'GET', 'faculty-submission/view', [], 'faculty', ['id' => $submission['uuid']]);
         $I->seeResponseCodeIs(200);
         $facultyKeys = $this->recursiveKeys($this->response($I));
         foreach ([
@@ -297,7 +297,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
 
     private function staffDetail(FunctionalTester $I, $submissionId)
     {
-        $this->request($I, 'GET', 'submission-workflow/submission/' . $submissionId, [], 'staff-a');
+        $this->request($I, 'GET', 'submission-workflow/view-submission', [], 'staff-a', ['id' => $submissionId]);
         $I->seeResponseCodeIs(200);
         return $this->response($I);
     }
