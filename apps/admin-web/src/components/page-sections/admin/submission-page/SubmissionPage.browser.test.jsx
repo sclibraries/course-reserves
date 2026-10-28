@@ -9,7 +9,7 @@ import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../../pages
 import AdminLayout from '../../../layout/AdminLayout';
 import Header from '../../../layout/Header';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
-import '../../../css/App.css';
+import '../../../../css/App.css';
 import SubmissionPage from './SubmissionPage';
 import ItemWorkPane from './item-pane/ItemWorkPane';
 import { createLinkingState } from './SubmissionPage.testUtils';

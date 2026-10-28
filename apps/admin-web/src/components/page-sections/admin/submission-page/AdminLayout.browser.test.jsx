@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { page } from '@vitest/browser/context';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
 import Layout from '../../../layout/Layout';
-import '../../../css/App.css';
+import '../../../../css/App.css';
 
 const mocks = vi.hoisted(() => ({
   navigation: {
