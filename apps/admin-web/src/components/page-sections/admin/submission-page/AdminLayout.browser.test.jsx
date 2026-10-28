@@ -114,7 +114,11 @@ describe('admin route viewport layout in Chromium', () => {
     await page.viewport(320, 900);
     expect(header.getBoundingClientRect().height).toBe(80);
     expect(content.getBoundingClientRect().right).toBe(window.innerWidth);
-    expect(content.getBoundingClientRect().top).toBe(header.getBoundingClientRect().height);
+    const mobileNavigationRow = container
+      .querySelector('button[aria-label="Open admin navigation"]')
+      .parentElement;
+    expect(mobileNavigationRow.getBoundingClientRect().top).toBe(header.getBoundingClientRect().bottom);
+    expect(content.getBoundingClientRect().top).toBe(mobileNavigationRow.getBoundingClientRect().bottom);
     await expectNoHorizontalOverflow([320]);
     await expectNoAxeViolations(container);
 
