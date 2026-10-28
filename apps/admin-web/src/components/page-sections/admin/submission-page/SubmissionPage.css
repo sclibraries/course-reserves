@@ -1,0 +1,21 @@
+/* Account for the mobile admin switcher and the page's own vertical padding. */
+.submission-page-workbench {
+  min-height: calc(100vh - 5rem);
+}
+
+@media (min-width: 768px) {
+  .submission-page-workbench {
+    min-height: calc(100vh - 1.5rem);
+  }
+}
+
+/* The app shell also reserves root padding and a fixed-header content offset. */
+#main-content.main-content-no-search .submission-page-workbench {
+  min-height: calc(100vh - 14rem);
+}
+
+@media (min-width: 768px) {
+  #main-content.main-content-no-search .submission-page-workbench {
+    min-height: calc(100vh - 10.5rem);
+  }
+}

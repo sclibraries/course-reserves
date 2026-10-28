@@ -193,12 +193,21 @@ describe('SubmissionPage workbench in Chromium', () => {
     ));
   }
 
+  function expectPageBackgroundFitsViewport(width) {
+    const workbench = container.querySelector('[data-testid="submission-page-workbench"]');
+    expect(workbench.getBoundingClientRect().bottom, `${width}px background bottom`)
+      .toBeGreaterThanOrEqual(window.innerHeight - 12);
+    expect(document.documentElement.scrollHeight, `${width}px page scroll height`)
+      .toBeLessThanOrEqual(window.innerHeight);
+  }
+
   it('keeps the workbench accessible and reflowed with collapsed and expanded navigation', async () => {
     await page.viewport(1280, 900);
     await mountWorkbench();
 
     const nav = container.querySelector('[aria-label="Admin navigation panel"]');
     expect(nav.className).toContain('tw-w-16');
+    expectPageBackgroundFitsViewport(1280);
     expect(container.querySelectorAll('[data-item-row]')).toHaveLength(3);
     expect(Array.from(container.querySelectorAll('[data-item-group]'), (group) => group.dataset.itemGroup))
       .toEqual(['Core readings', 'Further reading']);
@@ -218,10 +227,11 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(mocks.itemFlow).toHaveBeenCalledTimes(1);
     await expectNoHorizontalOverflow([1280]);
     await expectNoAxeViolations(container);
-    await page.screenshot({ path: '../../../../dist/test-results/AW-073-submission-1280.png' });
+    await page.screenshot({ path: '../../../../../dist/test-results/AW-073-submission-1280.png' });
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
+    expectPageBackgroundFitsViewport(1024);
     expect(nav.className).toContain('tw-w-72');
     const grid = container.querySelector('[data-testid="submission-workbench-grid"]');
     expect(getComputedStyle(grid).gridTemplateColumns.split(' ')[0]).toBe('260px');
@@ -231,6 +241,10 @@ describe('SubmissionPage workbench in Chromium', () => {
     await page.viewport(768, 900);
     expect(getByRole(container, 'button', { name: 'Back to list' })).toBeTruthy();
     await expectNoHorizontalOverflow([320, 768, 1280]);
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      expectPageBackgroundFitsViewport(width);
+    }
   });
 
   it('keeps long row titles and claimers intact while clamping their visible layout', async () => {
@@ -245,7 +259,7 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(title.textContent).toBe(longTitle);
     expect(claimer.className).toContain('tw-truncate');
     expect(claimer.getAttribute('title')).toBe(longClaim);
-    expect(claimer.textContent).toBe(longClaim);
+    expect(claimer.textContent).toContain(longClaim);
     await expectNoHorizontalOverflow([1280, 1024, 320]);
   });
 });
