@@ -50,18 +50,13 @@ const Layout = () => {
   const showSearchbar = !isAdminPath && !isRecordsPage;
 
   return (
-    <> 
-      {/* Header is shown on all pages */}
+    <div className={isAdminPath ? undefined : 'app-frame'}>
       <Header />
-      
-      {/* Search bar only shown on appropriate pages */}
       {showSearchbar && <Searchbar />}
-      
-      {/* Content with different styling based on whether searchbar is shown */}
-      <main id="main-content" className={showSearchbar ? "main-content" : "main-content-no-search"}>
+      <main id="main-content" className={showSearchbar ? 'main-content' : 'main-content-no-search'}>
         <AppRoutes />
       </main>
-    </>
+    </div>
   );
 };
 

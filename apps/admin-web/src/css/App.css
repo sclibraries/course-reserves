@@ -7,10 +7,13 @@ html, body {
 
 #root {
   margin: 0 auto;
-  padding: 2rem;
   min-height: 100vh;      
   background-color: #fff; 
   box-sizing: border-box; 
+}
+
+.app-frame {
+  padding: 2rem;
 }
 
 .logo:hover {

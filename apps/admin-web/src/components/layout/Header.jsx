@@ -19,6 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import useUnreadMessages from '../../hooks/useUnreadMessages';
 import '../../css/Header.css';
 import LoginButton from '../ui/LoginButton';
+import { ADMIN_HEADER_HEIGHT } from './adminLayoutConstants';
 
 /**
  * Calculates whether text on a background should be light or dark
@@ -147,7 +148,7 @@ function Header() {
         className="shadow-sm"
         style={{
           backgroundColor: headerBgColor,
-          minHeight: '70px',
+          minHeight: isAdminPath ? ADMIN_HEADER_HEIGHT : '70px',
         }}
       >
         <div className="container-fluid d-flex justify-content-between align-items-center">

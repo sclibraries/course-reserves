@@ -7,8 +7,9 @@ import { page } from '@vitest/browser/context';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../../pages/adminTabRegistry';
 import AdminLayout from '../../../layout/AdminLayout';
-import { ADMIN_HEADER_HEIGHT } from '../../../layout/adminLayoutConstants';
+import Header from '../../../layout/Header';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
+import '../../../css/App.css';
 import SubmissionPage from './SubmissionPage';
 import ItemWorkPane from './item-pane/ItemWorkPane';
 import { createLinkingState } from './SubmissionPage.testUtils';
@@ -37,6 +38,9 @@ vi.mock('../../../../services/admin/submissionSyllabiService', async (importOrig
     downloadOriginal: mocks.downloadOriginal,
   },
 }));
+vi.mock('../../../../contexts/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: false, user: null }) }));
+vi.mock('../../../../hooks/useUnreadMessages', () => ({ default: () => ({ unreadCount: 0 }) }));
+vi.mock('../../../ui/LoginButton', () => ({ default: () => null }));
 vi.mock('../../../../hooks/admin/useAdminNavigation', async (importOriginal) => {
   const original = await importOriginal();
   const { useState } = await import('react');
@@ -171,14 +175,16 @@ PageContent.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
 
 function WorkbenchShell({ folders }) {
   return (
-    <div>
-      <div data-testid="header-spacer" style={{ height: ADMIN_HEADER_HEIGHT }} />
-      <Routes>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/submissions/:submissionId" element={<PageContent folders={folders} />} />
-        </Route>
-      </Routes>
-    </div>
+    <>
+      <Header />
+      <main id="main-content" className="main-content-no-search">
+        <Routes>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/submissions/:submissionId" element={<PageContent folders={folders} />} />
+          </Route>
+        </Routes>
+      </main>
+    </>
   );
 }
 
@@ -197,6 +203,7 @@ describe('SubmissionPage workbench in Chromium', () => {
 
   async function mountWorkbench(folders = screenshotFolders) {
     container = document.createElement('div');
+    container.id = 'root';
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => root.render(
@@ -217,7 +224,7 @@ describe('SubmissionPage workbench in Chromium', () => {
 
   function expectMutedAreaCoversViewportBelowHeader(width) {
     const content = container.querySelector('[data-testid="admin-layout-content"]');
-    const headerHeight = container.querySelector('[data-testid="header-spacer"]').getBoundingClientRect().height;
+    const headerHeight = container.querySelector('header .navbar').getBoundingClientRect().height;
     expect(getComputedStyle(content).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
     expect(content.getBoundingClientRect().height, `${width}px muted area height`)
       .toBeGreaterThanOrEqual(window.innerHeight - headerHeight);
@@ -249,7 +256,7 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(mocks.itemFlow).toHaveBeenCalledTimes(1);
     await expectNoHorizontalOverflow([1280]);
     await expectNoAxeViolations(container);
-    await page.screenshot({ path: '../../../../../dist/test-results/AW-073-submission-1280.png' });
+    await page.screenshot({ path: '../../../../../dist/test-results/AW-074-admin-1280.png' });
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
