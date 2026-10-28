@@ -8,6 +8,7 @@ import Layout from '../../../layout/Layout';
 import '../../../../css/App.css';
 
 const mocks = vi.hoisted(() => ({
+  setCollege: vi.fn(),
   navigation: {
     counts: {},
     isCollapsed: true,
@@ -18,26 +19,41 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../layout/AppRoutes', async () => {
+  const { createElement } = await import('react');
   const { Route, Routes } = await import('react-router-dom');
   const { default: AdminLayout } = await import('../../../layout/AdminLayout');
 
   return {
     default: function TestRoutes() {
-      return (
-        <Routes>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route path="submissions/:submissionId" element={<div>Submission details</div>} />
-          </Route>
-          <Route path="/search" element={<div>Search results</div>} />
-        </Routes>
+      return createElement(
+        Routes,
+        null,
+        createElement(
+          Route,
+          { path: '/admin', element: createElement(AdminLayout) },
+          createElement(Route, {
+            path: 'submissions/:submissionId',
+            element: createElement('div', null, 'Submission details'),
+          }),
+        ),
+        createElement(Route, {
+          path: '/search',
+          element: createElement('div', null, 'Search results'),
+        }),
       );
     },
   };
 });
-vi.mock('../../../layout/Searchbar', () => ({ default: () => <div data-testid="searchbar" /> }));
+vi.mock('../../../layout/Searchbar', async () => {
+  const { createElement } = await import('react');
+  return { default: () => createElement('div', { 'data-testid': 'searchbar' }) };
+});
 vi.mock('../../../ui/LoginButton', () => ({ default: () => null }));
 vi.mock('../../../../contexts/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: false, user: null }) }));
-vi.mock('../../../../hooks/useUnreadMessages', () => ({ default: () => ({ unreadCount: 0 }) }));
+vi.mock('../../../../hooks/useUnreadMessages', () => {
+  const useUnreadMessages = () => ({ unreadCount: 0 });
+  return { default: useUnreadMessages, useUnreadMessages };
+});
 vi.mock('../../../../hooks/admin/useAdminNavigation', async (importOriginal) => ({
   ...await importOriginal(),
   useAdminNavigation: () => mocks.navigation,
@@ -48,7 +64,9 @@ vi.mock('../../../../store/customizationStore', () => ({
     getCustomizationForCollege: () => ({}),
   }),
 }));
-vi.mock('../../../../store/searchStore', () => ({ default: (selector) => selector({ setCollege: vi.fn() }) }));
+vi.mock('../../../../store/searchStore', () => ({
+  default: (selector) => selector({ setCollege: mocks.setCollege }),
+}));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -39,7 +39,10 @@ vi.mock('../../../../services/admin/submissionSyllabiService', async (importOrig
   },
 }));
 vi.mock('../../../../contexts/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: false, user: null }) }));
-vi.mock('../../../../hooks/useUnreadMessages', () => ({ default: () => ({ unreadCount: 0 }) }));
+vi.mock('../../../../hooks/useUnreadMessages', () => {
+  const useUnreadMessages = () => ({ unreadCount: 0 });
+  return { default: useUnreadMessages, useUnreadMessages };
+});
 vi.mock('../../../ui/LoginButton', () => ({ default: () => null }));
 vi.mock('../../../../hooks/admin/useAdminNavigation', async (importOriginal) => {
   const original = await importOriginal();
