@@ -18,14 +18,24 @@ export const NAV_COLLAPSED_KEY = 'admin-navigation-collapsed';
 export const ELECTRONIC_NAV_COLLAPSED_KEY = 'admin-navigation-electronic-collapsed';
 export const SUBMISSION_NAV_COLLAPSED_KEY = 'admin-navigation-submissions-collapsed';
 const SAVE_ERROR = 'Could not save your pinned pages. Your previous pins were restored.';
-const ROUTE_COLLAPSE_SETTINGS = [
-  { routePrefix: '/admin/electronic/', key: ELECTRONIC_NAV_COLLAPSED_KEY, defaultCollapsed: true },
-  { routePrefix: '/admin/submissions/', key: SUBMISSION_NAV_COLLAPSED_KEY, defaultCollapsed: true },
+const ROUTE_SETTINGS = [
+  {
+    routePrefix: '/admin/electronic/',
+    key: ELECTRONIC_NAV_COLLAPSED_KEY,
+    defaultCollapsed: true,
+    mutedBackground: false,
+  },
+  {
+    routePrefix: '/admin/submissions/',
+    key: SUBMISSION_NAV_COLLAPSED_KEY,
+    defaultCollapsed: true,
+    mutedBackground: true,
+  },
 ];
 
-function getRouteCollapseSettings(pathname) {
-  return ROUTE_COLLAPSE_SETTINGS.find(({ routePrefix }) => pathname.startsWith(routePrefix))
-    || { key: NAV_COLLAPSED_KEY, defaultCollapsed: false };
+export function getAdminNavigationRouteSettings(pathname) {
+  return ROUTE_SETTINGS.find(({ routePrefix }) => pathname.startsWith(routePrefix))
+    || { key: NAV_COLLAPSED_KEY, defaultCollapsed: false, mutedBackground: false };
 }
 
 function readCollapsed(key, defaultValue) {
@@ -58,8 +68,8 @@ export function useAdminNavigation() {
   const [statusMessage, setStatusMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   const savingRef = useRef(false);
-  const collapseSettings = getRouteCollapseSettings(location.pathname);
-  const { key: collapsedKey, defaultCollapsed } = collapseSettings;
+  const routeSettings = getAdminNavigationRouteSettings(location.pathname);
+  const { key: collapsedKey, defaultCollapsed } = routeSettings;
   const [isCollapsed, setIsCollapsed] = useState(() => readCollapsed(collapsedKey, defaultCollapsed));
   const previousCollapsedKey = useRef(collapsedKey);
 

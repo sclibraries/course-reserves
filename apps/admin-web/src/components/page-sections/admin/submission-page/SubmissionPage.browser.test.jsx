@@ -1,12 +1,13 @@
-import { act, useState } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, getByRole } from '@testing-library/dom';
 import { page } from '@vitest/browser/context';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../../pages/adminTabRegistry';
-import AdminNavigationSidebar from '../../../layout/admin-nav/AdminNavigationSidebar';
+import AdminLayout from '../../../layout/AdminLayout';
+import { ADMIN_HEADER_HEIGHT } from '../../../layout/adminLayoutConstants';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
 import SubmissionPage from './SubmissionPage';
 import ItemWorkPane from './item-pane/ItemWorkPane';
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   itemFlow: vi.fn(),
   getSyllabi: vi.fn().mockResolvedValue([]),
   downloadOriginal: vi.fn(),
+  navigation: null,
 }));
 
 vi.mock('../../../../hooks/admin/useItemFlow', () => ({
@@ -35,6 +37,17 @@ vi.mock('../../../../services/admin/submissionSyllabiService', async (importOrig
     downloadOriginal: mocks.downloadOriginal,
   },
 }));
+vi.mock('../../../../hooks/admin/useAdminNavigation', async (importOriginal) => {
+  const original = await importOriginal();
+  const { useState } = await import('react');
+  return {
+    ...original,
+    useAdminNavigation: () => {
+      const [isCollapsed, setCollapsed] = useState(true);
+      return { ...mocks.navigation, isCollapsed, setCollapsed };
+    },
+  };
+});
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,6 +61,21 @@ const registry = createAdminTabRegistry({
   isAdmin: true,
   canManageProxyAccess: true,
 });
+mocks.navigation = {
+  activeTab: 'submissions',
+  counts: { 'my-work': 2, submissions: 3, mentions: 4 },
+  isPinLimitReached: false,
+  isSaving: false,
+  pins: ['my-work'],
+  pinsLoaded: true,
+  pinnedTabs: [registry.tabs.find(({ key }) => key === 'my-work')],
+  resetPins: () => {},
+  saveError: '',
+  statusMessage: '',
+  tabRegistry: registry,
+  togglePin: () => {},
+  visibleGroups: getVisibleAdminGroups(registry),
+};
 const longUrl = `https://example.test/${'x'.repeat(179)}`;
 const longTitle = `Synthetic reserve reading ${'with descriptive words '.repeat(8)}${'unbroken'.repeat(10)}`;
 const longClaim = `Synthetic staff member ${'with a long display name '.repeat(5)}`;
@@ -142,29 +170,14 @@ function PageContent({ folders = screenshotFolders }) {
 PageContent.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
 
 function WorkbenchShell({ folders }) {
-  const [isCollapsed, setCollapsed] = useState(true);
-  const navigation = {
-    activeTab: 'submissions',
-    counts: { 'my-work': 2, submissions: 3, mentions: 4 },
-    isCollapsed,
-    setCollapsed,
-    isPinLimitReached: false,
-    isSaving: false,
-    pins: ['my-work'],
-    pinsLoaded: true,
-    pinnedTabs: [registry.tabs.find(({ key }) => key === 'my-work')],
-    resetPins: () => {},
-    saveError: '',
-    statusMessage: '',
-    tabRegistry: registry,
-    togglePin: () => {},
-    visibleGroups: getVisibleAdminGroups(registry),
-  };
-
   return (
-    <div className="tw-flex tw-min-w-0 tw-flex-col md:tw-flex-row">
-      <AdminNavigationSidebar navigation={navigation} />
-      <main className="tw-min-w-0 tw-flex-1 tw-px-4 tw-py-3"><PageContent folders={folders} /></main>
+    <div>
+      <div data-testid="header-spacer" style={{ height: ADMIN_HEADER_HEIGHT }} />
+      <Routes>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/submissions/:submissionId" element={<PageContent folders={folders} />} />
+        </Route>
+      </Routes>
     </div>
   );
 }
@@ -193,12 +206,21 @@ describe('SubmissionPage workbench in Chromium', () => {
     ));
   }
 
-  function expectPageBackgroundFitsViewport(width) {
-    const workbench = container.querySelector('[data-testid="submission-page-workbench"]');
-    expect(workbench.getBoundingClientRect().bottom, `${width}px background bottom`)
-      .toBeGreaterThanOrEqual(window.innerHeight - 12);
-    expect(document.documentElement.scrollHeight, `${width}px page scroll height`)
-      .toBeLessThanOrEqual(window.innerHeight);
+  function expectShortPageBackgroundFitsViewport(width) {
+    const content = container.querySelector('[data-testid="admin-layout-content"]');
+    expect(getComputedStyle(content).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(content.getBoundingClientRect().bottom, `${width}px muted area bottom`)
+      .toBeGreaterThanOrEqual(window.innerHeight - 1);
+    expect(document.documentElement.scrollHeight, `${width}px document height`)
+      .toBeLessThanOrEqual(window.innerHeight + 1);
+  }
+
+  function expectMutedAreaCoversViewportBelowHeader(width) {
+    const content = container.querySelector('[data-testid="admin-layout-content"]');
+    const headerHeight = container.querySelector('[data-testid="header-spacer"]').getBoundingClientRect().height;
+    expect(getComputedStyle(content).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(content.getBoundingClientRect().height, `${width}px muted area height`)
+      .toBeGreaterThanOrEqual(window.innerHeight - headerHeight);
   }
 
   it('keeps the workbench accessible and reflowed with collapsed and expanded navigation', async () => {
@@ -207,7 +229,7 @@ describe('SubmissionPage workbench in Chromium', () => {
 
     const nav = container.querySelector('[aria-label="Admin navigation panel"]');
     expect(nav.className).toContain('tw-w-16');
-    expectPageBackgroundFitsViewport(1280);
+    expectShortPageBackgroundFitsViewport(1280);
     expect(container.querySelectorAll('[data-item-row]')).toHaveLength(3);
     expect(Array.from(container.querySelectorAll('[data-item-group]'), (group) => group.dataset.itemGroup))
       .toEqual(['Core readings', 'Further reading']);
@@ -231,7 +253,7 @@ describe('SubmissionPage workbench in Chromium', () => {
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
-    expectPageBackgroundFitsViewport(1024);
+    expectShortPageBackgroundFitsViewport(1024);
     expect(nav.className).toContain('tw-w-72');
     const grid = container.querySelector('[data-testid="submission-workbench-grid"]');
     expect(getComputedStyle(grid).gridTemplateColumns.split(' ')[0]).toBe('260px');
@@ -241,9 +263,9 @@ describe('SubmissionPage workbench in Chromium', () => {
     await page.viewport(768, 900);
     expect(getByRole(container, 'button', { name: 'Back to list' })).toBeTruthy();
     await expectNoHorizontalOverflow([320, 768, 1280]);
-    for (const width of [320, 768, 1280]) {
+    for (const width of [320, 768]) {
       await page.viewport(width, 900);
-      expectPageBackgroundFitsViewport(width);
+      expectMutedAreaCoversViewportBelowHeader(width);
     }
   });
 

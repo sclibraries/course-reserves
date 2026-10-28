@@ -26,6 +26,7 @@ import {
   navigationPropType,
   tabPropType,
 } from './navigationPropTypes';
+import { ADMIN_HEADER_HEIGHT_STYLE } from '../adminLayoutConstants';
 
 function RailLink({ tab, counts }) {
   const count = getTabCount(tab.key, counts);
@@ -99,9 +100,10 @@ export default function AdminNavigationSidebar({ navigation }) {
       <TooltipProvider delayDuration={200}>
         <aside
           aria-label="Admin navigation panel"
-          className={`tw-sticky tw-top-20 tw-hidden tw-h-[calc(100vh-5rem)] tw-shrink-0 tw-flex-col tw-border-r tw-bg-card tw-transition-[width] md:tw-flex ${
+          className={`tw-sticky tw-top-[var(--admin-header-height)] tw-hidden tw-h-[calc(100vh-var(--admin-header-height))] tw-shrink-0 tw-flex-col tw-border-r tw-bg-card tw-transition-[width] md:tw-flex ${
             navigation.isCollapsed ? 'tw-w-16' : 'tw-w-72'
           }`}
+          style={ADMIN_HEADER_HEIGHT_STYLE}
         >
           {navigation.isCollapsed ? (
             <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col tw-items-center tw-gap-2 tw-overflow-y-auto tw-px-2 tw-py-3">

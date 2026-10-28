@@ -4,7 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 import ItemList from './ItemList';
 import SubmissionPageHeader from './SubmissionPageHeader';
 import WorkPane from './WorkPane';
-import './SubmissionPage.css';
 import {
   buildSubmissionItemGroups,
   countReadiness,
@@ -59,7 +58,7 @@ function SubmissionPage({
   };
 
   return (
-    <div className="submission-page-workbench tw-min-w-0 tw-space-y-3 tw-bg-muted/20 tw-p-2 sm:tw-p-4" data-testid="submission-page-workbench">
+    <div className="tw-min-w-0 tw-space-y-3 tw-p-2 sm:tw-p-4">
       <SubmissionPageHeader
         submission={submission}
         counts={counts}

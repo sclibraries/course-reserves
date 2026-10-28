@@ -43,7 +43,7 @@ vi.mock('../../services/admin/navPinsService', async (importOriginal) => {
 });
 
 import { renderHook } from './testUtils/renderHook';
-import { useAdminNavigation } from './useAdminNavigation';
+import { getAdminNavigationRouteSettings, useAdminNavigation } from './useAdminNavigation';
 
 const loadedPins = (pins, defaults = ['my-work', 'submissions']) => ({
   pins,
@@ -76,6 +76,12 @@ afterEach(() => {
 });
 
 describe('useAdminNavigation', () => {
+  it('marks only submission routes for the muted admin content background', () => {
+    expect(getAdminNavigationRouteSettings('/admin/submissions/31').mutedBackground).toBe(true);
+    expect(getAdminNavigationRouteSettings('/admin/electronic/500').mutedBackground).toBe(false);
+    expect(getAdminNavigationRouteSettings('/admin').mutedBackground).toBe(false);
+  });
+
   it('keeps only known and accessible saved pins visible and moves badge counts into the hook', async () => {
     mocks.auth = {
       user: { role: 'staff', permissions: ['manage_submissions'] },
