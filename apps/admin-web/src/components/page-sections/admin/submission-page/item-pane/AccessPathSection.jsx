@@ -71,7 +71,7 @@ function AccessPathSection({ item, currentUsername, flow, onChanged }) {
   };
 
   return (
-    <section aria-label="Access path" className="tw-min-w-0 tw-space-y-3 tw-rounded-md tw-border tw-p-3">
+    <section aria-label="Access path" className="tw-min-w-0 tw-space-y-3">
       <h3 className="tw-text-base tw-font-semibold">How will we get it?</h3>
       {item.accessPath && <p className="tw-text-sm">Current path: {ACCESS_PATH_LABELS[item.accessPath] || item.accessPath}</p>}
       <div className="tw-flex tw-min-w-0 tw-flex-col tw-gap-2 sm:tw-flex-row sm:tw-items-end">

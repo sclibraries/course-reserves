@@ -6,7 +6,7 @@ import SubmissionPageHeader from './SubmissionPageHeader';
 import WorkPane from './WorkPane';
 import {
   buildSubmissionItemGroups,
-  countSubmissionItems,
+  countReadiness,
   isItemDone,
 } from './submissionPageUtils';
 
@@ -30,7 +30,7 @@ function SubmissionPage({
     [folders, submission, unfolderedItems],
   );
   const items = useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const counts = useMemo(() => countSubmissionItems(items), [items]);
+  const counts = useMemo(() => countReadiness(items), [items]);
   const selectedItem = items.find((item) => String(item.id) === searchParams.get('item'))
     || items.find((item) => !isItemDone(item))
     || null;
@@ -58,7 +58,7 @@ function SubmissionPage({
   };
 
   return (
-    <div>
+    <div className="tw-min-w-0 tw-space-y-3 tw-bg-muted/20 tw-p-2 sm:tw-p-4" data-testid="submission-page-workbench">
       <SubmissionPageHeader
         submission={submission}
         counts={counts}
@@ -68,7 +68,7 @@ function SubmissionPage({
         onUnlock={onUnlock}
         linking={linking}
       />
-      <div className="tw-grid tw-grid-cols-1 tw-gap-4 lg:tw-grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="tw-grid tw-min-w-0 tw-grid-cols-1 tw-items-start tw-gap-3 lg:tw-grid-cols-[260px_minmax(0,1fr)]" data-testid="submission-workbench-grid">
         <aside
           className={`tw-min-w-0 ${isLinked && mobilePaneOpen ? 'tw-hidden lg:tw-block' : ''} ${isLinked ? '' : 'tw-pointer-events-none tw-rounded-lg tw-bg-muted/30 tw-p-2 tw-saturate-50'}`}
           data-testid="submission-item-list-pane"

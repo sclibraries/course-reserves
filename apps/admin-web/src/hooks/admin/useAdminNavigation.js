@@ -16,7 +16,17 @@ import {
 
 export const NAV_COLLAPSED_KEY = 'admin-navigation-collapsed';
 export const ELECTRONIC_NAV_COLLAPSED_KEY = 'admin-navigation-electronic-collapsed';
+export const SUBMISSION_NAV_COLLAPSED_KEY = 'admin-navigation-submissions-collapsed';
 const SAVE_ERROR = 'Could not save your pinned pages. Your previous pins were restored.';
+const ROUTE_COLLAPSE_SETTINGS = [
+  { routePrefix: '/admin/electronic/', key: ELECTRONIC_NAV_COLLAPSED_KEY, defaultCollapsed: true },
+  { routePrefix: '/admin/submissions/', key: SUBMISSION_NAV_COLLAPSED_KEY, defaultCollapsed: true },
+];
+
+function getRouteCollapseSettings(pathname) {
+  return ROUTE_COLLAPSE_SETTINGS.find(({ routePrefix }) => pathname.startsWith(routePrefix))
+    || { key: NAV_COLLAPSED_KEY, defaultCollapsed: false };
+}
 
 function readCollapsed(key, defaultValue) {
   try {
@@ -48,9 +58,9 @@ export function useAdminNavigation() {
   const [statusMessage, setStatusMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   const savingRef = useRef(false);
-  const isElectronicRoute = location.pathname.startsWith('/admin/electronic/');
-  const collapsedKey = isElectronicRoute ? ELECTRONIC_NAV_COLLAPSED_KEY : NAV_COLLAPSED_KEY;
-  const [isCollapsed, setIsCollapsed] = useState(() => readCollapsed(collapsedKey, isElectronicRoute));
+  const collapseSettings = getRouteCollapseSettings(location.pathname);
+  const { key: collapsedKey, defaultCollapsed } = collapseSettings;
+  const [isCollapsed, setIsCollapsed] = useState(() => readCollapsed(collapsedKey, defaultCollapsed));
   const previousCollapsedKey = useRef(collapsedKey);
 
   const permissions = user?.permissions || [];
@@ -113,11 +123,11 @@ export function useAdminNavigation() {
   useEffect(() => {
     if (previousCollapsedKey.current !== collapsedKey) {
       previousCollapsedKey.current = collapsedKey;
-      setIsCollapsed(readCollapsed(collapsedKey, isElectronicRoute));
+      setIsCollapsed(readCollapsed(collapsedKey, defaultCollapsed));
       return;
     }
     writeCollapsed(collapsedKey, isCollapsed);
-  }, [collapsedKey, isCollapsed, isElectronicRoute]);
+  }, [collapsedKey, defaultCollapsed, isCollapsed]);
 
   useEffect(() => {
     if (location.pathname !== '/admin') return;

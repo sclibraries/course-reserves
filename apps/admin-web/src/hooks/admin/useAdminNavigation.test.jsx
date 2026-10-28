@@ -161,7 +161,19 @@ describe('useAdminNavigation', () => {
     failedSaveHook.unmount();
   });
 
-  it('defaults electronic pages to collapsed and persists each route family separately', async () => {
+  it('defaults submission and electronic pages to collapsed and remembers each route family', async () => {
+    mocks.pathname = '/admin/submissions/31';
+    const submissionHook = await renderHook(() => useAdminNavigation(), {});
+
+    expect(submissionHook.current.isCollapsed).toBe(true);
+    await act(async () => submissionHook.current.setCollapsed(false));
+    expect(storage.get('admin-navigation-submissions-collapsed')).toBe('false');
+    submissionHook.unmount();
+
+    const rememberedSubmissionHook = await renderHook(() => useAdminNavigation(), {});
+    expect(rememberedSubmissionHook.current.isCollapsed).toBe(false);
+    rememberedSubmissionHook.unmount();
+
     mocks.pathname = '/admin/electronic/500';
     const hook = await renderHook(() => useAdminNavigation(), {});
 

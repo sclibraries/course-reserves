@@ -15,6 +15,16 @@ const mocks = vi.hoisted(() => ({
   overrideSubmissionLink: vi.fn(),
   unlinkSubmission: vi.fn(),
   recheckSubmission: vi.fn(),
+  getSyllabi: vi.fn().mockResolvedValue([]),
+  downloadOriginal: vi.fn(),
+}));
+
+vi.mock('../../../../../services/admin/submissionSyllabiService', async (importOriginal) => ({
+  ...await importOriginal(),
+  submissionSyllabiService: {
+    getSyllabi: mocks.getSyllabi,
+    downloadOriginal: mocks.downloadOriginal,
+  },
 }));
 
 vi.mock('../../../../../services/admin/submissionWorkflowService', () => ({
@@ -40,6 +50,7 @@ import LinkingStep from './LinkingStep';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const submission = {
+  id: 31,
   uuid: 'synthetic-uuid',
   courseCode: 'afr 155',
   courseTitle: 'African Studies',
@@ -85,7 +96,7 @@ function Harness({ record = submission, items = [] }) {
     <main>
       <SubmissionPageHeader
         submission={record}
-        counts={{ total: 1, todo: 1, inProgress: 0, done: 0 }}
+        counts={{ total: 1, ready: 0 }}
         isLinked={isLinked}
         onBack={vi.fn()}
         onLock={vi.fn()}
@@ -204,7 +215,7 @@ describe('submission linking step', () => {
     const view = await renderLinking({
       record: { ...submission, linkState: 'linked', folioCourseListingId: 'folio-listing-1' },
     });
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Change' })));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Change link' })));
 
     expect(screen.getByRole('dialog', { name: 'Change linked course' })).toBeTruthy();
     expect(screen.getByRole('cell', { name: /AFR155/ })).toBeTruthy();
@@ -216,7 +227,7 @@ describe('submission linking step', () => {
     await expectAccessible();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Confirm unlink' })));
     expect(mocks.unlinkSubmission).toHaveBeenCalledWith('synthetic-uuid', { reason: 'Wrong section' });
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change' })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change link' })));
     view.unmount();
   });
 
@@ -238,7 +249,7 @@ describe('submission linking step', () => {
       record: { ...submission, linkState: 'linked', folioCourseListingId: 'folio-listing-1' },
       items: [{ status: 'available_online', materializedAt: '2026-10-16T12:00:00Z' }],
     });
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Change' })));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Change link' })));
     const dialog = screen.getByRole('dialog', { name: 'Change linked course' });
     expect(dialog.textContent).toContain('Unlink is unavailable after items have been published.');
     expect(screen.queryByRole('button', { name: 'Unlink' })).toBeNull();

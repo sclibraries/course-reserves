@@ -167,7 +167,7 @@ export function formatSubmissionDetail(response) {
       courseTitle: response.course_title,
       section: response.section || '',
       term: response.term_code,
-      facultyName: response.faculty_display_name,
+      facultyName: response.faculty_display_name || response.shibboleth_user_id,
       facultyId: response.shibboleth_user_id,
       proxyName: response.proxy_display_name,
       proxyId: response.proxy_shibboleth_user_id,

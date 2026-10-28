@@ -13,7 +13,7 @@ import DetailsTab from './DetailsTab';
 import HistoryTab from './HistoryTab';
 import TakeoverDialog from './TakeoverDialog';
 
-const itemTabClass = 'tw-min-w-0 tw-whitespace-normal tw-break-words tw-px-1 tw-text-center tw-text-xs tw-leading-tight sm:tw-whitespace-nowrap sm:tw-px-3 sm:tw-text-sm';
+const itemTabClass = 'tw-min-w-0 tw-whitespace-normal tw-break-words tw-rounded-none tw-border-b-2 tw-border-transparent tw-bg-transparent tw-px-2 tw-py-2 tw-text-center tw-text-xs tw-leading-tight tw-shadow-none data-[state=active]:tw-border-primary data-[state=active]:tw-bg-transparent data-[state=active]:tw-text-foreground data-[state=active]:tw-shadow-none sm:tw-text-sm';
 
 function ItemWorkPane({ item, submission, currentUsername = '', onChanged, onGoToWork, onReopen }) {
   const [activeTab, setActiveTab] = useState('process');
@@ -38,37 +38,39 @@ function ItemWorkPane({ item, submission, currentUsername = '', onChanged, onGoT
       <ItemPaneHeader item={item} currentUsername={currentUsername} claims={claims} />
       <HandoffDialog claims={claims} title={item.title || 'item'} />
       <TakeoverDialog claims={claims} title={item.title || 'item'} />
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="tw-min-w-0">
-        <TabsList className="tw-grid tw-h-auto tw-w-full tw-grid-cols-2 sm:tw-grid-cols-4">
-          <TabsTrigger value="process" className={itemTabClass}>Process</TabsTrigger>
-          <TabsTrigger value="messages" className={itemTabClass}>Messages ({unreadCount} unread)</TabsTrigger>
-          <TabsTrigger value="details" className={itemTabClass}>Details</TabsTrigger>
-          <TabsTrigger value="history" className={itemTabClass}>History</TabsTrigger>
-        </TabsList>
-        <TabsContent value="process" className="tw-min-w-0">
-          <ProcessTab
-            item={item}
-            currentUsername={currentUsername}
-            flow={flow}
-            switchFlow={switchFlow}
-            onGoToWork={onGoToWork}
-            onReopen={onReopen}
-            onChanged={onChanged}
-          />
-        </TabsContent>
-        <TabsContent value="messages" className="tw-min-w-0">
-          <MessagesTab item={item} submission={submission} onChanged={onChanged} />
-        </TabsContent>
-        <TabsContent value="details" className="tw-min-w-0">
-          <DetailsTab item={item} />
-        </TabsContent>
-        <TabsContent value="history" className="tw-min-w-0">
-          <HistoryTab
-            flowHistory={flow.flowState?.history || []}
-            timeline={{ ...timeline, title: item.title, kind: item.kind, itemId: item.id }}
-          />
-        </TabsContent>
-      </Tabs>
+      <section aria-label="Item processing" className="tw-min-w-0 tw-rounded-lg tw-border tw-bg-card tw-p-3 sm:tw-p-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="tw-min-w-0">
+          <TabsList aria-label="Item sections" className="tw-grid tw-h-auto tw-w-full tw-grid-cols-2 tw-justify-start tw-gap-x-3 tw-rounded-none tw-border-b tw-bg-transparent tw-p-0 lg:tw-flex">
+            <TabsTrigger value="process" className={itemTabClass}>Process</TabsTrigger>
+            <TabsTrigger value="messages" className={itemTabClass}>Messages ({unreadCount} unread)</TabsTrigger>
+            <TabsTrigger value="details" className={itemTabClass}>Details</TabsTrigger>
+            <TabsTrigger value="history" className={itemTabClass}>History</TabsTrigger>
+          </TabsList>
+          <TabsContent value="process" className="tw-min-w-0 tw-mt-4">
+            <ProcessTab
+              item={item}
+              currentUsername={currentUsername}
+              flow={flow}
+              switchFlow={switchFlow}
+              onGoToWork={onGoToWork}
+              onReopen={onReopen}
+              onChanged={onChanged}
+            />
+          </TabsContent>
+          <TabsContent value="messages" className="tw-min-w-0 tw-mt-4">
+            <MessagesTab item={item} submission={submission} onChanged={onChanged} />
+          </TabsContent>
+          <TabsContent value="details" className="tw-min-w-0 tw-mt-4">
+            <DetailsTab item={item} />
+          </TabsContent>
+          <TabsContent value="history" className="tw-min-w-0 tw-mt-4">
+            <HistoryTab
+              flowHistory={flow.flowState?.history || []}
+              timeline={{ ...timeline, title: item.title, kind: item.kind, itemId: item.id }}
+            />
+          </TabsContent>
+        </Tabs>
+      </section>
     </section>
   );
 }

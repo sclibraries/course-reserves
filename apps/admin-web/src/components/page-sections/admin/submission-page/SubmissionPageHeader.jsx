@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { ArrowLeft } from 'lucide-react';
 import { Badge } from '../../../ui/badge';
 import { Button } from '../../../ui/button';
 import ChangeLinkedCourseDialog from './linking/ChangeLinkedCourseDialog';
@@ -28,47 +29,40 @@ function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, on
   };
 
   return (
-    <header className="tw-mb-4 tw-rounded-lg tw-border tw-bg-card tw-p-5 tw-shadow-sm">
-      <Button variant="link" className="tw-mb-2 tw-h-auto tw-p-0" onClick={onBack}>
-        Back to Queue
+    <header className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-x-3 tw-gap-y-2 tw-rounded-lg tw-border tw-bg-card tw-p-3">
+      <Button type="button" variant="ghost" size="icon" className="tw-h-8 tw-w-8 tw-shrink-0" aria-label="Back to Queue" onClick={onBack}>
+        <ArrowLeft aria-hidden="true" />
       </Button>
-      <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-4">
-        <div className="tw-min-w-0">
-          <h1 className="tw-text-2xl tw-font-semibold">
-            {submission.courseCode} {submission.section && `· ${submission.section}`}: {submission.courseTitle}
-          </h1>
-          <dl className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-x-5 tw-gap-y-1 tw-text-sm tw-text-muted-foreground">
-            <div><dt className="tw-inline tw-font-medium tw-text-foreground">Term: </dt><dd className="tw-inline">{submission.term}</dd></div>
-            <div><dt className="tw-inline tw-font-medium tw-text-foreground">Section: </dt><dd className="tw-inline">{submission.section || '—'}</dd></div>
-            <div><dt className="tw-inline tw-font-medium tw-text-foreground">Submitted: </dt><dd className="tw-inline">{formatDate(submission.submittedAt)}</dd></div>
-            <div><dt className="tw-inline tw-font-medium tw-text-foreground">Faculty: </dt><dd className="tw-inline">{submission.facultyName}</dd></div>
-          </dl>
-        </div>
-        <div className="tw-flex tw-flex-wrap tw-items-center tw-gap-2">
-          {isLinked ? (
-            <Badge variant="secondary" className="tw-bg-emerald-100 tw-text-emerald-800">
-              ✓ Linked to FOLIO {course}
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="tw-bg-amber-100 tw-text-amber-900">Needs linking</Badge>
-          )}
-          {isLinked && (
-            <Button ref={changeTriggerRef} variant="link" className="tw-h-auto tw-p-0" onClick={() => handleChangeOpen(true)}>Change</Button>
-          )}
-          <SubmissionActivitySheet linking={linking} />
-          <SubmissionSyllabusSheet submissionId={submission.id} />
-        </div>
+      <div className="tw-flex tw-min-w-0 tw-flex-1 tw-flex-wrap tw-items-center tw-gap-x-3 tw-gap-y-1">
+        <h1 className="tw-min-w-0 tw-break-words tw-text-lg tw-font-semibold">
+          {course} · {submission.courseTitle || 'Untitled course'}
+        </h1>
+        <p className="tw-break-words tw-text-sm tw-text-muted-foreground">
+          {[submission.term, submission.facultyName, formatDate(submission.submittedAt)].filter(Boolean).join(' · ')}
+        </p>
+        {isLinked ? (
+          <Badge variant="secondary">Linked to FOLIO {course}</Badge>
+        ) : (
+          <Badge variant="outline">Needs linking</Badge>
+        )}
+        <Badge variant="outline" role="status" aria-label="Submission readiness">
+          {counts.ready}/{counts.total} ready
+        </Badge>
+        {submission.isLocked && (
+          <p role="status" className="tw-mt-1 tw-break-words tw-text-xs tw-text-muted-foreground">{formatLockNotice(submission)}</p>
+        )}
       </div>
-      <p className="tw-mt-4 tw-text-sm" aria-label="Submission item counts">
-        {counts.total} items · {counts.todo} to do · {counts.inProgress} in progress · {counts.done} done
-      </p>
-      <div className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-3">
-        <Button variant="outline" size="sm" onClick={submission.isLocked ? onUnlock : onLock}>
+      <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-2">
+        <SubmissionActivitySheet linking={linking} />
+        {isLinked && (
+          <Button ref={changeTriggerRef} type="button" variant="outline" size="sm" onClick={() => handleChangeOpen(true)}>
+            Change link
+          </Button>
+        )}
+        <SubmissionSyllabusSheet submissionId={submission.id} />
+        <Button type="button" variant="outline" size="sm" onClick={submission.isLocked ? onUnlock : onLock}>
           {submission.isLocked ? 'Unlock' : 'Lock & process'}
         </Button>
-        {submission.isLocked && (
-          <p role="status" className="tw-text-sm tw-text-muted-foreground">{formatLockNotice(submission)}</p>
-        )}
       </div>
       {isLinked && (
         <ChangeLinkedCourseDialog
@@ -85,7 +79,7 @@ function SubmissionPageHeader({ submission, counts, isLinked, onBack, onLock, on
 
 SubmissionPageHeader.propTypes = {
   submission: PropTypes.object.isRequired,
-  counts: PropTypes.shape({ total: PropTypes.number, todo: PropTypes.number, inProgress: PropTypes.number, done: PropTypes.number }).isRequired,
+  counts: PropTypes.shape({ total: PropTypes.number, ready: PropTypes.number }).isRequired,
   isLinked: PropTypes.bool.isRequired,
   onBack: PropTypes.func.isRequired,
   onLock: PropTypes.func.isRequired,

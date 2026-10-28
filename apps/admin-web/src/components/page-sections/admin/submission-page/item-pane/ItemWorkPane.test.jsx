@@ -47,6 +47,8 @@ const item = {
   claimed_by: 'test-api078-staff',
   claimed_by_display: 'Test Owner',
   authors: 'Synthetic Author',
+  materialType: 'Print book',
+  readiness: 'missing',
   publicationYear: '2026',
   doi: '10.1000/aw059',
   issn: '1234-5678',
@@ -561,6 +563,20 @@ describe('ItemWorkPane process and history', () => {
 });
 
 describe('ItemWorkPane messages and details', () => {
+  it('shows author, format, readiness, claim, and the full record in the item card', async () => {
+    const { container: pane } = await renderPane();
+    const actions = getByRole(pane, 'group', { name: 'Item claim actions' });
+
+    expect(getByRole(pane, 'heading', { name: 'Synthetic item' })).toBeTruthy();
+    expect(getByText(pane, 'Synthetic Author')).toBeTruthy();
+    expect(getByText(pane, '· Print book')).toBeTruthy();
+    expect(getByText(pane, 'Missing')).toBeTruthy();
+    expect(getByText(pane, 'You')).toBeTruthy();
+    expect(getByRole(actions, 'button', { name: 'Release Synthetic item' })).toBeTruthy();
+    expect(getByRole(pane, 'link', { name: /View full record/ }).getAttribute('href'))
+      .toBe('https://search.ebscohost.com/record/synthetic-aw059');
+  });
+
   it('shows unread count, item messages, reply, and new-message actions', async () => {
     const { user } = await renderPane();
     const messagesTab = getByRole(container, 'tab', { name: 'Messages (1 unread)' });

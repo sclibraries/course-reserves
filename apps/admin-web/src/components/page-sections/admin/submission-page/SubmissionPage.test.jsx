@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fireEvent, screen, waitFor } from '@testing-library/dom';
+import { fireEvent, screen, waitFor, within } from '@testing-library/dom';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
@@ -303,7 +303,7 @@ describe('SubmissionPage', () => {
     const grid = view.container.querySelector('.tw-grid');
     const workPane = view.container.querySelector('[data-testid="submission-work-pane"]');
 
-    expect(grid.className).toContain('lg:tw-grid-cols-[minmax(0,2fr)_minmax(0,3fr)]');
+    expect(grid.className).toContain('lg:tw-grid-cols-[260px_minmax(0,1fr)]');
     expect(view.container.querySelector('[data-testid="submission-item-list-pane"]').className).toContain('tw-min-w-0');
     expect(workPane.parentElement.className).toContain('tw-min-w-0');
     expect(workPane.className).toContain('tw-break-words');
@@ -317,8 +317,7 @@ describe('SubmissionPage', () => {
       .toEqual(['Zeta', 'Alpha', 'Not in a folder']);
     expect(view.container.textContent).toContain('ENG 101');
     expect(view.container.textContent).toContain('Synthetic Literature');
-    expect(view.container.textContent).toContain('Section: 01');
-    expect(view.container.textContent).toContain('Book · Purchase request · Request purchase');
+    expect(screen.getByRole('heading', { name: 'ENG 101-01 · Synthetic Literature' })).toBeTruthy();
     expect(view.container.textContent).toContain('You');
     expect(view.container.textContent).toContain('Other Staff');
     expect(view.container.textContent).toContain('Cataloguing');
@@ -326,17 +325,36 @@ describe('SubmissionPage', () => {
     expect(view.container.textContent).toContain('Done');
   });
 
-  it('shows detail flow and readiness without requesting a flow for each row', async () => {
+  it('shows readiness details without requesting a flow for each row', async () => {
     view = await renderPage();
 
-    expect(screen.getByText('2 of 5 ready')).toBeTruthy();
-    expect(view.container.textContent).toContain('Ready: 2 · In progress: 0 · Missing: 2 · Unknown: 1');
-    expect(screen.getAllByText('Missing')).toHaveLength(2);
-    expect(view.container.querySelector('[data-item-row="11"]').textContent)
-      .toContain('Book · Purchase request · Request purchase');
-    expect(view.container.querySelector('[data-item-select="11"]').getAttribute('aria-description'))
-      .toBe('Readiness: Missing. No Five College copy found');
+    expect(screen.getByRole('status', { name: 'Submission readiness' }).textContent).toBe('2/5 ready');
+    expect(screen.getAllByRole('img', { name: 'Missing' })).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Select Mine next' }).getAttribute('aria-description'))
+      .toBe('Readiness: Missing. No Five College copy found. Claim: You.');
     expect(mocks.itemFlow).not.toHaveBeenCalled();
+  });
+
+  it('shows each claim label as a line in its selectable row', async () => {
+    view = await renderPage();
+
+    expect(within(screen.getByRole('button', { name: /Select Mine next/ })).getByText('You')).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Select Other staff/ })).getByText('Other Staff')).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Select Unclaimed item/ })).getByText('Unclaimed')).toBeTruthy();
+  });
+
+  it('labels readiness icons and repeats those labels in the legend', async () => {
+    const props = pageProps();
+    props.folders[1].items[0].readiness = 'in_progress';
+    view = await renderPage(props);
+
+    const legend = screen.getByRole('group', { name: 'Readiness legend' });
+    for (const label of ['Ready', 'In progress', 'Missing', 'Unknown']) {
+      expect(within(legend).getByRole('img', { name: label })).toBeTruthy();
+      expect(within(legend).getByText(label)).toBeTruthy();
+    }
+    expect(within(view.container.querySelector('[data-item-row="14"]')).getByRole('img', { name: 'In progress' })).toBeTruthy();
+    expect(within(view.container.querySelector('[data-item-row="12"]')).getByRole('img', { name: 'Unknown' })).toBeTruthy();
   });
 
   it('shows and counts In progress without including it in Not ready', async () => {
@@ -344,9 +362,9 @@ describe('SubmissionPage', () => {
     props.folders[1].items[0].readiness = 'in_progress';
     view = await renderPage(props);
 
-    expect(view.container.textContent).toContain('Ready: 1 · In progress: 1 · Missing: 2 · Unknown: 1');
+    expect(screen.getByRole('status', { name: 'Submission readiness' }).textContent).toBe('1/5 ready');
     expect(screen.getByRole('button', { name: 'Not ready (3)' })).toBeTruthy();
-    expect(screen.getAllByText('In progress')).toHaveLength(1);
+    expect(screen.getAllByRole('img', { name: 'In progress' })).toHaveLength(2);
 
     await click(screen.getByRole('button', { name: 'Not ready (3)' }));
     expect(rowIds(view.container)).toEqual(['11', '12', '13']);
@@ -364,25 +382,25 @@ describe('SubmissionPage', () => {
 
   it('filters items and shows each filter count', async () => {
     view = await renderPage();
-    expect(view.container.textContent).toContain('All (5)');
-    expect(view.container.textContent).toContain('Mine (1)');
-    expect(view.container.textContent).toContain('Unclaimed (1)');
-    expect(view.container.textContent).toContain('Done (1)');
+    for (const name of ['All (5)', 'Mine (1)', 'Unclaimed (1)', 'Done (1)']) {
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+    }
 
-    await click(Array.from(view.container.querySelectorAll('button')).find((button) => button.textContent.includes('Mine (1)')));
+    await click(screen.getByRole('button', { name: 'Mine (1)' }));
     expect(rowIds(view.container)).toEqual(['11']);
   });
 
   it('uses the item query parameter for selection and keeps it through rerenders', async () => {
     view = await renderPage(pageProps(), '/admin/submissions/31?item=12');
-    expect(view.container.querySelector('[data-item-select="12"]').getAttribute('aria-pressed')).toBe('true');
+    const selected = screen.getByRole('button', { name: /Select Other staff/ });
+    expect(selected.getAttribute('aria-current')).toBe('true');
 
-    await click(view.container.querySelector('[data-item-select="13"]'));
+    await click(screen.getByRole('button', { name: /Select Unclaimed item/ }));
     expect(view.container.querySelector('[data-testid="location-search"]').textContent).toBe('?item=13');
     await view.rerender();
 
     expect(view.container.querySelector('[data-testid="location-search"]').textContent).toBe('?item=13');
-    expect(view.container.querySelector('[data-item-select="13"]').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: /Select Unclaimed item/ }).getAttribute('aria-current')).toBe('true');
   });
 
   it('defaults to the first not-done item and writes that selection into the URL', async () => {
@@ -395,7 +413,7 @@ describe('SubmissionPage', () => {
   it('shows Back to list in the narrow work pane and returns to the list', async () => {
     view = await renderPage();
     await click(view.container.querySelector('[data-item-select="12"]'));
-    const backButton = Array.from(view.container.querySelectorAll('button')).find((button) => button.textContent.includes('Back to list'));
+    const backButton = screen.getByRole('button', { name: 'Back to list' });
 
     expect(backButton).toBeTruthy();
     expect(backButton.className).toContain('lg:tw-hidden');
@@ -410,7 +428,7 @@ describe('SubmissionPage', () => {
     view = await renderPage(props);
 
     const listPane = view.container.querySelector('[data-testid="submission-item-list-pane"]');
-    const itemButtons = Array.from(listPane.querySelectorAll('button[aria-label^="Select "]'));
+    const itemButtons = within(listPane).getAllByRole('button', { name: /^Select / });
     expect(itemButtons.length).toBeGreaterThan(0);
     expect(itemButtons.every((button) => button.disabled)).toBe(true);
     expect(listPane.className).toContain('tw-bg-muted/30');
@@ -422,7 +440,7 @@ describe('SubmissionPage', () => {
   it('claims all items through the existing API and refreshes the submission', async () => {
     const props = pageProps();
     view = await renderPage(props);
-    await click(Array.from(view.container.querySelectorAll('button')).find((button) => button.textContent.includes('Claim all')));
+    await click(screen.getByRole('button', { name: 'Claim all' }));
 
     expect(mocks.claimAllItems).toHaveBeenCalledWith('synthetic-submission');
     expect(props.onChanged).toHaveBeenCalled();

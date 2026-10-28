@@ -1,20 +1,22 @@
 import { formatSubmissionClaimItems } from '../../../../services/admin/workflowClaims/claimsFormatters';
+import { CircleCheck, CircleDashed, CircleHelp, CircleX } from 'lucide-react';
 
 const DONE_STATUSES = new Set(['complete', 'unavailable', 'withdrawn']);
-const READINESS_STATES = new Set(['ready', 'in_progress', 'missing', 'unknown']);
+const READINESS_PRESENTATIONS = {
+  ready: { label: 'Ready', Icon: CircleCheck, variant: 'secondary' },
+  in_progress: { label: 'In progress', Icon: CircleDashed, variant: 'outline' },
+  missing: { label: 'Missing', Icon: CircleX, variant: 'destructive' },
+  unknown: { label: 'Unknown', Icon: CircleHelp, variant: 'outline' },
+};
+const READINESS_STATES = new Set(Object.keys(READINESS_PRESENTATIONS));
 const NOT_READY_STATES = new Set(['missing', 'unknown']);
-export const READINESS_LABELS = {
-  ready: 'Ready',
-  in_progress: 'In progress',
-  missing: 'Missing',
-  unknown: 'Unknown',
-};
-export const READINESS_VARIANTS = {
-  ready: 'secondary',
-  in_progress: 'outline',
-  missing: 'destructive',
-  unknown: 'outline',
-};
+export const READINESS_STATUSES = Object.keys(READINESS_PRESENTATIONS);
+export const READINESS_LABELS = Object.fromEntries(
+  Object.entries(READINESS_PRESENTATIONS).map(([status, presentation]) => [status, presentation.label]),
+);
+export const READINESS_VARIANTS = Object.fromEntries(
+  Object.entries(READINESS_PRESENTATIONS).map(([status, presentation]) => [status, presentation.variant]),
+);
 
 function itemKey(item) {
   return `${item.kind || (item.isReuse ? 'reuse' : 'new')}/${item.id}`;
@@ -33,8 +35,15 @@ export function getReadinessStatus(item) {
   return READINESS_STATES.has(item.readiness) ? item.readiness : 'unknown';
 }
 
+export function getReadinessPresentation(itemOrStatus) {
+  const status = typeof itemOrStatus === 'string' && READINESS_STATES.has(itemOrStatus)
+    ? itemOrStatus
+    : getReadinessStatus(itemOrStatus);
+  return { status, ...READINESS_PRESENTATIONS[status] };
+}
+
 export function getReadinessLabel(status) {
-  return READINESS_LABELS[status] || READINESS_LABELS.unknown;
+  return getReadinessPresentation(status).label;
 }
 
 export function countReadiness(items) {

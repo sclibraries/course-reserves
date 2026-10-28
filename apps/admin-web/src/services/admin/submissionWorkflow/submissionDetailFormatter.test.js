@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { formatSubmissionDetail } from './submissionDetailFormatter';
 
 describe('formatSubmissionDetail EDS fields', () => {
+  it('uses the faculty username when the display name is missing', () => {
+    const result = formatSubmissionDetail({
+      faculty_display_name: '',
+      shibboleth_user_id: 'test-faculty-a',
+      newResources: [],
+      communications: [],
+    });
+
+    expect(result.submission.facultyName).toBe('test-faculty-a');
+  });
+
   it('preserves readiness and flow summaries from the submission detail', () => {
     const flow = {
       name: 'Synthetic purchase flow',
