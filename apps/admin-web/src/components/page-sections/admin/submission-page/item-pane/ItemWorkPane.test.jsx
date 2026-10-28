@@ -196,7 +196,7 @@ describe('ItemWorkPane claim actions', () => {
     const { container: pane } = await renderPane({ item: { ...item, claimed_by: null } });
 
     expect(getByRole(pane, 'button', { name: 'Claim Synthetic item' })).toBeTruthy();
-    expect(getByText(pane, 'Use the claim controls above to claim this item.')).toBeTruthy();
+    expect(getByRole(pane, 'status').textContent).toContain('Claim this item to work on it');
     expect(queryByRole(pane, 'button', { name: 'Release Synthetic item' })).toBeNull();
     expect(queryByRole(pane, 'button', { name: 'Hand off Synthetic item' })).toBeNull();
     expect(queryByRole(pane, 'button', { name: 'Take over Synthetic item' })).toBeNull();
@@ -340,20 +340,6 @@ describe('ItemWorkPane process and history', () => {
     }));
   });
 
-  it('disables access path controls when another person holds the claim and explains why', async () => {
-    const { container: pane } = await renderPane({ item: {
-      ...item,
-      claimed_by: 'test-api078-owner',
-      readiness: 'missing',
-      allowedAccessPaths: ['purchase'],
-    } });
-    const section = getByRole(pane, 'region', { name: 'Access path' });
-
-    expect(getByRole(section, 'combobox', { name: 'Access path' }).disabled).toBe(true);
-    expect(getByRole(section, 'button', { name: 'Save access path' }).disabled).toBe(true);
-    expect(getByRole(section, 'status').textContent).toContain('Only the staff member who holds the claim can set the access path.');
-  });
-
   it.each([
     ['no_flow_mapped', 'No workflow is set up for this path yet; ask an admin to map it.'],
     ['no_group_mapped', 'No group is set up for this path yet; ask an admin to map it.'],
@@ -387,9 +373,16 @@ describe('ItemWorkPane process and history', () => {
   });
 
   it('shows the flow question and posts the selected outcome', async () => {
-    const { user } = await renderPane();
+    const { user } = await renderPane({ item: {
+      ...item,
+      readiness: 'missing',
+      allowedAccessPaths: ['purchase'],
+    } });
 
-    expect(getByRole(container, 'heading', { name: 'Do we own it?' })).toBeTruthy();
+    const question = getByRole(container, 'heading', { name: 'Do we own it?' });
+    const accessPathHeading = getByRole(container, 'heading', { name: 'How will we get it?' });
+    expect(question.compareDocumentPosition(accessPathHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(getByRole(container, 'combobox', { name: 'Access path' }).disabled).toBe(false);
     expect(getByText(container, 'Check the catalog.')).toBeTruthy();
     expect(getByRole(container, 'button', { name: 'Yes' }).className).toContain('tw-bg-primary');
     expect(getByRole(container, 'button', { name: 'No' }).className).toContain('tw-border-input');
@@ -440,12 +433,66 @@ describe('ItemWorkPane process and history', () => {
     }));
   });
 
-  it('disables outcomes when the current staff member does not hold the claim', async () => {
+  it('shows one claim notice and read-only step details until an unclaimed item is claimed', async () => {
+    mocks.getItemFlow.mockResolvedValueOnce(flowState({ current_step: { step: {
+      key: 'order', kind: 'action', label: 'Order a copy', help_text: 'Contact the supplier.',
+      outcomes: [{ key: 'done', label: 'Ordered', next: { step: 'confirm' }, reason_required: false }],
+    } } }));
+    const { container: pane, user } = await renderPane({ item: {
+      ...item,
+      claimed_by: null,
+      claimed_by_display: null,
+      readiness: 'missing',
+      accessPath: 'purchase',
+      allowedAccessPaths: ['purchase'],
+    } });
+
+    const notice = getByRole(pane, 'status');
+    expect(notice.textContent).toContain('Claim this item to work on it');
+    expect(pane.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(getByRole(pane, 'button', { name: 'Claim item' })).toBeTruthy();
+    expect(getByRole(pane, 'heading', { name: 'Order a copy' })).toBeTruthy();
+    expect(getByText(pane, 'Contact the supplier.')).toBeTruthy();
+    expect(getByText(pane, 'Current path: Purchase')).toBeTruthy();
+    expect(queryByRole(pane, 'button', { name: 'Ordered' })).toBeNull();
+    expect(queryByRole(pane, 'textbox', { name: 'Action notes' })).toBeNull();
+    expect(queryByRole(pane, 'combobox', { name: 'Access path' })).toBeNull();
+    expect(queryByRole(pane, 'button', { name: 'Save access path' })).toBeNull();
+    expect(queryByRole(pane, 'status', { name: /Only the staff member who holds the claim/ })).toBeNull();
+    expect(pane.textContent).not.toContain('Use the claim controls above to claim this item.');
+    await expectAccessible(pane);
+
+    await user.click(getByRole(pane, 'button', { name: 'Claim item' }));
+    expect(mocks.claimItem).toHaveBeenCalledWith('new', item.id);
+  });
+
+  it('shows a single read-only notice when another staff member holds the claim', async () => {
+    const { container: pane } = await renderPane({ item: {
+      ...item,
+      claimed_by: 'test-api078-owner',
+      accessPath: 'purchase',
+      readiness: 'missing',
+      allowedAccessPaths: ['purchase'],
+    } });
+
+    expect(getByRole(pane, 'status').textContent).toBe('Being handled by Test Owner');
+    expect(getByRole(pane, 'heading', { name: 'Do we own it?' })).toBeTruthy();
+    expect(getByText(pane, 'Current path: Purchase')).toBeTruthy();
+    expect(queryByRole(pane, 'button', { name: 'Yes' })).toBeNull();
+    expect(queryByRole(pane, 'button', { name: 'No' })).toBeNull();
+    expect(queryByRole(pane, 'combobox', { name: 'Access path' })).toBeNull();
+    expect(queryByRole(pane, 'button', { name: 'Save access path' })).toBeNull();
+    expect(pane.textContent).not.toContain('Only the staff member who holds the claim');
+    expect(pane.textContent).not.toContain('Use the claim controls above to claim this item.');
+    await expectAccessible(pane);
+  });
+
+  it('keeps outcomes disabled when the API says the current claimant cannot act', async () => {
     mocks.getItemFlow.mockResolvedValueOnce(flowState({ can_act: false }));
     const { container: pane } = await renderPane();
 
-    expect(getByText(pane, 'Claim this item to work on it')).toBeTruthy();
     expect(getByRole(pane, 'button', { name: 'Yes' }).disabled).toBe(true);
+    expect(pane.textContent).not.toContain('Claim this item to work on it');
     expect(mocks.submitStepResult).not.toHaveBeenCalled();
   });
 
@@ -557,7 +604,7 @@ describe('ItemWorkPane process and history', () => {
   it('shows the current assignee when someone else holds the claim', async () => {
     const { container: pane } = await renderPane({ item: { ...item, claimed_by: 'test-api078-owner' } });
 
-    expect(getByText(pane, 'Being handled by Test Owner.')).toBeTruthy();
+    expect(getByRole(pane, 'status').textContent).toBe('Being handled by Test Owner');
     expect(queryByRole(pane, 'button', { name: 'Work on This' })).toBeNull();
   });
 });

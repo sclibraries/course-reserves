@@ -1,8 +1,9 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { fileURLToPath } from 'node:url';
 import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, getByRole } from '@testing-library/dom';
+import { fireEvent, getByRole, queryByRole } from '@testing-library/dom';
 import { page } from '@vitest/browser/context';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../../pages/adminTabRegistry';
@@ -25,7 +26,31 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../hooks/admin/useItemFlow', () => ({
   default: (...args) => {
     mocks.itemFlow(...args);
-    return { flowState: null, loading: false };
+    return {
+      flowState: {
+        flow: { id: 7, name: 'Synthetic workflow', version: 1 },
+        current_step: { step: {
+          key: 'own_it', kind: 'question', label: 'Do we own it?', help_text: 'Check the synthetic catalog.',
+          outcomes: [
+            { key: 'yes', label: 'Yes', next: { step: 'available' }, reason_required: false },
+            { key: 'no', label: 'No', next: { step: 'order' }, reason_required: false },
+          ],
+        } },
+        finished: null,
+        history: [],
+        can_act: true,
+      },
+      loading: false,
+      pending: false,
+      notes: '',
+      selectedOutcome: null,
+      clearNotice: () => {},
+      clearError: () => {},
+      loadFlow: () => {},
+      replaceFlowState: () => {},
+      handleOutcome: () => {},
+      setNotes: () => {},
+    };
   },
 }));
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({
@@ -204,13 +229,13 @@ describe('SubmissionPage workbench in Chromium', () => {
     root = null;
   });
 
-  async function mountWorkbench(folders = screenshotFolders) {
+  async function mountWorkbench(folders = screenshotFolders, selectedItemId = folders[0].items[0].id) {
     container = document.createElement('div');
     container.id = 'root';
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => root.render(
-      <MemoryRouter initialEntries={[`/admin/submissions/31?item=${folders[0].items[0].id}`]}>
+      <MemoryRouter initialEntries={[`/admin/submissions/31?item=${selectedItemId}`]}>
         <WorkbenchShell folders={folders} />
       </MemoryRouter>,
     ));
@@ -259,7 +284,7 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(mocks.itemFlow).toHaveBeenCalledTimes(1);
     await expectNoHorizontalOverflow([1280]);
     await expectNoAxeViolations(container);
-    await page.screenshot({ path: '../../../../../dist/test-results/AW-074-admin-1280.png' });
+    await page.screenshot({ path: fileURLToPath(new URL('../../../../../dist/test-results/AW-075-claimed-missing-1280.png', import.meta.url)) });
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
@@ -293,5 +318,24 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(claimer.getAttribute('title')).toBe(longClaim);
     expect(claimer.textContent).toContain(longClaim);
     await expectNoHorizontalOverflow([1280, 1024, 320]);
+  });
+
+  it('keeps an unclaimed Missing item readable, accessible, and reflowed', async () => {
+    await page.viewport(1280, 900);
+    await mountWorkbench(screenshotFolders, 'test-item-3');
+
+    expect(getByRole(container, 'heading', { name: 'Do we own it?' })).toBeTruthy();
+    expect(getByRole(container, 'status').textContent).toContain('Claim this item to work on it');
+    expect(queryByRole(container, 'button', { name: 'Yes' })).toBeNull();
+    expect(queryByRole(container, 'button', { name: 'No' })).toBeNull();
+    expect(queryByRole(container, 'combobox', { name: 'Access path' })).toBeNull();
+    expect(queryByRole(container, 'button', { name: 'Save access path' })).toBeNull();
+    await page.screenshot({ path: fileURLToPath(new URL('../../../../../dist/test-results/AW-075-unclaimed-missing-1280.png', import.meta.url)) });
+
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      await expectNoHorizontalOverflow([width]);
+      await expectNoAxeViolations(container);
+    }
   });
 });

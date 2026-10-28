@@ -49,7 +49,7 @@ function ItemWorkPane({ item, submission, currentUsername = '', onChanged, onGoT
           <TabsContent value="process" className="tw-min-w-0 tw-mt-4">
             <ProcessTab
               item={item}
-              currentUsername={currentUsername}
+              claims={claims}
               flow={flow}
               switchFlow={switchFlow}
               onGoToWork={onGoToWork}

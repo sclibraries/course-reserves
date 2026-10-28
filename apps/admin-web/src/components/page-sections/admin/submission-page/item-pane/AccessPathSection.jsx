@@ -9,20 +9,16 @@ import { workflowFlowsApi } from '../../../../../services/admin/workflowFlows/wo
 import { getReadinessStatus } from '../submissionPageUtils';
 import RequiredReasonForm from '../RequiredReasonForm';
 
-function AccessPathSection({ item, currentUsername, flow, onChanged }) {
+function AccessPathSection({ item, canSetPath, flow, onChanged }) {
   const [accessPath, setAccessPath] = useState(item.accessPath || '');
   const [reasonOpen, setReasonOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const canSetPath = Boolean(currentUsername && item.claimed_by === currentUsername);
   const showSection = getReadinessStatus(item) === 'missing' || Boolean(item.accessPath);
   const pathChanged = Boolean(item.accessPath && accessPath !== item.accessPath);
   const selectId = `access-path-${item.kind}-${item.id}`;
-  const describedBy = [
-    !canSetPath && `${selectId}-claim-help`,
-    error && `${selectId}-error`,
-  ].filter(Boolean).join(' ') || undefined;
+  const describedBy = error ? `${selectId}-error` : undefined;
 
   useEffect(() => setAccessPath(item.accessPath || ''), [item.kind, item.id, item.accessPath]);
 
@@ -74,51 +70,50 @@ function AccessPathSection({ item, currentUsername, flow, onChanged }) {
     <section aria-label="Access path" className="tw-min-w-0 tw-space-y-3">
       <h3 className="tw-text-base tw-font-semibold">How will we get it?</h3>
       {item.accessPath && <p className="tw-text-sm">Current path: {ACCESS_PATH_LABELS[item.accessPath] || item.accessPath}</p>}
-      <div className="tw-flex tw-min-w-0 tw-flex-col tw-gap-2 sm:tw-flex-row sm:tw-items-end">
-        <div className="tw-min-w-0 tw-flex-1 tw-space-y-2">
-          <Label htmlFor={`access-path-${item.kind}-${item.id}`}>Access path</Label>
-          <NativeSelect
-            id={selectId}
-            value={accessPath}
-            aria-describedby={describedBy}
-            disabled={!canSetPath || saving || reasonOpen}
-            onChange={(event) => { setAccessPath(event.target.value); setNotice(''); setError(''); }}
-          >
-            <option value="">Choose an access path</option>
-            {(item.allowedAccessPaths || []).map((path) => (
-              <option key={path} value={path}>{ACCESS_PATH_LABELS[path] || path}</option>
-            ))}
-          </NativeSelect>
-        </div>
-        {!reasonOpen && (
-          <Button
-            type="button"
-            disabled={!canSetPath || !accessPath || accessPath === item.accessPath || saving}
-            onClick={handleSave}
-          >
-            Save access path
-          </Button>
-        )}
-      </div>
-      {!canSetPath && (
-        <p id={`${selectId}-claim-help`} className="tw-text-sm tw-text-muted-foreground" role="status">
-          Only the staff member who holds the claim can set the access path.
-        </p>
-      )}
-      {!reasonOpen && error && <p id={`${selectId}-error`} className="tw-text-sm tw-text-destructive" role="alert">{error}</p>}
-      {notice && <p className="tw-break-words tw-text-sm" role="status">{notice}</p>}
-      {reasonOpen && (
-        <RequiredReasonForm
-          open
-          onCancel={() => { setReasonOpen(false); setError(''); }}
-          onSuccess={() => setReasonOpen(false)}
-          onConfirm={savePath}
-          saving={saving}
-          reasonId={`access-path-reason-${item.kind}-${item.id}`}
-          reasonLabel="Reason for changing access path (required)"
-          error={error}
-          submitLabel="Save access path"
-        />
+      {canSetPath && (
+        <>
+          <div className="tw-flex tw-min-w-0 tw-flex-col tw-gap-2 sm:tw-flex-row sm:tw-items-end">
+            <div className="tw-min-w-0 tw-flex-1 tw-space-y-2">
+              <Label htmlFor={selectId}>Access path</Label>
+              <NativeSelect
+                id={selectId}
+                value={accessPath}
+                aria-describedby={describedBy}
+                disabled={saving || reasonOpen}
+                onChange={(event) => { setAccessPath(event.target.value); setNotice(''); setError(''); }}
+              >
+                <option value="">Choose an access path</option>
+                {(item.allowedAccessPaths || []).map((path) => (
+                  <option key={path} value={path}>{ACCESS_PATH_LABELS[path] || path}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            {!reasonOpen && (
+              <Button
+                type="button"
+                disabled={!accessPath || accessPath === item.accessPath || saving}
+                onClick={handleSave}
+              >
+                Save access path
+              </Button>
+            )}
+          </div>
+          {!reasonOpen && error && <p id={`${selectId}-error`} className="tw-text-sm tw-text-destructive" role="alert">{error}</p>}
+          {notice && <p className="tw-break-words tw-text-sm" role="status">{notice}</p>}
+          {reasonOpen && (
+            <RequiredReasonForm
+              open
+              onCancel={() => { setReasonOpen(false); setError(''); }}
+              onSuccess={() => setReasonOpen(false)}
+              onConfirm={savePath}
+              saving={saving}
+              reasonId={`access-path-reason-${item.kind}-${item.id}`}
+              reasonLabel="Reason for changing access path (required)"
+              error={error}
+              submitLabel="Save access path"
+            />
+          )}
+        </>
       )}
     </section>
   );
@@ -126,7 +121,7 @@ function AccessPathSection({ item, currentUsername, flow, onChanged }) {
 
 AccessPathSection.propTypes = {
   item: PropTypes.object.isRequired,
-  currentUsername: PropTypes.string,
+  canSetPath: PropTypes.bool.isRequired,
   flow: PropTypes.object.isRequired,
   onChanged: PropTypes.func,
 };

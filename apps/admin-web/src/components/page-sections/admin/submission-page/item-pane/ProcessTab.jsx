@@ -8,7 +8,7 @@ import { getProcessingBlockReason } from '../../../../../services/admin/processi
 import SwitchFlowDialog from './SwitchFlowDialog';
 import AccessPathSection from './AccessPathSection';
 
-function ProcessAction({ item, currentUsername, onGoToWork, onReopen }) {
+function ProcessAction({ item, canWork, onGoToWork, onReopen }) {
   if (item.status === 'complete') {
     return (
       <div className="tw-flex tw-flex-wrap tw-items-center tw-gap-3 tw-border-t tw-pt-3">
@@ -17,11 +17,7 @@ function ProcessAction({ item, currentUsername, onGoToWork, onReopen }) {
       </div>
     );
   }
-  if (!item.claimed_by) return <p className="tw-border-t tw-pt-3 tw-text-sm tw-text-muted-foreground">Use the claim controls above to claim this item.</p>;
-  const claimedByDisplay = item.claimed_by_display || item.assigned_group?.name || item.claimed_by;
-  if (item.claimed_by !== currentUsername) {
-    return <p className="tw-border-t tw-pt-3 tw-text-sm tw-text-muted-foreground">Being handled by {claimedByDisplay || 'another staff member'}.</p>;
-  }
+  if (!canWork) return null;
   const blockReason = getProcessingBlockReason(item);
   if (blockReason) return <p className="tw-border-t tw-pt-3 tw-text-sm tw-text-muted-foreground" role="status">{blockReason}</p>;
   return (
@@ -33,14 +29,16 @@ function ProcessAction({ item, currentUsername, onGoToWork, onReopen }) {
 
 ProcessAction.propTypes = {
   item: PropTypes.object.isRequired,
-  currentUsername: PropTypes.string,
+  canWork: PropTypes.bool.isRequired,
   onGoToWork: PropTypes.func.isRequired,
   onReopen: PropTypes.func.isRequired,
 };
 
-function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReopen, onChanged }) {
+function ProcessTab({ item, claims, flow, switchFlow, onGoToWork, onReopen, onChanged }) {
   const step = flow.flowState?.current_step?.step;
   const canAct = Boolean(flow.flowState?.can_act);
+  const canWork = claims.isMine;
+  const claimedByDisplay = item.claimed_by_display || item.assigned_group?.name || item.claimed_by;
 
   const reload = () => {
     flow.clearNotice();
@@ -50,6 +48,18 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
 
   return (
     <section className="tw-min-w-0 tw-space-y-4" aria-label={`Process ${item.title}`}>
+      {!canWork && (
+        <div role="status" className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-rounded-md tw-border tw-bg-muted/30 tw-p-3">
+          <p className="tw-text-sm tw-font-medium">
+            {item.claimed_by ? `Being handled by ${claimedByDisplay || 'another staff member'}` : 'Claim this item to work on it'}
+          </p>
+          {!item.claimed_by && (
+            <Button variant="outline" size="sm" disabled={claims.pending} onClick={claims.claim}>
+              Claim item
+            </Button>
+          )}
+        </div>
+      )}
       <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3">
         <div className="tw-min-w-0">
           {flow.flowState?.flow && (
@@ -67,8 +77,6 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
       {(flow.error || switchFlow.error) && <p className="tw-text-sm tw-text-destructive" role="alert">{flow.error || switchFlow.error}</p>}
       {flow.notice && <p className="tw-text-sm tw-text-muted-foreground" role="status">{flow.notice}</p>}
 
-      <AccessPathSection item={item} currentUsername={currentUsername} flow={flow} onChanged={onChanged} />
-
       {flow.flowState?.flow === null && <p className="tw-text-sm">No flow is set for this material type.</p>}
       {flow.flowState?.finished && (
         <div className="tw-space-y-1">
@@ -80,10 +88,7 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
         <p className="tw-text-sm"><strong>Not started.</strong> Select a flow to begin processing.</p>
       )}
 
-      {!canAct && step && step.kind !== 'finish' && (
-        <p className="tw-text-sm tw-text-muted-foreground" role="status">Claim this item to work on it</p>
-      )}
-      {step && step.kind === 'action' && !flow.flowState?.finished && (
+      {canWork && step && step.kind === 'action' && !flow.flowState?.finished && (
         <div className="tw-space-y-2">
           <Label htmlFor={`flow-notes-${item.kind}-${item.id}`}>Action notes</Label>
           <Textarea
@@ -93,7 +98,7 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
           />
         </div>
       )}
-      {step && step.kind !== 'finish' && !flow.flowState?.finished && (
+      {canWork && step && step.kind !== 'finish' && !flow.flowState?.finished && (
         <>
           <div className="tw-flex tw-flex-wrap tw-gap-2">
             {(step.outcomes || []).map((outcome, index) => (
@@ -137,12 +142,14 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
         </>
       )}
 
+      <AccessPathSection item={item} canSetPath={canWork} flow={flow} onChanged={onChanged} />
+
       <div className="tw-border-t tw-pt-3">
         <Button variant="link" className="tw-h-auto tw-p-0" onClick={switchFlow.openSwitchFlow} disabled={flow.pending || switchFlow.pending}>
           Switch flow
         </Button>
       </div>
-      <ProcessAction item={item} currentUsername={currentUsername} onGoToWork={onGoToWork} onReopen={onReopen} />
+      <ProcessAction item={item} canWork={canWork} onGoToWork={onGoToWork} onReopen={onReopen} />
       <SwitchFlowDialog item={item} switchFlow={switchFlow} flowPending={flow.pending} />
     </section>
   );
@@ -150,7 +157,7 @@ function ProcessTab({ item, currentUsername, flow, switchFlow, onGoToWork, onReo
 
 ProcessTab.propTypes = {
   item: PropTypes.object.isRequired,
-  currentUsername: PropTypes.string,
+  claims: PropTypes.object.isRequired,
   flow: PropTypes.object.isRequired,
   switchFlow: PropTypes.object.isRequired,
   onGoToWork: PropTypes.func.isRequired,
