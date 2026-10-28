@@ -75,6 +75,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 let container;
 let root;
+let resetDateAfterTest = false;
 
 async function renderRoute(path) {
   localStorage.removeItem('admin-navigation-collapsed');
@@ -102,6 +103,10 @@ afterEach(() => {
   container?.remove();
   container = null;
   root = null;
+  if (resetDateAfterTest) {
+    vi.useRealTimers();
+    resetDateAfterTest = false;
+  }
 });
 
 describe('admin navigation in Chromium', () => {
@@ -156,6 +161,9 @@ describe('admin navigation in Chromium', () => {
   });
 
   it('matches the three-row submissions table at desktop and reflows without overflow', async () => {
+    resetDateAfterTest = true;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-27T12:00:00Z'));
     mocks.workflow.submissions = [
       {
         submissionId: 99907809, status: 'submitted', courseCode: 'TST 101', section: '01',
