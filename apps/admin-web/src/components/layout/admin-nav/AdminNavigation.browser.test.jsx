@@ -197,8 +197,6 @@ describe('admin navigation in Chromium', () => {
     const details = getAllByRole(rows[1], 'cell')[4].querySelector('.tw-flex-col > .tw-text-xs');
     expect(details.textContent).toContain('Assigned to test-staff');
     expect(details.textContent).toContain('1 unread');
-    const fadeIn = queue.closest('.fade-in')?.getAnimations()[0];
-    if (fadeIn) await fadeIn.finished;
     await expectNoAxeViolations(queue);
     const viewportMeasurements = [];
     for (const [width, expectedColumns] of [[320, 1], [768, 5], [1280, 5]]) {

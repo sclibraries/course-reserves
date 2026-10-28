@@ -13,6 +13,7 @@ export async function expectNoHorizontalOverflow(widths = [320, 768, 1280]) {
 }
 
 export async function expectNoAxeViolations(container = document.body) {
+  await Promise.all(container.ownerDocument.getAnimations().map((animation) => animation.finished.catch(() => {})));
   const { violations } = await axe.run(container, {
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
   });
