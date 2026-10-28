@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { getByRole } from '@testing-library/dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
 
@@ -55,7 +56,7 @@ describe('access path interfaces in Chromium', () => {
             kind: 'new', id: 9001, title: 'Synthetic article', readiness: 'missing',
             allowedAccessPaths: ['purchase', 'faculty_supplies'], claimed_by: 'devadmin',
           }}
-          currentUsername="devadmin"
+          canSetPath
           flow={{ replaceFlowState: vi.fn() }}
         />
         <AccessPathRoutingTab />
@@ -66,6 +67,8 @@ describe('access path interfaces in Chromium', () => {
     const paneSection = container.querySelector('[aria-label="Access path"]');
     const routingTab = container.querySelector('[aria-label="Access path routing"]');
     expect(paneSection).toBeTruthy();
+    expect(getByRole(paneSection, 'combobox', { name: 'Access path' })).toBeTruthy();
+    expect(getByRole(paneSection, 'button', { name: 'Save access path' })).toBeTruthy();
     expect(routingTab).toBeTruthy();
     await expectNoAxeViolations(paneSection);
     await expectNoAxeViolations(routingTab);
