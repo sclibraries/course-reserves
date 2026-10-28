@@ -307,17 +307,17 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         $db = \Yii::$app->db;
         $wasLogging = $db->enableLogging;
         $db->enableLogging = true;
-        $logger = \Yii::getLogger();
-        $wasFlushInterval = $logger->flushInterval;
-        // Keep query messages buffered so a logger flush cannot clear the measured slice.
+        $originalLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
         $logger->flushInterval = 0;
-        $firstMessage = count($logger->messages);
+        // Codeception's logger drops database query messages.
+        \Yii::setLogger($logger);
         try {
             (new \app\controllers\SubmissionWorkflowController('submission-workflow', \Yii::$app))
                 ->actionViewSubmission($submissionId);
-            $messages = array_slice($logger->messages, $firstMessage);
+            $messages = $logger->messages;
         } finally {
-            $logger->flushInterval = $wasFlushInterval;
+            \Yii::setLogger($originalLogger);
             $db->enableLogging = $wasLogging;
         }
         $queries = array_filter($messages, function ($message) {
