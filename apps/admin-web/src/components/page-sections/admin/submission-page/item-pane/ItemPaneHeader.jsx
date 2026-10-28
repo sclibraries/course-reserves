@@ -2,11 +2,12 @@ import PropTypes from 'prop-types';
 import { ExternalLink } from 'lucide-react';
 import { Badge } from '../../../../ui/badge';
 import { Button } from '../../../../ui/button';
-import { getClaimBadge, getReadinessPresentation } from '../submissionPageUtils';
+import { getClaimBadge, getClaimLineLabel, getReadinessPresentation } from '../submissionPageUtils';
 import { getHttpUrl } from './itemPaneUtils';
 
 function ItemPaneHeader({ item, currentUsername, claims }) {
   const claim = getClaimBadge(item, { username: currentUsername });
+  const claimLineLabel = getClaimLineLabel(item, claim);
   const readiness = getReadinessPresentation(item);
   const recordUrl = item.eds ? getHttpUrl(item.eds.plink) : null;
   const materialDetails = [item.authors, item.materialType].filter(Boolean);
@@ -45,12 +46,17 @@ function ItemPaneHeader({ item, currentUsername, claims }) {
         {materialDetails.map((detail, index) => (
           <span key={`${detail}-${index}`}>{index ? `· ${detail}` : detail}</span>
         ))}
+        <span className="tw-min-w-0 tw-whitespace-normal tw-break-words tw-text-xs tw-text-muted-foreground">
+          {claimLineLabel}
+        </span>
         {item.publicationYear && <span>· {item.publicationYear}</span>}
-        <Badge variant={readiness.variant}>
+        <Badge
+          variant="outline"
+          className={`tw-border-0 tw-px-2 tw-py-0.5 tw-text-xs tw-font-semibold tw-leading-[18px] ${readiness.className}`}
+        >
           <ReadinessIcon aria-hidden="true" className="tw-mr-1 tw-h-3.5 tw-w-3.5" />
           {readiness.label}
         </Badge>
-        <Badge variant={claim.variant}>{claim.label}</Badge>
         {recordUrl && (
           <a
             className="tw-inline-flex tw-items-center tw-gap-1 tw-text-primary tw-underline-offset-4 hover:tw-underline focus-visible:tw-rounded-sm focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring"

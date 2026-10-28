@@ -343,6 +343,28 @@ describe('SubmissionPage', () => {
     expect(within(screen.getByRole('button', { name: /Select Unclaimed item/ })).getByText('Unclaimed')).toBeTruthy();
   });
 
+  it('clamps long row text while keeping complete titles and claimers available', async () => {
+    const props = pageProps();
+    const fullTitle = `Synthetic long title ${'with extended words '.repeat(7)}`.trimEnd();
+    const fullClaimer = `Synthetic staff display ${'with a longer surname '.repeat(5)}`;
+    props.folders[0].items[0].title = fullTitle;
+    props.folders[0].items[0].claimedByUsername = 'other-staff';
+    props.folders[0].items[0].claimedByDisplay = fullClaimer;
+    view = await renderPage(props);
+
+    const row = view.container.querySelector('[data-item-row="12"]');
+    const button = within(row).getByRole('button', { name: new RegExp(fullTitle) });
+    const title = within(button).getByText(fullTitle);
+    const claimer = button.querySelector('[data-row-claim]');
+
+    expect(title.className).toContain('tw-line-clamp-3');
+    expect(title.getAttribute('title')).toBe(fullTitle);
+    expect(claimer.className).toContain('tw-truncate');
+    expect(claimer.getAttribute('title')).toBe(fullClaimer);
+    expect(button.textContent).toContain(fullTitle);
+    expect(claimer.textContent).toContain(fullClaimer);
+  });
+
   it('labels readiness icons and repeats those labels in the legend', async () => {
     const props = pageProps();
     props.folders[1].items[0].readiness = 'in_progress';

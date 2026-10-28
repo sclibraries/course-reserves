@@ -7,6 +7,7 @@ function SubmissionItemRow({ item, currentUser, selected, disabled, onSelect }) 
   const readiness = getReadinessPresentation(item);
   const claim = getClaimBadge(item, currentUser);
   const title = item.title || 'Untitled item';
+  const claimTitle = item.claimed_by_display || item.claimed_by || claim.label;
 
   return (
     <div
@@ -27,8 +28,12 @@ function SubmissionItemRow({ item, currentUser, selected, disabled, onSelect }) 
         onClick={() => onSelect(item)}
       >
         <span className="tw-min-w-0 tw-flex-1">
-          <span className="tw-block tw-break-words tw-font-medium">{title}</span>
-          <span className="tw-mt-0.5 tw-block tw-break-words tw-text-xs tw-text-muted-foreground">
+          <span data-row-title className="tw-line-clamp-3 tw-break-words tw-font-medium" title={title}>{title}</span>
+          <span
+            data-row-claim
+            className="tw-mt-0.5 tw-block tw-min-w-0 tw-truncate tw-text-xs tw-text-muted-foreground"
+            title={claimTitle}
+          >
             <span className="tw-sr-only">Claim: </span>{claim.label}
           </span>
         </span>

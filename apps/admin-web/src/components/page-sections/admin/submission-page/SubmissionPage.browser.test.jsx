@@ -1,5 +1,6 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, getByRole } from '@testing-library/dom';
 import { page } from '@vitest/browser/context';
@@ -48,29 +49,58 @@ const registry = createAdminTabRegistry({
   canManageProxyAccess: true,
 });
 const longUrl = `https://example.test/${'x'.repeat(179)}`;
-const longTitle = `Synthetic course reserve title ${'with additional words '.repeat(8)}`;
-const longClaim = `Synthetic staff member ${'with a very long display name '.repeat(4)}`;
-const item = {
-  id: 'test-item-1',
-  title: longTitle,
+const longTitle = `Synthetic reserve reading ${'with descriptive words '.repeat(8)}${'unbroken'.repeat(10)}`;
+const longClaim = `Synthetic staff member ${'with a long display name '.repeat(5)}`;
+const makeItem = (id, title, overrides = {}) => ({
+  id,
+  kind: 'new',
+  title,
   authors: 'Synthetic Author',
   materialType: 'Book',
   eds: { plink: longUrl },
   status: 'pending',
-  readiness: 'missing',
-  readinessReason: 'No Five College copy was found for this catalog identity.',
+  readiness: 'ready',
+  readinessReason: 'Synthetic catalog record found.',
   flow: {
-    name: `Purchase workflow ${'with a long label '.repeat(4)}`,
+    name: 'Purchase workflow',
     current_step_label: 'Request purchase',
     finish_state: null,
   },
-  claimed_by: 'synthetic-staff',
-  claimed_by_display: longClaim,
+  claimed_by: null,
+  claimed_by_display: null,
   displayOrder: 1,
   positionInFolder: 1,
-};
+  ...overrides,
+});
+const screenshotFolders = [
+  {
+    name: 'Core readings',
+    items: [
+      makeItem('test-item-1', 'The Glass Orchard', {
+          readiness: 'missing', readinessReason: 'No synthetic catalog match was found.',
+          claimed_by: 'devadmin', claimed_by_display: 'Synthetic Admin',
+      }),
+      makeItem('test-item-2', 'A Map of Quiet Places', {
+        readiness: 'in_progress', claimed_by: 'synthetic-staff', claimed_by_display: 'Synthetic Staff Member',
+      }),
+    ],
+  },
+  {
+    name: 'Further reading',
+    items: [makeItem('test-item-3', 'History of the Blue River', { readiness: 'missing' })],
+  },
+];
+const longTitleFolders = [{
+  name: 'Core readings',
+  items: [
+    screenshotFolders[0].items[0],
+    makeItem('test-long-title', longTitle, {
+      claimed_by: 'synthetic-long-staff', claimed_by_display: longClaim,
+    }),
+  ],
+}];
 
-function PageContent() {
+function PageContent({ folders = screenshotFolders }) {
   return (
     <SubmissionPage
       submission={{
@@ -87,8 +117,8 @@ function PageContent() {
         linkState: 'linked',
         folioCourseListingId: 'test-listing-31',
       }}
-      folders={[]}
-      unfolderedItems={[item]}
+      folders={folders}
+      unfolderedItems={[]}
       currentUser={{ id: '999000001', username: 'devadmin' }}
       onBack={() => {}}
       onLock={() => {}}
@@ -109,7 +139,9 @@ function PageContent() {
   );
 }
 
-function WorkbenchShell() {
+PageContent.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
+
+function WorkbenchShell({ folders }) {
   const [isCollapsed, setCollapsed] = useState(true);
   const navigation = {
     activeTab: 'submissions',
@@ -132,10 +164,12 @@ function WorkbenchShell() {
   return (
     <div className="tw-flex tw-min-w-0 tw-flex-col md:tw-flex-row">
       <AdminNavigationSidebar navigation={navigation} />
-      <main className="tw-min-w-0 tw-flex-1 tw-px-4 tw-py-3"><PageContent /></main>
+      <main className="tw-min-w-0 tw-flex-1 tw-px-4 tw-py-3"><PageContent folders={folders} /></main>
     </div>
   );
 }
+
+WorkbenchShell.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
 
 describe('SubmissionPage workbench in Chromium', () => {
   let container;
@@ -148,21 +182,34 @@ describe('SubmissionPage workbench in Chromium', () => {
     root = null;
   });
 
-  it('keeps the workbench accessible and reflowed with collapsed and expanded navigation', async () => {
-    await page.viewport(1280, 900);
+  async function mountWorkbench(folders = screenshotFolders) {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => root.render(
-      <MemoryRouter initialEntries={['/admin/submissions/31?item=test-item-1']}>
-        <WorkbenchShell />
+      <MemoryRouter initialEntries={[`/admin/submissions/31?item=${folders[0].items[0].id}`]}>
+        <WorkbenchShell folders={folders} />
       </MemoryRouter>,
     ));
+  }
+
+  it('keeps the workbench accessible and reflowed with collapsed and expanded navigation', async () => {
+    await page.viewport(1280, 900);
+    await mountWorkbench();
 
     const nav = container.querySelector('[aria-label="Admin navigation panel"]');
     expect(nav.className).toContain('tw-w-16');
-    expect(container.textContent).toContain(longTitle);
-    expect(container.textContent).toContain(longClaim);
+    expect(container.querySelectorAll('[data-item-row]')).toHaveLength(3);
+    expect(Array.from(container.querySelectorAll('[data-item-group]'), (group) => group.dataset.itemGroup))
+      .toEqual(['Core readings', 'Further reading']);
+    expect(Array.from(container.querySelectorAll('[data-row-claim]'), (claim) => claim.textContent.replace('Claim: ', '')))
+      .toEqual(['You', 'Synthetic Staff Member', 'Unclaimed']);
+    expect(container.textContent).toContain('The Glass Orchard');
+    expect(container.textContent).toContain('A Map of Quiet Places');
+    expect(container.textContent).toContain('History of the Blue River');
+    expect(container.textContent).toContain('Claimed by you');
+    expect(container.textContent).toContain('Synthetic Staff Member');
+    expect(container.textContent).toContain('Unclaimed');
     expect(container.textContent).toContain('Synthetic Author');
     expect(container.textContent).toContain('Book');
     expect(getByRole(container, 'link', { name: /View full record/ }).getAttribute('href')).toBe(longUrl);
@@ -171,7 +218,7 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(mocks.itemFlow).toHaveBeenCalledTimes(1);
     await expectNoHorizontalOverflow([1280]);
     await expectNoAxeViolations(container);
-    await page.screenshot({ path: 'dist/test-results/AW-073-submission-1280.png' });
+    await page.screenshot({ path: '../../../../dist/test-results/AW-073-submission-1280.png' });
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
@@ -184,5 +231,21 @@ describe('SubmissionPage workbench in Chromium', () => {
     await page.viewport(768, 900);
     expect(getByRole(container, 'button', { name: 'Back to list' })).toBeTruthy();
     await expectNoHorizontalOverflow([320, 768, 1280]);
+  });
+
+  it('keeps long row titles and claimers intact while clamping their visible layout', async () => {
+    await page.viewport(1280, 900);
+    await mountWorkbench(longTitleFolders);
+
+    const row = container.querySelector('[data-item-row="test-long-title"]');
+    const title = row.querySelector('[data-row-title]');
+    const claimer = row.querySelector('[data-row-claim]');
+    expect(title.className).toContain('tw-line-clamp-3');
+    expect(title.getAttribute('title')).toBe(longTitle);
+    expect(title.textContent).toBe(longTitle);
+    expect(claimer.className).toContain('tw-truncate');
+    expect(claimer.getAttribute('title')).toBe(longClaim);
+    expect(claimer.textContent).toBe(longClaim);
+    await expectNoHorizontalOverflow([1280, 1024, 320]);
   });
 });

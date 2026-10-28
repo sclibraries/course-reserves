@@ -571,10 +571,37 @@ describe('ItemWorkPane messages and details', () => {
     expect(getByText(pane, 'Synthetic Author')).toBeTruthy();
     expect(getByText(pane, '· Print book')).toBeTruthy();
     expect(getByText(pane, 'Missing')).toBeTruthy();
-    expect(getByText(pane, 'You')).toBeTruthy();
+    expect(getByText(pane, 'Claimed by you')).toBeTruthy();
     expect(getByRole(actions, 'button', { name: 'Release Synthetic item' })).toBeTruthy();
     expect(getByRole(pane, 'link', { name: /View full record/ }).getAttribute('href'))
       .toBe('https://search.ebscohost.com/record/synthetic-aw059');
+  });
+
+  it.each([
+    [{}, 'Claimed by you'],
+    [{ claimed_by: 'another-staff', claimed_by_display: 'Synthetic Other Staff' }, 'Claimed by Synthetic Other Staff'],
+    [{ claimed_by: null, claimed_by_display: null }, 'Unclaimed'],
+  ])('shows claim ownership as wrapping muted author-line text', async (overrides, label) => {
+    const { container: pane } = await renderPane({ item: { ...item, ...overrides } });
+    const claimLine = getByText(pane, label);
+
+    expect(claimLine.className).toContain('tw-text-xs');
+    expect(claimLine.className).toContain('tw-text-muted-foreground');
+    expect(claimLine.className).not.toContain('tw-rounded-full');
+    expect(claimLine.className).not.toContain('tw-truncate');
+  });
+
+  it.each([
+    ['ready', 'Ready', 'tw-bg-status-complete/15', 'tw-text-status-complete-fg'],
+    ['in_progress', 'In progress', 'tw-bg-status-review/15', 'tw-text-status-review-fg'],
+    ['missing', 'Missing', 'tw-bg-status-canceled/15', 'tw-text-status-canceled-fg'],
+    ['unknown', 'Unknown', 'tw-bg-status-draft/15', 'tw-text-status-draft-fg'],
+  ])('uses the tinted queue status tokens for %s readiness', async (status, label, background, foreground) => {
+    const { container: pane } = await renderPane({ item: { ...item, readiness: status } });
+    const readiness = getByText(pane, label).closest('.tw-rounded-full');
+
+    expect(readiness.className).toContain(background);
+    expect(readiness.className).toContain(foreground);
   });
 
   it('shows unread count, item messages, reply, and new-message actions', async () => {

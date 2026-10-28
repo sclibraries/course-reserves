@@ -3,10 +3,22 @@ import { CircleCheck, CircleDashed, CircleHelp, CircleX } from 'lucide-react';
 
 const DONE_STATUSES = new Set(['complete', 'unavailable', 'withdrawn']);
 const READINESS_PRESENTATIONS = {
-  ready: { label: 'Ready', Icon: CircleCheck, variant: 'secondary' },
-  in_progress: { label: 'In progress', Icon: CircleDashed, variant: 'outline' },
-  missing: { label: 'Missing', Icon: CircleX, variant: 'destructive' },
-  unknown: { label: 'Unknown', Icon: CircleHelp, variant: 'outline' },
+  ready: {
+    label: 'Ready', Icon: CircleCheck, variant: 'outline',
+    className: 'tw-bg-status-complete/15 tw-text-status-complete-fg',
+  },
+  in_progress: {
+    label: 'In progress', Icon: CircleDashed, variant: 'outline',
+    className: 'tw-bg-status-review/15 tw-text-status-review-fg',
+  },
+  missing: {
+    label: 'Missing', Icon: CircleX, variant: 'outline',
+    className: 'tw-bg-status-canceled/15 tw-text-status-canceled-fg',
+  },
+  unknown: {
+    label: 'Unknown', Icon: CircleHelp, variant: 'outline',
+    className: 'tw-bg-status-draft/15 tw-text-status-draft-fg',
+  },
 };
 const READINESS_STATES = new Set(Object.keys(READINESS_PRESENTATIONS));
 const NOT_READY_STATES = new Set(['missing', 'unknown']);
@@ -69,6 +81,15 @@ export function getClaimBadge(item, currentUser) {
   }
   if (item.assigned_group?.name) return { label: item.assigned_group.name, variant: 'secondary' };
   return { label: 'Unclaimed', variant: 'outline' };
+}
+
+export function getClaimLineLabel(item, claim) {
+  if (claim.label === 'You') return 'Claimed by you';
+  if (claim.label === 'Unclaimed') return 'Unclaimed';
+  if (claim.label === 'Done') return 'Done';
+  if (item.claimed_by) return `Claimed by ${claim.label}`;
+  if (item.assigned_group?.name) return `Assigned to ${claim.label}`;
+  return claim.label;
 }
 
 export function buildSubmissionItemGroups(folders = [], unfolderedItems = [], submission = {}) {
