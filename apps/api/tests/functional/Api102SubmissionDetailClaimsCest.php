@@ -308,12 +308,16 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         $wasLogging = $db->enableLogging;
         $db->enableLogging = true;
         $logger = \Yii::getLogger();
+        $wasFlushInterval = $logger->flushInterval;
+        // Keep query messages buffered so a logger flush cannot clear the measured slice.
+        $logger->flushInterval = 0;
         $firstMessage = count($logger->messages);
         try {
             (new \app\controllers\SubmissionWorkflowController('submission-workflow', \Yii::$app))
                 ->actionViewSubmission($submissionId);
             $messages = array_slice($logger->messages, $firstMessage);
         } finally {
+            $logger->flushInterval = $wasFlushInterval;
             $db->enableLogging = $wasLogging;
         }
         $queries = array_filter($messages, function ($message) {
