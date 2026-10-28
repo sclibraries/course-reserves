@@ -22,7 +22,7 @@ function AccessPathSection({ item, canSetPath, flow, onChanged }) {
 
   useEffect(() => setAccessPath(item.accessPath || ''), [item.kind, item.id, item.accessPath]);
 
-  if (!showSection) return null;
+  if (!showSection || (!canSetPath && !item.accessPath)) return null;
 
   const savePath = async (reason) => {
     if (!canSetPath || !accessPath || saving) return false;

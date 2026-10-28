@@ -123,6 +123,7 @@ describe('ItemWorkPane claim state', () => {
     const process = getByRole(pane, 'region', { name: 'Process Synthetic reserve item' });
 
     expect(getAllByText(process, 'Claim this item to work on it', { exact: true })).toHaveLength(1);
+    expect(queryByRole(process, 'heading', { name: 'How will we get it?' })).toBeNull();
     expect(queryByText(process, 'Only the staff member who holds the claim can set the access path.')).toBeNull();
     expect(queryByText(process, 'Use the claim controls above to claim this item.')).toBeNull();
     await expectAccessible(pane);
@@ -156,6 +157,16 @@ describe('ItemWorkPane claim state', () => {
     expect((await waitFor(() => getByRole(process, 'alert'))).textContent)
       .toBe('Only group members can claim this; use Take over with a reason.');
     await expectAccessible(pane);
+  });
+
+  it('shows the existing access path when another staff member holds the claim', async () => {
+    const { pane } = await renderPane({ paneItem: {
+      ...item, claimed_by: 'another-staff', claimed_by_display: 'Another Staff', accessPath: 'purchase',
+    } });
+    const process = getByRole(pane, 'region', { name: 'Process Synthetic reserve item' });
+
+    expect(getByRole(process, 'heading', { name: 'How will we get it?' })).toBeTruthy();
+    expect(getByText(process, 'Current path: Purchase')).toBeTruthy();
   });
 
   it('does not offer Claim for an unclaimed complete item and keeps Reopen', async () => {

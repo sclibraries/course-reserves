@@ -213,6 +213,7 @@ describe('SubmissionPage workbench in Chromium', () => {
     const process = within(container).getByRole('region', { name: 'Process History of the Blue River' });
 
     expect(getByRole(process, 'heading', { name: 'Do we own it?' })).toBeTruthy();
+    expect(queryByRole(process, 'heading', { name: 'How will we get it?' })).toBeNull();
     expect(within(process).getByRole('status').textContent).toContain('Claim this item to work on it');
     expect(queryByRole(process, 'button', { name: 'Yes' })).toBeNull();
     expect(queryByRole(process, 'button', { name: 'No' })).toBeNull();
