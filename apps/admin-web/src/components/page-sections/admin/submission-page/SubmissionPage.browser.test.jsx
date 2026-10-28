@@ -1,19 +1,14 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fileURLToPath } from 'node:url';
-import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, getByRole, queryByRole } from '@testing-library/dom';
+import { fireEvent, getByRole, queryByRole, within } from '@testing-library/dom';
 import { page } from '@vitest/browser/context';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { createAdminTabRegistry, getVisibleAdminGroups } from '../../../../pages/adminTabRegistry';
-import AdminLayout from '../../../layout/AdminLayout';
-import Header from '../../../layout/Header';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
 import '../../../../css/App.css';
-import SubmissionPage from './SubmissionPage';
-import ItemWorkPane from './item-pane/ItemWorkPane';
-import { createLinkingState } from './SubmissionPage.testUtils';
+import WorkbenchShell from './SubmissionPage.browser.testUtils';
+import { longClaim, longTitle, longTitleFolders, longUrl, screenshotFolders } from './SubmissionPage.browser.fixtures';
 
 const mocks = vi.hoisted(() => ({
   claimAllItems: vi.fn(),
@@ -108,115 +103,6 @@ mocks.navigation = {
   togglePin: () => {},
   visibleGroups: getVisibleAdminGroups(registry),
 };
-const longUrl = `https://example.test/${'x'.repeat(179)}`;
-const longTitle = `Synthetic reserve reading ${'with descriptive words '.repeat(8)}${'unbroken'.repeat(10)}`;
-const longClaim = `Synthetic staff member ${'with a long display name '.repeat(5)}`;
-const makeItem = (id, title, overrides = {}) => ({
-  id,
-  kind: 'new',
-  title,
-  authors: 'Synthetic Author',
-  materialType: 'Book',
-  eds: { plink: longUrl },
-  status: 'pending',
-  readiness: 'ready',
-  readinessReason: 'Synthetic catalog record found.',
-  flow: {
-    name: 'Purchase workflow',
-    current_step_label: 'Request purchase',
-    finish_state: null,
-  },
-  claimed_by: null,
-  claimed_by_display: null,
-  displayOrder: 1,
-  positionInFolder: 1,
-  ...overrides,
-});
-const screenshotFolders = [
-  {
-    name: 'Core readings',
-    items: [
-      makeItem('test-item-1', 'The Glass Orchard', {
-          readiness: 'missing', readinessReason: 'No synthetic catalog match was found.',
-          claimed_by: 'devadmin', claimed_by_display: 'Synthetic Admin',
-      }),
-      makeItem('test-item-2', 'A Map of Quiet Places', {
-        readiness: 'in_progress', claimed_by: 'synthetic-staff', claimed_by_display: 'Synthetic Staff Member',
-      }),
-    ],
-  },
-  {
-    name: 'Further reading',
-    items: [makeItem('test-item-3', 'History of the Blue River', { readiness: 'missing' })],
-  },
-];
-const longTitleFolders = [{
-  name: 'Core readings',
-  items: [
-    screenshotFolders[0].items[0],
-    makeItem('test-long-title', longTitle, {
-      claimed_by: 'synthetic-long-staff', claimed_by_display: longClaim,
-    }),
-  ],
-}];
-
-function PageContent({ folders = screenshotFolders }) {
-  return (
-    <SubmissionPage
-      submission={{
-        id: 31,
-        uuid: 'test-submission-31',
-        courseCode: 'ENG 101',
-        courseTitle: 'Synthetic Literature',
-        section: '01',
-        term: 'Fall 2026',
-        facultyName: 'Test Faculty',
-        submittedAt: '2026-06-16T12:00:00Z',
-        status: 'processing',
-        isLocked: false,
-        linkState: 'linked',
-        folioCourseListingId: 'test-listing-31',
-      }}
-      folders={folders}
-      unfolderedItems={[]}
-      currentUser={{ id: '999000001', username: 'devadmin' }}
-      onBack={() => {}}
-      onLock={() => {}}
-      onUnlock={() => {}}
-      linking={createLinkingState()}
-      renderSelectedItem={(selected) => (
-        <ItemWorkPane
-          key={`${selected.kind}/${selected.id}`}
-          item={selected}
-          submission={{ facultyName: 'Test Faculty' }}
-          currentUsername="devadmin"
-          onChanged={() => {}}
-          onGoToWork={() => {}}
-          onReopen={() => {}}
-        />
-      )}
-    />
-  );
-}
-
-PageContent.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
-
-function WorkbenchShell({ folders }) {
-  return (
-    <>
-      <Header />
-      <main id="main-content" className="main-content-no-search">
-        <Routes>
-          <Route element={<AdminLayout />}>
-            <Route path="/admin/submissions/:submissionId" element={<PageContent folders={folders} />} />
-          </Route>
-        </Routes>
-      </main>
-    </>
-  );
-}
-
-WorkbenchShell.propTypes = { folders: PropTypes.arrayOf(PropTypes.object) };
 
 describe('SubmissionPage workbench in Chromium', () => {
   let container;
@@ -284,7 +170,8 @@ describe('SubmissionPage workbench in Chromium', () => {
     expect(mocks.itemFlow).toHaveBeenCalledTimes(1);
     await expectNoHorizontalOverflow([1280]);
     await expectNoAxeViolations(container);
-    await page.screenshot({ path: fileURLToPath(new URL('../../../../../dist/test-results/AW-075-claimed-missing-1280.png', import.meta.url)) });
+    await page.screenshot({ path: '../../../../../dist/test-results/AW-074-admin-1280.png' });
+    await page.screenshot({ path: '../../../../../dist/test-results/AW-075-claimed-missing-1280.png' });
 
     await page.viewport(1024, 900);
     await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Expand admin navigation' })));
@@ -323,14 +210,15 @@ describe('SubmissionPage workbench in Chromium', () => {
   it('keeps an unclaimed Missing item readable, accessible, and reflowed', async () => {
     await page.viewport(1280, 900);
     await mountWorkbench(screenshotFolders, 'test-item-3');
+    const process = within(container).getByRole('region', { name: 'Process History of the Blue River' });
 
-    expect(getByRole(container, 'heading', { name: 'Do we own it?' })).toBeTruthy();
-    expect(getByRole(container, 'status').textContent).toContain('Claim this item to work on it');
-    expect(queryByRole(container, 'button', { name: 'Yes' })).toBeNull();
-    expect(queryByRole(container, 'button', { name: 'No' })).toBeNull();
-    expect(queryByRole(container, 'combobox', { name: 'Access path' })).toBeNull();
-    expect(queryByRole(container, 'button', { name: 'Save access path' })).toBeNull();
-    await page.screenshot({ path: fileURLToPath(new URL('../../../../../dist/test-results/AW-075-unclaimed-missing-1280.png', import.meta.url)) });
+    expect(getByRole(process, 'heading', { name: 'Do we own it?' })).toBeTruthy();
+    expect(within(process).getByRole('status').textContent).toContain('Claim this item to work on it');
+    expect(queryByRole(process, 'button', { name: 'Yes' })).toBeNull();
+    expect(queryByRole(process, 'button', { name: 'No' })).toBeNull();
+    expect(queryByRole(process, 'combobox', { name: 'Access path' })).toBeNull();
+    expect(queryByRole(process, 'button', { name: 'Save access path' })).toBeNull();
+    await page.screenshot({ path: '../../../../../dist/test-results/AW-075-unclaimed-missing-1280.png' });
 
     for (const width of [320, 768, 1280]) {
       await page.viewport(width, 900);

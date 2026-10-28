@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/tabs';
 import useItemClaimActions from '../../../../../hooks/admin/useItemClaimActions';
@@ -17,8 +17,13 @@ const itemTabClass = 'tw-min-w-0 tw-whitespace-normal tw-break-words tw-rounded-
 
 function ItemWorkPane({ item, submission, currentUsername = '', onChanged, onGoToWork, onReopen }) {
   const [activeTab, setActiveTab] = useState('process');
-  const claims = useItemClaimActions({ item, currentUsername, onChanged });
   const flow = useItemFlow({ item, onChanged });
+  const loadFlow = flow.loadFlow;
+  const reloadAfterClaimChange = useCallback(async () => {
+    await onChanged?.();
+    await loadFlow();
+  }, [loadFlow, onChanged]);
+  const claims = useItemClaimActions({ item, currentUsername, onChanged: reloadAfterClaimChange });
   const switchFlow = useSwitchFlow({
     item,
     canAct: Boolean(flow.flowState?.can_act),

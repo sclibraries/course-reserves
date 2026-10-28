@@ -20,7 +20,7 @@ function ItemPaneHeader({ item, currentUsername, claims }) {
           {item.title || 'Untitled item'}
         </h2>
         <div role="group" aria-label="Item claim actions" className="tw-flex tw-shrink-0 tw-flex-wrap tw-gap-2">
-          {!claims.isClaimed && (
+          {!claims.isClaimed && item.status !== 'complete' && (
             <Button variant="outline" size="sm" aria-label={`Claim ${item.title}`} disabled={claims.pending} onClick={claims.claim}>
               Claim
             </Button>

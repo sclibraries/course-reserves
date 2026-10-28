@@ -39,6 +39,9 @@ function ProcessTab({ item, claims, flow, switchFlow, onGoToWork, onReopen, onCh
   const canAct = Boolean(flow.flowState?.can_act);
   const canWork = claims.isMine;
   const claimedByDisplay = item.claimed_by_display || item.assigned_group?.name || item.claimed_by;
+  const claimMessage = item.assigned_group?.name
+    ? `Assigned to ${item.assigned_group.name}. Claim this item to work on it`
+    : 'Claim this item to work on it';
 
   const reload = () => {
     flow.clearNotice();
@@ -48,16 +51,19 @@ function ProcessTab({ item, claims, flow, switchFlow, onGoToWork, onReopen, onCh
 
   return (
     <section className="tw-min-w-0 tw-space-y-4" aria-label={`Process ${item.title}`}>
-      {!canWork && (
-        <div role="status" className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-rounded-md tw-border tw-bg-muted/30 tw-p-3">
-          <p className="tw-text-sm tw-font-medium">
-            {item.claimed_by ? `Being handled by ${claimedByDisplay || 'another staff member'}` : 'Claim this item to work on it'}
-          </p>
-          {!item.claimed_by && (
-            <Button variant="outline" size="sm" disabled={claims.pending} onClick={claims.claim}>
-              Claim item
-            </Button>
-          )}
+      {!canWork && item.status !== 'complete' && (
+        <div className="tw-space-y-2 tw-rounded-md tw-border tw-bg-muted/30 tw-p-3">
+          <div role="status" className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
+            <p className="tw-text-sm tw-font-medium">
+              {item.claimed_by ? `Being handled by ${claimedByDisplay || 'another staff member'}` : claimMessage}
+            </p>
+            {!item.claimed_by && (
+              <Button variant="outline" size="sm" disabled={claims.pending} onClick={claims.claim}>
+                Claim item
+              </Button>
+            )}
+          </div>
+          {!item.claimed_by && claims.error && <p className="tw-text-sm tw-text-destructive" role="alert">{claims.error}</p>}
         </div>
       )}
       <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3">
