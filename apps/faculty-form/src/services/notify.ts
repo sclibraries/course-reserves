@@ -25,12 +25,15 @@ export const getSafeErrorFeedback = (error: unknown, message: string): ErrorFeed
 
 export const notify = {
   success(message: string, options?: NotifyOptions) {
-    toast.success(message, { duration: 5000, ...options });
+    toast.success(message, options);
   },
   info(message: string, options?: NotifyOptions) {
-    toast.info(message, { duration: 5000, ...options });
+    toast.info(message, options);
   },
-  error(message: string, { reference }: { reference: string }) {
-    toast.error(message, { description: `Reference: ${reference}`, duration: Infinity });
+  error(message: string, { reference }: { reference?: string } = {}) {
+    toast.error(message, {
+      ...(reference && reference !== 'unavailable' ? { description: `Reference: ${reference}` } : {}),
+      duration: Infinity,
+    });
   },
 };

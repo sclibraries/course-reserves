@@ -27,13 +27,20 @@ describe('Sonner notifications in Chromium', () => {
     root = createRoot(container);
     await act(async () => {
       root?.render(<Toaster />);
+    });
+
+    await act(async () => {
       notify.success('Item added', {
         action: { label: 'Undo', onClick: () => { undone = true; } },
       });
       notify.info('Existing course list kept', { duration: Infinity });
       notify.error("Couldn't save the access path", { reference: '7F3K2Q' });
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
+
+    await expect.poll(() => document.body.textContent).toContain('Item added');
+    await expect.poll(() => document.body.textContent).toContain('Existing course list kept');
+    await expect.poll(() => document.body.textContent).toContain("Couldn't save the access path");
+    await expect.poll(() => document.body.textContent).toContain('Reference: 7F3K2Q');
 
     expect(document.body.textContent).toContain('Item added');
     expect(document.body.textContent).toContain('Existing course list kept');

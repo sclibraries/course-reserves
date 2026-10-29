@@ -14,7 +14,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={5000}
       closeButton
       toastOptions={{
-        duration: 5000,
         closeButton: true,
         classNames: {
           closeButton:

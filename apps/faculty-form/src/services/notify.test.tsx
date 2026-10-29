@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { toast } from 'sonner';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSafeErrorFeedback, notify } from './notify';
 
 vi.mock('sonner', () => ({
@@ -11,21 +11,23 @@ vi.mock('sonner', () => ({
   },
 }));
 
+beforeEach(() => vi.clearAllMocks());
+
 describe('notify', () => {
-  it('passes success actions through and auto-closes after five seconds', () => {
+  it('passes success actions through without setting its own duration', () => {
     const action = createElement('button', { type: 'button' }, 'Undo');
 
     notify.success('Item added', { action });
 
-    expect(toast.success).toHaveBeenCalledWith('Item added', { duration: 5000, action });
+    expect(toast.success).toHaveBeenCalledWith('Item added', { action });
   });
 
-  it('auto-closes informational feedback after five seconds and passes its action through', () => {
+  it('passes informational actions through without setting its own duration', () => {
     const action = createElement('button', { type: 'button' }, 'View course');
 
     notify.info('The existing course list was kept', { action });
 
-    expect(toast.info).toHaveBeenCalledWith('The existing course list was kept', { duration: 5000, action });
+    expect(toast.info).toHaveBeenCalledWith('The existing course list was kept', { action });
   });
 
   it('keeps toast-only information dismiss-only when requested', () => {
@@ -41,6 +43,18 @@ describe('notify', () => {
       description: 'Reference: 7F3K2Q',
       duration: Infinity,
     });
+  });
+
+  it('keeps client-side errors visible without a reference description', () => {
+    notify.error('Please enter a title');
+
+    expect(toast.error).toHaveBeenCalledWith('Please enter a title', { duration: Infinity });
+  });
+
+  it('omits the unavailable placeholder from client-side error feedback', () => {
+    notify.error('Please enter a title', { reference: 'unavailable' });
+
+    expect(toast.error).toHaveBeenCalledWith('Please enter a title', { duration: Infinity });
   });
 
   it('hides server text while preserving its reference id', () => {
