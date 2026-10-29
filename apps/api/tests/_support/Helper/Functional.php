@@ -84,6 +84,27 @@ class Functional extends \Codeception\Module
     }
 
     /**
+     * Send a request to a literal production URL, optionally with a bearer token.
+     *
+     * @param string      $method HTTP method.
+     * @param string      $path   Literal request path.
+     * @param string|null $token  Optional JWT.
+     * @return int HTTP response status code.
+     */
+    public function sendApiRequest($method, $path, $token = null)
+    {
+        $server = [];
+        if ($token !== null) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+        }
+
+        $module = $this->getModule('Yii2');
+        $module->_request(strtoupper($method), $path, [], [], $server);
+
+        return $module->_getResponseStatusCode();
+    }
+
+    /**
      * Decode the last response body as JSON.
      *
      * @return array|null

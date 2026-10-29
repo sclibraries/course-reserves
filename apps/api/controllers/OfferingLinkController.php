@@ -13,6 +13,7 @@ use yii\filters\Cors;
 use yii\filters\auth\HttpBearerAuth;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
+use app\services\PublicResourceFields;
 
 class OfferingLinkController extends ActiveController
 {
@@ -25,7 +26,8 @@ class OfferingLinkController extends ActiveController
         // Re-add the authenticator and exclude OPTIONS requests from authentication
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'except' => ['options', 'find-links', 'find-linked-offerings', 'find-linked-resources', 'get-linked-resources'],
+            'except' => ['options', 'find-linked-offerings'],
+            'optional' => ['get-linked-resources'],
         ];
         // Add the CORS filter first so that it handles OPTIONS requests properly
         $behaviors['corsFilter'] = [
@@ -48,6 +50,8 @@ class OfferingLinkController extends ActiveController
                 'delete' => Roles::STAFF,
                 'link-existing-resources' => Roles::STAFF,
                 'update-resource-order' => Roles::STAFF,
+                'find-links' => Roles::STAFF,
+                'find-linked-resources' => Roles::STAFF,
             ],
         ];
 
@@ -152,7 +156,9 @@ class OfferingLinkController extends ActiveController
                     FROM course_resources 
                     WHERE offering_id = :offering_id
                 )";
-        return Yii::$app->db->createCommand($sql, [':offering_id' => $offering_id])->queryAll();
+        $resources = Yii::$app->db->createCommand($sql, [':offering_id' => $offering_id])->queryAll();
+
+        return PublicResourceFields::serializeMany($resources, Yii::$app->user->identity);
     }
 
     public function actionLinkExistingResources()
@@ -320,7 +326,7 @@ class OfferingLinkController extends ActiveController
         }
         
         // Re-index the array to return a list rather than an associative array keyed by resource_id.
-        $resources = array_values($resources);
+        $resources = PublicResourceFields::serializeMany(array_values($resources), Yii::$app->user->identity);
     
         return [
             'course' => $course,
