@@ -2,7 +2,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../index.css';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { page } from '@vitest/browser/context';
+import { userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../test/browser';
 import { notify } from '../../services/notify';
@@ -54,7 +54,7 @@ describe('Sonner notifications in Chromium', () => {
     await expectNoHorizontalOverflow([320, 768, 1280]);
 
     closeButton.focus();
-    await page.keyboard.press('Enter');
+    await userEvent.keyboard('{Enter}');
     await vi.waitFor(() => {
       expect(document.querySelector('[data-sonner-toast][data-type="error"]')).toBeNull();
     });
