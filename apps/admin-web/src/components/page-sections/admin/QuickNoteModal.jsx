@@ -18,7 +18,7 @@ import {
   Spinner
 } from 'reactstrap';
 import { FaStickyNote, FaSave, FaTimes } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 
 const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
@@ -37,7 +37,7 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
     e.preventDefault();
 
     if (!note.trim()) {
-      toast.error('Please enter a note');
+      notify.error('Please enter a note');
       return;
     }
 
@@ -48,7 +48,7 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
       
       if (!submissionId) {
         console.error('Item structure:', item);
-        toast.error('Unable to find submission ID');
+        notify.error('Unable to find submission ID');
         setSaving(false);
         return;
       }
@@ -62,7 +62,7 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
       resource_id: item.id,
     };      await submissionWorkflowService.createCommunication(submissionId, data);
       
-      toast.success('Note saved');
+      notify.success('Note saved');
       
       if (onNoteSaved) {
         onNoteSaved();
@@ -70,7 +70,7 @@ const QuickNoteModal = ({ isOpen, toggle, item, onNoteSaved }) => {
       
       toggle();
     } catch (error) {
-      toast.error(error.message || 'Failed to save note');
+      notify.fromError(error, "Couldn't save the note");
     } finally {
       setSaving(false);
     }

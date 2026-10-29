@@ -4,7 +4,7 @@ import {
   Button, Alert, TabContent, TabPane, Nav, NavItem, NavLink, 
   Spinner, Row, Col
 } from 'reactstrap';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { adminCustomizationService } from '../../../services/admin/adminCustomizationService';
 import { useAuth } from '../../../contexts/AuthContext'; // Import the auth context
 
@@ -177,7 +177,7 @@ function AdminCustomizations() {
             );
 
             if(!update) {
-                toast.error('Failed to update section. Please try again.');
+                notify.error("Couldn't update the section");
                 return;
             }
             
@@ -187,13 +187,13 @@ function AdminCustomizations() {
             );
             
             setCustomizations(updatedCustomizations);
-            toast.success(`Successfully updated ${section.title} for ${editedCustomization.campus_location}.`);
+            notify.success('Settings updated');
             
             // Hide success message after 5 seconds
             setTimeout(() => setSuccess(null), 5000);
         } catch (error) {
             console.error('Error updating section:', error);
-            toast.error(`Failed to update section: ${error.message}`);
+            notify.fromError(error, "Couldn't update the section");
         } finally {
             setSectionLoading(prev => ({
                 ...prev,

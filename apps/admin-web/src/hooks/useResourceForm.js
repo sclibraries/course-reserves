@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { adminMaterialTypeService } from '../services/admin/adminMaterialTypeService';
-import { toast } from 'react-toastify';
+import { notify } from '../services/notify';
 
 /**
  * useResourceForm - Custom hook for handling resource form state and actions
@@ -105,7 +105,7 @@ export const useResourceForm = (initialData = {}) => {
       setMaterialTypeFields(data);
     } catch (err) {
       console.error('Error fetching fields:', err);
-      toast.error('Failed to load material type fields');
+      notify.fromError(err, "Couldn't load material type fields");
       setError('Failed to load material type fields');
     }
   };

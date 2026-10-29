@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, X } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import useSubmissionWorkflowStore from '../../../store/submissionWorkflowStore';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import { buildProcessingHandoff, getProcessingBlockReason } from '../../../services/admin/processingHandoff';
@@ -69,17 +69,17 @@ function SubmissionDetail() {
     if (confirm('Are you sure you want to reopen this item for processing?')) {
       const result = await updateItemStatus(itemId, 'in_progress');
       if (result.success) {
-        toast.success('Item reopened');
+        notify.success('Item reopened');
         await refreshSubmission();
       } else {
-        toast.error(result.error || 'Failed to reopen item');
+        notify.fromError(result.error, "Couldn't reopen the item");
       }
     }
   };
   const handleGoToWork = (item) => {
     const handoff = buildProcessingHandoff(item);
     if (!handoff) {
-      toast.error(getProcessingBlockReason(item));
+      notify.error(getProcessingBlockReason(item));
       return;
     }
     navigate(handoff.pathname, { state: handoff.state });

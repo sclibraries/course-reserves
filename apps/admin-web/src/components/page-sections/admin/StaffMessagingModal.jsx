@@ -15,7 +15,7 @@ import {
   Spinner,
 } from 'reactstrap';
 import { FaComment, FaPaperPlane, FaTimes } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import StaffMessageFields from './StaffMessageFields';
 import './StaffMessagingModal.css';
@@ -131,7 +131,7 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
     e.preventDefault();
 
     if (!message.trim()) {
-      toast.error('Please enter a message');
+      notify.error('Please enter a message');
       return;
     }
 
@@ -142,7 +142,7 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
       
       if (!submissionId) {
         console.error('Item structure:', item);
-        toast.error('Unable to find submission ID');
+        notify.error('Unable to find submission ID');
         setSending(false);
         return;
       }
@@ -161,7 +161,7 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
 
       await submissionWorkflowService.createCommunication(submissionId, data);
       
-      toast.success('Message sent successfully');
+      notify.success('Message sent');
       
       if (onMessageSent) {
         onMessageSent();
@@ -169,7 +169,7 @@ const StaffMessagingModal = ({ isOpen, toggle, item, onMessageSent }) => {
       
       toggle();
     } catch (error) {
-      toast.error(error.message || 'Failed to send message');
+      notify.fromError(error, "Couldn't send the message");
     } finally {
       setSending(false);
     }

@@ -22,11 +22,12 @@
  */
 
 import PropTypes from 'prop-types';
-import { Form, FormGroup, Label, Input, Button, Table, Spinner } from 'reactstrap';
+import { Form, FormGroup, Label, Input, Button, Table, Spinner, Alert } from 'reactstrap';
 
 export const AdminReuseForm = ({ 
   searchTerm, 
   searchResults, 
+  error,
   onSearchTermChange, 
   onSearch, 
   onReuse, 
@@ -44,6 +45,7 @@ export const AdminReuseForm = ({
 
   return (
     <>
+      {error && <Alert color="danger" role="alert" fade={false}>{error}</Alert>}
       {/* Search Form */}
       <Form onSubmit={handleSubmit} className="mb-4">
         <FormGroup>
@@ -154,6 +156,7 @@ export const AdminReuseForm = ({
 };
 
 AdminReuseForm.propTypes = {
+  error: PropTypes.string,
   /** Current search term */
   searchTerm: PropTypes.string,
   /** Array of search results to display */
@@ -174,6 +177,7 @@ AdminReuseForm.propTypes = {
 };
 
 AdminReuseForm.defaultProps = {
+  error: null,
   searchTerm: '',
   searchResults: [],
   isLoading: false

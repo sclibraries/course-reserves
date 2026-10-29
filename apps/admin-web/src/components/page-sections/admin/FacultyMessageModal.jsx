@@ -19,7 +19,7 @@ import {
   Alert
 } from 'reactstrap';
 import { FaEnvelope, FaPaperPlane, FaTimes } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 
 const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
@@ -40,12 +40,12 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
     e.preventDefault();
 
     if (!message.trim()) {
-      toast.error('Please enter a message');
+      notify.error('Please enter a message');
       return;
     }
 
     if (!subject.trim()) {
-      toast.error('Please enter a subject');
+      notify.error('Please enter a subject');
       return;
     }
 
@@ -56,7 +56,7 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
       
       if (!submissionId) {
         console.error('Item structure:', item);
-        toast.error('Unable to find submission ID');
+        notify.error('Unable to find submission ID');
         setSending(false);
         return;
       }
@@ -72,7 +72,7 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
 
       await submissionWorkflowService.createCommunication(submissionId, data);
       
-      toast.success('Message sent to faculty');
+      notify.success('Message sent to faculty');
       
       if (onMessageSent) {
         onMessageSent();
@@ -80,7 +80,7 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
       
       toggle();
     } catch (error) {
-      toast.error(error.message || 'Failed to send message');
+      notify.fromError(error, "Couldn't send the message");
     } finally {
       setSending(false);
     }

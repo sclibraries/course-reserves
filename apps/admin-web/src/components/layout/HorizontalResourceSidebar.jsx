@@ -19,7 +19,7 @@ import {
   InputGroup,
 } from 'reactstrap';
 import { FaSearch, FaRedo } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { notify } from '../../services/notify';
 import PropTypes from 'prop-types';
 import useResourceSearchStore from '../../store/resourceSearchStore';
 import { adminMaterialTypeService } from '../../services/admin/adminMaterialTypeService';
@@ -63,7 +63,7 @@ function HorizontalResourceSidebar({ refreshResources }) {
         setMaterialTypes(data);
       } catch (err) {
         console.error('Error fetching material types:', err);
-        toast.error('Error fetching material types.');
+        notify.fromError(err, "Couldn't load material types");
       }
     };
     fetchMaterialTypes();
@@ -103,10 +103,10 @@ function HorizontalResourceSidebar({ refreshResources }) {
       });
       setSearchResults(data);
       setPagination(pagination);
-      toast.success('Search completed successfully.');
+      notify.success('Search completed');
     } catch (err) {
       console.error('Failed to search resources:', err);
-      toast.error(err.message || 'Failed to search resources.');
+      notify.fromError(err, "Couldn't search resources");
     } finally {
       setLoading(false);
     }

@@ -5,7 +5,6 @@
  */
 import { Alert, Badge, Button, Container, Spinner } from 'reactstrap';
 import { FaArrowLeft } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import useWorkQueueDetail from '../hooks/admin/useWorkQueueDetail';
 import WorkQueueSidebar from '../components/page-sections/admin/work-queue/WorkQueueSidebar';
 import WorkQueueChannelContent from '../components/page-sections/admin/work-queue/WorkQueueChannelContent';
@@ -120,7 +119,6 @@ function WorkQueueDetail() {
           onOpenFacultyMessage={() => setFacultyMessageModal({ isOpen: true, item: selectedItem })}
           onOpenNote={() => setNoteModal({ isOpen: true, item: selectedItem })}
           onComplete={() => {
-            toast.success('Item completed!');
             fetchClaimedItems();
             navigate(getCompletionReturnPath());
           }}

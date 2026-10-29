@@ -66,9 +66,12 @@ describe('facultyProxyService', () => {
     );
   });
 
-  it('surfaces API errors to callers', async () => {
-    fetch.mockResolvedValue(response({ message: 'Staff access required' }, false, 403));
+  it('keeps API errors generic and preserves their reference', async () => {
+    fetch.mockResolvedValue(response({ message: 'Synthetic server detail', reference: 'SYNTH-403' }, false, 403));
 
-    await expect(facultyProxyService.listGrants()).rejects.toThrow('Staff access required');
+    await expect(facultyProxyService.listGrants()).rejects.toMatchObject({
+      message: 'Faculty proxy request failed',
+      reference: 'SYNTH-403',
+    });
   });
 });

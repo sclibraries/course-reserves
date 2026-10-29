@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { adminCourseService } from '../services/admin/adminCourseService';
 import { fetchRecords } from '../components/page-sections/course-record/api';
-import { toast } from 'react-toastify';
+import { notify } from '../services/notify';
 
 export const useAdminResourceStore = create((set, get) => ({
   // Electronic resources state
@@ -49,8 +49,8 @@ export const useAdminResourceStore = create((set, get) => ({
       set({ resources: updated });
     } catch (err) {
       console.error('Error fetching resources:', err);
-      toast.error('Failed to fetch resources.');
-      set({ error: err.message || 'Failed to fetch resources' });
+      notify.fromError(err, "Couldn't load resources");
+      set({ error: "Couldn't load resources" });
       throw err;
     }
   },
@@ -108,9 +108,9 @@ export const useAdminResourceStore = create((set, get) => ({
       set({ printResources: merged, loading: false });
     } catch (err) {
       console.error('Error loading print resources:', err);
-      const errorMsg = err.message || 'Error fetching print resources';
+      const errorMsg = "Couldn't load print resources";
       set({ error: errorMsg, loading: false });
-      toast.error(errorMsg);
+      notify.fromError(err, errorMsg);
       throw err;
     }
   },
@@ -129,8 +129,8 @@ export const useAdminResourceStore = create((set, get) => ({
       }
     } catch (err) {
       console.error('Error fetching linked courses:', err);
-      toast.error('Failed to fetch linked courses.');
-      set({ error: err.message || 'Failed to fetch linked courses' });
+      notify.fromError(err, "Couldn't load linked courses");
+      set({ error: "Couldn't load linked courses" });
       throw err;
     }
   },
@@ -148,10 +148,10 @@ export const useAdminResourceStore = create((set, get) => ({
         await get().fetchLinkedCourses(offeringId);
       }
       
-      toast.success('Resource unlinked successfully.');
+      notify.success('Resource unlinked');
     } catch (err) {
       console.error('Error unlinking resource:', err);
-      toast.error('Failed to unlink resource.');
+      notify.fromError(err, "Couldn't unlink the resource");
       throw err;
     }
   },
@@ -218,10 +218,10 @@ export const useAdminResourceStore = create((set, get) => ({
       // 6) Update state
       set({ resources: sortedElectronic, printResources: mergedPrint });
   
-      toast.success('Resource order updated successfully');
+      notify.success('Resource order updated');
     } catch (err) {
       console.error('Error updating unified resource order:', err);
-      toast.error('Failed to update resource order.');
+      notify.fromError(err, "Couldn't update the resource order");
       
       // On error, try to refresh the data to get back to a consistent state
       try {

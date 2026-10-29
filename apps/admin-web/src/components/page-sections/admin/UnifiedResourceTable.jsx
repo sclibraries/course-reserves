@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Table, Button, Alert, Input, Spinner } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useDrag, useDrop } from 'react-dnd';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { buildFolioVerificationUrl } from '../../../util/urlHelpers';
 import ResourceSortDropdown from './ResourceSortDropdown';
 import BulkOperationsPanel from './BulkOperationsPanel';
@@ -637,7 +637,7 @@ function UnifiedResourceTable({
       onSortChange('manual'); // Reset to default order to show backend-provided order
     } catch (error) {
       console.error('Error updating order:', error);
-      toast.error('Failed to update resource order. Please try again.');
+      notify.fromError(error, "Couldn't update the resource order");
     } finally {
       setIsUpdating(false);
     }

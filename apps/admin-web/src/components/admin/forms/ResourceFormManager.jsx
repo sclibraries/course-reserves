@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, ModalHeader, ModalBody, Container, Row, Col, Card, CardBody, Table, Spinner, Alert, Button, ListGroup, ListGroupItem } from 'reactstrap';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 
 // Form components
 import BaseResourceForm from './common/BaseResourceForm';
@@ -198,17 +198,16 @@ export const ResourceFormManager = ({
       }
 
       if (result !== false) {
-        toast.success(formType === ResourceFormType.EDIT ? 'Resource updated successfully' : 'Resource added successfully');
-        onSubmit?.(formData); // Pass formData to the callback
+        notify.success(formType === ResourceFormType.EDIT ? 'Resource updated' : 'Resource added');
+        onSubmit?.(formData);
         onClose();
       }
       
       return result;
     } catch (err) {
       console.error('Error submitting resource:', err);
-      const message = err.message || 'Failed to save resource';
-      setError(message);
-      toast.error(message);
+      setError("Couldn't save the resource");
+      notify.fromError(err, "Couldn't save the resource");
       throw err;
     } finally {
       setLoading(false);
@@ -300,29 +299,28 @@ export const ResourceFormManager = ({
     }
   };
 
-  /**
-   * Handle reuse resource action
-   */
   const handleReuseResource = async (resourceId) => {
+    setError(null);
+    setLoading(true);
     try {
-      setLoading(true);
       await additionalProps.onReuse?.(resourceId);
-      toast.success('Resource added to course successfully');
-      onSubmit?.();
+      try {
+        await onSubmit?.();
+      } catch {
+        setError('Resource linked, but the list could not be refreshed.');
+        return;
+      }
+      notify.success('Resource linked');
       onClose();
     } catch (err) {
       console.error('Error reusing resource:', err);
-      const message = err.message || 'Failed to reuse resource';
-      setError(message);
-      toast.error(message);
+      setError("Couldn't add the resource to the course");
+      notify.fromError(err, "Couldn't link the resource");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Copy text to clipboard with feedback
-   */
   const handleCopyToClipboard = async (value, fieldName) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -330,7 +328,7 @@ export const ResourceFormManager = ({
       setTimeout(() => setCopiedField(null), 2000);
     } catch (err) {
       console.error('Failed to copy text:', err);
-      toast.error('Failed to copy to clipboard');
+      notify.fromError(err, "Couldn't copy the text");
     }
   };
 
@@ -376,7 +374,7 @@ export const ResourceFormManager = ({
       setCurrentPage(nextPage);
     } catch (err) {
       console.error('Error loading more results:', err);
-      toast.error(<span style={{ whiteSpace: 'pre-line' }}>{err.message || getEdsSearchErrorMessage()}</span>);
+      notify.fromError(err, "Couldn't load more library results");
     } finally {
       setLoading(false);
     }
@@ -508,14 +506,15 @@ export const ResourceFormManager = ({
     switch (formType) {
       case ResourceFormType.REUSE:
         return (
-          <AdminReuseForm
-            searchTerm={searchTerm}
-            searchResults={searchResults}
-            onSearchTermChange={setSearchTerm}
-            onSearch={handleSearch}
-            onReuse={handleReuseResource}
-            isLoading={loading}
-          />
+            <AdminReuseForm
+              error={error}
+              searchTerm={searchTerm}
+              searchResults={searchResults}
+              onSearchTermChange={setSearchTerm}
+              onSearch={handleSearch}
+              onReuse={handleReuseResource}
+              isLoading={loading}
+            />
         );
 
       case ResourceFormType.CROSSLINK:
@@ -830,11 +829,6 @@ ResourceFormManager.propTypes = {
   onReuse: PropTypes.func,
   onUpdate: PropTypes.func,
   resourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-};
-
-ResourceFormManager.defaultProps = {
-  initialData: {},
-  searchResults: [],
 };
 
 export default ResourceFormManager;

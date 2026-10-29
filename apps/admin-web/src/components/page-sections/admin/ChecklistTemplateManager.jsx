@@ -8,7 +8,7 @@ import {
   Spinner,
   Alert
 } from 'reactstrap';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { checklistService } from '../../../services/admin/checklistService';
 import ChecklistTemplateEditor from './ChecklistTemplateEditor';
@@ -45,14 +45,14 @@ function ChecklistTemplateManager() {
     }
   };
 
-  const handleDuplicate = async (templateId, templateName) => {
+  const handleDuplicate = async (templateId) => {
     try {
       await checklistService.duplicateTemplate(templateId);
-      toast.success(`Template "${templateName}" duplicated successfully`);
+      notify.success('Template duplicated');
       loadTemplates();
     } catch (err) {
       console.error('Failed to duplicate template:', err);
-      toast.error('Failed to duplicate template');
+      notify.fromError(err, "Couldn't duplicate the template");
     }
   };
 
@@ -63,11 +63,11 @@ function ChecklistTemplateManager() {
 
     try {
       await checklistService.deleteTemplate(templateId);
-      toast.success(`Template "${templateName}" deleted successfully`);
+      notify.success('Template deleted');
       loadTemplates();
     } catch (err) {
       console.error('Failed to delete template:', err);
-      toast.error('Failed to delete template');
+      notify.fromError(err, "Couldn't delete the template");
     }
   };
 
@@ -82,7 +82,7 @@ function ChecklistTemplateManager() {
       setExpandedTemplate(details);
     } catch (err) {
       console.error('Failed to load template details:', err);
-      toast.error('Failed to load template details');
+      notify.fromError(err, "Couldn't load template details");
     }
   };
 
@@ -97,7 +97,7 @@ function ChecklistTemplateManager() {
   };
 
   const handleEditorSave = () => {
-    toast.success('Checklist template saved successfully');
+    notify.success('Checklist template saved');
     setShowEditor(false);
     setEditingTemplateId(null);
     loadTemplates();

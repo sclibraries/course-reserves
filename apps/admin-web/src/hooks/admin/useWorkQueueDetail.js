@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { notify } from '../../services/notify';
 import useSubmissionWorkflowStore from '../../store/submissionWorkflowStore';
 import { submissionWorkflowService } from '../../services/admin/submissionWorkflowService';
 import { matchesCommunicationChannel } from '../../util/messageChannels';
@@ -65,7 +65,7 @@ export default function useWorkQueueDetail() {
       if (item) {
         setSelectedItem(item);
       } else {
-        toast.warning('Item not found in your work queue');
+        notify.warning('Item not found in your work queue');
         navigate('/admin?tab=my-work');
       }
     } else if (!itemId && formattedItems && formattedItems.length > 0) {
@@ -75,11 +75,15 @@ export default function useWorkQueueDetail() {
 
   const handleStatusChange = async (changedItemId, newStatus) => {
     try {
-      await updateItemStatus(changedItemId, newStatus);
-      toast.success('Status updated successfully');
+      const result = await updateItemStatus(changedItemId, newStatus);
+      if (!result?.success) {
+        notify.fromError(result?.error, "Couldn't update the item status");
+        return;
+      }
+      notify.success('Status updated');
       await fetchClaimedItems();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (error) {
+      notify.fromError(error, "Couldn't update the item status");
     }
   };
 

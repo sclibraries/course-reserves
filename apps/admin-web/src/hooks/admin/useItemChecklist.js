@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../../services/notify';
 import { useAuth } from '../../contexts/AuthContext';
 import { checklistService } from '../../services/admin/checklistService';
 import {
@@ -73,13 +73,13 @@ export default function useItemChecklist(itemId, onComplete) {
     try {
       setSaving(true);
       await checklistService.assignChecklistToItem(itemId, templateId, user?.username);
-      toast.success('Checklist assigned successfully');
+      notify.success('Checklist assigned');
       setShowSelector(false);
       setNoChecklistAssigned(false);
       loadChecklist();
     } catch (err) {
       console.error('Failed to assign checklist:', err);
-      toast.error('Failed to assign checklist');
+      notify.fromError(err, "Couldn't assign the checklist");
     } finally {
       setSaving(false);
     }
@@ -97,10 +97,10 @@ export default function useItemChecklist(itemId, onComplete) {
           ? { ...task, completed: newStatus, completed_at: newStatus ? new Date().toISOString() : null }
           : task)
       }));
-      toast.success(`Task ${newStatus ? 'completed' : 'unchecked'}`);
+      notify.success(newStatus ? 'Task completed' : 'Task reopened');
     } catch (err) {
       console.error('Failed to update task:', err);
-      toast.error('Failed to update task');
+      notify.fromError(err, "Couldn't update the checklist task");
     } finally {
       setSaving(false);
     }
@@ -127,11 +127,11 @@ export default function useItemChecklist(itemId, onComplete) {
     try {
       setSaving(true);
       await checklistService.completeItemChecklist(itemId, user?.username);
-      toast.success('Item completed successfully!');
+      notify.success('Item completed');
       if (onComplete) onComplete();
     } catch (err) {
       console.error('Failed to complete checklist:', err);
-      toast.error('Failed to complete checklist');
+      notify.fromError(err, "Couldn't complete the checklist");
       setSaving(false);
     }
   };

@@ -14,7 +14,7 @@ import {
   Spinner,
   Table,
 } from 'reactstrap';
-import { toast } from 'react-toastify';
+import { notify } from '../../../../services/notify';
 import { formatLocalDate } from '../../../../util/dateBoundaries';
 import { facultyProxyService } from '../../../../services/admin/facultyProxyService';
 import ProxyActivityLog from './ProxyActivityLog';
@@ -111,12 +111,12 @@ export default function FacultyProxyAccess() {
     if (!grantToRevoke) return;
     setRevoking(true);
     try {
-      const result = await facultyProxyService.revokeGrant(grantToRevoke.permission_id);
-      toast.success(result.message || 'Proxy access revoked');
+      await facultyProxyService.revokeGrant(grantToRevoke.permission_id);
+      notify.success('Proxy access revoked');
       setGrantToRevoke(null);
       await loadData();
     } catch (revokeError) {
-      toast.error(revokeError.message || 'Unable to revoke proxy access.');
+      notify.fromError(revokeError, "Couldn't revoke proxy access");
     } finally {
       setRevoking(false);
     }

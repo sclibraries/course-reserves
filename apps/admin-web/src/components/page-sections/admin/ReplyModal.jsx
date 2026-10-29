@@ -21,7 +21,7 @@ import {
   Alert
 } from 'reactstrap';
 import { FaReply, FaPaperPlane, FaTimes, FaAt } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import './StaffMessagingModal.css'; // Reuse the same CSS
 
@@ -122,7 +122,7 @@ const ReplyModal = ({ isOpen, toggle, parentMessage, submissionId, onReplySent }
     e.preventDefault();
 
     if (!message.trim()) {
-      toast.error('Please enter a reply message');
+      notify.error('Please enter a reply message');
       return;
     }
 
@@ -139,7 +139,7 @@ const ReplyModal = ({ isOpen, toggle, parentMessage, submissionId, onReplySent }
 
       const response = await submissionWorkflowService.createCommunication(submissionId, data);
       
-      toast.success('Reply sent successfully');
+      notify.success('Reply sent');
       
       if (onReplySent) {
         // Pass the created reply back for optimistic update
@@ -161,7 +161,7 @@ const ReplyModal = ({ isOpen, toggle, parentMessage, submissionId, onReplySent }
       
       toggle();
     } catch (error) {
-      toast.error(error.message || 'Failed to send reply');
+      notify.fromError(error, "Couldn't send the reply");
     } finally {
       setSending(false);
     }

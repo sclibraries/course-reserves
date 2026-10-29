@@ -1,6 +1,18 @@
 import { apiConfig } from '../../../config/api.config';
 import { authFetch } from '../../http/authFetch';
 
+async function createRequestError(response, message) {
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    // Some failed responses have no JSON body.
+  }
+  return Object.assign(new Error(message), {
+    reference: payload.reference || payload.reference_id,
+  });
+}
+
 export const communicationsApi = {
   /**
    * Get all communications for a submission
@@ -19,7 +31,7 @@ export const communicationsApi = {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch communications: ${response.status}`);
+        throw await createRequestError(response, 'Communications request failed');
       }
 
       const data = await response.json();
@@ -51,8 +63,7 @@ export const communicationsApi = {
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to create communication: ${response.status}`);
+        throw await createRequestError(response, 'Communication request failed');
       }
 
       return await response.json();
@@ -82,8 +93,7 @@ export const communicationsApi = {
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to update communication: ${response.status}`);
+        throw await createRequestError(response, 'Communication request failed');
       }
 
       return await response.json();
@@ -111,7 +121,7 @@ export const communicationsApi = {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to mark as read: ${response.status}`);
+        throw await createRequestError(response, 'Communication request failed');
       }
 
       return await response.json();

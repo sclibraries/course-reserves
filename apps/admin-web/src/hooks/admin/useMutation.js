@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../../services/notify';
 import { getClaimsErrorMessage } from '../../services/admin/workflowClaims/claimsFormatters';
 
 export default function useMutation(formatError = getClaimsErrorMessage) {
@@ -15,7 +15,7 @@ export default function useMutation(formatError = getClaimsErrorMessage) {
       const result = await request();
       await onSuccess?.(result);
       await reload?.();
-      if (successMessage) toast.success(successMessage);
+      if (successMessage) notify.success(successMessage);
       return result;
     } catch (requestError) {
       await onError?.(requestError);

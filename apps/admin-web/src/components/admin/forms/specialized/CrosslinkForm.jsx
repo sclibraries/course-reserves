@@ -19,7 +19,7 @@ import { useBuildQuery } from '../../../../hooks/useBuildQuery';
 import { adminCourseService } from '../../../../services/admin/adminCourseService';
 import { transformFolioCourseToLocal } from '../../../../util/adminTransformers';
 import useCourseStore from '../../../../store';
-import { toast } from 'react-toastify';
+import { notify } from '../../../../services/notify';
 import { useAdminCourseStore } from '../../../../store/adminCourseStore';
 import useAdminSearchStore from '../../../../store/adminSearchStore';
 import useSearchStore from '../../../../store/searchStore';
@@ -170,7 +170,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
         setLinkedCourses(linked);
       } catch (err) {
         console.error('Error loading linked courses:', err);
-        toast.error('Error loading linked courses.');
+        notify.fromError(err, "Couldn't load linked courses");
       } finally {
         setLoadingLinked(false);
       }
@@ -190,7 +190,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
       await fetchResults(cqlQuery);
     } catch (err) {
       console.error('Error fetching courses:', err);
-      toast.error('Error fetching courses. Please try again.');
+      notify.fromError(err, "Couldn't load courses");
     }
   };
 
@@ -210,7 +210,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
       // Validate folioCourseId before making API call
       if (!folioCourseId) {
         console.error('Missing folioCourseId from FOLIO course data:', folioCourse);
-        toast.error('Invalid course data. Missing course listing ID.');
+        notify.error('Invalid course data. Missing course listing ID.');
         return;
       }
       
@@ -246,20 +246,18 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
 
       // Verify we have the necessary data for linking
       if (!data || !data.offering_id) {
-        toast.error('Error linking course. Source course offering ID is missing.');
+        notify.error('Error linking course. Source course offering ID is missing.');
         return;
       }
 
       if (!localCourse || !localCourse.offerings || localCourse.offerings.length === 0) {
-        toast.error('Error linking course. Target course offering is missing.');
+        notify.error('Error linking course. Target course offering is missing.');
         return;
       }
 
       // Link the local course to the resource using provided IDs
       await adminCourseService.linkCourses(data.offering_id, localCourse.offerings[0].offering_id);
 
-      toast.success('Course linked successfully.');
-      
       // Refresh linked courses list
       const linked = await adminCourseService.getLinkedCourses(data.offering_id);
       setLinkedCourses(linked);
@@ -267,9 +265,10 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
       if (onSuccess) {
         onSuccess();
       }
+      notify.success('Course linked');
     } catch (err) {
       console.error('Error linking FOLIO course:', err);
-      toast.error(`Error linking course: ${err.message}`);
+      notify.fromError(err, "Couldn't link the course");
     }
   };
 
@@ -280,14 +279,14 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
    */
   const handleUnlinkCourse = async (offeringLinkId) => {
     if (!offeringLinkId) {
-      toast.error('Error unlinking course. Link ID is missing.');
+      notify.error('Error unlinking course. Link ID is missing.');
       return;
     }
 
     if (window.confirm('Are you sure you want to unlink this course?')) {
       try {
         await adminCourseService.unlinkCourses(offeringLinkId);
-        toast.success('Course unlinked successfully.');
+        notify.success('Course unlinked');
         
         // Refresh linked courses list
         const data = course;
@@ -301,7 +300,7 @@ export function CrossLinkForm({ onSuccess, courseInfo }) {
         }
       } catch (err) {
         console.error('Error unlinking course:', err);
-        toast.error(`Error unlinking course: ${err.message}`);
+        notify.fromError(err, "Couldn't unlink the course");
       }
     }
   };

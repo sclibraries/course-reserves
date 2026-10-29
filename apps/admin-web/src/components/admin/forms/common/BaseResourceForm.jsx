@@ -25,7 +25,6 @@ import ResourceLinks from '../fields/ResourceLinks';
 // Import services
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
 import { useAdminCourseStore } from '../../../../store/adminCourseStore';
-import { toast } from 'react-toastify';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import '../../../../css/AdminForms.css';
 
@@ -440,8 +439,7 @@ export const BaseResourceForm = ({
       
     } catch (error) {
       console.error('Error saving resource:', error);
-      setErrorMessage(error.message || 'Failed to save resource');
-      toast.error(error.message || 'Failed to save resource');
+      setErrorMessage("Couldn't save the resource");
     } finally {
       setIsLoading(false);
     }

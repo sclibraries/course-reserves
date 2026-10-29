@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../../../../services/notify';
 import { apiConfig } from '../../../../config/api.config';
 
 const usePermissionManagement = (token) => {
@@ -32,7 +32,7 @@ const usePermissionManagement = (token) => {
       setPermissions(data.institutions || {});
     } catch (error) {
       console.error('Error fetching permissions:', error);
-      toast.error('Failed to load permission data');
+      notify.fromError(error, "Couldn't load permission data");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ const usePermissionManagement = (token) => {
       });
     } catch (error) {
       console.error('Error fetching available permissions:', error);
-      toast.error('Failed to load available permission data');
+      notify.fromError(error, "Couldn't load available permissions");
     }
   }, [token]);
   
@@ -99,10 +99,10 @@ const usePermissionManagement = (token) => {
         return newPermissions;
       });
       
-      toast.success(`Permission ${updatedPermission.granted ? 'granted' : 'revoked'}`);
+      notify.success(updatedPermission.granted ? 'Permission granted' : 'Permission revoked');
     } catch (error) {
       console.error('Error toggling permission:', error);
-      toast.error('Failed to update permission');
+      notify.fromError(error, "Couldn't update the permission");
     } finally {
       setUpdating(false);
     }

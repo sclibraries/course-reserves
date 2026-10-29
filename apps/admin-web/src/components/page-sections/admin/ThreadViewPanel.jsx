@@ -23,7 +23,7 @@ import {
   FaPaperPlane
 } from 'react-icons/fa';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import './CommunicationsPanel.css';
 
 const ThreadViewPanel = ({ thread, onClose, onReplyAdded }) => {
@@ -54,7 +54,7 @@ const ThreadViewPanel = ({ thread, onClose, onReplyAdded }) => {
 
   const handleSubmitReply = async () => {
     if (!replyText.trim()) {
-      toast.warning('Please enter a reply');
+      notify.warning('Please enter a reply');
       return;
     }
 
@@ -78,9 +78,6 @@ const ThreadViewPanel = ({ thread, onClose, onReplyAdded }) => {
       const result = await submissionWorkflowService.createCommunication(submissionId, replyData);
       
       if (result) {
-        toast.success('Reply added');
-        setReplyText('');
-        
         // Fetch the full communication data including the new reply
         const updatedComms = await submissionWorkflowService.getSubmissionCommunications(submissionId);
         
@@ -96,10 +93,12 @@ const ThreadViewPanel = ({ thread, onClose, onReplyAdded }) => {
             onReplyAdded(newReply);
           }
         }
+        notify.success('Reply added');
+        setReplyText('');
       }
     } catch (error) {
       console.error('Error submitting reply:', error);
-      toast.error('Failed to add reply');
+      notify.fromError(error, "Couldn't add the reply");
     } finally {
       setSubmitting(false);
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../../../../services/notify';
 import { config } from '../../../../config';
 
 const useUserManagement = (token) => {
@@ -59,11 +59,11 @@ const useUserManagement = (token) => {
       if (response.ok) {
         setPendingUsers(data || []);
       } else {
-        toast.error(data.message || 'Failed to fetch pending users');
+        notify.fromError(data, "Couldn't load pending users");
       }
     } catch (error) {
       console.error('Error fetching pending users:', error);
-      toast.error('An unexpected error occurred while fetching pending users.');
+      notify.fromError(error, "Couldn't load pending users");
     } finally {
       setLoading(false);
     }
@@ -87,11 +87,11 @@ const useUserManagement = (token) => {
       if (response.ok) {
         setUsers(data || []);
       } else {
-        toast.error(data.message || 'Failed to fetch users');
+        notify.fromError(data, "Couldn't load users");
       }
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('An unexpected error occurred while fetching users.');
+      notify.fromError(error, "Couldn't load users");
     } finally {
       setLoading(false);
     }
@@ -164,13 +164,13 @@ const useUserManagement = (token) => {
         setPendingUsers(pendingUsers.filter(u => u.id !== user.id));
         setModalOpen(false);
         fetchAllUsers(); // Refresh the all users list
-        toast.success(`User ${user.full_name} has been approved successfully`);
+        notify.success('User approved');
       } else {
-        toast.error(data.message || 'Failed to approve user');
+        notify.fromError(data, "Couldn't approve the user");
       }
     } catch (error) {
       console.error('Error approving user:', error);
-      toast.error('An unexpected error occurred while approving the user.');
+      notify.fromError(error, "Couldn't approve the user");
     }
   };
   
@@ -189,14 +189,14 @@ const useUserManagement = (token) => {
         // Remove user from pending list
         setPendingUsers(pendingUsers.filter(u => u.id !== user.id));
         setModalOpen(false);
-        toast.success(`User ${user.full_name} has been rejected`);
+        notify.success('User rejected');
       } else {
         const data = await response.json();
-        toast.error(data.message || 'Failed to reject user');
+        notify.fromError(data, "Couldn't reject the user");
       }
     } catch (error) {
       console.error('Error rejecting user:', error);
-      toast.error('An unexpected error occurred while rejecting the user.');
+      notify.fromError(error, "Couldn't reject the user");
     }
   };
 
@@ -289,7 +289,7 @@ const useUserManagement = (token) => {
     e.preventDefault();
     
     if (!validateEditForm()) {
-      toast.error('Please correct the errors in the form');
+      notify.error('Please correct the errors in the form');
       return;
     }
     
@@ -313,13 +313,13 @@ const useUserManagement = (token) => {
           user.id === selectedUser.id ? { ...user, ...editFormData } : user
         ));
         setEditModalOpen(false);
-        toast.success(`User ${editFormData.full_name} has been updated successfully`);
+        notify.success('User updated');
       } else {
-        toast.error(data.message || 'Failed to update user');
+        notify.fromError(data, "Couldn't update the user");
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('An unexpected error occurred while updating the user.');
+      notify.fromError(error, "Couldn't update the user");
     } finally {
       setSubmitting(false);
     }
@@ -330,7 +330,7 @@ const useUserManagement = (token) => {
     e.preventDefault();
     
     if (!validateCreateForm()) {
-      toast.error('Please correct the errors in the form');
+      notify.error('Please correct the errors in the form');
       return;
     }
     
@@ -357,13 +357,13 @@ const useUserManagement = (token) => {
         }
         
         setCreateModalOpen(false);
-        toast.success(`User ${createFormData.full_name} has been created successfully`);
+        notify.success('User created');
       } else {
-        toast.error(data.message || 'Failed to create user');
+        notify.fromError(data, "Couldn't create the user");
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      toast.error('An unexpected error occurred while creating the user.');
+      notify.fromError(error, "Couldn't create the user");
     } finally {
       setSubmitting(false);
     }

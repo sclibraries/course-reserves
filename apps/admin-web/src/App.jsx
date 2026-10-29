@@ -5,7 +5,6 @@
  * toast notifications, and Font Awesome icons.
  * @requires react
  * @requires react-router-dom
- * @requires react-toastify
  * @requires @fortawesome/fontawesome-svg-core
  */
 import { useEffect } from 'react';
@@ -13,14 +12,13 @@ import PropTypes from 'prop-types';
 import { BrowserRouter as Router } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import CampusDetection from './components/CampusDetection';
-import { ToastContainer } from 'react-toastify';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from '@fortawesome/free-solid-svg-icons';
+import { Toaster } from './components/ui/sonner';
 import useCustomizationStore from './store/customizationStore'; // <-- Import the store
 import { AuthProvider } from './contexts/AuthContext';
 import './css/variables.css'; // Import the new variables CSS file
 import './css/App.css';
-import 'react-toastify/dist/ReactToastify.css';
 import 'react-loading-skeleton/dist/skeleton.css';
 
 // Register free solid icons for string-based FontAwesomeIcon props.
@@ -64,7 +62,7 @@ const AppContent = () => {
   return (
     <>
       <CampusDetection />
-      <ToastContainer position="top-right" autoClose={5000} />
+      <Toaster />
       <AuthProvider>
         <Layout />
       </AuthProvider>

@@ -17,7 +17,7 @@ import {
 } from 'reactstrap';
 import { FaBell, FaExclamationCircle, FaCheckCircle, FaEye, FaExternalLinkAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { notify } from '../../../services/notify';
 import { submissionWorkflowService } from '../../../services/admin/submissionWorkflowService';
 import './MyMentions.css';
 
@@ -57,9 +57,9 @@ const MyMentions = () => {
         prev.map(m => m.id === mentionId ? { ...m, is_read: true } : m)
       );
       
-      toast.success('Marked as read');
+      notify.success('Mention marked as read');
     } catch (error) {
-      toast.error('Failed to mark as read');
+      notify.fromError(error, "Couldn't mark the mention as read");
       console.error(error);
     } finally {
       setMarkingRead(prev => ({ ...prev, [mentionId]: false }));
@@ -76,7 +76,7 @@ const MyMentions = () => {
     console.log('MyMentions - Navigating to item:', itemId);
     
     if (!itemId) {
-      toast.error('Unable to determine item ID');
+      notify.error('Unable to determine item ID');
       return;
     }
     

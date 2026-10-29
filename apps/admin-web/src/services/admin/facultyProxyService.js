@@ -15,14 +15,15 @@ const withQuery = (path, filters) => {
 const request = async (url, options) => {
   const response = await authFetch(url, options);
   if (!response.ok) {
-    let message = `Faculty proxy request failed (${response.status})`;
+    let body = {};
     try {
-      const body = await response.json();
-      message = body.message || message;
+      body = await response.json();
     } catch {
-      // Keep the status-based message when the server has no JSON error body.
+      // Keep the request failure generic when no JSON error body is available.
     }
-    throw new Error(message);
+    throw Object.assign(new Error('Faculty proxy request failed'), {
+      reference: body.reference || body.reference_id,
+    });
   }
   return response.json();
 };

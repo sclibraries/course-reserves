@@ -2,7 +2,6 @@ import { MemoryRouter } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../src/css/App.css';
 import '../src/css/index.css';
-import 'react-toastify/dist/ReactToastify.css';
 import 'react-loading-skeleton/dist/skeleton.css';
 
 

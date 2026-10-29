@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   listGrants: vi.fn(),
   getActivityLog: vi.fn(),
   revokeGrant: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
+  notifySuccess: vi.fn(),
+  notifyFromError: vi.fn(),
 }));
 
 vi.mock('../../../../services/admin/facultyProxyService', () => ({
@@ -17,7 +17,9 @@ vi.mock('../../../../services/admin/facultyProxyService', () => ({
     revokeGrant: mocks.revokeGrant,
   },
 }));
-vi.mock('react-toastify', () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError } }));
+vi.mock('../../../../services/notify', () => ({
+  notify: { success: mocks.notifySuccess, fromError: mocks.notifyFromError },
+}));
 
 import FacultyProxyAccess from './FacultyProxyAccess';
 
@@ -120,8 +122,8 @@ async function renderPage({ grantsReply = grants, activityReply = activity } = {
   mocks.listGrants.mockReset().mockResolvedValue({ items: grantsReply, count: grantsReply.length });
   mocks.getActivityLog.mockReset().mockResolvedValue({ items: activityReply, count: activityReply.length });
   mocks.revokeGrant.mockReset().mockResolvedValue({ success: true, message: 'Proxy access revoked' });
-  mocks.toastSuccess.mockReset();
-  mocks.toastError.mockReset();
+  mocks.notifySuccess.mockReset();
+  mocks.notifyFromError.mockReset();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -248,6 +250,25 @@ describe('FacultyProxyAccess', () => {
 
     expect(mocks.revokeGrant).toHaveBeenCalledWith(41);
     expect(mocks.listGrants.mock.calls.length).toBeGreaterThan(initialListCalls);
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Proxy access revoked');
+    expect(mocks.notifySuccess).toHaveBeenCalledWith('Proxy access revoked');
+  });
+
+  it('reports revoke failures with a generic message and the reference', async () => {
+    await renderPage();
+    mocks.revokeGrant.mockRejectedValueOnce(Object.assign(new Error('Synthetic provider detail'), {
+      reference: 'SYNTH-REVOKE-1',
+    }));
+    await act(async () => {
+      container.querySelector('[aria-label="Revoke grant 41"]').click();
+    });
+    await act(async () => {
+      [...document.body.querySelectorAll('button')].find(button => button.textContent.includes('Revoke access')).click();
+      await Promise.resolve();
+    });
+
+    expect(mocks.notifyFromError).toHaveBeenCalledWith(
+      expect.objectContaining({ reference: 'SYNTH-REVOKE-1' }),
+      "Couldn't revoke proxy access"
+    );
   });
 });

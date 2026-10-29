@@ -13,7 +13,7 @@ import { useResourceFormModal } from '../hooks/admin/useResourceFormModal';
 
 import { useAdminCourseStore } from '../store/adminCourseStore';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { toast } from 'react-toastify';
+import { notify } from '../services/notify';
 import { buildFolioCourseUrl } from '../util/urlHelpers';
 
 // Import new component files
@@ -138,7 +138,7 @@ function AdminElectronicResources() {
             });
             setResources([]);
             setShowReusePrompt(false);
-            toast.success('New section created successfully.');
+            notify.success('New section created successfully.');
           }
         } else {
           // Offering exists for this exact term+section
@@ -188,7 +188,7 @@ function AdminElectronicResources() {
         // Fetch course data from FOLIO
         const folioCourseData = await fetchCourseData(folioCourseId);
         if (!folioCourseData || !folioCourseData.length) {
-          toast.error('Course not found in FOLIO.');
+          notify.error('Could not find the course in FOLIO');
           return;
         }
         const courseDetails = folioCourseData[0];
@@ -197,7 +197,7 @@ function AdminElectronicResources() {
         // Extract term name from FOLIO course details.
         const folioTermName = courseDetails?.courseListingObject?.termObject?.name;
         if (!folioTermName) {
-          toast.error('FOLIO course data is missing term information.');
+          notify.error('Could not find term information for this course');
           return;
         }
   
@@ -205,6 +205,7 @@ function AdminElectronicResources() {
       } catch (err) {
         console.error(err);
         setError('Error setting up course');
+        notify.fromError(err, "Couldn't load the course");
       } finally {
         setLoading(false);
       }
@@ -266,10 +267,10 @@ function AdminElectronicResources() {
       const resourceData = await adminCourseService.fetchCourseResources(reactivatedCourse.offering.offering_id);
       setResources(resourceData.resources);
       setShowReusePrompt(false);
-      toast.success('Course reactivated successfully with existing resources.');
+      notify.success('Course reactivated');
     } catch (err) {
       console.error(err);
-      toast.error('Error reactivating the course.');
+      notify.fromError(err, "Couldn't reactivate the course");
     } finally {
       setLoading(false);
     }
@@ -294,10 +295,10 @@ function AdminElectronicResources() {
       
       setResources([]);
       setShowReusePrompt(false);
-      toast.success('New course created successfully.');
+      notify.success('Course created');
     } catch (err) {
       console.error(err);
-      toast.error('Error creating new course.');
+      notify.fromError(err, "Couldn't create the course");
     } finally {
       setLoading(false);
     }
@@ -311,25 +312,16 @@ function AdminElectronicResources() {
       setSearchResults(resources);
     } catch (err) {
       console.error(err);
-      toast.error('Resource search failed.');
+      notify.fromError(err, "Couldn't search resources");
     }
   };
 
   const handleReuseResource = async (resourceId) => {
     try {
       await adminCourseService.linkExistingResources(course.offering_id, resourceId);
-      await fetchResources(course.offering_id);
-      toast.success('Resource linked successfully.');
-      resourceFormModal.openReuseForm({
-        searchTerm,
-        searchResults,
-        onSearchTermChange: setSearchTerm,
-        onSearch: handleSearchResources,
-        onReuse: handleReuseResource
-      });
     } catch (err) {
       console.error(err);
-      toast.error('Failed to link resource.');
+      throw err;
     }
   };
 
@@ -351,10 +343,10 @@ function AdminElectronicResources() {
       await submissionWorkflowService.completeProcessing(processingContext.itemId);
       setProcessingComplete(true);
       await handleUpdateResources();
-      toast.success('Submission item published to the course.');
+      notify.success('Submission item published');
     } catch (err) {
       console.error(err);
-      toast.error(err.message || 'Failed to publish submission item.');
+      notify.fromError(err, "Couldn't publish the submission item");
     } finally {
       setCompletingProcessing(false);
     }

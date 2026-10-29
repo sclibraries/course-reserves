@@ -22,8 +22,7 @@ import ResourceFormManager from '../../admin/forms/ResourceFormManager';
 import { ResourceFormType } from '../../admin/forms/constants/formTypes';
 import { useResourceFormModal } from '../../../hooks/admin/useResourceFormModal';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
-import { toast } from 'react-toastify';
-import { adjustProxy } from '../../../util/proxyUtil';
+import { notify } from '../../../services/notify';
 
 /**
  * Delete confirmation modal component
@@ -83,25 +82,7 @@ const ResourceListTable = ({ resources, refreshResources }) => {
 
   const toggleDeleteModal = () => setDeleteModalOpen(!deleteModalOpen);
 
-  const handleEdit = async (formData) => {
-    const { resource_id, ...data } = formData;
-    
-    try {
-      adjustProxy(data);
-      const update = await adminResourceService.updateResource(resource_id, data);
-      
-      if (update) {
-        editResourceModal.closeModal();
-        toast.success('Resource updated successfully');
-        refreshResources();
-      } else {
-        toast.error('Resource update failed');
-      }
-    } catch (error) {
-      console.error('Resource Update Failed:', error);
-      toast.error(`Resource update failed: ${error.message || 'Unknown error'}`);
-    }
-  };
+  const handleEdit = () => refreshResources();
 
   const handleDelete = (id) => {
     const resource = resources.find(r => r.resource_id === id);
@@ -115,11 +96,11 @@ const ResourceListTable = ({ resources, refreshResources }) => {
     try {
       setLoading(true);
       await adminResourceService.deleteResource(resourceToDelete.resource_id);
-      toast.success('Resource deleted successfully');
+      notify.success('Resource deleted');
       refreshResources();
     } catch (error) {
       console.error('Delete failed:', error);
-      toast.error(`Failed to delete resource: ${error.message || 'Unknown error'}`);
+      notify.fromError(error, "Couldn't delete the resource");
     } finally {
       setLoading(false);
       toggleDeleteModal();
