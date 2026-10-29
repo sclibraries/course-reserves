@@ -20,6 +20,7 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             $offering = $this->createOffering('one');
             $otherOffering = $this->createOffering('other');
             $electronic = $this->createSubmission('electronic', $offering);
+            $sameOffering = $this->createSubmission('same-offering', $offering);
             $physical = $this->createSubmission('physical', $offering, 'reuse');
             $shared = $this->createSubmission('shared', $offering);
             $completeOnly = $this->createSubmission('complete-only', $offering);
@@ -44,6 +45,27 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             $db->createCommand()->update('submission_new_resources', [
                 'materialized_resource_id' => $resourceId,
                 'materialized_course_resource_id' => $courseResourceId,
+                'materialized_at' => '2026-10-01 12:02:00',
+                'materialized_by_staff_id' => 'synthetic-staff',
+            ], ['id' => $sameOffering['item_id']])->execute();
+
+            $db->createCommand()->insert('resources', [
+                'name' => $this->prefix . 'shared electronic title',
+                'item_url' => 'https://example.edu/shared-item',
+            ])->execute();
+            $sharedResourceId = (int)$db->getLastInsertID();
+            $db->createCommand()->insert('course_resources', [
+                'offering_id' => $offering,
+                'resource_id' => $sharedResourceId,
+            ])->execute();
+            $sharedCourseResourceId = (int)$db->getLastInsertID();
+            $db->createCommand()->insert('course_resources', [
+                'offering_id' => $otherOffering,
+                'resource_id' => $sharedResourceId,
+            ])->execute();
+            $db->createCommand()->update('submission_new_resources', [
+                'materialized_resource_id' => $sharedResourceId,
+                'materialized_course_resource_id' => $sharedCourseResourceId,
                 'materialized_at' => '2026-10-01 12:05:00',
                 'materialized_by_staff_id' => 'synthetic-staff',
             ], ['id' => $shared['item_id']])->execute();
@@ -55,6 +77,12 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
                 'offering_id' => $offering,
             ])->execute();
             $physicalReferenceId = (int)$db->getLastInsertID();
+            $db->createCommand()->insert('physical_resource_references', [
+                'external_resource_id' => $this->prefix . 'barcode',
+                'resource_type' => 'physical',
+                'display_name' => $this->prefix . 'shared physical title',
+                'offering_id' => $otherOffering,
+            ])->execute();
             $db->createCommand()->update('submission_reuse_resources', [
                 'barcode' => $this->prefix . 'barcode',
                 'materialized_physical_reference_id' => $physicalReferenceId,
@@ -90,13 +118,17 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             Assert::assertSame($this->prefix . 'live electronic title', $liveSnapshot['resource']['name']);
             Assert::assertSame($courseResourceId, (int)$liveSnapshot['course_resource']['course_resource_id']);
 
+            $sameOfferingState = $this->state('new', $sameOffering['item_id']);
+            Assert::assertSame('verified', $sameOfferingState['reconciliation_status']);
+
             $sharedState = $this->state('new', $shared['item_id']);
             Assert::assertSame('verified_shared', $sharedState['reconciliation_status']);
             Assert::assertTrue(json_decode($sharedState['published_destination'], true)['shared']);
 
             $physicalState = $this->state('reuse', $physical['item_id']);
             Assert::assertSame('published', $physicalState['state']);
-            Assert::assertSame('verified', $physicalState['reconciliation_status']);
+            Assert::assertSame('verified_shared', $physicalState['reconciliation_status']);
+            Assert::assertTrue(json_decode($physicalState['published_destination'], true)['shared']);
             Assert::assertSame('physical', json_decode($physicalState['published_snapshot'], true)['kind']);
 
             $completeState = $this->state('new', $completeOnly['item_id']);

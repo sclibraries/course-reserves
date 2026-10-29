@@ -127,11 +127,11 @@ class SubmissionPublicationStateMigrationReconciler
         if ($expectedId && (string)$expectedId !== (string)$reference['external_resource_id']) {
             return $this->unknown('identity_mismatch', 'The physical reference does not match the item barcode or instance id.');
         }
-        $shared = $this->sharedPhysicalReference($kind, $item['id'], $referenceId);
+        $shared = $this->sharedPhysicalReference($reference);
         return [
             'verified' => true,
             'status' => $shared ? 'verified_shared' : 'verified',
-            'reason' => $shared ? 'The physical destination is referenced by multiple submission items.' : null,
+            'reason' => $shared ? 'The physical resource is also associated with another course offering.' : null,
             'destination' => [
                 'kind' => 'physical',
                 'physical_reference_id' => (int)$reference['reference_id'],
@@ -177,14 +177,11 @@ class SubmissionPublicationStateMigrationReconciler
             'SELECT field_name, field_value FROM resource_metadata WHERE resource_id = :id ORDER BY metadata_id',
             [':id' => (int)$resourceId]
         )->queryAll();
-        $shared = $this->sharedCourseResource($kind, $item['id'], $courseResourceId)
-            || (int)$this->db->createCommand(
-                'SELECT COUNT(*) FROM course_resources WHERE resource_id = :id', [':id' => (int)$resourceId]
-            )->queryScalar() > 1;
+        $shared = $this->sharedElectronicResource($resourceId, $item['offering_id']);
         return [
             'verified' => true,
             'status' => $shared ? 'verified_shared' : 'verified',
-            'reason' => $shared ? 'The resource or course destination is shared; its live content was preserved.' : null,
+            'reason' => $shared ? 'The resource is also associated with another course offering.' : null,
             'destination' => [
                 'kind' => 'electronic',
                 'resource_id' => (int)$resourceId,
@@ -211,38 +208,25 @@ class SubmissionPublicationStateMigrationReconciler
         )->queryOne() ?: null;
     }
 
-    private function sharedPhysicalReference($kind, $itemId, $referenceId)
+    private function sharedPhysicalReference(array $reference)
     {
         return (int)$this->db->createCommand(
-            'SELECT (SELECT COUNT(*) FROM submission_new_resources WHERE materialized_physical_reference_id = :id '
-            . 'AND NOT (:new_kind = "new" AND id = :new_item_id)) + '
-            . '(SELECT COUNT(*) FROM submission_reuse_resources WHERE materialized_physical_reference_id = :reuse_id '
-            . 'AND NOT (:reuse_kind = "reuse" AND id = :reuse_item_id))',
+            'SELECT COUNT(*) FROM physical_resource_references '
+            . 'WHERE external_resource_id = :external_resource_id AND offering_id <> :offering_id',
             [
-                ':id' => (int)$referenceId,
-                ':reuse_id' => (int)$referenceId,
-                ':new_kind' => $kind,
-                ':new_item_id' => (int)$itemId,
-                ':reuse_kind' => $kind,
-                ':reuse_item_id' => (int)$itemId,
+                ':external_resource_id' => $reference['external_resource_id'],
+                ':offering_id' => (int)$reference['offering_id'],
             ]
         )->queryScalar() > 0;
     }
 
-    private function sharedCourseResource($kind, $itemId, $courseResourceId)
+    private function sharedElectronicResource($resourceId, $offeringId)
     {
         return (int)$this->db->createCommand(
-            'SELECT (SELECT COUNT(*) FROM submission_new_resources WHERE materialized_course_resource_id = :id '
-            . 'AND NOT (:new_kind = "new" AND id = :new_item_id)) + '
-            . '(SELECT COUNT(*) FROM submission_reuse_resources WHERE materialized_course_resource_id = :reuse_id '
-            . 'AND NOT (:reuse_kind = "reuse" AND id = :reuse_item_id))',
+            'SELECT COUNT(*) FROM course_resources WHERE resource_id = :resource_id AND offering_id <> :offering_id',
             [
-                ':id' => (int)$courseResourceId,
-                ':reuse_id' => (int)$courseResourceId,
-                ':new_kind' => $kind,
-                ':new_item_id' => (int)$itemId,
-                ':reuse_kind' => $kind,
-                ':reuse_item_id' => (int)$itemId,
+                ':resource_id' => (int)$resourceId,
+                ':offering_id' => (int)$offeringId,
             ]
         )->queryScalar() > 0;
     }
