@@ -38,22 +38,26 @@ describe('Sonner notifications in Chromium', () => {
       });
     });
 
-    const toast = document.querySelector('[data-sonner-toast][data-type="error"]');
-    const closeButton = page.getByRole('button', { name: 'Close toast' });
+    const errorToast = document.querySelector('[data-sonner-toast][data-type="error"]');
+    const closeButton = errorToast.querySelector('button[data-close-button]');
     expect(region?.getAttribute('aria-label')).toContain('Notifications');
     expect(region?.textContent).toContain('Item claimed');
     expect(region?.textContent).toContain("Couldn't save the access path. Reference: SYNTH-42");
-    expect(toast?.classList.contains('toast')).toBe(false);
-    expect(window.getComputedStyle(toast).display).not.toBe('none');
-    expect(toast.getBoundingClientRect().width).toBeGreaterThan(0);
+    expect(errorToast?.classList.contains('toast')).toBe(false);
+    expect(window.getComputedStyle(errorToast).display).not.toBe('none');
+    expect(errorToast.getBoundingClientRect().width).toBeGreaterThan(0);
     expect(closeButton).toBeTruthy();
-    expect(closeButton.element().getBoundingClientRect().width).toBeGreaterThanOrEqual(24);
-    expect(closeButton.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
+    expect(closeButton.getAttribute('aria-label')).toBe('Close toast');
+    expect(closeButton.offsetWidth).toBeGreaterThanOrEqual(24);
+    expect(closeButton.offsetHeight).toBeGreaterThanOrEqual(24);
     await expectNoAxeViolations(document.body);
     await expectNoHorizontalOverflow([320, 768, 1280]);
 
-    await closeButton.focus();
+    closeButton.focus();
     await page.keyboard.press('Enter');
-    await page.getByText("Couldn't save the access path. Reference: SYNTH-42").waitFor({ state: 'detached' });
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-sonner-toast][data-type="error"]')).toBeNull();
+    });
+    expect(document.querySelector('[data-sonner-toast][data-type="success"]')?.textContent).toContain('Item claimed');
   });
 });
