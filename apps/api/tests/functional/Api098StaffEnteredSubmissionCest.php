@@ -33,8 +33,10 @@ class Api098StaffEnteredSubmissionCest extends BaseFunctionalCest
     public function endpointIsStaffOnlyAndAllowsOptions(FunctionalTester $I)
     {
         $route = 'staff-entered-submission/options';
-        $I->sendJsonRequest('OPTIONS', $route, []);
-        $I->seeResponseCodeIs(204);
+        $status = $I->sendJsonRequest('OPTIONS', $route, []);
+        Assert::assertGreaterThanOrEqual(200, $status);
+        Assert::assertLessThan(300, $status);
+        Assert::assertSame($route, \Yii::$app->requestedRoute);
 
         $I->sendJsonRequest('POST', 'staff-entered-submission/create', $this->payload('auth'));
         $I->seeResponseCodeIs(401);

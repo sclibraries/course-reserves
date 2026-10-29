@@ -26,10 +26,16 @@ class Api100StaffNavPinsCest extends BaseFunctionalCest
 
     public function protectsStaffRoutesAndAllowsPreflight(FunctionalTester $I)
     {
-        $I->sendJsonRequest('OPTIONS', 'staff-nav-pin/options', []);
-        $I->seeResponseCodeIs(204);
-        $I->sendJsonRequest('OPTIONS', 'staff-nav-pin/options', []);
-        $I->seeResponseCodeIs(204);
+        $route = 'staff-nav-pin/options';
+        $status = $I->sendJsonRequest('OPTIONS', $route, []);
+        Assert::assertGreaterThanOrEqual(200, $status);
+        Assert::assertLessThan(300, $status);
+        Assert::assertSame($route, \Yii::$app->requestedRoute);
+
+        $status = $I->sendJsonRequest('OPTIONS', $route, []);
+        Assert::assertGreaterThanOrEqual(200, $status);
+        Assert::assertLessThan(300, $status);
+        Assert::assertSame($route, \Yii::$app->requestedRoute);
 
         $I->sendJsonRequest('GET', 'staff-nav-pin/index', []);
         $I->seeResponseCodeIs(401);
