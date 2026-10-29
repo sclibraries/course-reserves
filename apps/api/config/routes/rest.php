@@ -13,6 +13,7 @@ return [
     'GET material-type/fields' => 'material-type/fields',
     'OPTIONS material-type/fields' => 'material-type/options',
     'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
+    'OPTIONS physical-resource/update-resource-order' => 'cors-preflight/options',
     [
         'class' => 'yii\rest\UrlRule',
         'controller' => [

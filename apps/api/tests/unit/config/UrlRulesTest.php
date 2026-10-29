@@ -135,6 +135,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         ];
         $corsRules = [
             'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
+            'OPTIONS physical-resource/update-resource-order' => 'cors-preflight/options',
             'OPTIONS <path:.*>' => 'cors-preflight/options',
         ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
@@ -158,7 +159,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $corsRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(253, $mergedRules);
+        $this->assertCount(254, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -315,6 +316,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['OPTIONS', 'physical-resource/cleanup-references', [
                 'cors-preflight/options', ['path' => 'physical-resource/cleanup-references'],
             ]],
+            ['OPTIONS', 'physical-resource/update-resource-order', ['cors-preflight/options', []]],
             ['GET', 'course/course-reserves/public/courses/' . $uuid, [
                 'course/course/public-view', ['uuid' => $uuid],
             ]],

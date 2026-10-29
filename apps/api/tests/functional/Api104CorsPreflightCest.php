@@ -6,6 +6,28 @@
 class Api104CorsPreflightCest extends BaseFunctionalCest
 {
     private $devOrigin = 'http://localhost:5173';
+    private $originalUrlManager;
+
+    public function _before(FunctionalTester $I)
+    {
+        parent::_before($I);
+        $this->originalUrlManager = \Yii::$app->get('urlManager');
+
+        // The functional app uses config/test.php, which omits production pretty URL rules.
+        $webConfig = require codecept_root_dir('config/web.php');
+        $urlManagerConfig = $webConfig['components']['urlManager'];
+        $urlManagerConfig['class'] = \yii\web\UrlManager::class;
+        \Yii::$app->set('urlManager', $urlManagerConfig);
+        \Yii::$app->urlManager->showScriptName = false;
+    }
+
+    public function _after(FunctionalTester $I)
+    {
+        if ($this->originalUrlManager !== null) {
+            \Yii::$app->set('urlManager', $this->originalUrlManager);
+            $this->originalUrlManager = null;
+        }
+    }
 
     public function frontendRoutesAcceptUnauthenticatedPreflights(FunctionalTester $I)
     {
@@ -20,25 +42,14 @@ class Api104CorsPreflightCest extends BaseFunctionalCest
         ];
 
         foreach ($routes as $route) {
-            $status = $I->sendCorsRequest('OPTIONS', $route[0], $this->devOrigin, $route[1], 'authorization,content-type');
-            \PHPUnit\Framework\Assert::assertSame(204, $status, 'OPTIONS ' . $route[0]);
-            \PHPUnit\Framework\Assert::assertSame(
+            $status = $I->sendCorsRequest(
+                'OPTIONS',
+                $route[0],
                 $this->devOrigin,
-                \Yii::$app->response->headers->get('Access-Control-Allow-Origin'),
-                'OPTIONS ' . $route[0] . ' should allow the configured dev origin.'
+                $route[1],
+                'Authorization, Content-Type, X-Requested-With'
             );
-            \PHPUnit\Framework\Assert::assertSame(
-                'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS',
-                \Yii::$app->response->headers->get('Access-Control-Allow-Methods')
-            );
-            \PHPUnit\Framework\Assert::assertSame(
-                'Authorization, Content-Type, X-Requested-With',
-                \Yii::$app->response->headers->get('Access-Control-Allow-Headers')
-            );
-            \PHPUnit\Framework\Assert::assertSame(
-                'true',
-                \Yii::$app->response->headers->get('Access-Control-Allow-Credentials')
-            );
+            $this->assertPreflightResponse($I, $status, $this->devOrigin, $route[0]);
         }
     }
 
@@ -54,24 +65,22 @@ class Api104CorsPreflightCest extends BaseFunctionalCest
                 '/physical-resource/cleanup-references',
                 $allowedOrigin,
                 'POST',
-                'authorization,content-type'
+                'Authorization, Content-Type, X-Requested-With'
             );
-            \PHPUnit\Framework\Assert::assertSame(204, $status);
-            \PHPUnit\Framework\Assert::assertSame(
-                $allowedOrigin,
-                \Yii::$app->response->headers->get('Access-Control-Allow-Origin')
-            );
+            $this->assertPreflightResponse($I, $status, $allowedOrigin, '/physical-resource/cleanup-references');
 
             $status = $I->sendCorsRequest(
                 'OPTIONS',
                 '/physical-resource/cleanup-references',
                 'https://not-allowed.example.test',
                 'POST',
-                'authorization,content-type'
+                'Authorization, Content-Type, X-Requested-With'
             );
-            \PHPUnit\Framework\Assert::assertSame(204, $status);
-            \PHPUnit\Framework\Assert::assertNull(
-                \Yii::$app->response->headers->get('Access-Control-Allow-Origin')
+            $this->assertPreflightResponse(
+                $I,
+                $status,
+                null,
+                '/physical-resource/cleanup-references'
             );
 
             $status = $I->sendCorsRequest(
@@ -101,5 +110,39 @@ class Api104CorsPreflightCest extends BaseFunctionalCest
                 \Yii::$app->params['corsOrigins'] = $previousOrigins;
             }
         }
+    }
+
+    private function assertPreflightResponse(FunctionalTester $I, $status, $allowedOrigin, $path)
+    {
+        \PHPUnit\Framework\Assert::assertGreaterThanOrEqual(200, $status, 'OPTIONS ' . $path);
+        \PHPUnit\Framework\Assert::assertLessThan(300, $status, 'OPTIONS ' . $path);
+        \PHPUnit\Framework\Assert::assertSame(
+            'cors-preflight/options',
+            \Yii::$app->requestedRoute,
+            'OPTIONS ' . $path . ' must use the side-effect-free preflight route.'
+        );
+        \PHPUnit\Framework\Assert::assertSame(
+            $allowedOrigin,
+            \Yii::$app->response->headers->get('Access-Control-Allow-Origin'),
+            'OPTIONS ' . $path . ' should only allow an approved origin.'
+        );
+        \PHPUnit\Framework\Assert::assertSame(
+            'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS',
+            \Yii::$app->response->headers->get('Access-Control-Allow-Methods')
+        );
+        \PHPUnit\Framework\Assert::assertSame(
+            'Authorization, Content-Type, X-Requested-With',
+            \Yii::$app->response->headers->get('Access-Control-Allow-Headers')
+        );
+        \PHPUnit\Framework\Assert::assertSame(
+            $allowedOrigin === null ? null : 'true',
+            \Yii::$app->response->headers->get('Access-Control-Allow-Credentials')
+        );
+        \PHPUnit\Framework\Assert::assertSame(
+            '86400',
+            \Yii::$app->response->headers->get('Access-Control-Max-Age')
+        );
+        \PHPUnit\Framework\Assert::assertNull(\Yii::$app->response->headers->get('WWW-Authenticate'));
+        \PHPUnit\Framework\Assert::assertNull(\Yii::$app->response->data, 'Preflight must not run a business action.');
     }
 }

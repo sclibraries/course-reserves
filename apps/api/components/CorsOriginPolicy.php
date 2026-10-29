@@ -52,7 +52,8 @@ class CorsOriginPolicy
     {
         $response = Yii::$app->response;
         $origin = Yii::$app->request->headers->get('Origin');
-        $response->statusCode = 204;
+        // Yii's Cors filter also completes preflights with 200 OK.
+        $response->statusCode = 200;
 
         if (is_string($origin) && in_array($origin, self::allowedOrigins(), true)) {
             $response->headers->set('Access-Control-Allow-Origin', $origin);
