@@ -11,6 +11,7 @@ class SubmissionDetailPresenter
     private $flows;
     private $flowStatePresenter;
     private $publication;
+    private $inputProjection;
 
     public function __construct($folioService = null, $flows = null)
     {
@@ -18,6 +19,7 @@ class SubmissionDetailPresenter
         $this->flows = $flows ?: Yii::$container->get(FlowRepository::class);
         $this->flowStatePresenter = new FlowStatePresenter($this->flows);
         $this->publication = Yii::$container->get(SubmissionPublicationStateService::class);
+        $this->inputProjection = Yii::$container->get(SubmissionInputProjectionService::class);
     }
 
     public function present(array $submission, $actor = null)
@@ -147,6 +149,12 @@ class SubmissionDetailPresenter
                 $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
                 $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
                 $item['publication'] = $publicationContracts[$flowKey] ?? null;
+                if ($actor !== null && (int)($item['id'] ?? 0) > 0) {
+                    $projection = $this->inputProjection->project($kind, (int)$item['id']);
+                    if (($projection['status'] ?? null) === 200) {
+                        $item['input_projection'] = $projection['body']['projection'];
+                    }
+                }
                 $submission[$collection][$index] = $item;
             }
         }

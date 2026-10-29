@@ -48,7 +48,7 @@ class FacultySubmissionItemUpdateService
                 $currentData = json_decode($item->resource_data, true) ?? [];
                 $item->resource_data = json_encode($this->updatedResourceData($currentData, $itemData));
                 $updatedData = json_decode($item->resource_data, true) ?: [];
-                $item->material_type_id = $this->materialTypeId($updatedData['materialType'] ?? 'book');
+                $item->material_type_id = $this->materialTypeId($updatedData['materialType'] ?? null);
                 if (isset($itemData['barcode'])) {
                     $item->source_barcode = $itemData['barcode'];
                     $item->is_reuse = 1;
@@ -73,7 +73,7 @@ class FacultySubmissionItemUpdateService
                 $item->source_call_number = $itemData['call_number'] ?? null;
             }
             $resourceData = $this->updatedResourceData([], $itemData);
-            $item->material_type_id = $this->materialTypeId($resourceData['materialType'] ?? 'book');
+            $item->material_type_id = $this->materialTypeId($resourceData['materialType'] ?? null);
             $item->resource_data = json_encode($resourceData);
             $item->display_order = $itemData['display_order'] ?? 999;
             $item->folder_name = $folderName;
@@ -114,7 +114,6 @@ class FacultySubmissionItemUpdateService
             return $materialType->material_type_id;
         }
 
-        $bookType = MaterialTypes::find()->where(['name' => 'book'])->one();
-        return $bookType ? $bookType->material_type_id : null;
+        return null;
     }
 }

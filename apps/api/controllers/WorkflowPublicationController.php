@@ -26,6 +26,7 @@ class WorkflowPublicationController extends Controller
         ];
         return ApiAccessBehaviors::withRoleRules($behaviors, [
             'state' => Roles::STAFF,
+            'projection' => Roles::STAFF,
             'ready' => Roles::STAFF,
             'options' => Roles::STAFF,
         ]);
@@ -40,6 +41,12 @@ class WorkflowPublicationController extends Controller
     public function actionState($kind, $id)
     {
         return $this->respond($this->service()->contract($kind, $id, $this->actor()));
+    }
+
+    public function actionProjection($kind, $id)
+    {
+        return $this->respond(Yii::$container->get(\app\services\SubmissionInputProjectionService::class)
+            ->project($kind, $id));
     }
 
     public function actionReady($kind, $id)

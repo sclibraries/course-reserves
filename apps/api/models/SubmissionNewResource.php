@@ -88,6 +88,25 @@ class SubmissionNewResource extends ActiveRecord
         ];
     }
 
+    public function beforeSave($insert)
+    {
+        if (!parent::beforeSave($insert)) {
+            return false;
+        }
+        if ($this->hasAttribute('source_snapshot_json')) {
+            $sourceChanged = $insert || (string)$this->getOldAttribute('source_resource_id')
+                !== (string)$this->source_resource_id;
+            if ($sourceChanged || !$this->source_snapshot_json) {
+                $snapshot = \app\services\SubmissionSourceSnapshot::capture($this->source_resource_id);
+                $this->source_snapshot_json = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_SLASHES) : null;
+                if ($snapshot && $this->material_type_id === null && !$this->hasResourceMaterialType()) {
+                    $this->material_type_id = $snapshot['material_type_id'];
+                }
+            }
+        }
+        return true;
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -129,13 +148,23 @@ class SubmissionNewResource extends ActiveRecord
     public function fields()
     {
         $fields = parent::fields();
-        foreach (['claimed_by', 'claimed_by_staff_id', 'claimed_at', 'last_activity_at', 'assigned_group_id'] as $field) {
+        foreach ([
+            'claimed_by', 'claimed_by_staff_id', 'claimed_at', 'last_activity_at', 'assigned_group_id',
+            'staff_material_type_id', 'destination_class_choice', 'source_snapshot_json', 'staff_corrections_json',
+        ] as $field) {
             unset($fields[$field]);
         }
-        
+        $fields['material_type_id'] = function ($model) {
+            return \app\services\EffectiveMaterialType::id($model->getAttributes());
+        };
+        $fields['resource_data'] = function ($model) {
+            return $model->getResourceDataForPresentation();
+        };
         // Only add materialType relation, NOT submission to avoid circular reference
         // (FacultySubmission already includes newResources)
-        $fields['materialType'] = 'materialType';
+        $fields['materialType'] = function ($model) {
+            return $model->getEffectiveMaterialType();
+        };
         
         return $fields;
     }
@@ -183,6 +212,38 @@ class SubmissionNewResource extends ActiveRecord
     public function getMaterialType()
     {
         return $this->hasOne(MaterialTypes::class, ['material_type_id' => 'material_type_id']);
+    }
+
+    public function getEffectiveMaterialType()
+    {
+        $id = \app\services\EffectiveMaterialType::id($this->getAttributes());
+        return $id ? MaterialTypes::findOne($id) : null;
+    }
+
+    public function getResourceDataForPresentation()
+    {
+        $data = $this->getResourceDataDecoded();
+        if (!is_array($data)) {
+            return $this->resource_data;
+        }
+        $typeId = \app\services\EffectiveMaterialType::id($this->getAttributes());
+        $type = $this->getEffectiveMaterialType();
+        if ($type) {
+            $data['materialType'] = $type->name;
+            if (array_key_exists('material_type_id', $data)) {
+                $data['material_type_id'] = $typeId;
+            }
+        } else {
+            unset($data['materialType']);
+            unset($data['material_type_id']);
+        }
+        return $data;
+    }
+
+    private function hasResourceMaterialType()
+    {
+        $data = $this->getResourceDataDecoded();
+        return is_array($data) && (array_key_exists('materialType', $data) || array_key_exists('material_type_id', $data));
     }
 
     /**

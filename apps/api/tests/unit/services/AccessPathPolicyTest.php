@@ -23,6 +23,17 @@ class AccessPathPolicyTest extends \Codeception\Test\Unit
         );
     }
 
+    public function testEffectiveMaterialTypeWinsOverStaleSubmissionJson()
+    {
+        $this->assertSame(
+            ['purchase', 'faculty_supplies'],
+            AccessPathPolicy::allowedForItem([
+                'material_type' => 'book',
+                'resource_data' => json_encode(['materialType' => 'article']),
+            ])
+        );
+    }
+
     private function item($type)
     {
         $data = ['title' => 'Synthetic item'];

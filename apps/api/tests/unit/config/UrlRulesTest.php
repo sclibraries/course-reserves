@@ -135,8 +135,10 @@ class UrlRulesTest extends \Codeception\Test\Unit
         ];
         $publicationRules = [
             'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/state',
+            'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/projection' => 'workflow-publication/projection',
             'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/ready',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/projection' => 'workflow-publication/options',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/options',
         ];
         $corsRules = [
@@ -167,7 +169,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $corsRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(260, $mergedRules);
+        $this->assertCount(262, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -242,6 +244,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['GET', 'workflow/item/new/999007211/flow', [
                 'workflow-flow/item-flow', ['kind' => 'new', 'id' => '999007211'],
             ]],
+            ['GET', 'workflow/item/new/999007218/projection', [
+                'workflow-publication/projection', ['kind' => 'new', 'id' => '999007218'],
+            ]],
+            ['OPTIONS', 'workflow/item/reuse/999007219/projection', [
+                'workflow-publication/options', ['kind' => 'reuse', 'id' => '999007219'],
+            ]],
             ['POST', 'workflow/item/reuse/999007212/step-result', [
                 'workflow-flow/step-result', ['kind' => 'reuse', 'id' => '999007212'],
             ]],
@@ -250,6 +258,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ]],
             ['POST', 'workflow/item/reuse/999007215/access-path', [
                 'workflow-flow/access-path', ['kind' => 'reuse', 'id' => '999007215'],
+            ]],
+            ['GET', 'workflow/item/new/999007218/projection', [
+                'workflow-publication/projection', ['kind' => 'new', 'id' => '999007218'],
+            ]],
+            ['OPTIONS', 'workflow/item/reuse/999007219/projection', [
+                'workflow-publication/options', ['kind' => 'reuse', 'id' => '999007219'],
             ]],
             ['PUT', 'workflow/item/new/999007216/details', [
                 'workflow-item-details/update', ['kind' => 'new', 'id' => '999007216'],

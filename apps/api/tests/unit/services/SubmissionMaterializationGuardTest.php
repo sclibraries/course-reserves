@@ -195,6 +195,13 @@ class SubmissionMaterializationGuardTest extends \Codeception\Test\Unit
         );
     }
 
+    public function testMissingMaterialTypeDoesNotBecomeBookDuringFacultyUpdate()
+    {
+        $updated = SubmissionMaterializationGuard::buildUpdatedResourceData(['title' => 'Untyped'], []);
+
+        $this->assertArrayNotHasKey('materialType', $updated);
+    }
+
     private function guard()
     {
         return new SubmissionMaterializationGuard();

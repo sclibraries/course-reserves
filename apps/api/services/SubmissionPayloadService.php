@@ -121,7 +121,7 @@ class SubmissionPayloadService
             $data = self::normalizeResourceData($data);
             $folderId = $resource['folder_id'] ?? $resource['folder_uuid'] ?? null;
             $folderName = $resource['folder_name'] ?? ($folderNames[$folderId] ?? null);
-            $materialType = $data['materialType'] ?? 'book';
+            $materialType = $data['materialType'] ?? null;
             $isReuse = !empty($resource['is_reuse']);
             $item = new SubmissionNewResource();
             $item->submission_id = $submissionId;
@@ -133,6 +133,7 @@ class SubmissionPayloadService
             $item->source_call_number = $source['source_call_number'] ?? null;
             $item->source_resource_id = $source['source_resource_id'] ?? null;
             $item->source_folio_instance_id = $source['source_folio_instance_id'] ?? null;
+            $item->source_folio_holdings_id = $source['source_folio_holdings_id'] ?? null;
             $item->display_order = $resource['display_order'] ?? $index;
             $item->folder_name = $folderName;
             $item->position_in_folder = $resource['position_in_folder'] ?? null;
@@ -251,9 +252,6 @@ class SubmissionPayloadService
             return $cache[$name];
         }
         $type = MaterialTypes::find()->where(['name' => $name])->one();
-        if (!$type) {
-            $type = MaterialTypes::find()->where(['name' => 'book'])->one();
-        }
         $cache[$name] = $type ? $type->material_type_id : null;
         return $cache[$name];
     }

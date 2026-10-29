@@ -252,12 +252,12 @@ class FacultySubmissionController extends BaseRestController
             
             // Then, assign materials to their folders
             foreach ($allResources as $resource) {
-                $resourceData = json_decode($resource->resource_data, true) ?? [];
+                $resourceData = $resource->getResourceDataForPresentation() ?? [];
                 $materialItem = [
                     'id' => $resource->id,
                     'title' => $resourceData['title'] ?? 'Untitled',
                     'authors' => $resourceData['authors'] ?? null,
-                    'material_type' => $resourceData['materialType'] ?? 'book',
+                    'material_type' => $resourceData['materialType'] ?? null,
                     'is_reuse' => (bool)$resource->is_reuse,
                     'barcode' => $resource->is_reuse ? $resource->source_barcode : ($resourceData['barcode'] ?? null),
                     'call_number' => $resource->is_reuse ? $resource->source_call_number : ($resourceData['callNumber'] ?? null),
@@ -438,7 +438,7 @@ class FacultySubmissionController extends BaseRestController
         }
         
         foreach ($submission->newResources as $item) {
-            $resourceData = json_decode($item->resource_data, true);
+            $resourceData = $item->getResourceDataForPresentation();
             $allItems[] = [
                 'type' => 'new',
                 'id' => $item->id,
@@ -726,7 +726,7 @@ class FacultySubmissionController extends BaseRestController
         }
         
         foreach ($allResources as $resource) {
-            $resourceData = json_decode($resource->resource_data, true) ?? [];
+            $resourceData = $resource->getResourceDataForPresentation() ?? [];
             $materialItem = [
                 'id' => $resource->id,
                 'title' => $resourceData['title'] ?? 'Untitled',

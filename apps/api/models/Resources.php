@@ -107,6 +107,24 @@ class Resources extends \yii\db\ActiveRecord
         $this->loadDynamicFields();
     }
 
+    public function afterSave($insert, $changedAttributes)
+    {
+        parent::afterSave($insert, $changedAttributes);
+        $sourceFields = [
+            'name', 'item_url', 'description', 'material_type_id',
+            'start_visibility', 'end_visibility', 'use_proxy',
+        ];
+        if ($insert || array_intersect($sourceFields, array_keys($changedAttributes))) {
+            (new \app\services\SubmissionPublicationInvalidator())->sourceResource($this->resource_id);
+        }
+    }
+
+    public function afterDelete()
+    {
+        parent::afterDelete();
+        (new \app\services\SubmissionPublicationInvalidator())->sourceResource($this->resource_id);
+    }
+
     private function loadDynamicFields()
     {
         $this->dynamicFields = [];

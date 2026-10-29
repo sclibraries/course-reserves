@@ -12,16 +12,26 @@ class PublicationDraftSnapshot
             $resourceData = json_decode($resourceData, true);
         }
         $resourceData = is_array($resourceData) ? $resourceData : [];
-        unset($resourceData['notes'], $resourceData['faculty_notes'], $resourceData['internal_note'], $resourceData['staff_notes']);
+        unset(
+            $resourceData['notes'], $resourceData['faculty_notes'], $resourceData['internal_note'],
+            $resourceData['staff_notes'], $resourceData['materialType'],
+            $resourceData['material_type_id']
+        );
+        $sourceSnapshot = self::decode($item['source_snapshot_json'] ?? null);
+        $staffCorrections = self::decode($item['staff_corrections_json'] ?? null);
 
         return self::sortKeys([
             'resource_data' => $resourceData,
-            'material_type_id' => isset($item['material_type_id']) ? (int)$item['material_type_id'] : null,
+            'staff_corrections' => $staffCorrections,
+            'source_snapshot' => $sourceSnapshot,
+            'material_type_id' => EffectiveMaterialType::id($item),
+            'destination_class_choice' => $item['destination_class_choice'] ?? null,
             'is_reuse' => (int)($item['is_reuse'] ?? 0),
             'source_barcode' => $item['source_barcode'] ?? null,
             'source_call_number' => $item['source_call_number'] ?? null,
             'source_resource_id' => $item['source_resource_id'] ?? null,
             'source_folio_instance_id' => $item['source_folio_instance_id'] ?? null,
+            'source_folio_holdings_id' => $item['source_folio_holdings_id'] ?? null,
             'public_note' => $item['public_note'] ?? null,
             'assigned_pages' => $item['assigned_pages'] ?? null,
             'display_order' => isset($item['display_order']) ? (int)$item['display_order'] : null,
@@ -34,6 +44,14 @@ class PublicationDraftSnapshot
     public static function changed(array $before, array $after)
     {
         return self::fromNewItem($before) !== self::fromNewItem($after);
+    }
+
+    private static function decode($value)
+    {
+        if (is_string($value)) {
+            $value = json_decode($value, true);
+        }
+        return is_array($value) ? $value : [];
     }
 
     private static function sortKeys(array $value)

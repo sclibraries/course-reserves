@@ -149,8 +149,6 @@ class SubmissionMaterializationGuard
 
         $resourceData['title'] = $resourceData['title'] ?? '';
         $resourceData['authors'] = $resourceData['authors'] ?? '';
-        $resourceData['materialType'] = $resourceData['materialType'] ?? 'book';
-
         return $resourceData;
     }
 

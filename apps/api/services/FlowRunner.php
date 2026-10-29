@@ -49,8 +49,20 @@ class FlowRunner
 
     public function getItemFlow($kind, $itemId, array $actor)
     {
-        return $this->claims->withLinkedItem($kind, $itemId, function ($item) use ($kind, $itemId, $actor) {
+        return $this->claims->withLinkedItem($kind, $itemId, function ($item, $transaction, $now) use ($kind, $itemId, $actor) {
             $latest = $this->flows->latestRun($kind, $itemId, true);
+            $state = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
+            if ($latest && (int)$latest['draft_revision'] < (int)$state['draft_revision']) {
+                if (empty($latest['closed_at'])) {
+                    $this->flows->updateRun($latest['id'], [
+                        'current_step_key' => null,
+                        'finish_state' => 'superseded',
+                        'closed_at' => $now,
+                        'closed_reason' => 'draft_inputs_changed',
+                    ]);
+                }
+                $latest = null;
+            }
             if (!$latest) {
                 $mapping = $this->flows->mappedFlow($item['material_type_id']);
                 if ($mapping) {

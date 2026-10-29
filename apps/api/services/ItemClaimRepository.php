@@ -34,15 +34,18 @@ class ItemClaimRepository
         )->queryScalar()) {
             return null;
         }
-        $materialTypeJoin = $kind === 'new'
-            ? 'mt.material_type_id = i.material_type_id'
-            : 'mt.material_type_id = source.material_type_id';
+        $effectiveType = EffectiveMaterialType::sql('i');
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
             . 'i.assigned_group_id, i.access_path, i.item_status AS status, i.display_order AS position, '
             . 'i.public_note, i.assigned_pages, '
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, '
-            . 'mt.name AS material_type, mt.material_type_id, flow_run.current_step_key, '
+            . 'source.resource_id AS source_resource_found, i.source_resource_id, '
+            . 'i.source_folio_instance_id, i.source_folio_holdings_id, i.source_snapshot_json, '
+            . 'i.staff_corrections_json, i.staff_material_type_id, i.destination_class_choice, '
+            . 'i.material_type_id AS default_material_type_id, '
+            . $effectiveType . ' AS material_type_id, ' . $effectiveType . ' AS effective_material_type_id, '
+            . 'mt.name AS material_type, flow_run.current_step_key, '
             . 'flow_run.finish_state AS flow_finish_state, flow_version.steps_json AS flow_steps_json, '
             . 's.submission_uuid, s.course_code, s.section, s.term_code, s.link_state, '
             . 's.status AS submission_status, s.submitted_at, '
@@ -50,7 +53,7 @@ class ItemClaimRepository
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
             . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
-            . 'LEFT JOIN material_types mt ON ' . $materialTypeJoin . ' '
+            . 'LEFT JOIN material_types mt ON mt.material_type_id = ' . $effectiveType . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
             . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
             . 'LEFT JOIN item_flow_runs flow_run ON flow_run.id = (SELECT MAX(run.id) FROM item_flow_runs run '
