@@ -138,7 +138,11 @@ class FacultySubmissionPresenter
 
     public static function resourceResponse($resource)
     {
-        $result = self::pick(self::arrayValue($resource), self::RESOURCE_FIELDS);
+        return self::renameAssignedPages(self::pick(self::arrayValue($resource), self::RESOURCE_FIELDS));
+    }
+
+    private static function renameAssignedPages(array $result)
+    {
         if (array_key_exists('assigned_pages', $result)) {
             $result['assignedPages'] = $result['assigned_pages'];
             unset($result['assigned_pages']);
@@ -174,12 +178,7 @@ class FacultySubmissionPresenter
     private static function folderItemCollection($items)
     {
         return self::mapRows($items, function ($item) {
-            $result = self::pick(self::arrayValue($item), self::FOLDER_ITEM_FIELDS);
-            if (array_key_exists('assigned_pages', $result)) {
-                $result['assignedPages'] = $result['assigned_pages'];
-                unset($result['assigned_pages']);
-            }
-            return $result;
+            return self::renameAssignedPages(self::pick(self::arrayValue($item), self::FOLDER_ITEM_FIELDS));
         });
     }
 

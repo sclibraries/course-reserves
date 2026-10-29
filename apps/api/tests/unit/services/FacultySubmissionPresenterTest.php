@@ -32,6 +32,15 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'reason' => 'test-api084-private-reason',
                 'actor_display' => 'test-api084-private-staff',
             ]],
+            'folders' => [[
+                'id' => 23,
+                'name' => 'Synthetic folder',
+                'items' => [[
+                    'id' => 20,
+                    'title' => 'Folder item',
+                    'assigned_pages' => '30-34',
+                ]],
+            ]],
             'workflowAssignment' => ['staff_notes' => 'test-internal-assignment-note'],
             'metadata' => [
                 'total_items' => 1,
@@ -62,6 +71,15 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'resource_data' => '{"title":"Synthetic item"}',
                 'faculty_notes' => 'Item note',
                 'assignedPages' => '20-25',
+            ]],
+            'folders' => [[
+                'id' => 23,
+                'name' => 'Synthetic folder',
+                'items' => [[
+                    'id' => 20,
+                    'title' => 'Folder item',
+                    'assignedPages' => '30-34',
+                ]],
             ]],
             'metadata' => ['total_items' => 1],
             'courseOffering' => ['offering_id' => 7, 'term_name' => 'Fall 2099'],
