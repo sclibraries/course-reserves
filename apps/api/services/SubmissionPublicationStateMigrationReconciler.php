@@ -70,7 +70,7 @@ class SubmissionPublicationStateMigrationReconciler
             $values['published_destination_json'] = json_encode($result['destination'], JSON_UNESCAPED_SLASHES);
             $values['published_snapshot'] = json_encode($result['snapshot'], JSON_UNESCAPED_SLASHES);
             $values['reconciliation_reason'] = 'Live destination captured; equality with the pre-version draft is unknown.';
-            $values['state'] = $flowReady ? 'ready' : 'published';
+            $values['state'] = 'published';
         }
         if ($flowReady) {
             $values['readiness_source'] = 'flow';

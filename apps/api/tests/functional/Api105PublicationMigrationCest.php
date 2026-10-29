@@ -22,9 +22,14 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             $electronic = $this->createSubmission('electronic', $offering);
             $sameOffering = $this->createSubmission('same-offering', $offering);
             $physical = $this->createSubmission('physical', $offering, 'reuse');
+            $physicalUnshared = $this->createSubmission('physical-unshared', $offering, 'reuse');
             $shared = $this->createSubmission('shared', $offering);
             $completeOnly = $this->createSubmission('complete-only', $offering);
             $mismatch = $this->createSubmission('mismatch', $offering);
+            Assert::assertGreaterThan(0, $physical['item_id'], 'Reuse-table physical item fixture should have an id.');
+            Assert::assertGreaterThan(
+                0, $physicalUnshared['item_id'], 'Unshared reuse-table physical item fixture should have an id.'
+            );
 
             $db->createCommand()->insert('resources', [
                 'name' => $this->prefix . 'live electronic title',
@@ -90,6 +95,20 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
                 'materialized_by_staff_id' => 'synthetic-staff',
             ], ['id' => $physical['item_id']])->execute();
 
+            $db->createCommand()->insert('physical_resource_references', [
+                'external_resource_id' => $this->prefix . 'unshared-barcode',
+                'resource_type' => 'physical',
+                'display_name' => $this->prefix . 'unshared physical title',
+                'offering_id' => $offering,
+            ])->execute();
+            $unsharedPhysicalReferenceId = (int)$db->getLastInsertID();
+            $db->createCommand()->update('submission_reuse_resources', [
+                'barcode' => $this->prefix . 'unshared-barcode',
+                'materialized_physical_reference_id' => $unsharedPhysicalReferenceId,
+                'materialized_at' => '2026-10-02 12:10:00',
+                'materialized_by_staff_id' => 'synthetic-staff',
+            ], ['id' => $physicalUnshared['item_id']])->execute();
+
             $db->createCommand()->update('submission_new_resources', [
                 'item_status' => 'complete',
             ], ['id' => $completeOnly['item_id']])->execute();
@@ -112,46 +131,96 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
 
             MigrationRollback::migrate('up');
             $electronicState = $this->state('new', $electronic['item_id']);
-            Assert::assertSame('published', $electronicState['state']);
-            Assert::assertSame('verified', $electronicState['reconciliation_status']);
+            Assert::assertSame('published', $electronicState['state'], 'Electronic item should reconcile as published.');
+            Assert::assertSame('verified', $electronicState['reconciliation_status'], 'Electronic item should be verified.');
             $liveSnapshot = json_decode($electronicState['published_snapshot'], true);
-            Assert::assertSame($this->prefix . 'live electronic title', $liveSnapshot['resource']['name']);
-            Assert::assertSame($courseResourceId, (int)$liveSnapshot['course_resource']['course_resource_id']);
+            Assert::assertSame(
+                $this->prefix . 'live electronic title', $liveSnapshot['resource']['name'],
+                'Electronic item snapshot should preserve the live title.'
+            );
+            Assert::assertSame(
+                $courseResourceId, (int)$liveSnapshot['course_resource']['course_resource_id'],
+                'Electronic item snapshot should preserve its course-resource association.'
+            );
 
             $sameOfferingState = $this->state('new', $sameOffering['item_id']);
-            Assert::assertSame('verified', $sameOfferingState['reconciliation_status']);
+            Assert::assertSame(
+                'published', $sameOfferingState['state'],
+                'Same-offering electronic item should reconcile as published.'
+            );
+            Assert::assertSame(
+                'verified', $sameOfferingState['reconciliation_status'],
+                'Same-offering electronic item should remain verified.'
+            );
 
             $sharedState = $this->state('new', $shared['item_id']);
-            Assert::assertSame('verified_shared', $sharedState['reconciliation_status']);
+            Assert::assertSame(
+                'published', $sharedState['state'],
+                'Cross-offering electronic item should reconcile as published.'
+            );
+            Assert::assertSame(
+                'verified_shared', $sharedState['reconciliation_status'],
+                'Cross-offering electronic item should be verified_shared.'
+            );
             Assert::assertTrue(json_decode($sharedState['published_destination'], true)['shared']);
+            Assert::assertSame(
+                $sharedResourceId, (int)json_decode($sharedState['published_snapshot'], true)['resource']['resource_id'],
+                'Cross-offering electronic item snapshot should preserve its live resource.'
+            );
 
             $physicalState = $this->state('reuse', $physical['item_id']);
-            Assert::assertSame('published', $physicalState['state']);
-            Assert::assertSame('verified_shared', $physicalState['reconciliation_status']);
+            Assert::assertSame('published', $physicalState['state'], 'Reuse-table physical item should be published.');
+            Assert::assertSame(
+                'verified_shared', $physicalState['reconciliation_status'],
+                'Cross-offering reuse-table physical item should be verified_shared.'
+            );
             Assert::assertTrue(json_decode($physicalState['published_destination'], true)['shared']);
-            Assert::assertSame('physical', json_decode($physicalState['published_snapshot'], true)['kind']);
+            Assert::assertSame(
+                'physical', json_decode($physicalState['published_snapshot'], true)['kind'],
+                'Reuse-table physical item snapshot should be physical.'
+            );
+
+            $physicalUnsharedState = $this->state('reuse', $physicalUnshared['item_id']);
+            Assert::assertSame(
+                'published', $physicalUnsharedState['state'],
+                'Unshared reuse-table physical item should be published.'
+            );
+            Assert::assertSame(
+                'verified', $physicalUnsharedState['reconciliation_status'],
+                'Unshared reuse-table physical item should be verified.'
+            );
+            Assert::assertSame(
+                'physical', json_decode($physicalUnsharedState['published_snapshot'], true)['kind'],
+                'Unshared reuse-table physical item snapshot should be physical.'
+            );
 
             $completeState = $this->state('new', $completeOnly['item_id']);
-            Assert::assertSame('pending', $completeState['state']);
+            Assert::assertSame('pending', $completeState['state'], 'Complete-only item should remain pending.');
             Assert::assertNull($completeState['published_revision']);
-            Assert::assertSame('no_materialization_marker', $completeState['reconciliation_status']);
+            Assert::assertSame(
+                'no_materialization_marker', $completeState['reconciliation_status'],
+                'Complete-only item should not count as published.'
+            );
 
             $mismatchState = $this->state('new', $mismatch['item_id']);
-            Assert::assertSame('pending', $mismatchState['state']);
-            Assert::assertSame('offering_mismatch', $mismatchState['reconciliation_status']);
+            Assert::assertSame('pending', $mismatchState['state'], 'Mismatched electronic item should remain pending.');
+            Assert::assertSame(
+                'offering_mismatch', $mismatchState['reconciliation_status'],
+                'Mismatched electronic item should report its offering mismatch.'
+            );
 
             MigrationRollback::migrate('down');
             Assert::assertSame(1, (int)$db->createCommand(
                 'SELECT COUNT(*) FROM resources WHERE resource_id = :id', [':id' => $resourceId]
-            )->queryScalar());
+            )->queryScalar(), 'Electronic item resource should survive rollback.');
             Assert::assertSame($courseResourceId, (int)$db->createCommand(
                 'SELECT materialized_course_resource_id FROM submission_new_resources WHERE id = :id',
                 [':id' => $electronic['item_id']]
-            )->queryScalar());
+            )->queryScalar(), 'Electronic item course-resource marker should survive rollback.');
             Assert::assertSame($physicalReferenceId, (int)$db->createCommand(
                 'SELECT materialized_physical_reference_id FROM submission_reuse_resources WHERE id = :id',
                 [':id' => $physical['item_id']]
-            )->queryScalar());
+            )->queryScalar(), 'Reuse-table physical item marker should survive rollback.');
         });
     }
 
@@ -168,11 +237,19 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             'folio_course_listing_id' => $this->prefix . 'folio-' . $suffix,
             'offering_id' => $offering,
         ]);
-        $table = $kind === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
-        $itemId = (int)\Yii::$app->db->createCommand(
-            'SELECT id FROM ' . $table . ' WHERE submission_id = :id LIMIT 1',
-            [':id' => $submissionId]
-        )->queryScalar();
+        $db = \Yii::$app->db;
+        if ($kind === 'reuse') {
+            $db->createCommand()->insert('submission_reuse_resources', [
+                'submission_id' => $submissionId,
+                'faculty_notes' => 'Synthetic API-105 reuse-table migration item.',
+            ])->execute();
+            $itemId = (int)$db->getLastInsertID();
+        } else {
+            $itemId = (int)$db->createCommand(
+                'SELECT id FROM submission_new_resources WHERE submission_id = :id LIMIT 1',
+                [':id' => $submissionId]
+            )->queryScalar();
+        }
         return ['submission_id' => $submissionId, 'item_id' => $itemId];
     }
 
