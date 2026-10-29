@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -30,11 +30,12 @@ export function DraftDiscardButton({ submissionId }: { submissionId: string }) {
       if (uuid) await discardDraft(uuid);
       useReserveStore.getState().deleteReserve(submissionId);
       useDraftStore.getState().deleteDraft(submissionId);
-      toast.success('Draft discarded');
+      notify.success('Draft discarded');
       setOpen(false);
     } catch (error) {
       console.error('Failed to discard faculty draft:', error);
-      toast.error('Could not discard this draft. Please try again.');
+      const feedback = getSafeErrorFeedback(error, "Couldn't discard this draft");
+      notify.error(feedback.message, { reference: feedback.reference });
     } finally {
       setIsDiscarding(false);
     }

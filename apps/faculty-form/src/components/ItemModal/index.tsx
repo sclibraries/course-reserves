@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 import ItemForm from './ItemForm';
 import { createEmptyItemData, type ItemData } from './itemFormData';
 import { saveValidatedItem } from '@/utils/saveValidatedItem';
@@ -26,7 +26,7 @@ export const ItemModal = ({ open, onOpenChange, onSave, initialData, showSuccess
   const handleSave = () => {
     if (!saveValidatedItem(formData, onSave)) return;
     onOpenChange(false);
-    if (showSuccessToast) toast.success('Item saved successfully');
+    if (showSuccessToast) notify.success('Item saved');
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,9 +41,11 @@ const CorrectionRequiredDialog = () => {
         message: summary,
       });
       if (!result.success) throw new Error('Message was not saved.');
-      toast.success('Correction request sent to library staff.');
+      notify.success('Correction request sent to library staff.');
       closeDialog();
-    } catch {
+    } catch (error) {
+      const feedback = getSafeErrorFeedback(error, 'Could not send the correction request');
+      notify.error(feedback.message, { reference: feedback.reference });
       setSendError('Your correction request could not be sent. Please try again.');
     } finally {
       setSending(false);

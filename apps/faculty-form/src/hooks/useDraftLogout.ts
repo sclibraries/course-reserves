@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { buildSubmissionPayload } from '@/handlers/submissionPayload';
 import { syncDraft } from '@/services/api/facultyDraftApi';
 import { useDraftStore } from '@/store/draftStore';
@@ -28,11 +28,12 @@ export function useDraftLogout(onLogout: () => void) {
         draftStore.markAsSaved(reserveId);
       }
 
-      toast.success('All changes saved successfully');
+      notify.success('All changes saved');
       onLogout();
     } catch (error) {
       console.error('Failed to save drafts before logout:', error);
-      toast.error('Failed to save some changes. Your drafts remain available here.');
+      const feedback = getSafeErrorFeedback(error, "Couldn't save your drafts");
+      notify.error(feedback.message, { reference: feedback.reference });
     } finally {
       setIsSaving(false);
     }

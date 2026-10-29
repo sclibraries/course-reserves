@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { getSafeErrorFeedback } from '@/services/notify';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
@@ -16,9 +17,9 @@ import {
   type ProxyPermissionType,
 } from '@/services/api/facultyProxyApi';
 
-const apiError = (error: unknown) => {
-  const data = (error as { response?: { data?: { message?: string; error?: string } } }).response?.data;
-  return data?.message || data?.error || (error instanceof Error ? error.message : 'Request failed');
+const apiError = (error: unknown, message: string) => {
+  const feedback = getSafeErrorFeedback(error, message);
+  return `${feedback.message}. Reference: ${feedback.reference}`;
 };
 
 const ManageDesignees = () => {
@@ -42,7 +43,7 @@ const ManageDesignees = () => {
 
   useEffect(() => {
     if (user?.role !== 'faculty') return;
-    loadProxies().catch((loadError) => setError(apiError(loadError)));
+    loadProxies().catch((loadError) => setError(apiError(loadError, "Couldn't load designees")));
     fetchCourseAssignments().catch(() => undefined);
   }, [user?.role, loadProxies, fetchCourseAssignments]);
 
@@ -83,7 +84,7 @@ const ManageDesignees = () => {
       setInvitationUrl(response.invitation_url);
       await loadProxies();
     } catch (inviteError) {
-      setError(apiError(inviteError));
+      setError(apiError(inviteError, "Couldn't invite this designee"));
     } finally {
       setLoading(false);
     }
@@ -108,7 +109,7 @@ const ManageDesignees = () => {
       setRevokeTarget(null);
       await loadProxies();
     } catch (revokeError) {
-      setError(apiError(revokeError));
+      setError(apiError(revokeError, "Couldn't revoke this designee"));
     } finally {
       setLoading(false);
     }
@@ -121,7 +122,7 @@ const ManageDesignees = () => {
       setActivity(response.items || []);
       setActivityLoaded(true);
     } catch (activityError) {
-      setError(apiError(activityError));
+      setError(apiError(activityError, "Couldn't load the activity log"));
     }
   };
 

@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
 import { useCourseReservesStore } from "../store/courseReservesStore";
 import { useAuthStore } from "../store/authStore";
 import { API_ENDPOINTS } from "@/config/endpoints";

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { toast } from 'sonner';
 import { createDragHandlers } from './dragHandlers';
+import { notify } from '@/services/notify';
 
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/services/notify', () => ({ notify: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
 describe('createDragHandlers', () => {
   it('applies the target zone once when an item drops into a folder', () => {
@@ -18,6 +18,7 @@ describe('createDragHandlers', () => {
 
     expect(moveTo).toHaveBeenCalledTimes(1);
     expect(moveTo).toHaveBeenCalledWith('reserve-1', 'item-1', { intoFolder: 'folder-1' });
+    expect(notify.success).toHaveBeenCalledWith('List order updated');
   });
 
   it('moves an item before a folder when the pointer is in its before zone', () => {
@@ -50,7 +51,7 @@ describe('createDragHandlers', () => {
 
   it('blocks drag while searching with the reorder message', () => {
     const moveTo = vi.fn();
-    vi.mocked(toast.error).mockClear();
+    vi.mocked(notify.error).mockClear();
     const { handleDragEnd } = createDragHandlers('reserve-1', moveTo, true);
 
     handleDragEnd({
@@ -59,6 +60,6 @@ describe('createDragHandlers', () => {
     } as never);
 
     expect(moveTo).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith('Clear the search to reorder.');
+    expect(notify.error).toHaveBeenCalledWith('Clear the search to reorder.', { reference: 'unavailable' });
   });
 });

@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@/services/api/facultyDraftApi', () => api);
-vi.mock('sonner', () => ({ toast: { info: vi.fn() } }));
+vi.mock('@/services/notify', () => ({ notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 vi.hoisted(() => {
   const values: Record<string, string> = {};
@@ -28,7 +28,7 @@ vi.hoisted(() => {
 import { useLegacyDraftUpload } from './useLegacyDraftUpload';
 import { useReserveStore } from '@/store/useReserveStore';
 import { useDraftStore } from '@/store/draftStore';
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -113,8 +113,8 @@ describe('useLegacyDraftUpload', () => {
     });
 
     expect(api.createDraft).toHaveBeenCalledTimes(1);
-    expect(toast.info).toHaveBeenCalledTimes(1);
-    expect(toast.info).toHaveBeenCalledWith('The existing server list was kept for this course.');
+    expect(notify.info).toHaveBeenCalledTimes(1);
+    expect(notify.info).toHaveBeenCalledWith('The existing server list was kept for this course.', { duration: Infinity });
   });
 
   it('drops a matching local copy already present in the server index and redirects to its UUID', async () => {

@@ -4,8 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseAssignment } from '@/store/courseAssignmentsStore';
 
+vi.mock('@/services/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/notify')>();
+  return { ...actual, notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() } };
+});
+
 let CourseAssignmentCard: typeof import('./CourseAssignmentCard').CourseAssignmentCard;
 let useCourseReservesStore: typeof import('@/store/courseReservesStore').useCourseReservesStore;
+let notify: typeof import('@/services/notify').notify;
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -14,9 +20,11 @@ describe('CourseAssignmentCard roster course', () => {
   let root: Root | null = null;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     vi.stubGlobal('localStorage', makeLocalStorageMock());
     vi.resetModules();
     ({ useCourseReservesStore } = await import('@/store/courseReservesStore'));
+    ({ notify } = await import('@/services/notify'));
     ({ CourseAssignmentCard } = await import('./CourseAssignmentCard'));
   });
 
@@ -63,8 +71,40 @@ describe('CourseAssignmentCard roster course', () => {
       academicPeriod: 'AP_202702',
       term: 'Spring 2027',
     });
+    expect(notify.success).toHaveBeenCalledWith('Course reserve created');
+  });
+
+  it('announces when it opens an existing reserve', async () => {
+    const assignment = makeAssignment();
+    useCourseReservesStore.setState({ reserves: [{
+      id: 'existing-reserve', courseCode: 'BIO 101', courseTitle: 'Synthetic Biology', section: '01',
+      instructors: 'Test Faculty', term: 'Spring 2027', status: 'draft', items: [], folders: [],
+      courseAssignmentId: 'BIO-101-01-202702',
+    }] as never });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root?.render(<MemoryRouter><CourseAssignmentCard assignment={assignment} /></MemoryRouter>));
+    const openButton = [...container.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Open Reserves'));
+
+    act(() => openButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+    expect(notify.info).toHaveBeenCalledWith('Opening existing course reserve');
   });
 });
+
+function makeAssignment() {
+  return {
+    assignment: {
+      academic_period: 'AP_202702', course_id: 'BIO-101-01-202702', course_title: 'Synthetic Biology',
+      smith_id: 'test-faculty', role: 'instructor', created_at: '2026-07-21T00:00:00Z', updated_at: '2026-07-21T00:00:00Z',
+    },
+    parsed_course: { courseNumber: 'BIO 101', sectionName: '01', raw: 'BIO 101-01' },
+    folio_term: null,
+    folio_course: { id: 'test-course-1', name: 'Synthetic Biology' },
+  } as unknown as CourseAssignment;
+}
 
 function makeLocalStorageMock() {
   const values: Record<string, string> = {};

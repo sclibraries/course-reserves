@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/services/notify";
 import type { ItemData } from "@/components/ItemModal";
 import { transformItemForEditing, transformItemForSaving } from "@/utils/itemTransformers";
 import type { CourseItem, CourseReserve } from "../store/courseReservesStore";
@@ -34,7 +34,7 @@ export const createItemHandlers = (
     if (editingItem) {
       updateItem(reserveId, editingItem.id, courseItemData);
     } else if (!addItem(reserveId, courseItemData)) {
-      toast.error('This item is already in your reserve list.');
+      notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
       return false;
     }
     setModalOpen(false);
@@ -44,29 +44,29 @@ export const createItemHandlers = (
 
   const handleMoveUp = (itemId: string) => {
     if (isSearching) {
-      toast.error('Clear the search to reorder.');
+      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
       return;
     }
 
     if (moveItemInList(reserveId, itemId, 'up')) {
-      toast.success("Item moved up");
+      notify.success('Item moved up');
     }
   };
 
   const handleMoveDown = (itemId: string) => {
     if (isSearching) {
-      toast.error('Clear the search to reorder.');
+      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
       return;
     }
 
     if (moveItemInList(reserveId, itemId, 'down')) {
-      toast.success("Item moved down");
+      notify.success('Item moved down');
     }
   };
 
   const handleDeleteItem = (itemId: string) => {
     deleteItem(reserveId, itemId);
-    toast.success("Item removed from list");
+    notify.success('Item removed');
   };
 
   const handleClearAll = (itemsCount: number, foldersCount: number) => {
@@ -79,7 +79,7 @@ export const createItemHandlers = (
     if (confirmed) {
       // One atomic update: clear both items and folders
       updateReserve(reserveId, { items: [], folders: [], layout: [] });
-      toast.success(
+      notify.success(
         foldersCount > 0 
           ? `Cleared ${itemsCount} item${itemsCount !== 1 ? 's' : ''} and ${foldersCount} folder${foldersCount !== 1 ? 's' : ''}`
           : `Removed all ${itemsCount} item${itemsCount !== 1 ? 's' : ''}`

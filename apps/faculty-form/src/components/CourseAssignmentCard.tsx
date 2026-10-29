@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { CourseAssignment } from "@/store/courseAssignmentsStore";
 import { useCourseReservesStore } from "@/store/courseReservesStore";
-import { toast } from "sonner";
+import { notify } from "@/services/notify";
 import { getCourseTermLabel } from "@/utils/courseTermLabel";
 
 interface CourseAssignmentCardProps {
@@ -31,7 +31,7 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
   const handleCreateOrOpenCourse = () => {
     // If reserve already exists, navigate to it
     if (existingReserve) {
-      toast.info(`Opening existing course reserve`);
+      notify.info('Opening existing course reserve');
       navigate(`/submission/${existingReserve.id}/edit`);
       return;
     }
@@ -62,7 +62,7 @@ export const CourseAssignmentCard = ({ assignment }: CourseAssignmentCardProps) 
       academicPeriod: assignmentData?.academic_period,
     });
     
-    toast.success(`Created course reserve: ${parsedCourse?.courseNumber || assignmentData?.course_id}`);
+    notify.success('Course reserve created');
     navigate(`/submission/${reserveId}/edit`);
   };
 

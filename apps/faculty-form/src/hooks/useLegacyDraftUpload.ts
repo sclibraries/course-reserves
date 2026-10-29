@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 import { buildSubmissionPayload } from '@/handlers/submissionPayload';
 import { createDraft, getDraft } from '@/services/api/facultyDraftApi';
 import { useDraftStore } from '@/store/draftStore';
@@ -95,5 +95,5 @@ function dropLocalDraft(reserveId: string) {
 function notifyExistingDraft(reserveId: string) {
   if (notifiedExistingDrafts.has(reserveId)) return;
   notifiedExistingDrafts.add(reserveId);
-  toast.info('The existing server list was kept for this course.');
+  notify.info('The existing server list was kept for this course.', { duration: Infinity });
 }

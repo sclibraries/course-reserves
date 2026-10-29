@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseReserve } from '@/store/courseReservesStore';
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/services/notify', () => ({ notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 vi.hoisted(() => {
   const values: Record<string, string> = {};
@@ -16,6 +16,7 @@ vi.hoisted(() => {
 
 import { createSubmissionHandlers } from './submissionHandlers';
 import { shouldSubmitAsDraft } from './shouldSubmitAsDraft';
+import { notify } from '@/services/notify';
 
 describe('submissionHandlers server draft submit', () => {
   beforeEach(() => {
@@ -58,6 +59,7 @@ describe('submissionHandlers server draft submit', () => {
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/submission/server-draft-1?refresh=true'));
 
     expect(submitDraft).toHaveBeenCalledWith(true);
+    expect(notify.success).toHaveBeenCalledWith('Submission sent');
     expect(fetch).not.toHaveBeenCalled();
   });
 

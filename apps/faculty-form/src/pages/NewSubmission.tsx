@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Check } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/services/notify";
 import { NewSubmissionHeader } from "@/components/pageHeaders/NewSubmissionHeader";
 
 const NewSubmission = () => {
@@ -43,7 +43,7 @@ const NewSubmission = () => {
 
   const handleCreate = () => {
     const newId = Date.now().toString();
-    toast.success("Submission created successfully!");
+    notify.success('Submission created');
     navigate(`/submission/${newId}/edit`);
   };
 

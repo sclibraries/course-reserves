@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Upload, Info } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { notify } from "@/services/notify";
 
 export interface ItemData {
   id?: string;
@@ -47,21 +47,21 @@ export const ItemDrawer = ({ open, onOpenChange, onSave, initialData }: ItemDraw
 
   const handleSave = () => {
     if (!formData.title.trim()) {
-      toast.error("Please enter a title");
+      notify.error('Please enter a title', { reference: 'unavailable' });
       return;
     }
     if (!formData.materialType) {
-      toast.error("Please select a material type");
+      notify.error('Please select a material type', { reference: 'unavailable' });
       return;
     }
     if (!formData.requestType) {
-      toast.error("Please select a request type");
+      notify.error('Please select a request type', { reference: 'unavailable' });
       return;
     }
 
     onSave(formData);
     onOpenChange(false);
-    toast.success("Item saved successfully");
+    notify.success('Item saved');
   };
 
   const handleCancel = () => {

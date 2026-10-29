@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, User, LogOut, LogIn, Plus, Zap } from "lucide-react";
-import { toast } from "sonner";
+import { getSafeErrorFeedback, notify } from "@/services/notify";
 import { CourseModal, CourseData } from "./CourseModal";
 import { LogoutConfirmDialog } from "./LogoutConfirmDialog";
 import { useHasAnyUnsavedChanges } from "@/hooks/useUnsavedChangesWarning";
@@ -70,12 +70,13 @@ export const AuthDebugPanel = () => {
         }
       }
 
-      toast.success('All changes saved successfully');
+      notify.success('All changes saved');
       setLogoutDialogOpen(false);
       logout();
     } catch (error) {
       console.error('Failed to save drafts:', error);
-      toast.error('Failed to save some changes');
+      const feedback = getSafeErrorFeedback(error, "Couldn't save your drafts");
+      notify.error(feedback.message, { reference: feedback.reference });
     } finally {
       setIsSavingBeforeLogout(false);
     }
@@ -115,7 +116,7 @@ export const AuthDebugPanel = () => {
 
   const handleQuickCreateCourse = () => {
     if (!user?.full_name) {
-      toast.error("Please login first");
+      notify.error('Please log in first', { reference: 'unavailable' });
       return;
     }
 
@@ -134,7 +135,7 @@ export const AuthDebugPanel = () => {
       folders: []
     });
     
-    toast.success(`Created test course: TEST-${timestamp % 1000}`);
+    notify.success(`Created test course: TEST-${timestamp % 1000}`);
     
     // Navigate to the editor
     navigate(`/submission/${reserveId}/edit`);
@@ -152,7 +153,7 @@ export const AuthDebugPanel = () => {
       folders: []
     });
     
-    toast.success(`Created course: ${courseData.courseCode}`);
+    notify.success(`Created course: ${courseData.courseCode}`);
     setCourseModalOpen(false);
     
     // Navigate to the editor

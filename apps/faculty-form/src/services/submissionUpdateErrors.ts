@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { useDraftStore } from '@/store/draftStore';
 import { useReserveStore } from '@/store/useReserveStore';
 
@@ -105,7 +105,7 @@ export const handleSubmitFailure = async (
   response: Response,
   reserve: { id: string },
   attemptedUpdate: Record<string, unknown>,
-  getErrorMessage: (response: Response) => Promise<string>
+  getErrorMessage: (response: Response) => Promise<string | Error>
 ): Promise<'locked' | void> => {
   if (response.status === 423) {
     let lockData: { locked_by?: string | null; locked_at?: string | null; lock_reason?: string | null } = {};
@@ -116,12 +116,14 @@ export const handleSubmitFailure = async (
     }
     useReserveStore.getState().applyLockState(reserve.id, lockData);
     useDraftStore.getState().deleteDraft(reserve.id);
-    toast.error('This submission was locked by staff and can no longer be edited.');
+    const feedback = getSafeErrorFeedback(lockData, 'This submission can no longer be edited');
+    notify.error(feedback.message, { reference: feedback.reference });
     return 'locked';
   }
 
   const correction = await parseCorrectionRequired(response, attemptedUpdate);
   if (correction) throw new CorrectionRequiredError(correction);
 
-  throw new Error(await getErrorMessage(response));
+  const error = await getErrorMessage(response);
+  throw error instanceof Error ? error : new Error(error);
 };

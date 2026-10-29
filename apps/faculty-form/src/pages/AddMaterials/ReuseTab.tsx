@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, BookOpen, Plus } from 'lucide-react';
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,8 +57,11 @@ export default function ReuseTab() {
       if (currentRequest === requestId.current) {
         setResources(mapReuseResources(result.orderedResources || result.electronicResources, result.physicalReserves));
       }
-    } catch {
-      if (currentRequest === requestId.current) toast.error('Could not load materials for this course.');
+    } catch (error) {
+      if (currentRequest === requestId.current) {
+        const feedback = getSafeErrorFeedback(error, "Couldn't load materials for this course");
+        notify.error(feedback.message, { reference: feedback.reference });
+      }
     } finally {
       if (currentRequest === requestId.current) setLoadingResources(false);
     }

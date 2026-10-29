@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import CommunicationsContainer from "@/components/Communications/CommunicationsContainer";
 import { CommunicationsAPI, CreateMessageRequest, Message } from "@/services/api/communications";
-import { toast } from "sonner";
+import { getSafeErrorFeedback, notify } from "@/services/notify";
 import { SubmissionDetailHeader } from "@/components/pageHeaders/SubmissionDetailHeader";
 import { SubmissionDetailItemsTable } from "@/components/SubmissionDetailItemsTable";
 
@@ -71,12 +71,12 @@ const SubmissionDetail = () => {
     
     try {
       await api.createMessage(id, data);
-      toast.success('Message sent to library staff');
+      notify.success('Message sent to library staff');
       // Refresh messages to update badge counts
       loadMessages();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-      toast.error(errorMessage);
+      const feedback = getSafeErrorFeedback(err, "Couldn't send the message");
+      notify.error(feedback.message, { reference: feedback.reference });
       throw err; // Re-throw so dialog knows it failed
     }
   };
@@ -88,11 +88,11 @@ const SubmissionDetail = () => {
     setDeleting(true);
     try {
       await deleteSubmission(id);
-      toast.success('Submission deleted successfully');
+      notify.success('Submission deleted');
       navigate('/');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete submission';
-      toast.error(errorMessage);
+      const feedback = getSafeErrorFeedback(err, "Couldn't delete the submission");
+      notify.error(feedback.message, { reference: feedback.reference });
     } finally {
       setDeleting(false);
       setShowDeleteDialog(false);
@@ -254,12 +254,12 @@ const SubmissionDetail = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Submission?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
-              <p>
+              <div>
                 Are you sure you want to delete this submission for <strong>{reserve.courseCode} · {reserve.term}</strong>?
-              </p>
-              <p className="text-red-600">
+              </div>
+              <div className="text-red-600">
                 This action cannot be undone. All {reserve.items.length} items and {reserve.folders.length} folders will be permanently deleted.
-              </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

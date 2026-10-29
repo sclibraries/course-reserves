@@ -4,8 +4,14 @@ import { useReserveStore } from '@/store/useReserveStore';
 import { useDraftStore } from '@/store/draftStore';
 import { useEditorUIStore } from '@/store/useEditorUIStore';
 
-const toastError = vi.fn();
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: (...a: unknown[]) => toastError(...a) } }));
+const notifyError = vi.fn();
+vi.mock('@/services/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/notify')>();
+  return {
+    ...actual,
+    notify: { ...actual.notify, error: (...args: unknown[]) => notifyError(...args) },
+  };
+});
 
 // The persist middleware captures the localStorage reference at store
 // creation time (module evaluation). We must install a working stub before
@@ -37,7 +43,7 @@ const organized = { folders: [], ungroupedItems: [], mixedContent: [] };
 describe('confirmSubmit on 423', () => {
   beforeEach(() => {
     useReserveStore.setState({ reserves: [{ ...reserve }] as never });
-    toastError.mockReset();
+    notifyError.mockReset();
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ locked_by: 'Jane Staff', locked_at: '2026-06-20T10:00:00Z', lock_reason: 'Processing' }),
       { status: 423, headers: { 'Content-Type': 'application/json' } }
@@ -55,8 +61,8 @@ describe('confirmSubmit on 423', () => {
       expect(r.canEdit).toBe(false);
     });
     expect(navigate).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledTimes(1);
-    expect(toastError).toHaveBeenCalledWith('This submission was locked by staff and can no longer be edited.');
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledWith('This submission can no longer be edited', { reference: 'unavailable' });
   });
 
   it('clears the persisted draft on a 423 lock conflict', async () => {
@@ -100,7 +106,7 @@ describe('confirmSubmit on 423', () => {
       attemptedUpdate: { items: [] },
     });
     expect(useDraftStore.getState().getDraft('sub-1')).toBeDefined();
-    expect(toastError).not.toHaveBeenCalled();
+    expect(notifyError).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: 'unavailable' });
     expect(navigate).not.toHaveBeenCalled();
   });
 });

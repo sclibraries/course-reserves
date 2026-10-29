@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 import { useEditorUIStore } from '@/store/useEditorUIStore';
 import type { CorrectionRequiredDetail } from '@/services/submissionUpdateErrors';
 import CorrectionRequiredDialog from './CorrectionRequiredDialog';
@@ -12,7 +12,10 @@ vi.mock('@/services/api/communications', () => ({
     createMessage = createMessage;
   },
 }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }));
+vi.mock('@/services/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/notify')>();
+  return { ...actual, notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() } };
+});
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -70,7 +73,7 @@ describe('CorrectionRequiredDialog', () => {
       resource_id: 259,
       message: expect.stringContaining('Climate and Society'),
     });
-    expect(toast.success).toHaveBeenCalledWith('Correction request sent to library staff.');
+    expect(notify.success).toHaveBeenCalledWith('Correction request sent to library staff.');
     expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(false);
   });
 
@@ -86,6 +89,7 @@ describe('CorrectionRequiredDialog', () => {
     });
     expect(document.body.textContent).toContain('Climate and Society');
     expect(document.body.textContent).toContain('could not be sent');
+    expect(notify.error).toHaveBeenCalledWith('Could not send the correction request', { reference: 'unavailable' });
     expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(true);
 
     await act(async () => {

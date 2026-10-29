@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { MoveTarget } from '@/utils/listLayout';
 
@@ -19,7 +19,7 @@ export const createDragHandlers = (
     if (!over) return;
 
     if (isSearching) {
-      toast.error('Clear the search to reorder.');
+      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
       return;
     }
 
@@ -31,7 +31,7 @@ export const createDragHandlers = (
     if (!target) return;
 
     moveTo(reserveId, String(active.id), target);
-    toast.success('List order updated');
+    notify.success('List order updated');
   };
 
   return { handleDragEnd };

@@ -1,14 +1,21 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ItemModal, type ItemData } from './index';
 import { transformItemForEditing } from '@/utils/itemTransformers';
+import { notify } from '@/services/notify';
 
+vi.mock('@/services/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/notify')>();
+  return { ...actual, notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() } };
+});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('ItemModal', () => {
   let container: HTMLDivElement | null = null;
   let root: Root | null = null;
+
+  beforeEach(() => vi.clearAllMocks());
 
   beforeAll(() => {
     HTMLElement.prototype.hasPointerCapture = () => false;
@@ -93,6 +100,16 @@ describe('ItemModal', () => {
       sourceLink: 'https://example.test/reading',
       requestType: 'link-electronic',
     }));
+    expect(notify.success).toHaveBeenCalledWith('Item saved');
+  });
+
+  it('announces validation feedback without saving an incomplete item', () => {
+    const onSave = renderModal();
+
+    saveItem();
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(notify.error).toHaveBeenCalledWith('Item title is required.', { reference: 'unavailable' });
   });
 
   it('creates a print item from the empty form using the visible controls', () => {

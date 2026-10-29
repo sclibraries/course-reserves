@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/services/notify";
 import type { CourseData } from "@/components/CourseModal";
 import type { CourseFolder, CourseReserve } from "../store/courseReservesStore";
 
@@ -16,7 +16,7 @@ export const createFolderHandlers = (
     const title = prompt("Enter folder name:");
     if (title?.trim()) {
       createFolder(reserveId, title.trim());
-      toast.success("Folder created");
+      notify.success('Folder created');
     }
   };
 
@@ -26,7 +26,7 @@ export const createFolderHandlers = (
 
   const handleDeleteFolder = (folderId: string) => {
     deleteFolder(reserveId, folderId);
-    toast.success("Folder deleted");
+    notify.success('Folder deleted');
   };
 
   const handleToggleFolder = (folderId: string) => {
@@ -62,7 +62,7 @@ export const createCourseHandlers = (
       term: courseData.term,
     });
     setCourseModalOpen(false);
-    toast.success("Course details updated");
+    notify.success('Course details updated');
   };
 
   return {

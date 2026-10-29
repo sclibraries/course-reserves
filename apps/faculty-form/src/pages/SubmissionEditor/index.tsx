@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '@/services/notify';
 import { Button } from '@/components/ui/button';
 import { useSubmissionEditor } from '@/hooks/useSubmissionEditor';
 import { usePreviousCourseDetection } from '@/hooks/usePreviousCourseDetection';
@@ -81,7 +81,7 @@ const SubmissionEditor = () => {
   const onAddedMaterial = (item: CourseItem) => {
     if (!isAddMaterialsPage || !id) return;
     useAddedMaterialsVisitStore.getState().add(id, { id: item.id, title: item.title });
-    toast.success(`Added: ${item.title}`, {
+    notify.success(`Added: ${item.title}`, {
       action: { label: 'Undo', onClick: () => undoAddedMaterial(item.id) },
     });
   };

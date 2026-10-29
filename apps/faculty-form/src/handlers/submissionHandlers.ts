@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { getSafeErrorFeedback, notify } from "@/services/notify";
 import type { CourseReserve, CourseFolder, CourseItem } from "../store/courseReservesStore";
 import { getAuthHeaders } from "@/store/authStore";
 import { useDraftStore } from "@/store/draftStore";
@@ -6,7 +6,7 @@ import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { API_ENDPOINTS, DEFAULT_CONFIG } from "@/config/endpoints";
 import { validateReserveForSubmission } from "@/utils/reserveValidation";
 import { CorrectionRequiredError, handleSubmitFailure } from "@/services/submissionUpdateErrors";
-import { getSubmissionErrorMessage } from "./submissionErrorMessage";
+import { getSubmissionErrorMessage, SubmissionResponseError } from "./submissionErrorMessage";
 import { buildSubmissionPayload } from './submissionPayload';
 import { useReserveStore } from '@/store/useReserveStore';
 import { shouldSubmitAsDraft } from './shouldSubmitAsDraft';
@@ -36,14 +36,10 @@ export const createSubmissionHandlers = (
     setShowSubmitDialog(true);
   };
 
-  const handleSaveDraft = () => {
-    toast.success("Draft saved");
-  };
-
   const confirmSubmit = (emailConfirmation: boolean) => {
     const validation = validateReserveForSubmission(reserve);
     if (!validation.valid) {
-      toast.error(`Submission failed: ${validation.errors[0]}`);
+      notify.error(`Submission failed: ${validation.errors[0]}`, { reference: 'unavailable' });
       return;
     }
 
@@ -61,7 +57,7 @@ export const createSubmissionHandlers = (
         if (draftActions && shouldSubmitAsDraft(reserve, draftActions.hasUnsavedChanges || false)) {
           const submissionUuid = await draftActions.submitDraft(emailConfirmation);
           if (!submissionUuid) return;
-          toast.success('Submission completed successfully');
+          notify.success('Submission sent');
           useDraftStore.getState().deleteDraft(reserve.id);
           if (reserve.id.startsWith('reserve-')) useReserveStore.getState().deleteReserve(reserve.id);
           navigate(`/submission/${submissionUuid}?refresh=true`);
@@ -148,12 +144,12 @@ export const createSubmissionHandlers = (
 
         // Success message
         if (isUpdate) {
-          toast.success(result?.message || 'Submission updated successfully');
+          notify.success('Submission updated');
         } else {
           if (result?.success) {
-            toast.success(result?.message || 'Submission completed successfully');
+            notify.success('Submission submitted');
           } else {
-            toast.success('Submission sent');
+            notify.success('Submission sent');
           }
         }
         
@@ -164,16 +160,22 @@ export const createSubmissionHandlers = (
       } catch (err) {
         if (err instanceof CorrectionRequiredError) {
           useEditorUIStore.getState().openCorrectionRequiredDialog(err.detail);
+          const feedback = getSafeErrorFeedback(err, "Couldn't submit this reserve request");
+          notify.error(feedback.message, { reference: feedback.reference });
           return;
         }
-        toast.error(`Submission failed: ${(err as Error).message}`);
+        if (err instanceof SubmissionResponseError) {
+          notify.error(err.message, { reference: err.reference });
+          return;
+        }
+        const feedback = getSafeErrorFeedback(err, "Couldn't submit this reserve request");
+        notify.error(feedback.message, { reference: feedback.reference });
       }
     })();
   };
 
   return {
     handleSubmit,
-    handleSaveDraft,
     confirmSubmit,
   };
 };

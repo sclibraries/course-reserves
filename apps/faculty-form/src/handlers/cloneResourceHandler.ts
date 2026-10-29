@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { getSafeErrorFeedback, notify } from "@/services/notify";
 import type { PreviewResource } from "@/hooks/useCourseCloning";
 import type { CourseReserve, CourseItem, FolioLocation, FolioCopiedItem } from "../store/courseReservesStore";
 
@@ -14,7 +14,7 @@ export const createCloneResourceHandler = (
   const handleAddSingleResource = (resource: PreviewResource) => {
     if (!reserve || !reserveId) {
       console.error('No reserve or ID found');
-      toast.error('Error: No course found');
+      notify.error('No course is selected.', { reference: 'unavailable' });
       return;
     }
     
@@ -28,7 +28,7 @@ export const createCloneResourceHandler = (
         
         if (!item || !item.title) {
           console.error('Invalid physical item data:', item);
-          toast.error('Invalid resource data');
+          notify.error('This resource could not be added.', { reference: 'unavailable' });
           return;
         }
         
@@ -76,9 +76,9 @@ export const createCloneResourceHandler = (
         
         console.log('Adding physical item with FOLIO metadata:', newItem);
         if (addItem(reserveId, newItem)) {
-          if (showSuccessToast) toast.success(`Added "${resource.title}"`);
+          if (showSuccessToast) notify.success(`Added "${resource.title}"`);
         } else {
-          toast.error('This item is already in your reserve list.');
+          notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
         }
         
       } 
@@ -110,20 +110,21 @@ export const createCloneResourceHandler = (
         
         console.log('Adding electronic item:', newItem);
         if (addItem(reserveId, newItem)) {
-          if (showSuccessToast) toast.success(`Added "${resource.title}"`);
+          if (showSuccessToast) notify.success(`Added "${resource.title}"`);
         } else {
-          toast.error('This item is already in your reserve list.');
+          notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
         }
         
       } else {
         console.error('Invalid resource - no original data:', resource);
-        toast.error('Invalid resource: missing original data');
+        notify.error('This resource could not be added.', { reference: 'unavailable' });
         return;
       }
       
     } catch (error) {
       console.error('Failed to add resource:', error, resource);
-      toast.error(`Failed to add resource: ${(error as Error).message || 'Unknown error'}`);
+      const feedback = getSafeErrorFeedback(error, "Couldn't add this item");
+      notify.error(feedback.message, { reference: feedback.reference });
     }
   };
 

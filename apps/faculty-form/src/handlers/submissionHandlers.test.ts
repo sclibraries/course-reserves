@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock('@/services/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/notify')>();
+  return { ...actual, notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() } };
+});
 
 vi.mock('@/config/endpoints', () => ({
   API_ENDPOINTS: {
@@ -83,7 +81,7 @@ describe('createSubmissionHandlers', () => {
 
   it('keeps the editor open and shows backend validation messages when submission fails', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
-    const { toast } = await import('sonner');
+    const { notify } = await import('@/services/notify');
     const reserve = buildReserve();
     const navigate = vi.fn();
 
@@ -92,7 +90,7 @@ describe('createSubmissionHandlers', () => {
       status: 400,
       statusText: 'Bad Request',
       text: async () => JSON.stringify({
-        message: 'Resource 0 is missing required title',
+        message: 'Resource 0 is missing required title', reference: '7F3K2Q',
       }),
     } as Response);
 
@@ -114,8 +112,9 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(
-        'Submission failed: Resource 0 is missing required title'
+      expect(notify.error).toHaveBeenCalledWith(
+        "Couldn't submit this reserve request",
+        { reference: '7F3K2Q' }
       );
     });
 
@@ -127,7 +126,7 @@ describe('createSubmissionHandlers', () => {
     [403, 'roster_course_not_found'],
   ])('shows the roster guidance for %s %s responses', async (status, errorCode) => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
-    const { toast } = await import('sonner');
+    const { notify } = await import('@/services/notify');
     const reserve = buildReserve();
 
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error_code: errorCode }), {
@@ -144,15 +143,16 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(
-        "Submission failed: This course isn't on your teaching roster for that term - contact the library"
+      expect(notify.error).toHaveBeenCalledWith(
+        "This course isn't on your teaching roster for that term - contact the library",
+        { reference: 'unavailable' }
       );
     });
   });
 
   it('keeps an unrelated 409 on the existing generic error path', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
-    const { toast } = await import('sonner');
+    const { notify } = await import('@/services/notify');
     const { useEditorUIStore } = await import('@/store/useEditorUIStore');
     const { reserve, organizedContent } = buildPayloadContractScenario('submitted');
     useEditorUIStore.getState().closeCorrectionRequiredDialog();
@@ -167,7 +167,7 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Submission failed: This submission changed elsewhere.');
+      expect(notify.error).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: 'unavailable' });
     });
     expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(false);
     expect(navigate).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe('createSubmissionHandlers', () => {
 
   it('blocks invalid reserve data before sending a submission request', async () => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
-    const { toast } = await import('sonner');
+    const { notify } = await import('@/services/notify');
     const reserve = {
       ...buildReserve(),
       items: [
@@ -207,7 +207,7 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Submission failed: Item 1: Item title is required.');
+      expect(notify.error).toHaveBeenCalledWith('Submission failed: Item 1: Item title is required.', { reference: 'unavailable' });
     });
 
     expect(fetch).not.toHaveBeenCalled();

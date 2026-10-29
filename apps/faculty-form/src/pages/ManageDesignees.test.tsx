@@ -199,6 +199,17 @@ describe('ManageDesignees', () => {
     expect(container?.textContent).toContain('invited');
   });
 
+  it('shows a generic load error with its reference instead of server text', async () => {
+    mocks.getMyProxies.mockRejectedValue({
+      response: { data: { message: 'database password leaked', reference_id: '7F3K2Q' } },
+    });
+    await renderPage();
+
+    await vi.waitFor(() => expect(container?.textContent).toContain("Couldn't load designees"));
+    expect(container?.textContent).toContain('Reference: 7F3K2Q');
+    expect(container?.textContent).not.toContain('database password leaked');
+  });
+
   it('shows a short message instead of management controls for non-faculty roles', async () => {
     mocks.role = 'employee';
     await renderPage();

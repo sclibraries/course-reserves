@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
 import { API_ENDPOINTS } from '@/config/endpoints';
 import { fetchMergedCourseResources, fetchPhysicalCourseResources } from '@/services/courseResourceFetch';
 import { buildPreviousCoursesQuery, mapFolioCourseToPreviousCourse, type FolioPreviousCourse, type PreviousCourseSearchMode } from './courseCloningUtils';
@@ -202,7 +202,8 @@ export const useCourseCloning = () => {
       } catch (error) {
         if (requestId === previousCoursesRequestId.current) {
           console.error('Failed to load other courses:', error);
-          toast.error('Failed to load other courses');
+          const feedback = getSafeErrorFeedback(error, "Couldn't load other courses");
+          notify.error(feedback.message, { reference: feedback.reference });
         }
 
         return exactCourses;
@@ -213,7 +214,8 @@ export const useCourseCloning = () => {
       }
     } catch (error) {
       console.error('Failed to load previous courses:', error);
-      toast.error('Failed to load previous courses');
+      const feedback = getSafeErrorFeedback(error, "Couldn't load previous courses");
+      notify.error(feedback.message, { reference: feedback.reference });
 
       if (requestId === previousCoursesRequestId.current) {
         setPreviousCourses([]);
