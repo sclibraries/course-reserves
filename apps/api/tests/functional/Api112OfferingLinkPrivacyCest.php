@@ -30,6 +30,7 @@ class Api112OfferingLinkPrivacyCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->resourceIds = [];
         $this->loadProductionRouter();
         $this->db = \Yii::$app->db;
 
