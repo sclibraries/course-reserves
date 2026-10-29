@@ -22,6 +22,6 @@ describe('saveValidatedItem', () => {
 
     expect(saveValidatedItem({ title: '', materialType: 'Book' } as never, onSave)).toBe(false);
     expect(onSave).not.toHaveBeenCalled();
-    expect(notify.error).toHaveBeenCalledWith('Item title is required.', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenCalledWith('Item title is required.');
   });
 });

@@ -52,8 +52,8 @@ describe('Sonner notifications in Chromium', () => {
     const errorToast = document.querySelector('[data-sonner-toast][data-type="error"]');
     const closeButton = errorToast?.querySelector<HTMLButtonElement>('[data-close-button]');
     expect(closeButton).not.toBeNull();
-    expect(closeButton?.getBoundingClientRect().width).toBeGreaterThanOrEqual(24);
-    expect(closeButton?.getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
+    expect(closeButton?.offsetWidth).toBeGreaterThanOrEqual(24);
+    expect(closeButton?.offsetHeight).toBeGreaterThanOrEqual(24);
     closeButton?.focus();
     await page.keyboard.press('Enter');
     await expect.poll(() => document.querySelector('[data-sonner-toast][data-type="error"]')).toBeNull();

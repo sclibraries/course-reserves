@@ -89,7 +89,7 @@ describe('CorrectionRequiredDialog', () => {
     });
     expect(document.body.textContent).toContain('Climate and Society');
     expect(document.body.textContent).toContain('could not be sent');
-    expect(notify.error).toHaveBeenCalledWith('Could not send the correction request', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenCalledWith('Could not send the correction request', { reference: undefined });
     expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(true);
 
     await act(async () => {

@@ -14,7 +14,7 @@ export const createCloneResourceHandler = (
   const handleAddSingleResource = (resource: PreviewResource) => {
     if (!reserve || !reserveId) {
       console.error('No reserve or ID found');
-      notify.error('No course is selected.', { reference: 'unavailable' });
+      notify.error('No course is selected.');
       return;
     }
     
@@ -28,7 +28,7 @@ export const createCloneResourceHandler = (
         
         if (!item || !item.title) {
           console.error('Invalid physical item data:', item);
-          notify.error('This resource could not be added.', { reference: 'unavailable' });
+          notify.error('This resource could not be added.');
           return;
         }
         
@@ -78,7 +78,7 @@ export const createCloneResourceHandler = (
         if (addItem(reserveId, newItem)) {
           if (showSuccessToast) notify.success(`Added "${resource.title}"`);
         } else {
-          notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
+          notify.error('This item is already in your reserve list.');
         }
         
       } 
@@ -112,12 +112,12 @@ export const createCloneResourceHandler = (
         if (addItem(reserveId, newItem)) {
           if (showSuccessToast) notify.success(`Added "${resource.title}"`);
         } else {
-          notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
+          notify.error('This item is already in your reserve list.');
         }
         
       } else {
         console.error('Invalid resource - no original data:', resource);
-        notify.error('This resource could not be added.', { reference: 'unavailable' });
+        notify.error('This resource could not be added.');
         return;
       }
       

@@ -62,7 +62,7 @@ describe('confirmSubmit on 423', () => {
     });
     expect(navigate).not.toHaveBeenCalled();
     expect(notifyError).toHaveBeenCalledTimes(1);
-    expect(notifyError).toHaveBeenCalledWith('This submission can no longer be edited', { reference: 'unavailable' });
+    expect(notifyError).toHaveBeenCalledWith('This submission can no longer be edited', { reference: undefined });
   });
 
   it('clears the persisted draft on a 423 lock conflict', async () => {
@@ -106,7 +106,7 @@ describe('confirmSubmit on 423', () => {
       attemptedUpdate: { items: [] },
     });
     expect(useDraftStore.getState().getDraft('sub-1')).toBeDefined();
-    expect(notifyError).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: 'unavailable' });
+    expect(notifyError).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: undefined });
     expect(navigate).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ import { getSafeErrorFeedback } from '@/services/notify';
 const ROSTER_COURSE_ERROR_MESSAGE = "This course isn't on your teaching roster for that term - contact the library";
 
 export class SubmissionResponseError extends Error {
-  constructor(message: string, readonly reference: string) {
+  constructor(message: string, readonly reference?: string) {
     super(message);
     this.name = 'SubmissionResponseError';
   }

@@ -19,7 +19,7 @@ import {
 
 const apiError = (error: unknown, message: string) => {
   const feedback = getSafeErrorFeedback(error, message);
-  return `${feedback.message}. Reference: ${feedback.reference}`;
+  return feedback.reference ? `${feedback.message}. Reference: ${feedback.reference}` : feedback.message;
 };
 
 const ManageDesignees = () => {

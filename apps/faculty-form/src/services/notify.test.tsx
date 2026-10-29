@@ -51,8 +51,9 @@ describe('notify', () => {
     expect(toast.error).toHaveBeenCalledWith('Please enter a title', { duration: Infinity });
   });
 
-  it('omits the unavailable placeholder from client-side error feedback', () => {
-    notify.error('Please enter a title', { reference: 'unavailable' });
+  it('omits a reference description for client-side feedback', () => {
+    const feedback = getSafeErrorFeedback(new Error('raw backend detail'), 'Please enter a title');
+    notify.error(feedback.message, { reference: feedback.reference });
 
     expect(toast.error).toHaveBeenCalledWith('Please enter a title', { duration: Infinity });
   });
@@ -67,10 +68,12 @@ describe('notify', () => {
     expect(JSON.stringify(feedback)).not.toContain('SQL connection password leaked');
   });
 
-  it('uses an unavailable marker when a failure has no server reference', () => {
+  it('omits a reference when a failure has no valid server reference', () => {
     expect(getSafeErrorFeedback(new Error('raw backend detail'), 'Could not save the item')).toEqual({
       message: 'Could not save the item',
-      reference: 'unavailable',
+    });
+    expect(getSafeErrorFeedback({ reference: 'not a valid id' }, 'Could not save the item')).toEqual({
+      message: 'Could not save the item',
     });
   });
 });

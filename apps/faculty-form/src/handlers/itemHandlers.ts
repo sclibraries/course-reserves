@@ -34,7 +34,7 @@ export const createItemHandlers = (
     if (editingItem) {
       updateItem(reserveId, editingItem.id, courseItemData);
     } else if (!addItem(reserveId, courseItemData)) {
-      notify.error('This item is already in your reserve list.', { reference: 'unavailable' });
+      notify.error('This item is already in your reserve list.');
       return false;
     }
     setModalOpen(false);
@@ -44,7 +44,7 @@ export const createItemHandlers = (
 
   const handleMoveUp = (itemId: string) => {
     if (isSearching) {
-      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
+      notify.error('Clear the search to reorder.');
       return;
     }
 
@@ -55,7 +55,7 @@ export const createItemHandlers = (
 
   const handleMoveDown = (itemId: string) => {
     if (isSearching) {
-      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
+      notify.error('Clear the search to reorder.');
       return;
     }
 

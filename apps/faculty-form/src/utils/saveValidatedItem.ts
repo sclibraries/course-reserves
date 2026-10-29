@@ -5,7 +5,7 @@ import { validateReserveItem } from './reserveValidation';
 export function saveValidatedItem(item: ItemData, onSave: (item: ItemData) => void | boolean): boolean {
   const validation = validateReserveItem(item);
   if (!validation.valid) {
-    notify.error(validation.errors[0], { reference: 'unavailable' });
+    notify.error(validation.errors[0]);
     return false;
   }
   return onSave(item) !== false;

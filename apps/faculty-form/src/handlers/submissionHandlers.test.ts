@@ -145,7 +145,7 @@ describe('createSubmissionHandlers', () => {
     await vi.waitFor(() => {
       expect(notify.error).toHaveBeenCalledWith(
         "This course isn't on your teaching roster for that term - contact the library",
-        { reference: 'unavailable' }
+        { reference: undefined }
       );
     });
   });
@@ -167,7 +167,7 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(notify.error).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: 'unavailable' });
+      expect(notify.error).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: undefined });
     });
     expect(useEditorUIStore.getState().correctionRequiredDialogOpen).toBe(false);
     expect(navigate).not.toHaveBeenCalled();
@@ -207,7 +207,7 @@ describe('createSubmissionHandlers', () => {
     handlers.confirmSubmit(false);
 
     await vi.waitFor(() => {
-      expect(notify.error).toHaveBeenCalledWith('Submission failed: Item 1: Item title is required.', { reference: 'unavailable' });
+      expect(notify.error).toHaveBeenCalledWith('Submission failed: Item 1: Item title is required.');
     });
 
     expect(fetch).not.toHaveBeenCalled();

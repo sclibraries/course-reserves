@@ -39,7 +39,7 @@ export const createSubmissionHandlers = (
   const confirmSubmit = (emailConfirmation: boolean) => {
     const validation = validateReserveForSubmission(reserve);
     if (!validation.valid) {
-      notify.error(`Submission failed: ${validation.errors[0]}`, { reference: 'unavailable' });
+      notify.error(`Submission failed: ${validation.errors[0]}`);
       return;
     }
 

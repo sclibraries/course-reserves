@@ -19,7 +19,7 @@ export const createDragHandlers = (
     if (!over) return;
 
     if (isSearching) {
-      notify.error('Clear the search to reorder.', { reference: 'unavailable' });
+      notify.error('Clear the search to reorder.');
       return;
     }
 

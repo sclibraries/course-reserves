@@ -60,6 +60,6 @@ describe('createDragHandlers', () => {
     } as never);
 
     expect(moveTo).not.toHaveBeenCalled();
-    expect(notify.error).toHaveBeenCalledWith('Clear the search to reorder.', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenCalledWith('Clear the search to reorder.');
   });
 });

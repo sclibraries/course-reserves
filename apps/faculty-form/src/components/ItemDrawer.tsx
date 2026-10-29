@@ -47,15 +47,15 @@ export const ItemDrawer = ({ open, onOpenChange, onSave, initialData }: ItemDraw
 
   const handleSave = () => {
     if (!formData.title.trim()) {
-      notify.error('Please enter a title', { reference: 'unavailable' });
+      notify.error('Please enter a title');
       return;
     }
     if (!formData.materialType) {
-      notify.error('Please select a material type', { reference: 'unavailable' });
+      notify.error('Please select a material type');
       return;
     }
     if (!formData.requestType) {
-      notify.error('Please select a request type', { reference: 'unavailable' });
+      notify.error('Please select a request type');
       return;
     }
 

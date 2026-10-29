@@ -1,13 +1,13 @@
 import { toast, type ExternalToast } from 'sonner';
 
 type NotifyOptions = Pick<ExternalToast, 'action' | 'duration'>;
-type ErrorFeedback = { message: string; reference: string };
+type ErrorFeedback = { message: string; reference?: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const getReference = (error: unknown): string => {
-  if (!isRecord(error)) return 'unavailable';
+const getReference = (error: unknown): string | undefined => {
+  if (!isRecord(error)) return undefined;
   const response = isRecord(error.response) ? error.response : undefined;
   const data = response && isRecord(response.data) ? response.data : undefined;
   const candidate = data?.reference ?? data?.reference_id ?? data?.referenceId ??
@@ -15,13 +15,13 @@ const getReference = (error: unknown): string => {
 
   return typeof candidate === 'string' && /^[A-Za-z0-9-]{4,64}$/.test(candidate)
     ? candidate
-    : 'unavailable';
+    : undefined;
 };
 
-export const getSafeErrorFeedback = (error: unknown, message: string): ErrorFeedback => ({
-  message,
-  reference: getReference(error),
-});
+export const getSafeErrorFeedback = (error: unknown, message: string): ErrorFeedback => {
+  const reference = getReference(error);
+  return reference ? { message, reference } : { message };
+};
 
 export const notify = {
   success(message: string, options?: NotifyOptions) {
@@ -32,7 +32,7 @@ export const notify = {
   },
   error(message: string, { reference }: { reference?: string } = {}) {
     toast.error(message, {
-      ...(reference && reference !== 'unavailable' ? { description: `Reference: ${reference}` } : {}),
+      ...(reference ? { description: `Reference: ${reference}` } : {}),
       duration: Infinity,
     });
   },

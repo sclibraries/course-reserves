@@ -16,8 +16,8 @@ describe('createItemHandlers search ordering guard', () => {
     handlers.handleMoveDown('item-1');
 
     expect(moveItemInList).not.toHaveBeenCalled();
-    expect(notify.error).toHaveBeenNthCalledWith(1, 'Clear the search to reorder.', { reference: 'unavailable' });
-    expect(notify.error).toHaveBeenNthCalledWith(2, 'Clear the search to reorder.', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenNthCalledWith(1, 'Clear the search to reorder.');
+    expect(notify.error).toHaveBeenNthCalledWith(2, 'Clear the search to reorder.');
   });
 
   it('announces successful item moves by name', () => {

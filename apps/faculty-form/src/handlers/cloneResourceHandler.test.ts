@@ -78,6 +78,6 @@ describe('createCloneResourceHandler', () => {
       _originalResource: { url: 'https://example.test/article' },
     } as PreviewResource);
 
-    expect(notify.error).toHaveBeenCalledWith('This item is already in your reserve list.', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenCalledWith('This item is already in your reserve list.');
   });
 });

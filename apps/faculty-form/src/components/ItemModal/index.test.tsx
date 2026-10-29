@@ -109,7 +109,7 @@ describe('ItemModal', () => {
     saveItem();
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(notify.error).toHaveBeenCalledWith('Item title is required.', { reference: 'unavailable' });
+    expect(notify.error).toHaveBeenCalledWith('Item title is required.');
   });
 
   it('creates a print item from the empty form using the visible controls', () => {

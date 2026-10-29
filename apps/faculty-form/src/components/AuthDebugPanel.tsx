@@ -116,7 +116,7 @@ export const AuthDebugPanel = () => {
 
   const handleQuickCreateCourse = () => {
     if (!user?.full_name) {
-      notify.error('Please log in first', { reference: 'unavailable' });
+      notify.error('Please log in first');
       return;
     }
 
