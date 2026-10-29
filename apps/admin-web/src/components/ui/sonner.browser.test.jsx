@@ -3,7 +3,7 @@ import '../../index.css';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { page } from '@vitest/browser/context';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../test/browser';
 import { notify } from '../../services/notify';
 import { Toaster } from './sonner';
@@ -25,14 +25,19 @@ describe('Sonner notifications in Chromium', () => {
     container = document.createElement('main');
     document.body.appendChild(container);
     root = createRoot(container);
+    await act(async () => root.render(<Toaster />));
+    const region = document.querySelector('section[aria-live="polite"]');
+    expect(region).toBeTruthy();
+
     await act(async () => {
-      root.render(<Toaster />);
       notify.success('Item claimed');
       notify.error("Couldn't save the access path", { reference: 'SYNTH-42' });
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await vi.waitFor(() => {
+        expect(region.textContent).toContain('Item claimed');
+        expect(region.textContent).toContain("Couldn't save the access path. Reference: SYNTH-42");
+      });
     });
 
-    const region = document.querySelector('section[aria-live="polite"]');
     const toast = document.querySelector('[data-sonner-toast][data-type="error"]');
     const closeButton = page.getByRole('button', { name: 'Dismiss notification' });
     expect(region?.getAttribute('aria-label')).toContain('Notifications');
