@@ -54,13 +54,7 @@ class CourseAssignmentsController extends ActiveController
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                    'http://localhost:5174',
-                    'http://127.0.0.1:5173',
-                    'http://127.0.0.1:5174',
-                    'http://localhost:8080',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Max-Age' => 3600,
@@ -69,7 +63,7 @@ class CourseAssignmentsController extends ActiveController
             ],
         ];
 
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function actions()

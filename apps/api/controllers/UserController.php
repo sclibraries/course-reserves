@@ -33,10 +33,7 @@ class UserController extends ActiveController
                     'class' => Cors::class,
                     'cors' => [
                         // Allowed origins
-                        'Origin' => array_merge([
-                            'http://localhost:5173',
-                            'http://127.0.0.1:5173',
-                        ], Yii::$app->params['corsOrigins'] ?? []),
+                        'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                         // Allowed request methods
                         'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                         // Allowed request headers sent by the browser in preflight
@@ -90,7 +87,7 @@ class UserController extends ActiveController
         ];
        
         
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function actionCurrent()

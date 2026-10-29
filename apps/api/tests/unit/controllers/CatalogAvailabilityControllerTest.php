@@ -13,7 +13,7 @@ require_once codecept_root_dir('controllers/CatalogAvailabilityController.php');
 /** Verifies access and response configuration for catalog availability. */
 class CatalogAvailabilityControllerTest extends \Codeception\Test\Unit
 {
-    public function testControllerUsesBaseAuthAndAddsLoopbackNginxOrigin()
+    public function testControllerUsesBaseAuthAndSharedCorsOrigins()
     {
         $controller = new CatalogAvailabilityController('catalog-availability', \Yii::$app);
         $behaviors = $controller->behaviors();
@@ -25,8 +25,8 @@ class CatalogAvailabilityControllerTest extends \Codeception\Test\Unit
             ['application/json' => Response::FORMAT_JSON],
             $behaviors['contentNegotiator']['formats']
         );
-        $this->assertContains(
-            'http://127.0.0.1:8080',
+        $this->assertSame(
+            \app\components\CorsOriginPolicy::allowedOrigins(),
             $behaviors['corsFilter']['cors']['Origin']
         );
     }

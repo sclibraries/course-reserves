@@ -30,7 +30,7 @@ class WorkflowLinkController extends Controller
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge(['http://localhost:5173', 'http://localhost:5174'], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Max-Age' => 86400,
@@ -48,7 +48,7 @@ class WorkflowLinkController extends Controller
             'class' => RoleAccessFilter::class,
             'rules' => $rules,
         ];
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function actionOptions()

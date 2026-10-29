@@ -29,6 +29,6 @@ class ApiAccessBehaviors
             'rules' => $rules,
         ];
 
-        return $behaviors;
+        return CorsOriginPolicy::corsFirst($behaviors);
     }
 }

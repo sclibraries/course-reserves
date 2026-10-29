@@ -31,9 +31,7 @@ class OfferingLinkController extends ActiveController
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Max-Age' => 3600,
@@ -53,7 +51,7 @@ class OfferingLinkController extends ActiveController
             ],
         ];
 
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function actions()

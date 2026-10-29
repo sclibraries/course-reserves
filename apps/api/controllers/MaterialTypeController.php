@@ -26,9 +26,7 @@ class MaterialTypeController extends ActiveController
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Allow-Headers' => ['Content-Type', 'Authorization'],

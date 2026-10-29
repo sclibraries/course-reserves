@@ -105,11 +105,11 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
             $this->assertSame(['options'], $behaviors['authenticator']['except']);
 
             $origins = $behaviors['corsFilter']['cors']['Origin'];
-            $this->assertNotContains('*', $origins);
-            $this->assertNotContains('https://libtools2.smith.edu', $origins);
-            $this->assertContains('https://app.example.test', $origins);
-            $this->assertContains('http://localhost:5174', $origins);
-            $this->assertContains('http://127.0.0.1:5174', $origins);
+            $this->assertSame([
+                'http://localhost:5173',
+                'http://localhost:5174',
+                'https://app.example.test',
+            ], $origins);
         } finally {
             \Yii::$app->params['corsOrigins'] = $previousOrigins;
         }
@@ -125,7 +125,7 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
         $this->assertNotFalse($preflightPosition);
         $this->assertNotFalse($parentBeforeActionPosition);
         $this->assertLessThan($parentBeforeActionPosition, $preflightPosition);
-        $this->assertStringContainsString("Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With'", $source);
+        $this->assertStringContainsString('CorsOriginPolicy::configurePreflightResponse();', $source);
     }
 
     public function testEbscoProxyDefinesRequestThrottle()

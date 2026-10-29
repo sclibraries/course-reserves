@@ -108,8 +108,10 @@ class Api088CatalogAvailabilityCest extends BaseFunctionalCest
         $I->sendJsonRequest('GET', 'catalog-availability', [], ['an' => 'smc.synthetic.accession']);
         $I->seeResponseCodeIs(401);
 
-        $I->sendJsonRequest('OPTIONS', 'catalog-availability');
-        $I->seeResponseCodeIs(204);
+        $status = $I->sendJsonRequest('OPTIONS', 'catalog-availability');
+        Assert::assertGreaterThanOrEqual(200, $status);
+        Assert::assertLessThan(300, $status);
+        Assert::assertSame('catalog-availability', \Yii::$app->requestedRoute);
     }
 
     private function get(FunctionalTester $I, $an, $token)

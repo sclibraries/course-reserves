@@ -58,6 +58,32 @@ class Functional extends \Codeception\Module
     }
 
     /**
+     * Send a literal browser request with CORS headers.
+     *
+     * @param string      $method        HTTP method.
+     * @param string      $path          Literal request path.
+     * @param string      $origin        Origin header.
+     * @param string|null $requestMethod Requested method for OPTIONS.
+     * @param string|null $requestHeaders Requested headers for OPTIONS.
+     * @return int HTTP response status code.
+     */
+    public function sendCorsRequest($method, $path, $origin, $requestMethod = null, $requestHeaders = null)
+    {
+        $server = ['HTTP_ORIGIN' => $origin];
+        if ($requestMethod !== null) {
+            $server['HTTP_ACCESS_CONTROL_REQUEST_METHOD'] = $requestMethod;
+        }
+        if ($requestHeaders !== null) {
+            $server['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'] = $requestHeaders;
+        }
+
+        $module = $this->getModule('Yii2');
+        $module->_request(strtoupper($method), $path, [], [], $server);
+
+        return $module->_getResponseStatusCode();
+    }
+
+    /**
      * Decode the last response body as JSON.
      *
      * @return array|null

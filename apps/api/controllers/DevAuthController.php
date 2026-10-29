@@ -43,12 +43,7 @@ class DevAuthController extends Controller
         $behaviors['corsFilter'] = [
             'class' => \yii\filters\Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                    'http://localhost:8080',
-                    'http://127.0.0.1:5173',
-                    'http://127.0.0.1:8080',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method'  => ['POST', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
                 'Access-Control-Allow-Credentials' => true,
@@ -56,7 +51,7 @@ class DevAuthController extends Controller
             ],
         ];
 
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     /**

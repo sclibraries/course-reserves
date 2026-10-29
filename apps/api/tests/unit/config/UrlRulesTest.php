@@ -133,6 +133,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'POST workflow/submission/staff-entered' => 'staff-entered-submission/create',
             'OPTIONS workflow/submission/staff-entered' => 'staff-entered-submission/options',
         ];
+        $corsRules = [
+            'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
+            'OPTIONS physical-resource/update-resource-order' => 'cors-preflight/options',
+            'OPTIONS <path:.*>' => 'cors-preflight/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
@@ -141,6 +146,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $expectedNavPinRules = array_intersect_key($mergedRules, $navPinRules);
         $expectedSyllabusRules = array_intersect_key($mergedRules, $syllabusRules);
         $expectedStaffEnteredRules = array_intersect_key($mergedRules, $staffEnteredRules);
+        $expectedCorsRules = array_intersect_key($mergedRules, $corsRules);
         $declaredRules = array_merge(
             $claimRules,
             $groupRules,
@@ -149,10 +155,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $availabilityRules,
             $syllabusRules,
             $staffEnteredRules,
-            $navPinRules
+            $navPinRules,
+            $corsRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(253, $mergedRules);
+        $this->assertCount(256, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -161,6 +168,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $this->assertSame($navPinRules, $expectedNavPinRules);
         $this->assertSame($syllabusRules, $expectedSyllabusRules);
         $this->assertSame($staffEnteredRules, $expectedStaffEnteredRules);
+        $this->assertSame($corsRules, $expectedCorsRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -174,7 +182,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $uuid = '123e4567-e89b-12d3-a456-426614174000';
         $cases = [
             ['POST', 'dev-auth/login', ['dev-auth/login', []]],
-            ['OPTIONS', 'dev-auth/login', ['dev-auth/login', []]],
+            ['OPTIONS', 'dev-auth/login', ['cors-preflight/options', []]],
             ['POST', 'workflow/submission/staff-entered', ['staff-entered-submission/create', []]],
             ['OPTIONS', 'workflow/submission/staff-entered', ['staff-entered-submission/options', []]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
@@ -301,7 +309,20 @@ class UrlRulesTest extends \Codeception\Test\Unit
                 'checklist/get-template', ['id' => '999007204'],
             ]],
             ['GET', 'course/999007205/resources', ['course/resources', ['offeringId' => '999007205']]],
+            ['OPTIONS', 'course/999007205/resources', [
+                'cors-preflight/options', ['path' => 'course/999007205/resources'],
+            ]],
             ['GET', 'course/get-merged-resources', ['course/get-merged-resources', []]],
+            ['GET', 'physical-resource/by-external-id/test-api104-id', [
+                'physical-resource/get-by-external-id', ['external_id' => 'test-api104-id'],
+            ]],
+            ['OPTIONS', 'physical-resource/by-external-id/test-api104-id', [
+                'cors-preflight/options', ['path' => 'physical-resource/by-external-id/test-api104-id'],
+            ]],
+            ['OPTIONS', 'physical-resource/cleanup-references', [
+                'cors-preflight/options', ['path' => 'physical-resource/cleanup-references'],
+            ]],
+            ['OPTIONS', 'physical-resource/update-resource-order', ['cors-preflight/options', []]],
             ['GET', 'course/course-reserves/public/courses/' . $uuid, [
                 'course/course/public-view', ['uuid' => $uuid],
             ]],
@@ -309,6 +330,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['GET', 'faculty-proxy/staff/grants', ['faculty-proxy/staff-grants', []]],
             ['OPTIONS', 'faculty-proxy/staff/grants', ['faculty-proxy/options', []]],
             ['GET', 'course-assignments/instructor-courses', ['course-assignments/instructor-courses', []]],
+            ['OPTIONS', 'course-assignments/instructor-courses', [
+                'cors-preflight/options', ['path' => 'course-assignments/instructor-courses'],
+            ]],
+            ['OPTIONS', 'offering-link/link-existing-resources', [
+                'cors-preflight/options', ['path' => 'offering-link/link-existing-resources'],
+            ]],
         ];
 
         $hadRequestMethod = isset($_SERVER['REQUEST_METHOD']);
@@ -330,5 +357,62 @@ class UrlRulesTest extends \Codeception\Test\Unit
                 unset($_SERVER['REQUEST_METHOD']);
             }
         }
+    }
+
+    public function testEveryConfiguredRoutePatternHasAnOptionsRoute()
+    {
+        $config = require codecept_root_dir('config/web.php');
+        $manager = new UrlManager($config['components']['urlManager']);
+        $paths = [];
+
+        foreach ($config['components']['urlManager']['rules'] as $pattern => $route) {
+            if (is_string($pattern) && preg_match('/^(GET|POST|PUT|PATCH|DELETE|HEAD) (.+)$/', $pattern, $matches)) {
+                $paths[] = $this->sampleRoutePath($matches[2]);
+                continue;
+            }
+
+            if (!is_array($route) || ($route['class'] ?? null) !== 'yii\\rest\\UrlRule') {
+                continue;
+            }
+
+            foreach ($route['controller'] as $controller) {
+                foreach (array_keys($route['extraPatterns']) as $extraPattern) {
+                    if (!preg_match('/^(GET|POST|PUT|PATCH|DELETE|HEAD) (.*)$/', $extraPattern, $matches)) {
+                        continue;
+                    }
+                    $paths[] = $this->sampleRoutePath($controller . '/' . $matches[2]);
+                }
+            }
+        }
+
+        $hadRequestMethod = isset($_SERVER['REQUEST_METHOD']);
+        $previousRequestMethod = $hadRequestMethod ? $_SERVER['REQUEST_METHOD'] : null;
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'OPTIONS';
+            foreach (array_unique($paths) as $path) {
+                $request = new Request();
+                $request->setBaseUrl('');
+                $request->setScriptUrl('');
+                $request->setPathInfo($path);
+                $parsed = $manager->parseRequest($request);
+
+                $this->assertNotFalse($parsed, 'No OPTIONS route for ' . $path);
+                $this->assertTrue(
+                    $parsed[0] === 'cors-preflight/options' || substr($parsed[0], -8) === '/options',
+                    'OPTIONS must target a preflight action for ' . $path . ', got ' . $parsed[0]
+                );
+            }
+        } finally {
+            if ($hadRequestMethod) {
+                $_SERVER['REQUEST_METHOD'] = $previousRequestMethod;
+            } else {
+                unset($_SERVER['REQUEST_METHOD']);
+            }
+        }
+    }
+
+    private function sampleRoutePath($path)
+    {
+        return preg_replace('/<[^>]+>/', '1', $path);
     }
 }
