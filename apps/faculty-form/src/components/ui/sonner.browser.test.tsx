@@ -1,7 +1,7 @@
 import '../../index.css';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { page } from '@vitest/browser/context';
+import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '@/test/browser';
 import { notify } from '@/services/notify';
@@ -42,10 +42,6 @@ describe('Sonner notifications in Chromium', () => {
     await expect.poll(() => document.body.textContent).toContain("Couldn't save the access path");
     await expect.poll(() => document.body.textContent).toContain('Reference: 7F3K2Q');
 
-    expect(document.body.textContent).toContain('Item added');
-    expect(document.body.textContent).toContain('Existing course list kept');
-    expect(document.body.textContent).toContain("Couldn't save the access path");
-    expect(document.body.textContent).toContain('Reference: 7F3K2Q');
     await page.getByRole('button', { name: 'Undo' }).click();
     expect(undone).toBe(true);
 
@@ -55,7 +51,7 @@ describe('Sonner notifications in Chromium', () => {
     expect(closeButton?.offsetWidth).toBeGreaterThanOrEqual(24);
     expect(closeButton?.offsetHeight).toBeGreaterThanOrEqual(24);
     closeButton?.focus();
-    await page.keyboard.press('Enter');
+    await userEvent.keyboard('{Enter}');
     await expect.poll(() => document.querySelector('[data-sonner-toast][data-type="error"]')).toBeNull();
 
     await expectNoAxeViolations(document.body);
