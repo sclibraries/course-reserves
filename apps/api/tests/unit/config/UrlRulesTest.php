@@ -133,6 +133,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'POST workflow/submission/staff-entered' => 'staff-entered-submission/create',
             'OPTIONS workflow/submission/staff-entered' => 'staff-entered-submission/options',
         ];
+        $publicationRules = [
+            'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/state',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/ready',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/options',
+        ];
         $corsRules = [
             'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
             'OPTIONS physical-resource/update-resource-order' => 'cors-preflight/options',
@@ -146,6 +152,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $expectedNavPinRules = array_intersect_key($mergedRules, $navPinRules);
         $expectedSyllabusRules = array_intersect_key($mergedRules, $syllabusRules);
         $expectedStaffEnteredRules = array_intersect_key($mergedRules, $staffEnteredRules);
+        $expectedPublicationRules = array_intersect_key($mergedRules, $publicationRules);
         $expectedCorsRules = array_intersect_key($mergedRules, $corsRules);
         $declaredRules = array_merge(
             $claimRules,
@@ -155,11 +162,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $availabilityRules,
             $syllabusRules,
             $staffEnteredRules,
+            $publicationRules,
             $navPinRules,
             $corsRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(256, $mergedRules);
+        $this->assertCount(260, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -168,6 +176,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $this->assertSame($navPinRules, $expectedNavPinRules);
         $this->assertSame($syllabusRules, $expectedSyllabusRules);
         $this->assertSame($staffEnteredRules, $expectedStaffEnteredRules);
+        $this->assertSame($publicationRules, $expectedPublicationRules);
         $this->assertSame($corsRules, $expectedCorsRules);
         $this->assertSame($baseline, $existingRules);
 

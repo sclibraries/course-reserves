@@ -87,18 +87,17 @@ class SubmissionPublicationStateService
     public function markReady($kind, $itemId, array $actor, $reason)
     {
         $reason = is_scalar($reason) ? trim((string)$reason) : '';
-        if ($reason === '') {
-            return $this->result(400, ['error_code' => 'reason_required']);
-        }
-        if (strlen($reason) > 65535) {
-            return $this->result(400, ['error_code' => 'reason_too_long']);
-        }
-
         return $this->claims->withLinkedItem($kind, $itemId, function ($item, $transaction, $now) use (
             $kind, $itemId, $actor, $reason
         ) {
             if (!$this->claims->claimActorMatches($item, $actor)) {
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
+            }
+            if ($reason === '') {
+                return $this->result(400, ['error_code' => 'reason_required']);
+            }
+            if (strlen($reason) > 65535) {
+                return $this->result(400, ['error_code' => 'reason_too_long']);
             }
             $state = $this->states->lock($kind, $itemId, $item['submission_id']);
             $run = $this->flows->latestRun($kind, $itemId, true);

@@ -215,9 +215,9 @@ class SubmissionPublicationStateMigrationReconciler
     {
         return (int)$this->db->createCommand(
             'SELECT (SELECT COUNT(*) FROM submission_new_resources WHERE materialized_physical_reference_id = :id '
-            . 'AND NOT (:new_kind = "new" AND item_id = :new_item_id)) + '
+            . 'AND NOT (:new_kind = "new" AND id = :new_item_id)) + '
             . '(SELECT COUNT(*) FROM submission_reuse_resources WHERE materialized_physical_reference_id = :reuse_id '
-            . 'AND NOT (:reuse_kind = "reuse" AND item_id = :reuse_item_id))',
+            . 'AND NOT (:reuse_kind = "reuse" AND id = :reuse_item_id))',
             [
                 ':id' => (int)$referenceId,
                 ':reuse_id' => (int)$referenceId,
@@ -233,9 +233,9 @@ class SubmissionPublicationStateMigrationReconciler
     {
         return (int)$this->db->createCommand(
             'SELECT (SELECT COUNT(*) FROM submission_new_resources WHERE materialized_course_resource_id = :id '
-            . 'AND NOT (:new_kind = "new" AND item_id = :new_item_id)) + '
+            . 'AND NOT (:new_kind = "new" AND id = :new_item_id)) + '
             . '(SELECT COUNT(*) FROM submission_reuse_resources WHERE materialized_course_resource_id = :reuse_id '
-            . 'AND NOT (:reuse_kind = "reuse" AND item_id = :reuse_item_id))',
+            . 'AND NOT (:reuse_kind = "reuse" AND id = :reuse_item_id))',
             [
                 ':id' => (int)$courseResourceId,
                 ':reuse_id' => (int)$courseResourceId,

@@ -20,7 +20,7 @@ class SubmissionDetailPresenter
         $this->publication = Yii::$container->get(SubmissionPublicationStateService::class);
     }
 
-    public function present(array $submission)
+    public function present(array $submission, $actor = null)
     {
         $entry = Yii::$app->db->createCommand(
             'SELECT entered_by, entry_source FROM faculty_submissions WHERE submission_id = :id',
@@ -114,14 +114,15 @@ class SubmissionDetailPresenter
                 }
             }
         }
-        $identity = Yii::$app->user->identity;
-        $actor = [
-            'username' => $identity->username ?? (string)$identity->id,
-            'role' => $identity->role,
-        ];
-        $publicationContracts = $this->publication->contractsForSubmission(
-            (int)($submission['submission_id'] ?? 0), $publicationItems, $actor, $flowRuns, $mappedFlows
-        );
+        $publicationContracts = [];
+        if ($actor !== null) {
+            $publicationContracts = $this->publication->contractsForSubmission(
+                (int)($submission['submission_id'] ?? 0), $publicationItems, [
+                    'username' => $actor->username ?? (string)$actor->id,
+                    'role' => $actor->role,
+                ], $flowRuns, $mappedFlows
+            );
+        }
 
         foreach ($collections as $collection => $kind) {
             foreach ($submission[$collection] ?? [] as $index => $item) {

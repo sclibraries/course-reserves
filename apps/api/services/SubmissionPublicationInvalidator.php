@@ -22,14 +22,15 @@ class SubmissionPublicationInvalidator
         if (!$ids) {
             return;
         }
-        $holders = implode(',', array_fill(0, count($ids), '?'));
-        $params = array_merge($ids, $ids);
+        $params = [];
+        $newHolders = $this->inList($ids, 'new_type_', $params);
+        $reuseHolders = $this->inList($ids, 'reuse_type_', $params);
         $rows = Yii::$app->db->createCommand(
             'SELECT "new" AS kind, id, submission_id FROM submission_new_resources '
-            . 'WHERE material_type_id IN (' . $holders . ') UNION ALL '
+            . 'WHERE material_type_id IN (' . $newHolders . ') UNION ALL '
             . 'SELECT "reuse" AS kind, item.id, item.submission_id FROM submission_reuse_resources item '
             . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
-            . 'WHERE source.material_type_id IN (' . $holders . ') ORDER BY kind, id',
+            . 'WHERE source.material_type_id IN (' . $reuseHolders . ') ORDER BY kind, id',
             $params
         )->queryAll();
         $this->invalidateRows($rows);
@@ -41,13 +42,14 @@ class SubmissionPublicationInvalidator
         if (!$paths) {
             return;
         }
-        $holders = implode(',', array_fill(0, count($paths), '?'));
-        $params = array_merge($paths, $paths);
+        $params = [];
+        $newHolders = $this->inList($paths, 'new_path_', $params);
+        $reuseHolders = $this->inList($paths, 'reuse_path_', $params);
         $rows = Yii::$app->db->createCommand(
             'SELECT "new" AS kind, id, submission_id FROM submission_new_resources '
-            . 'WHERE access_path IN (' . $holders . ') UNION ALL '
+            . 'WHERE access_path IN (' . $newHolders . ') UNION ALL '
             . 'SELECT "reuse" AS kind, id, submission_id FROM submission_reuse_resources '
-            . 'WHERE access_path IN (' . $holders . ') ORDER BY kind, id',
+            . 'WHERE access_path IN (' . $reuseHolders . ') ORDER BY kind, id',
             $params
         )->queryAll();
         $this->invalidateRows($rows);
@@ -82,5 +84,16 @@ class SubmissionPublicationInvalidator
                 $this->publication->invalidateContext($row['kind'], $row['id'], $row['submission_id']);
             }
         }
+    }
+
+    private function inList(array $values, $prefix, array &$params)
+    {
+        $placeholders = [];
+        foreach ($values as $index => $value) {
+            $placeholder = ':' . $prefix . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $value;
+        }
+        return implode(', ', $placeholders);
     }
 }

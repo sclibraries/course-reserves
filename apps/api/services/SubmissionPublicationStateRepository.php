@@ -69,7 +69,7 @@ class SubmissionPublicationStateRepository
         foreach ($items as $index => $item) {
             $kind = ':kind' . $index;
             $id = ':item_id' . $index;
-            $conditions[] = '(event.item_kind = ' . $kind . ' AND event.item_id = ' . $id . ')';
+            $conditions[] = '(item_kind = ' . $kind . ' AND item_id = ' . $id . ')';
             $params[$kind] = $item['kind'];
             $params[$id] = (int)$item['id'];
         }

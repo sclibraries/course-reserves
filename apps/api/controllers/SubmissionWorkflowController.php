@@ -567,7 +567,7 @@ class SubmissionWorkflowController extends Controller
             throw new NotFoundHttpException('Submission not found');
         }
 
-        return Yii::$container->get(\app\services\SubmissionDetailPresenter::class)->present($this->formatSubmissionDetailResponse($submission));
+        return Yii::$container->get(\app\services\SubmissionDetailPresenter::class)->present($this->formatSubmissionDetailResponse($submission), Yii::$app->user->identity);
     }
 
     protected function formatSubmissionDetailResponse($submission)
