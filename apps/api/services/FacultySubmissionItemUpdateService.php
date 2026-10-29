@@ -8,12 +8,17 @@ use app\models\SubmissionNewResource;
 /** Updates faculty-editable submission items without exposing staff-only fields. */
 class FacultySubmissionItemUpdateService
 {
-    public function updateItems($submission, $itemsData, array $folderUuidToNameMap = [])
+    private $publication;
+
+    public function __construct($publication = null)
     {
-        $existingItems = SubmissionNewResource::find()
-            ->where(['submission_id' => $submission->submission_id])
-            ->indexBy('id')
-            ->all();
+        $this->publication = $publication ?: new SubmissionPublicationStateService();
+    }
+
+    public function updateItems($submission, $itemsData, array $folderUuidToNameMap = [], ?array $lockedItems = null)
+    {
+        $existingItems = $lockedItems !== null ? $lockedItems : SubmissionNewResource::find()
+            ->where(['submission_id' => $submission->submission_id])->indexBy('id')->all();
         $processedItemIds = [];
 
         foreach ($itemsData as $itemData) {
@@ -25,6 +30,7 @@ class FacultySubmissionItemUpdateService
 
             if ($itemId && isset($existingItems[$itemId])) {
                 $item = $existingItems[$itemId];
+                $before = PublicationDraftSnapshot::fromNewItem($item->getAttributes());
                 if (isset($itemData['display_order'])) {
                     $item->display_order = $itemData['display_order'];
                 }
@@ -41,6 +47,8 @@ class FacultySubmissionItemUpdateService
 
                 $currentData = json_decode($item->resource_data, true) ?? [];
                 $item->resource_data = json_encode($this->updatedResourceData($currentData, $itemData));
+                $updatedData = json_decode($item->resource_data, true) ?: [];
+                $item->material_type_id = $this->materialTypeId($updatedData['materialType'] ?? 'book');
                 if (isset($itemData['barcode'])) {
                     $item->source_barcode = $itemData['barcode'];
                     $item->is_reuse = 1;
@@ -49,6 +57,9 @@ class FacultySubmissionItemUpdateService
                     $item->source_call_number = $itemData['call_number'];
                 }
                 $item->save();
+                if ($before !== PublicationDraftSnapshot::fromNewItem($item->getAttributes())) {
+                    $this->publication->invalidateDraft('new', $item->id, $item->submission_id);
+                }
                 $processedItemIds[] = $itemId;
                 continue;
             }
@@ -72,11 +83,13 @@ class FacultySubmissionItemUpdateService
             $item->priority = $itemData['priority'] ?? 'medium';
             $item->item_status = 'pending';
             $item->save();
+            $this->publication->lockForWrite('new', $item->id, $item->submission_id);
             $processedItemIds[] = $item->id;
         }
 
         foreach ($existingItems as $itemId => $item) {
             if (!in_array($itemId, $processedItemIds)) {
+                $this->publication->remove('new', $itemId);
                 $item->delete();
             }
         }

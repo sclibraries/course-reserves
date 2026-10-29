@@ -125,16 +125,13 @@ class Api084FlowEngineCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame('confirm', $this->response($I)['current_step']['step']['key']);
         $this->postStep($I, $item['id'], 'confirm', 'done', 'staff');
-        $I->seeResponseCodeIs(409);
-        Assert::assertSame('step_not_available_yet', $this->response($I)['error_code']);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame('on_reserve', $this->response($I)['finished']['finish_state']);
 
         $this->request($I, 'GET', 'workflow-claim/my-items', [], 'staff');
         $I->seeResponseCodeIs(200);
-        Assert::assertSame(
-            'Confirm on reserve in FOLIO',
-            $this->findClaimedItem($this->response($I)['items'], $item['id'])['current_step_label']
-        );
-        Assert::assertNull($this->findClaimedItem($this->response($I)['items'], $item['id'])['finish_state']);
+        Assert::assertNull($this->findClaimedItem($this->response($I)['items'], $item['id'])['current_step_label']);
+        Assert::assertSame('on_reserve', $this->findClaimedItem($this->response($I)['items'], $item['id'])['finish_state']);
     }
 
     public function groupHandoffUsesSharedQueueAndFinishRequiresReason(FunctionalTester $I)

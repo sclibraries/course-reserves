@@ -9,17 +9,20 @@ class SubmittedSubmissionCreator
 {
     private $contexts;
     private $payloads;
+    private $publicationStates;
 
     public function __construct(
         ?FacultySubmissionContext $contexts = null,
-        ?SubmissionPayloadService $payloads = null
+        ?SubmissionPayloadService $payloads = null,
+        ?SubmissionPublicationStateRepository $publicationStates = null
     ) {
         $this->contexts = $contexts ?: new FacultySubmissionContext();
         $this->payloads = $payloads ?: new SubmissionPayloadService();
+        $this->publicationStates = $publicationStates ?: new SubmissionPublicationStateRepository();
     }
 
     public function create(array $context, array $actor, array $data, array $attributes = [],
-        callable $afterCreate = null, callable $onFailure = null, bool $reuseDraft = true)
+        ?callable $afterCreate = null, ?callable $onFailure = null, bool $reuseDraft = true)
     {
         $existing = $this->contexts->findForCourse($context);
         if ($existing && $existing->status === FacultySubmission::STATUS_DRAFT && !$reuseDraft) {
@@ -51,6 +54,7 @@ class SubmittedSubmissionCreator
                 throw new \RuntimeException('Failed to save submission: ' . json_encode($submission->errors));
             }
             $this->payloads->replace($submission->submission_id, $data, $actor);
+            $this->publicationStates->ensureForSubmission($submission->submission_id);
             if ($afterCreate !== null) {
                 call_user_func($afterCreate, $submission);
             }

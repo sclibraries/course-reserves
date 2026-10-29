@@ -9,11 +9,13 @@ class AccessPathMappingService
 
     private $mappings;
     private $events;
+    private $publicationInvalidator;
 
-    public function __construct($mappings = null, $events = null)
+    public function __construct($mappings = null, $events = null, $publicationInvalidator = null)
     {
         $this->mappings = $mappings ?: new AccessPathMappingRepository();
         $this->events = $events ?: new WorkflowEventLog();
+        $this->publicationInvalidator = $publicationInvalidator ?: new SubmissionPublicationInvalidator();
     }
 
     public function getMapping()
@@ -37,7 +39,22 @@ class AccessPathMappingService
         }
         $before = $this->getMapping()['mapping'];
         $after = array_map([$this, 'format'], $rows);
-        return Transactional::run(function () use ($rows, $before, $after, $actor) {
+        $beforeByPath = [];
+        $afterByPath = [];
+        foreach ($before as $row) {
+            $beforeByPath[$row['access_path']] = $row;
+        }
+        foreach ($after as $row) {
+            $afterByPath[$row['access_path']] = $row;
+        }
+        $changedPaths = [];
+        foreach (array_unique(array_merge(array_keys($beforeByPath), array_keys($afterByPath))) as $path) {
+            if (($beforeByPath[$path] ?? null) !== ($afterByPath[$path] ?? null)) {
+                $changedPaths[] = $path;
+            }
+        }
+        return Transactional::run(function () use ($rows, $before, $after, $actor, $changedPaths) {
+            $this->publicationInvalidator->accessPaths($changedPaths);
             $this->mappings->replace($rows);
             $this->events->record(
                 null, null, $actor, 'flow_mapping_updated', null,

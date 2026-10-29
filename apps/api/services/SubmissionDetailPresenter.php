@@ -10,12 +10,14 @@ class SubmissionDetailPresenter
     private $folioService;
     private $flows;
     private $flowStatePresenter;
+    private $publication;
 
     public function __construct($folioService = null, $flows = null)
     {
         $this->folioService = $folioService ?: Yii::$container->get(FolioService::class);
         $this->flows = $flows ?: Yii::$container->get(FlowRepository::class);
         $this->flowStatePresenter = new FlowStatePresenter($this->flows);
+        $this->publication = Yii::$container->get(SubmissionPublicationStateService::class);
     }
 
     public function present(array $submission)
@@ -100,6 +102,27 @@ class SubmissionDetailPresenter
             }
         }
 
+        $publicationItems = [];
+        foreach ($collections as $collection => $kind) {
+            foreach ($submission[$collection] ?? [] as $item) {
+                if (is_array($item) && (int)($item['id'] ?? 0) > 0) {
+                    $publicationItems[] = [
+                        'kind' => $kind,
+                        'id' => (int)$item['id'],
+                        'item' => $item,
+                    ];
+                }
+            }
+        }
+        $identity = Yii::$app->user->identity;
+        $actor = [
+            'username' => $identity->username ?? (string)$identity->id,
+            'role' => $identity->role,
+        ];
+        $publicationContracts = $this->publication->contractsForSubmission(
+            (int)($submission['submission_id'] ?? 0), $publicationItems, $actor, $flowRuns, $mappedFlows
+        );
+
         foreach ($collections as $collection => $kind) {
             foreach ($submission[$collection] ?? [] as $index => $item) {
                 if (!is_array($item)) {
@@ -122,6 +145,7 @@ class SubmissionDetailPresenter
                 $item['allowed_access_paths'] = AccessPathPolicy::allowedForItem($item);
                 $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
                 $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
+                $item['publication'] = $publicationContracts[$flowKey] ?? null;
                 $submission[$collection][$index] = $item;
             }
         }

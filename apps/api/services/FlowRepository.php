@@ -253,7 +253,7 @@ class FlowRepository
         ];
     }
 
-    public function insertRun($kind, $itemId, $flowId, $version, $firstStep)
+    public function insertRun($kind, $itemId, $flowId, $version, $firstStep, $draftRevision = 1)
     {
         Yii::$app->db->createCommand()->insert('item_flow_runs', [
             'item_kind' => $kind,
@@ -261,6 +261,7 @@ class FlowRepository
             'flow_id' => (int)$flowId,
             'version' => (int)$version,
             'current_step_key' => $firstStep,
+            'draft_revision' => (int)$draftRevision,
         ])->execute();
         return (int)Yii::$app->db->getLastInsertID();
     }

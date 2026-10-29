@@ -29,6 +29,11 @@ class ItemClaimRepository
     public function find($kind, $id, $forUpdate = false)
     {
         $table = $this->table($kind);
+        if ($forUpdate && !Yii::$app->db->createCommand(
+            'SELECT id FROM ' . $table . ' WHERE id = :id FOR UPDATE', [':id' => (int)$id]
+        )->queryScalar()) {
+            return null;
+        }
         $materialTypeJoin = $kind === 'new'
             ? 'mt.material_type_id = i.material_type_id'
             : 'mt.material_type_id = source.material_type_id';
@@ -52,12 +57,20 @@ class ItemClaimRepository
             . 'WHERE run.item_kind = "' . $kind . '" AND run.item_id = i.id) '
             . 'LEFT JOIN flow_versions flow_version ON flow_version.flow_id = flow_run.flow_id '
             . 'AND flow_version.version = flow_run.version '
-            . 'WHERE i.id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
+            . 'WHERE i.id = :id LIMIT 1';
         $row = Yii::$app->db->createCommand($sql, [':id' => $id])->queryOne();
         if ($row) {
             $row['item_kind'] = $kind;
         }
         return $row ?: null;
+    }
+
+    public function submissionId($kind, $id)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT submission_id FROM ' . $this->table($kind) . ' WHERE id = :id LIMIT 1',
+            [':id' => (int)$id]
+        )->queryScalar();
     }
 
     public function claimsBySubmission($submissionId)

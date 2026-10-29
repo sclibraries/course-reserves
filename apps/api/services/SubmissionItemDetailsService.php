@@ -12,12 +12,16 @@ class SubmissionItemDetailsService
     private $claims;
     private $items;
     private $events;
+    private $publication;
 
-    public function __construct($claims = null, $items = null, $events = null)
+    public function __construct($claims = null, $items = null, $events = null, $publication = null)
     {
         $this->claims = $claims ?: Yii::$container->get(ItemClaimService::class);
         $this->items = $items ?: new ItemClaimRepository();
         $this->events = $events ?: new WorkflowEventLog();
+        $this->publication = $publication ?: new SubmissionPublicationStateService(
+            null, $this->claims, $this->items, null, $this->events
+        );
     }
 
     public function update($kind, $id, array $actor, array $payload)
@@ -37,10 +41,14 @@ class SubmissionItemDetailsService
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
 
+            $this->publication->lockForWrite($kind, $id, $item['submission_id']);
             $before = $this->detailSnapshot($item);
             $this->items->updateDetails($kind, $id, $details, $now);
             $updated = $this->items->find($kind, $id);
             $after = $this->detailSnapshot($updated);
+            if ($before !== $after) {
+                $this->publication->invalidateDraft($kind, $id, $item['submission_id']);
+            }
             $this->events->record(
                 $item['submission_id'], $id, $actor, 'item_details_updated', null, $before, $after, $kind
             );

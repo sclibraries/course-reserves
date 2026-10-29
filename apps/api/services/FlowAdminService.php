@@ -10,12 +10,14 @@ class FlowAdminService
     private $flows;
     private $validator;
     private $events;
+    private $publicationInvalidator;
 
-    public function __construct($flows = null, $validator = null, $events = null)
+    public function __construct($flows = null, $validator = null, $events = null, $publicationInvalidator = null)
     {
         $this->flows = $flows ?: new FlowRepository();
         $this->validator = $validator ?: new FlowDefinitionValidator();
         $this->events = $events ?: new WorkflowEventLog();
+        $this->publicationInvalidator = $publicationInvalidator ?: new SubmissionPublicationInvalidator();
     }
 
     public function picker()
@@ -68,6 +70,7 @@ class FlowAdminService
             $latest = $this->flows->latestVersion($id);
             $version = (int)$latest['version'] + 1;
             $this->flows->insertVersion($id, $version, $steps, $actor['username']);
+            $this->publicationInvalidator->unpinnedFlowItems($id);
             $this->events->record(null, null, $actor, 'flow_version_created', null, [
                 'flow_id' => (int)$id, 'version' => (int)$latest['version'],
             ], ['flow_id' => (int)$id, 'version' => $version]);
@@ -165,10 +168,21 @@ class FlowAdminService
         }
         $before = $this->getMapping()['mapping'];
         $after = [];
-        foreach ($types as $type) {
-            $after[] = ['material_type' => $type['material_type'], 'flow_id' => $normalized[$type['material_type']]['flow_id']];
+        $beforeByName = [];
+        foreach ($before as $row) {
+            $beforeByName[$row['material_type']] = $row['flow_id'];
         }
-        return Transactional::run(function () use ($normalized, $before, $after, $actor) {
+        $changedMaterialTypeIds = [];
+        foreach ($types as $type) {
+            $name = $type['material_type'];
+            $flowId = $normalized[$name]['flow_id'];
+            $after[] = ['material_type' => $name, 'flow_id' => $flowId];
+            if ((int)($beforeByName[$name] ?? 0) !== (int)($flowId ?? 0)) {
+                $changedMaterialTypeIds[] = (int)$type['material_type_id'];
+            }
+        }
+        return Transactional::run(function () use ($normalized, $before, $after, $actor, $changedMaterialTypeIds) {
+            $this->publicationInvalidator->materialTypes($changedMaterialTypeIds);
             $this->flows->replaceMappings(array_values($normalized));
             $this->events->record(null, null, $actor, 'flow_mapping_updated', null, ['mapping' => $before], ['mapping' => $after]);
             return $this->result(200, ['mapping' => $after]);

@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use Yii;
+
 /** Locks one linked item, expires its claim, and coordinates the resulting notification. */
 class LinkedItemService
 {
@@ -21,15 +23,26 @@ class LinkedItemService
     public function withLinkedItem($kind, $id, callable $callback)
     {
         $outcome = Transactional::run(function ($transaction) use ($kind, $id, $callback) {
+            $submissionId = $this->repository->submissionId($kind, $id);
+            if (!$submissionId) {
+                return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
+            }
+            $submission = Yii::$app->db->createCommand(
+                'SELECT status, link_state FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
+                [':id' => (int)$submissionId]
+            )->queryOne();
+            if (!$submission) {
+                return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
+            }
+            if ($blocked = $this->submittedScope->guardStatus($submission['status'])) {
+                return $this->reject($transaction, 409, $blocked);
+            }
+            if ($submission['link_state'] !== 'linked') {
+                return $this->reject($transaction, 409, ['error_code' => 'submission_not_linked']);
+            }
             $item = $this->repository->find($kind, $id, true);
             if (!$item) {
                 return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
-            }
-            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
-                return $this->reject($transaction, 409, $blocked);
-            }
-            if ($item['link_state'] !== 'linked') {
-                return $this->reject($transaction, 409, ['error_code' => 'submission_not_linked']);
             }
 
             $now = $this->expiry->now();

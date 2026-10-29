@@ -16,17 +16,20 @@ class FacultyDraftService
     private $payloads;
     private $contexts;
     private $submittedSubmissions;
+    private $publicationStates;
 
     public function __construct(
         ?SubmissionOwnershipPolicy $ownership = null,
         ?SubmissionPayloadService $payloads = null,
-        ?FacultySubmissionContext $contexts = null
+        ?FacultySubmissionContext $contexts = null,
+        ?SubmissionPublicationStateRepository $publicationStates = null
     )
     {
         $this->ownership = $ownership ?: new SubmissionOwnershipPolicy();
         $this->payloads = $payloads ?: new SubmissionPayloadService();
         $this->contexts = $contexts ?: new FacultySubmissionContext($this->ownership);
         $this->submittedSubmissions = new SubmittedSubmissionCreator($this->contexts, $this->payloads);
+        $this->publicationStates = $publicationStates ?: new SubmissionPublicationStateRepository();
     }
 
     public function create(array $actor, array $data)
@@ -184,6 +187,7 @@ class FacultyDraftService
             if (!$submission->save()) {
                 throw new \RuntimeException('Failed to submit draft: ' . json_encode($submission->errors));
             }
+            $this->publicationStates->ensureForSubmission($submission->submission_id);
             return ['status' => FacultySubmission::STATUS_SUBMITTED];
         });
     }

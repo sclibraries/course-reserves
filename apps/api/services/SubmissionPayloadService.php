@@ -159,6 +159,11 @@ class SubmissionPayloadService
 
     public function deletePayload($submissionId, $includeMetadata = false)
     {
+        if (Yii::$app->db->schema->getTableSchema('submission_publication_state', true)) {
+            Yii::$app->db->createCommand()->delete('submission_publication_state', [
+                'submission_id' => $submissionId,
+            ])->execute();
+        }
         $tables = ['submission_new_resources', 'submission_reuse_resources', 'submission_folders'];
         if ($includeMetadata) {
             array_unshift($tables, 'submission_metadata');

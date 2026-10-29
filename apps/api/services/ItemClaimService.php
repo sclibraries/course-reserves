@@ -242,6 +242,10 @@ class ItemClaimService
         $transaction = Yii::$app->db->beginTransaction();
         $notifications = [];
         try {
+            Yii::$app->db->createCommand(
+                'SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
+                [':id' => (int)$submissionId]
+            )->queryScalar();
             $rows = $this->repository->claimsBySubmission($submissionId);
             $now = $this->expiry->now();
             $claims = [];

@@ -16,7 +16,7 @@ use app\models\SubmissionMetadata;
 use app\models\MaterialTypes;
 use app\models\Course;
 use app\models\CourseOffering;
-use app\services\{FacultyTokenClaims, SubmissionOwnershipPolicy, SubmissionMaterializationGuard, SubmissionPayloadService, SubmittedSubmissionUpdateValidator};
+use app\services\{FacultyTokenClaims, SubmissionOwnershipPolicy, SubmissionPayloadService, SubmittedSubmissionUpdateValidator};
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 use yii\helpers\ArrayHelper;
@@ -660,9 +660,7 @@ class FacultySubmissionController extends BaseRestController
         (new \app\services\SubmissionPayloadService())->validate($courseInfo, $resources);
     }
 
-    /**
-     * Update submission
-     */
+    /** Update a submitted faculty request through the shared locked item writer. */
     public function actionUpdate($id)
     {
         $facultyUser = $this->getFacultyUser();
@@ -675,10 +673,8 @@ class FacultySubmissionController extends BaseRestController
                 Yii::$app->request->getBodyParams()
             );
         }
-
-        // Check if submission is locked
         if ($submission->isLocked()) {
-            Yii::$app->response->statusCode = 423; // 423 Locked
+            Yii::$app->response->statusCode = 423;
             return [
                 'success' => false,
                 'error' => 'This submission is locked for processing and cannot be edited',
@@ -687,160 +683,23 @@ class FacultySubmissionController extends BaseRestController
                 'lock_reason' => $submission->lock_reason,
             ];
         }
-
-        // Check if submission can be edited (not complete/canceled)
         if (!$submission->canEdit()) {
             throw new BadRequestHttpException('Submission cannot be modified in current status: ' . $submission->status);
         }
 
-        $data = Yii::$app->request->getBodyParams();
-        $data = (new SubmittedSubmissionUpdateValidator())->validate($submission, $data);
-
-        if (isset($data['items']) || isset($data['folders'])) {
-            $existingItems = SubmissionNewResource::find()
-                ->where(['submission_id' => $submission->submission_id])
-                ->orderBy(['id' => SORT_ASC])
-                ->asArray()
-                ->all();
-            $foldersData = isset($data['folders']) && is_array($data['folders']) ? $data['folders'] : [];
-            $folderUuidToNameMap = SubmissionMaterializationGuard::folderUuidToNameMap($foldersData);
-            $guard = new SubmissionMaterializationGuard();
-            $incomingItems = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
-
-            if (!isset($data['items']) && isset($data['folders'])) {
-                $incomingItems = $guard->incomingItemsAfterFolderUpdate($existingItems, $foldersData);
-            }
-
-            $changedMaterializedItemIds = $guard->changedMaterializedItemIds(
-                $existingItems,
-                $incomingItems,
-                $folderUuidToNameMap
-            );
-            if ($changedMaterializedItemIds) {
-                Yii::$app->response->statusCode = 409;
-                return [
-                    'success' => false,
-                    'error_code' => 'materialized_item_correction_required',
-                    'message' => 'Processed course-reserve items must be corrected by library staff.',
-                    'submission_uuid' => $submission->submission_uuid,
-                    'item_ids' => $changedMaterializedItemIds,
-                ];
-            }
+        $data = (new SubmittedSubmissionUpdateValidator())->validate(
+            $submission, Yii::$app->request->getBodyParams()
+        );
+        $result = (new \app\services\SubmittedSubmissionUpdateService())->update(
+            $submission->submission_id, $data
+        );
+        if (isset($result['status_code'])) {
+            Yii::$app->response->statusCode = $result['status_code'];
+            return $result['body'];
         }
-
-        $transaction = Yii::$app->db->beginTransaction();
-        
-        try {
-            // Update basic submission fields
-            if (isset($data['submission_notes'])) {
-                $submission->submission_notes = $data['submission_notes'];
-            }
-            if (isset($data['needed_by_date'])) {
-                $submission->needed_by_date = $data['needed_by_date'];
-            }
-            if (isset($data['course_title'])) {
-                $submission->course_title = $data['course_title'];
-            }
-            if (isset($data['section'])) {
-                $submission->section = $data['section'];
-            }
-
-            if (!$submission->save()) {
-                throw new \Exception('Failed to update submission: ' . json_encode($submission->errors));
-            }
-
-            // Handle folders update
-            if (isset($data['folders'])) {
-                $folderUuidMap = $this->updateFolders($submission, $data['folders']);
-            } else {
-                $folderUuidMap = [];
-            }
-
-            // Handle items update (reuse and new resources)
-            if (isset($data['items'])) {
-                (new \app\services\FacultySubmissionItemUpdateService())->updateItems(
-                    $submission,
-                    $data['items'],
-                    $folderUuidMap
-                );
-            }
-
-            $transaction->commit();
-            
-            // Return updated submission with full structure
-            return $this->formatSubmissionResponse($submission);
-            
-        } catch (\Exception $e) {
-            $transaction->rollBack();
-            Yii::$app->response->statusCode = 422;
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
-        }
+        return $this->formatSubmissionResponse($result['submission']);
     }
 
-    /**
-     * Update folders for a submission
-     * Returns a map of folder_uuid to folder_name for items to reference
-     */
-    private function updateFolders($submission, $foldersData)
-    {
-        $folderUuidToNameMap = SubmissionMaterializationGuard::folderUuidToNameMap($foldersData);
-        
-        // First pass: get existing folders indexed by folder_name (not ID)
-        $existingFolders = SubmissionFolder::find()
-            ->where(['submission_id' => $submission->submission_id])
-            ->indexBy('folder_name')
-            ->all();
-
-        $processedFolderNames = [];
-
-        foreach ($foldersData as $folderData) {
-            $folderName = $folderData['folder_name'] ?? $folderData['name'] ?? null;
-            
-            if (!$folderName) {
-                Yii::warning('Skipping folder without name: ' . json_encode($folderData), __METHOD__);
-                continue;
-            }
-            
-            if (isset($existingFolders[$folderName])) {
-                // Update existing folder
-                $folder = $existingFolders[$folderName];
-                if (isset($folderData['display_order'])) {
-                    $folder->display_order = $folderData['display_order'];
-                }
-                $folder->save();
-                $processedFolderNames[] = $folderName;
-            } else {
-                // Create new folder
-                $folder = new SubmissionFolder();
-                $folder->submission_id = $submission->submission_id;
-                $folder->folder_name = $folderName;
-                $folder->display_order = $folderData['display_order'] ?? 999;
-                $folder->save();
-                $processedFolderNames[] = $folderName;
-            }
-        }
-
-        // Delete folders that weren't in the update
-        foreach ($existingFolders as $folderName => $folder) {
-            if (!in_array($folderName, $processedFolderNames)) {
-                // Delete folder and update items to be unfoldered
-                SubmissionNewResource::updateAll(
-                    ['folder_name' => null, 'position_in_folder' => null],
-                    ['submission_id' => $submission->submission_id, 'folder_name' => $folderName]
-                );
-                $folder->delete();
-            }
-        }
-        
-        return $folderUuidToNameMap;
-    }
-
-    /**
-     * Format submission response with full structure
-     */
     private function formatSubmissionResponse($submission)
     {
         $submission->refresh();

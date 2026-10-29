@@ -245,54 +245,13 @@ class SubmissionWorkflowController extends Controller
     {
         $currentUser = Yii::$app->user->identity;
         $this->assertClaimActor($currentUser);
-        $data = Yii::$app->request->getBodyParams();
-        
-        $item = SubmissionNewResource::findOne($itemId);
-        
-        if (!$item) throw new NotFoundHttpException('Item not found');
-        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
-
-        $this->assertItemCanBeMutatedBy($item, $currentUser, 'updated');
-
-        // Update item status
-        if (isset($data['item_status'])) {
-            $validStatuses = ['pending', 'in_progress', 'complete', 'unavailable'];
-            if (in_array($data['item_status'], $validStatuses)) {
-                $item->item_status = $data['item_status'];
-            } else {
-                throw new BadRequestHttpException('Invalid item_status. Must be: pending, in_progress, complete, or unavailable');
-            }
-        }
-
-        // Update staff notes (add this field to the table if it doesn't exist)
-        if (isset($data['staff_notes'])) {
-            $item->staff_notes = $data['staff_notes'];
-        }
-
-        // Update faculty notes if needed
-        if (isset($data['faculty_notes'])) {
-            $item->faculty_notes = $data['faculty_notes'];
-        }
-
-        // Update priority
-        if (isset($data['priority'])) {
-            $validPriorities = ['high', 'medium', 'low'];
-            if (in_array($data['priority'], $validPriorities)) {
-                $item->priority = $data['priority'];
-            }
-        }
-
-        if ($item->save()) {
-            Yii::$container->get(ItemClaimService::class)->recordActivity('new', $item->id);
-            return [
-                'success' => true,
-                'item' => $item,
-                'message' => 'Item updated successfully'
-            ];
-        } else {
-            Yii::$app->response->statusCode = 422;
-            return ['errors' => $item->errors];
-        }
+        $result = Yii::$container->get(\app\services\LegacySubmissionItemUpdateService::class)->update(
+            $itemId,
+            $this->claimActor($currentUser),
+            Yii::$app->request->getBodyParams()
+        );
+        Yii::$app->response->statusCode = $result['status'];
+        return $result['body'];
     }
 
     /**
