@@ -39,7 +39,7 @@ describe('Sonner notifications in Chromium', () => {
     });
 
     const toast = document.querySelector('[data-sonner-toast][data-type="error"]');
-    const closeButton = page.getByRole('button', { name: 'Dismiss notification' });
+    const closeButton = page.getByRole('button', { name: 'Close toast' });
     expect(region?.getAttribute('aria-label')).toContain('Notifications');
     expect(region?.textContent).toContain('Item claimed');
     expect(region?.textContent).toContain("Couldn't save the access path. Reference: SYNTH-42");

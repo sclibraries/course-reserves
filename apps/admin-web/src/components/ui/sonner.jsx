@@ -4,7 +4,6 @@ export function Toaster() {
   return (
     <Sonner
       closeButton
-      closeButtonAriaLabel="Dismiss notification"
       position="top-right"
       theme="light"
       className="admin-toaster"
