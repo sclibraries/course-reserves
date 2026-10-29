@@ -265,6 +265,7 @@ class FacultySubmissionController extends BaseRestController
                     'display_order' => $resource->display_order,
                     'folder_name' => $resource->folder_name,
                     'resource_data' => $resourceData,
+                    'assigned_pages' => $resource->assigned_pages,
                 ];
                 // Add to appropriate folder or unfoldered list
                 if ($resource->folder_name && isset($folderStructure[$resource->folder_name])) {
@@ -431,6 +432,7 @@ class FacultySubmissionController extends BaseRestController
                 'call_number' => $item->call_number,
                 'status' => $item->item_status,
                 'notes' => $item->faculty_notes,
+                'assigned_pages' => $item->assigned_pages,
                 'created_at' => $item->created_at,
             ];
         }
@@ -448,6 +450,7 @@ class FacultySubmissionController extends BaseRestController
                 'status' => $item->item_status,
                 'priority' => $item->priority,
                 'notes' => $item->faculty_notes,
+                'assigned_pages' => $item->assigned_pages,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ];
@@ -658,34 +661,6 @@ class FacultySubmissionController extends BaseRestController
     }
 
     /**
-     * Get material type ID by name (with caching)
-     */
-    protected function getMaterialTypeIdByName($typeName)
-    {
-        static $typeCache = [];
-        
-        if (isset($typeCache[$typeName])) {
-            return $typeCache[$typeName];
-        }
-        
-        $materialType = MaterialTypes::find()
-            ->where(['name' => $typeName])
-            ->one();
-        
-        if ($materialType) {
-            $typeCache[$typeName] = $materialType->material_type_id;
-            return $materialType->material_type_id;
-        }
-        
-        // Default to book type or return null
-        $bookType = MaterialTypes::find()
-            ->where(['name' => 'book'])
-            ->one();
-        
-        return $bookType ? $bookType->material_type_id : null;
-    }
-
-    /**
      * Update submission
      */
     public function actionUpdate($id)
@@ -783,7 +758,11 @@ class FacultySubmissionController extends BaseRestController
 
             // Handle items update (reuse and new resources)
             if (isset($data['items'])) {
-                $this->updateItems($submission, $data['items'], $folderUuidMap);
+                (new \app\services\FacultySubmissionItemUpdateService())->updateItems(
+                    $submission,
+                    $data['items'],
+                    $folderUuidMap
+                );
             }
 
             $transaction->commit();
@@ -860,115 +839,6 @@ class FacultySubmissionController extends BaseRestController
     }
 
     /**
-     * Update items for a submission
-     */
-    private function updateItems($submission, $itemsData, $folderUuidToNameMap = [])
-    {
-        // Get all existing items for this submission
-        $existingItems = SubmissionNewResource::find()
-            ->where(['submission_id' => $submission->submission_id])
-            ->indexBy('id')
-            ->all();
-        
-        $processedItemIds = [];
-        
-        foreach ($itemsData as $itemData) {
-            // Get the database ID from item_uuid field
-            $itemId = $itemData['item_uuid'] ?? $itemData['id'] ?? null;
-            
-            // Determine folder_name from folder_uuid
-            $folderUuid = $itemData['folder_uuid'] ?? null;
-            $folderName = null;
-            if ($folderUuid && isset($folderUuidToNameMap[$folderUuid])) {
-                $folderName = $folderUuidToNameMap[$folderUuid];
-            }
-            
-            // Check if item exists (update) or is new
-            if ($itemId && isset($existingItems[$itemId])) {
-                // Update existing item
-                $item = $existingItems[$itemId];
-                
-                // Update display order
-                if (isset($itemData['display_order'])) {
-                    $item->display_order = $itemData['display_order'];
-                }
-                
-                // Update folder assignment
-                $item->folder_name = $folderName;
-                $item->position_in_folder = $itemData['position_in_folder'] ?? null;
-                
-                // Update faculty notes if provided
-                if (isset($itemData['faculty_notes'])) {
-                    $item->faculty_notes = $itemData['faculty_notes'];
-                }
-                
-                // Update resource_data with new information while preserving existing metadata.
-                $currentData = json_decode($item->resource_data, true) ?? [];
-                $item->resource_data = json_encode($this->buildUpdatedResourceData($currentData, $itemData));
-                
-                // Update barcode and call number if provided (for reuse items)
-                if (isset($itemData['barcode'])) {
-                    $item->source_barcode = $itemData['barcode'];
-                    $item->is_reuse = 1;
-                }
-                if (isset($itemData['call_number'])) {
-                    $item->source_call_number = $itemData['call_number'];
-                }
-                
-                $item->save();
-                $processedItemIds[] = $itemId;
-                
-            } else {
-                // Create new item
-                $item = new SubmissionNewResource();
-                $item->submission_id = $submission->submission_id;
-                
-                // Determine if reuse or new based on barcode
-                $hasBarcode = !empty($itemData['barcode']);
-                $item->is_reuse = $hasBarcode ? 1 : 0;
-                
-                if ($hasBarcode) {
-                    $item->source_barcode = $itemData['barcode'];
-                    $item->source_call_number = $itemData['call_number'] ?? null;
-                }
-                
-                $resourceData = $this->buildNewResourceData($itemData);
-                $materialTypeName = $resourceData['materialType'] ?? 'book';
-                $item->material_type_id = $this->getMaterialTypeIdByName($materialTypeName);
-                
-                $item->resource_data = json_encode($resourceData);
-                
-                $item->display_order = $itemData['display_order'] ?? 999;
-                $item->folder_name = $folderName;
-                $item->position_in_folder = $itemData['position_in_folder'] ?? null;
-                $item->faculty_notes = $itemData['faculty_notes'] ?? null;
-                $item->priority = $itemData['priority'] ?? 'medium';
-                $item->item_status = 'pending';
-                
-                $item->save();
-                $processedItemIds[] = $item->id;
-            }
-        }
-        
-        // Delete items that weren't in the update (removed by faculty)
-        foreach ($existingItems as $itemId => $item) {
-            if (!in_array($itemId, $processedItemIds)) {
-                $item->delete();
-            }
-        }
-    }
-
-    private function buildUpdatedResourceData(array $currentData, array $itemData): array
-    {
-        return SubmissionPayloadService::normalizeResourceData(SubmissionMaterializationGuard::buildUpdatedResourceData($currentData, $itemData));
-    }
-
-    private function buildNewResourceData(array $itemData): array
-    {
-        return $this->buildUpdatedResourceData([], $itemData);
-    }
-
-    /**
      * Format submission response with full structure
      */
     private function formatSubmissionResponse($submission)
@@ -1006,6 +876,7 @@ class FacultySubmissionController extends BaseRestController
                 'display_order' => $resource->display_order,
                 'folder_name' => $resource->folder_name,
                 'faculty_notes' => $resource->faculty_notes,
+                'assigned_pages' => $resource->assigned_pages,
                 'status' => $resource->item_status,
             ];
             
@@ -1103,6 +974,7 @@ class FacultySubmissionController extends BaseRestController
         $reuseResource->display_order = $data['display_order'] ?? 999;
         $reuseResource->folder_name = $data['folder_name'] ?? null;
         $reuseResource->faculty_notes = $data['faculty_notes'] ?? null;
+        $reuseResource->assigned_pages = $data['assignedPages'] ?? $data['assigned_pages'] ?? null;
 
         if ($reuseResource->save()) {
             return \app\services\FacultySubmissionPresenter::resourceResponse($reuseResource);
@@ -1137,6 +1009,7 @@ class FacultySubmissionController extends BaseRestController
         $newResource->display_order = $data['display_order'] ?? 999;
         $newResource->folder_name = $data['folder_name'] ?? null;
         $newResource->faculty_notes = $data['faculty_notes'] ?? null;
+        $newResource->assigned_pages = $data['assignedPages'] ?? $data['assigned_pages'] ?? null;
         $newResource->priority = $data['priority'] ?? SubmissionNewResource::PRIORITY_MEDIUM;
 
         if ($newResource->save()) {

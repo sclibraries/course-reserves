@@ -28,7 +28,7 @@ class FacultySubmissionPresenter
         'id', 'material_type_id', 'resource_data', 'is_reuse', 'source_barcode',
         'source_call_number', 'source_resource_id', 'source_folio_instance_id',
         'barcode', 'call_number', 'item_status', 'display_order', 'position_in_folder',
-        'folder_name', 'faculty_notes', 'priority', 'created_at', 'updated_at',
+        'folder_name', 'faculty_notes', 'assigned_pages', 'priority', 'created_at', 'updated_at',
     ];
 
     private const FOLDER_FIELDS = ['id', 'folder_id', 'name', 'display_order', 'item_count'];
@@ -37,7 +37,7 @@ class FacultySubmissionPresenter
         'type', 'id', 'title', 'authors', 'material_type', 'material_type_id',
         'is_reuse', 'barcode', 'call_number', 'status', 'item_status', 'display_order',
         'position_in_folder', 'folder_name', 'notes', 'faculty_notes', 'priority',
-        'created_at', 'updated_at', 'resource_data', 'source_barcode', 'source_call_number',
+        'assigned_pages', 'created_at', 'updated_at', 'resource_data', 'source_barcode', 'source_call_number',
     ];
 
     private const METADATA_FIELDS = [
@@ -138,7 +138,12 @@ class FacultySubmissionPresenter
 
     public static function resourceResponse($resource)
     {
-        return self::pick(self::arrayValue($resource), self::RESOURCE_FIELDS);
+        $result = self::pick(self::arrayValue($resource), self::RESOURCE_FIELDS);
+        if (array_key_exists('assigned_pages', $result)) {
+            $result['assignedPages'] = $result['assigned_pages'];
+            unset($result['assigned_pages']);
+        }
+        return $result;
     }
 
     public static function facultyCommunicationsResponse(array $response)
@@ -169,7 +174,12 @@ class FacultySubmissionPresenter
     private static function folderItemCollection($items)
     {
         return self::mapRows($items, function ($item) {
-            return self::pick(self::arrayValue($item), self::FOLDER_ITEM_FIELDS);
+            $result = self::pick(self::arrayValue($item), self::FOLDER_ITEM_FIELDS);
+            if (array_key_exists('assigned_pages', $result)) {
+                $result['assignedPages'] = $result['assigned_pages'];
+                unset($result['assigned_pages']);
+            }
+            return $result;
         });
     }
 

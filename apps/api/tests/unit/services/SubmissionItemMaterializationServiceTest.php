@@ -2,6 +2,7 @@
 
 namespace tests\unit\services;
 
+use app\models\SubmissionNewResource;
 use app\services\SubmissionItemMaterializationService;
 
 class SubmissionItemMaterializationServiceTest extends \Codeception\Test\Unit
@@ -55,6 +56,23 @@ class SubmissionItemMaterializationServiceTest extends \Codeception\Test\Unit
         $this->assertTrue($service->isPhysicalItem($barcodeItem));
         $this->assertTrue($service->isPhysicalItem($folioItem));
         $this->assertFalse($service->isPhysicalItem($electronicItem));
+    }
+
+    public function testFacultyAndStaffNotesStayOutOfStudentVisibleResourceText()
+    {
+        $item = new SubmissionNewResource();
+        $item->resource_data = json_encode([
+            'description' => '',
+            'abstract' => 'Synthetic public abstract',
+            'notes' => 'test-faculty-note-in-resource-data',
+        ]);
+        $item->faculty_notes = 'test-faculty-note';
+        $item->public_note = 'test-staff-public-note';
+
+        $this->assertSame([
+            'description' => 'Synthetic public abstract',
+            'external_note' => null,
+        ], (new SubmissionItemMaterializationService())->safePublicText($item));
     }
 
     public function testCourseResourceOrderUsesFacultyDisplayOrder()

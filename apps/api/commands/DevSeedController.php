@@ -48,6 +48,9 @@ class DevSeedController extends Controller
             if (!empty($summary['printBookMapped'])) {
                 $this->stdout("Flow: Print book mapped to material type book\n", Console::FG_GREEN);
             }
+            if (!empty($summary['ebookMapped'])) {
+                $this->stdout("Flow: Ebook mapped to material type ebook\n", Console::FG_GREEN);
+            }
             $previousCourse = $summary['previousCourse'];
             $this->stdout(sprintf(
                 "Previous course: %s %s - %d electronic, %d physical\n",

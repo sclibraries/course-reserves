@@ -23,6 +23,8 @@ use yii\behaviors\TimestampBehavior;
  * @property int $position_in_folder
  * @property string $folder_name
  * @property string $faculty_notes
+ * @property string $public_note
+ * @property string $assigned_pages
  * @property string $staff_notes
  * @property string $priority
  * @property int $materialized_resource_id
@@ -73,7 +75,7 @@ class SubmissionNewResource extends ActiveRecord
         return [
             [['submission_id', 'resource_data'], 'required'],
             [['submission_id', 'material_type_id', 'display_order', 'position_in_folder', 'is_reuse', 'materialized_resource_id', 'materialized_course_resource_id', 'materialized_physical_reference_id', 'materialized_folder_id'], 'integer'],
-            [['resource_data', 'faculty_notes', 'staff_notes'], 'string'],
+            [['resource_data', 'faculty_notes', 'public_note', 'assigned_pages', 'staff_notes'], 'string'],
             [['created_at', 'updated_at', 'materialized_at'], 'safe'],
             [['folder_name', 'item_status', 'source_barcode', 'source_resource_id', 'source_folio_instance_id', 'materialized_by_staff_id'], 'string', 'max' => 255],
             [['source_call_number'], 'string', 'max' => 512],
@@ -106,6 +108,8 @@ class SubmissionNewResource extends ActiveRecord
             'position_in_folder' => 'Position in Folder',
             'folder_name' => 'Folder Name',
             'faculty_notes' => 'Faculty Notes',
+            'public_note' => 'Public Note',
+            'assigned_pages' => 'Assigned Pages',
             'staff_notes' => 'Staff Notes',
             'priority' => 'Priority',
             'materialized_resource_id' => 'Materialized Resource ID',

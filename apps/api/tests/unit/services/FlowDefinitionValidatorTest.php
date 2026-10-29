@@ -59,6 +59,16 @@ class FlowDefinitionValidatorTest extends \Codeception\Test\Unit
         $this->assertErrorContains($errors, 'unreachable');
     }
 
+    public function testAllowsEbookPreparationFinishStates()
+    {
+        foreach (['prepared', 'needs_access_path', 'unavailable'] as $state) {
+            $steps = $this->validSteps();
+            $steps[1]['finish_state'] = $state;
+
+            $this->assertSame([], (new FlowDefinitionValidator())->validate($steps, ['Acquisitions']));
+        }
+    }
+
     private function validSteps()
     {
         return [

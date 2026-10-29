@@ -110,14 +110,14 @@ class PublicResourceFieldsCest extends BaseFunctionalCest
             $I->deleteHeader('Authorization');
             $anonymous = $this->request($I, $route);
             \PHPUnit\Framework\Assert::assertFalse(
-                $this->hasInternalNoteKey($anonymous),
-                $route[0] . ' must omit internal_note for anonymous callers.'
+                $this->hasPrivateNoteKey($anonymous),
+                $route[0] . ' must omit private submission notes for anonymous callers.'
             );
 
             $faculty = $this->request($I, $route, $this->facultyToken);
             \PHPUnit\Framework\Assert::assertFalse(
-                $this->hasInternalNoteKey($faculty),
-                $route[0] . ' must omit internal_note for faculty callers.'
+                $this->hasPrivateNoteKey($faculty),
+                $route[0] . ' must omit private submission notes for faculty callers.'
             );
 
             $staff = $this->request($I, $route, $this->staffToken);
@@ -128,14 +128,14 @@ class PublicResourceFieldsCest extends BaseFunctionalCest
 
             $invalid = $this->request($I, $route, $this->invalidToken);
             \PHPUnit\Framework\Assert::assertFalse(
-                $this->hasInternalNoteKey($invalid),
-                $route[0] . ' must treat an invalid token as anonymous and omit internal_note.'
+                $this->hasPrivateNoteKey($invalid),
+                $route[0] . ' must treat an invalid token as anonymous and omit private submission notes.'
             );
 
             $expired = $this->request($I, $route, $this->expiredToken);
             \PHPUnit\Framework\Assert::assertFalse(
-                $this->hasInternalNoteKey($expired),
-                $route[0] . ' must treat an expired token as anonymous and omit internal_note.'
+                $this->hasPrivateNoteKey($expired),
+                $route[0] . ' must treat an expired token as anonymous and omit private submission notes.'
             );
         }
     }
@@ -156,20 +156,21 @@ class PublicResourceFieldsCest extends BaseFunctionalCest
         return $I->grabJsonResponse();
     }
 
-    private function hasInternalNoteKey($value)
+    private function hasPrivateNoteKey($value)
     {
         if (!is_array($value)) {
             return false;
         }
-        if (array_key_exists('internal_note', $value)) {
-            return true;
-        }
-        foreach ($value as $child) {
-            if ($this->hasInternalNoteKey($child)) {
+        foreach (['internal_note', 'faculty_notes', 'staff_notes', 'public_note'] as $field) {
+            if (array_key_exists($field, $value)) {
                 return true;
             }
         }
-
+        foreach ($value as $child) {
+            if ($this->hasPrivateNoteKey($child)) {
+                return true;
+            }
+        }
         return false;
     }
 

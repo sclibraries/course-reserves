@@ -35,6 +35,7 @@ class ItemClaimRepository
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
             . 'i.assigned_group_id, i.access_path, i.item_status AS status, i.display_order AS position, '
+            . 'i.public_note, i.assigned_pages, '
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, '
             . 'mt.name AS material_type, mt.material_type_id, flow_run.current_step_key, '
             . 'flow_run.finish_state AS flow_finish_state, flow_version.steps_json AS flow_steps_json, '
@@ -162,6 +163,14 @@ class ItemClaimRepository
         return Yii::$app->db->createCommand()->update($this->table($kind), [
             'access_path' => $accessPath,
         ], ['id' => (int)$id])->execute();
+    }
+
+    public function updateDetails($kind, $id, array $details, $now)
+    {
+        $details['last_activity_at'] = $now;
+        return Yii::$app->db->createCommand()->update(
+            $this->table($kind), $details, ['id' => (int)$id]
+        )->execute();
     }
 
     public function clearClaimForChecklistCompletion($kind, $id, $now)

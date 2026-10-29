@@ -18,6 +18,8 @@ use yii\db\ActiveRecord;
  * @property int $position_in_folder
  * @property string $folder_name
  * @property string $faculty_notes
+ * @property string $public_note
+ * @property string $assigned_pages
  * @property int $materialized_resource_id
  * @property int $materialized_course_resource_id
  * @property int $materialized_physical_reference_id
@@ -44,7 +46,7 @@ class SubmissionReuseResource extends ActiveRecord
         return [
             [['submission_id'], 'required'],
             [['submission_id', 'source_resource_id', 'display_order', 'position_in_folder', 'materialized_resource_id', 'materialized_course_resource_id', 'materialized_physical_reference_id', 'materialized_folder_id'], 'integer'],
-            [['faculty_notes'], 'string'],
+            [['faculty_notes', 'public_note', 'assigned_pages'], 'string'],
             [['created_at', 'materialized_at'], 'safe'],
             [['folder_name', 'barcode', 'call_number', 'item_status', 'materialized_by_staff_id'], 'string', 'max' => 255],
             [['display_order'], 'default', 'value' => 999],
@@ -64,6 +66,8 @@ class SubmissionReuseResource extends ActiveRecord
             'display_order' => 'Display Order',
             'folder_name' => 'Folder Name',
             'faculty_notes' => 'Faculty Notes',
+            'public_note' => 'Public Note',
+            'assigned_pages' => 'Assigned Pages',
             'materialized_resource_id' => 'Materialized Resource ID',
             'materialized_course_resource_id' => 'Materialized Course Resource ID',
             'materialized_physical_reference_id' => 'Materialized Physical Reference ID',

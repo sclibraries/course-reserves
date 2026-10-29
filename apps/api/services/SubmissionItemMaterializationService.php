@@ -144,13 +144,14 @@ class SubmissionItemMaterializationService
         }
 
         $data = $this->getResourceData($item);
+        $publicText = $this->safePublicText($item);
         $visibility = $this->getVisibilitySettings($item);
 
         $resource = new Resources();
         $resource->name = $this->getTitle($item);
         $resource->item_url = $this->firstStringValue($data, ['url', 'link', 'item_url']);
-        $resource->description = $this->firstStringValue($data, ['description', 'notes', 'abstract']);
-        $resource->external_note = $item->faculty_notes;
+        $resource->description = $publicText['description'];
+        $resource->external_note = $publicText['external_note'];
         $resource->material_type_id = $item->material_type_id;
         $resource->folder_id = $folderId;
         $resource->start_visibility = $visibility['start_visibility'];
@@ -165,6 +166,16 @@ class SubmissionItemMaterializationService
         $this->saveResourceMetadata($resource, $data);
 
         return $resource;
+    }
+
+    /** Returns only text safe for course-facing resource fields. */
+    public function safePublicText(SubmissionNewResource $item)
+    {
+        $data = $this->getResourceData($item);
+        return [
+            'description' => $this->firstStringValue($data, ['description', 'abstract']),
+            'external_note' => null,
+        ];
     }
 
     private function linkElectronicResourceToCourse(SubmissionNewResource $item, FacultySubmission $submission, Resources $resource, $folderId)

@@ -66,6 +66,10 @@ class Api086DraftsCest extends BaseFunctionalCest
             'SELECT COUNT(*) FROM submission_new_resources WHERE submission_id = :id',
             [':id' => $submission['submission_id']]
         )->queryScalar());
+        Assert::assertSame('5-10', \Yii::$app->db->createCommand(
+            'SELECT assigned_pages FROM submission_new_resources WHERE submission_id = :id',
+            [':id' => $submission['submission_id']]
+        )->queryScalar());
         Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM submission_folders WHERE submission_id = :id',
             [':id' => $submission['submission_id']]
@@ -98,6 +102,7 @@ class Api086DraftsCest extends BaseFunctionalCest
         $updated = $this->draftPayload();
         $updated['draft_version'] = 1;
         $updated['resources'][0]['resource_data']['title'] = 'Updated API-086 draft item';
+        $updated['resources'][0]['assignedPages'] = '11-14';
         $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
         $I->sendJsonRequest('PUT', 'faculty-submission/update', $updated, ['id' => $uuid]);
         $I->seeResponseCodeIs(200);
@@ -114,6 +119,11 @@ class Api086DraftsCest extends BaseFunctionalCest
             [':uuid' => $uuid]
         )->queryScalar();
         Assert::assertSame('Updated API-086 draft item', json_decode($savedTitle, true)['title']);
+        Assert::assertSame('11-14', \Yii::$app->db->createCommand(
+            'SELECT assigned_pages FROM submission_new_resources WHERE submission_id = '
+            . '(SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid)',
+            [':uuid' => $uuid]
+        )->queryScalar());
     }
 
     public function draftPutNormalizesLinksWithSpacesAndAccents(FunctionalTester $I)
@@ -238,6 +248,7 @@ class Api086DraftsCest extends BaseFunctionalCest
             'id' => $itemId,
             'title' => 'Synthetic API-089 submitted item',
             'url' => 'not a url',
+            'assignedPages' => '28-31',
             'display_order' => 0,
         ]];
 
@@ -250,6 +261,9 @@ class Api086DraftsCest extends BaseFunctionalCest
         $I->sendJsonRequest('PUT', 'faculty-submission/update', ['items' => $items], ['id' => $uuid]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame('https://example.org/a%20b', $this->storedResourceData($uuid)[0]['url']);
+        Assert::assertSame('28-31', \Yii::$app->db->createCommand(
+            'SELECT assigned_pages FROM submission_new_resources WHERE id = :id', [':id' => $itemId]
+        )->queryScalar());
     }
 
     public function submitPromotesDraftWithoutCreatingAnotherRow(FunctionalTester $I)
@@ -438,6 +452,7 @@ class Api086DraftsCest extends BaseFunctionalCest
             ],
             'resources' => [[
                 'resource_data' => ['title' => 'Synthetic API-086 draft item', 'materialType' => 'book'],
+                'assignedPages' => '5-10',
                 'display_order' => 0,
                 'folder_name' => 'Draft readings',
             ]],

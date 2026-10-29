@@ -275,12 +275,25 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             'source_resource_id' => $this->resourceId,
         ], ['id' => $completeItemId])->execute();
         $this->claim($I, 'new', $completeItemId, $this->staffToken);
+        $activityBeforePublication = $this->claimRow('new', $completeItemId)['last_activity_at'];
         $this->clockNow = '2026-10-21 10:00:00';
         $this->request($I, 'POST', 'submission-workflow/complete-processing', [], $this->staffToken, [
             'itemId' => $completeItemId,
         ]);
-        $I->seeResponseCodeIs(200);
-        Assert::assertSame('2026-10-21 10:00:00', $this->claimRow('new', $completeItemId)['last_activity_at']);
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame('publication_not_available_yet', $this->response($I)['error_code']);
+        Assert::assertSame($activityBeforePublication, $this->claimRow('new', $completeItemId)['last_activity_at']);
+        $materialization = \Yii::$app->db->createCommand(
+            'SELECT materialized_resource_id, materialized_course_resource_id, materialized_physical_reference_id, materialized_at '
+            . 'FROM submission_new_resources WHERE id = :id',
+            [':id' => $completeItemId]
+        )->queryOne();
+        Assert::assertSame([
+            'materialized_resource_id' => null,
+            'materialized_course_resource_id' => null,
+            'materialized_physical_reference_id' => null,
+            'materialized_at' => null,
+        ], $materialization);
     }
 
     public function unlinkedItemsAndNonStaffCannotUseClaimRoutes(FunctionalTester $I)

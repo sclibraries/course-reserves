@@ -76,7 +76,7 @@ class Api096AccessPathCest extends BaseFunctionalCest
     public function accessPathRulesCoverKnownAndUnknownTypes(FunctionalTester $I)
     {
         $this->claim($I);
-        foreach (['book', 'video', 'website', 'other', 'unknown', null] as $type) {
+        foreach (['book', 'ebook', 'video', 'website', 'other', 'unknown', null] as $type) {
             $this->setMaterialType($type);
             foreach (['ill', 'ags', 'in_house_copy'] as $path) {
                 $this->setStoredPath(null);

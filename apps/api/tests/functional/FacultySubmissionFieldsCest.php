@@ -245,6 +245,8 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
                 ],
                 'resources' => [[
                     'resource_data' => $resourceData,
+                    'assignedPages' => '3-7',
+                    'faculty_notes' => 'test-faculty-private-note',
                 ]],
                 'folders' => [],
                 'metadata' => [],
@@ -257,6 +259,10 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
             [':course_id' => 'TST-079-79-209909', ':owner_id' => $this->ownerId]
         )->queryOne();
         \PHPUnit\Framework\Assert::assertIsArray($submission);
+        \PHPUnit\Framework\Assert::assertSame('3-7', \Yii::$app->db->createCommand(
+            'SELECT assigned_pages FROM submission_new_resources WHERE submission_id = :id',
+            [':id' => $submission['submission_id']]
+        )->queryScalar());
 
         $index = $this->request(
             $I,
@@ -284,6 +290,11 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
             ])
         );
         $this->assertEdsIdentity($edsFields, $facultyView['newResources'][0]);
+        \PHPUnit\Framework\Assert::assertSame('3-7', $facultyView['newResources'][0]['assignedPages']);
+        \PHPUnit\Framework\Assert::assertSame(
+            'test-faculty-private-note', $facultyView['newResources'][0]['faculty_notes']
+        );
+        \PHPUnit\Framework\Assert::assertArrayNotHasKey('public_note', $facultyView['newResources'][0]);
 
         $staffView = $this->request(
             $I,
@@ -309,7 +320,7 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
         }
     }
 
-    private function request(FunctionalTester $I, $token, $method, $url, array $body = null)
+    private function request(FunctionalTester $I, $token, $method, $url, ?array $body = null)
     {
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
         if ($body === null) {

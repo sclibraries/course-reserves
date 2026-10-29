@@ -85,6 +85,9 @@ class DevSeedCest extends BaseFunctionalCest
         \PHPUnit\Framework\Assert::assertSame(1, count(array_filter($seed['output'], function ($line) {
             return trim($line) === 'Flow: Print book mapped to material type book';
         })), 'The seed command must print the flow mapping exactly once.');
+        \PHPUnit\Framework\Assert::assertSame(1, count(array_filter($seed['output'], function ($line) {
+            return trim($line) === 'Flow: Ebook mapped to material type ebook';
+        })), 'The seed command must print the Ebook flow mapping exactly once.');
 
         $repeat = $this->runSeedCommand(false);
         \PHPUnit\Framework\Assert::assertSame(0, $repeat['status'], implode("\n", $repeat['output']));

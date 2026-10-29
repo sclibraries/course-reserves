@@ -17,7 +17,6 @@ use app\models\FacultySubmission;
 use app\models\SubmissionWorkflowAssignment;
 use app\models\SubmissionNewResource;
 use app\models\User;
-use app\services\SubmissionItemMaterializationService;
 use app\services\SubmissionLinkGuard;
 use app\services\ItemClaimService;
 
@@ -333,9 +332,7 @@ class SubmissionWorkflowController extends Controller
         ];
     }
 
-    /**
-     * Complete staff processing and publish the item into the linked course.
-     */
+    /** Publication is deferred to API-105; this legacy route cannot publish in API-103. */
     public function actionCompleteProcessing($itemId)
     {
         $currentUser = Yii::$app->user->identity;
@@ -346,28 +343,10 @@ class SubmissionWorkflowController extends Controller
         if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
 
         $this->assertItemCanBeMutatedBy($item, $currentUser, 'completed');
-
-        $service = new SubmissionItemMaterializationService();
-        $materialization = $service->completeProcessing(
-            $item,
-            $currentUser->id,
-            Yii::$app->request->getBodyParams()
-        );
-        Yii::$container->get(ItemClaimService::class)->recordActivity('new', $item->id);
-
-        $item->refresh();
-        $submission = $item->submission;
-        $submissionData = $this->normalizeSubmissionResponse($submission);
-
+        Yii::$app->response->statusCode = 409;
         return [
-            'success' => true,
-            'item' => $this->formatWorkflowItemResponse(
-                $this->normalizeItemResponse($item),
-                $submissionData,
-                '/admin/submissions/' . $submissionData['submission_id']
-            ),
-            'materialization' => $materialization,
-            'message' => 'Item processing completed and published to the course.',
+            'error_code' => 'publication_not_available_yet',
+            'message' => 'Publication will be available in a later release.',
         ];
     }
 

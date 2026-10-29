@@ -5,7 +5,7 @@ namespace app\services;
 /** Validates a complete, ordered flow version without reading application state. */
 class FlowDefinitionValidator
 {
-    private $finishStates = ['on_reserve', 'available_online', 'unavailable', 'withdrawn'];
+    private $finishStates = ['on_reserve', 'available_online', 'unavailable', 'withdrawn', 'prepared', 'needs_access_path'];
     private $stepKinds = ['question', 'action', 'confirm_on_reserve', 'publish_online', 'finish'];
 
     public function validate(array $steps, array $existingGroups)

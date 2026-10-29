@@ -38,6 +38,7 @@ class DevSeedService
         $transaction = $this->db->beginTransaction();
         try {
             $flowMapping = (new PrintBookFlowMapping($this->db))->findOrCreate(true);
+            $ebookFlowMapping = (new EbookFlowMapping($this->db))->findOrCreate(true, 'dev-seed');
             $previousCourse = (new DevSeedPreviousCourseService())->seed();
             $people = $this->people();
             foreach ($people as $person) {
@@ -71,6 +72,7 @@ class DevSeedService
             'assignmentCount' => count($assignments),
             'previousCourse' => $previousCourse,
             'printBookMapped' => $flowMapping['mapped'],
+            'ebookMapped' => $ebookFlowMapping['mapped'],
         ];
     }
 
@@ -80,6 +82,7 @@ class DevSeedService
         $transaction = $this->db->beginTransaction();
         try {
             (new PrintBookFlowMapping($this->db))->resetSeededMaterialType();
+            (new EbookFlowMapping($this->db))->resetSeededMaterialType();
             (new DevSeedPreviousCourseService())->reset();
             (new DevSeedGroupService($this->db))->reset(self::USERNAME_PREFIX . 'staff');
             $this->db->createCommand(

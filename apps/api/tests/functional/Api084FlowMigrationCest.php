@@ -26,6 +26,10 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
                 $migrationIsDown = false;
                 $flow = $this->printBookFlow();
                 Assert::assertNotEmpty($flow, 'Migration must always seed the Print book flow.');
+                Assert::assertFalse(
+                    $this->flowExists('Ebook'),
+                    'API-084 seeds only Print book; API-103 owns the Ebook flow migration.'
+                );
                 Assert::assertSame(1, (int)$db->createCommand(
                     'SELECT COUNT(*) FROM flow_versions WHERE flow_id = :flow_id',
                     [':flow_id' => $flow['id']]
@@ -68,6 +72,13 @@ class Api084FlowMigrationCest extends BaseFunctionalCest
         return \Yii::$app->db->createCommand(
             'SELECT id FROM flows WHERE name = :name LIMIT 1', [':name' => 'Print book']
         )->queryOne();
+    }
+
+    private function flowExists($name)
+    {
+        return (bool)\Yii::$app->db->createCommand(
+            'SELECT 1 FROM flows WHERE name = :name LIMIT 1', [':name' => $name]
+        )->queryScalar();
     }
 
     private function replaceMaterialTypes(array $types)

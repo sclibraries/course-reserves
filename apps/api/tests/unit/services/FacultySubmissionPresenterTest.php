@@ -20,6 +20,8 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'submission_id' => 93,
                 'resource_data' => '{"title":"Synthetic item"}',
                 'faculty_notes' => 'Item note',
+                'public_note' => 'test-staff-public-note',
+                'assigned_pages' => '20-25',
                 'staff_notes' => 'test-internal-item-note',
                 'claimed_by_staff_id' => 'test-api077-staff',
                 'materialized_resource_id' => 82,
@@ -59,6 +61,7 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'id' => 19,
                 'resource_data' => '{"title":"Synthetic item"}',
                 'faculty_notes' => 'Item note',
+                'assignedPages' => '20-25',
             ]],
             'metadata' => ['total_items' => 1],
             'courseOffering' => ['offering_id' => 7, 'term_name' => 'Fall 2099'],
@@ -67,6 +70,7 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'message' => 'Faculty-visible message',
             ]],
         ], $response);
+        $this->assertStringNotContainsString('test-staff-public-note', json_encode($response));
     }
 
     public function testWorkflowLinkingFieldsAndEventsNeverReachFaculty()

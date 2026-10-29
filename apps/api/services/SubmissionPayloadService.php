@@ -137,6 +137,7 @@ class SubmissionPayloadService
             $item->folder_name = $folderName;
             $item->position_in_folder = $resource['position_in_folder'] ?? null;
             $item->faculty_notes = $resource['faculty_notes'] ?? null;
+            $item->assigned_pages = $resource['assignedPages'] ?? $resource['assigned_pages'] ?? null;
             $item->priority = $resource['priority'] ?? 'medium';
             $item->item_status = 'pending';
             if (!$item->save()) {
@@ -201,6 +202,7 @@ class SubmissionPayloadService
                 'folder_name' => $item['folder_name'] ?? null,
                 'folder_id' => $item['folder_uuid'] ?? null,
                 'faculty_notes' => $item['faculty_notes'] ?? $item['notes'] ?? null,
+                'assignedPages' => $item['assignedPages'] ?? $item['assigned_pages'] ?? null,
                 'priority' => $item['priority'] ?? 'medium',
             ];
         }
