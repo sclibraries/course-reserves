@@ -3,6 +3,7 @@
 namespace tests\unit\controllers;
 
 use app\controllers\FacultySubmissionController;
+use app\services\FacultySubmissionItemUpdateService;
 use yii\web\ConflictHttpException;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
@@ -61,9 +62,9 @@ class FacultySubmissionControllerTest extends \Codeception\Test\Unit
 
     public function testUpdatedResourceDataPreservesExistingMetadataOnPartialUpdate()
     {
-        $controller = new FacultySubmissionController('faculty-submission', \Yii::$app);
+        $service = new FacultySubmissionItemUpdateService();
 
-        $result = $this->invokeMethod($controller, 'buildUpdatedResourceData', [
+        $result = $this->invokeMethod($service, 'updatedResourceData', [
             [
                 'title' => 'Original title',
                 'authors' => 'Original Author',
@@ -93,9 +94,10 @@ class FacultySubmissionControllerTest extends \Codeception\Test\Unit
 
     public function testNewResourceDataPreservesNestedResourceDataAndFlatOverrides()
     {
-        $controller = new FacultySubmissionController('faculty-submission', \Yii::$app);
+        $service = new FacultySubmissionItemUpdateService();
 
-        $result = $this->invokeMethod($controller, 'buildNewResourceData', [
+        $result = $this->invokeMethod($service, 'updatedResourceData', [
+            [],
             [
                 'resource_data' => [
                     'title' => 'Nested title',
@@ -103,9 +105,11 @@ class FacultySubmissionControllerTest extends \Codeception\Test\Unit
                     'materialType' => 'book',
                     'edition' => '2nd',
                     'isbn' => '9780000000000',
+                    'pages' => '20-27',
                 ],
                 'title' => 'Flat title',
                 'material_type' => 'ebook',
+                'assignedPages' => '4-9',
             ],
         ]);
 
@@ -114,6 +118,8 @@ class FacultySubmissionControllerTest extends \Codeception\Test\Unit
         $this->assertSame('ebook', $result['materialType']);
         $this->assertSame('2nd', $result['edition']);
         $this->assertSame('9780000000000', $result['isbn']);
+        $this->assertSame('20-27', $result['pages']);
+        $this->assertArrayNotHasKey('assignedPages', $result);
     }
 
     public function testCompleteSubmissionValidationRejectsMissingCourseFields()

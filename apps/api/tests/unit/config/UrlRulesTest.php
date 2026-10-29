@@ -152,7 +152,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $navPinRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(251, $mergedRules);
+        $this->assertCount(253, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -233,6 +233,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ]],
             ['POST', 'workflow/item/reuse/999007215/access-path', [
                 'workflow-flow/access-path', ['kind' => 'reuse', 'id' => '999007215'],
+            ]],
+            ['PUT', 'workflow/item/new/999007216/details', [
+                'workflow-item-details/update', ['kind' => 'new', 'id' => '999007216'],
+            ]],
+            ['OPTIONS', 'workflow/item/reuse/999007217/details', [
+                'workflow-item-details/options', ['kind' => 'reuse', 'id' => '999007217'],
             ]],
             ['GET', 'workflow/admin/access-path-mapping', ['workflow-flow-admin/access-path-mapping', []]],
             ['POST', 'workflow/admin/flows', ['workflow-flow-admin/flows', []]],
