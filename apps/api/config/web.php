@@ -23,7 +23,10 @@ $config = [
         'cors' => [
             'class' => \yii\filters\Cors::class,
             'cors' => [
-                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins($params['corsOrigins'] ?? []),
+                'Origin' => array_merge([
+                    'http://localhost:5173',
+                    'http://localhost:5174',
+                ], $params['corsOrigins'] ?? []),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
                 'Access-Control-Allow-Credentials' => true,

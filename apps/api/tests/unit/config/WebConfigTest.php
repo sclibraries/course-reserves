@@ -41,6 +41,19 @@ class WebConfigTest extends \Codeception\Test\Unit
         $this->assertSame('faculty-submission/communications', $rules[$pattern]);
     }
 
+    public function testWebConfigLoadsWithoutYiiApplicationOrAppAutoloader()
+    {
+        $configPath = codecept_root_dir('config/web.php');
+        $script = 'define("YII_DEBUG", false); define("YII_ENV_DEV", false); '
+            . '$config = require ' . var_export($configPath, true) . '; '
+            . 'if (!isset($config["components"]["cors"]["cors"]["Origin"])) { exit(2); }';
+        $command = escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($script);
+
+        exec($command, $output, $exitCode);
+
+        $this->assertSame(0, $exitCode, implode(PHP_EOL, $output));
+    }
+
     public function testWebAndControllersUseTheSharedCorsOriginPolicy()
     {
         $config = require codecept_root_dir('config/web.php');

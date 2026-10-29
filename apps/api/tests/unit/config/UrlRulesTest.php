@@ -181,7 +181,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $uuid = '123e4567-e89b-12d3-a456-426614174000';
         $cases = [
             ['POST', 'dev-auth/login', ['dev-auth/login', []]],
-            ['OPTIONS', 'dev-auth/login', ['cors-preflight/options', ['path' => 'dev-auth/login']]],
+            ['OPTIONS', 'dev-auth/login', ['cors-preflight/options', []]],
             ['POST', 'workflow/submission/staff-entered', ['staff-entered-submission/create', []]],
             ['OPTIONS', 'workflow/submission/staff-entered', ['staff-entered-submission/options', []]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
