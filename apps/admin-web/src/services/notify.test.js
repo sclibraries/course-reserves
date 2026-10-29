@@ -59,13 +59,31 @@ describe('notify', () => {
     expect(sonner.error.mock.calls[0][0]).not.toContain('Synthetic provider detail');
   });
 
-  it('marks a missing request reference as unavailable', () => {
+  it('does not add a reference line when none is available', () => {
     notify.fromError(new Error('Synthetic provider detail'), "Couldn't save the access path");
 
-    expect(sonner.error).toHaveBeenCalledWith("Couldn't save the access path. Reference: unavailable", {
+    expect(sonner.error).toHaveBeenCalledWith("Couldn't save the access path", {
       closeButton: true,
       duration: Infinity,
     });
+  });
+
+  it.each(['reference', 'reference_id'])('reads %s from a workflow error payload', (field) => {
+    const error = Object.assign(new Error('Synthetic provider detail'), {
+      payload: { [field]: 'SYNTH-WORKFLOW-1' },
+    });
+
+    expect(toUserError(error, "Couldn't update the item")).toEqual({
+      message: "Couldn't update the item",
+      reference: 'SYNTH-WORKFLOW-1',
+    });
+  });
+
+  it.each([
+    { reference_id: 'SYNTH-UNSUPPORTED-1' },
+    { response: { data: { reference: 'SYNTH-UNSUPPORTED-2', reference_id: 'SYNTH-UNSUPPORTED-3' } } },
+  ])('ignores reference layouts not emitted by the current services', (error) => {
+    expect(toUserError(error).reference).toBeUndefined();
   });
 
   it('extracts a reference already included by a safe service error', () => {

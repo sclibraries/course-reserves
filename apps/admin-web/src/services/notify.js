@@ -3,13 +3,11 @@ import { toast } from 'sonner';
 const AUTO_CLOSE_MS = 5000;
 
 function getReference(error) {
+  // Communications/faculty wrappers use reference; WorkflowRequestError uses payload; EDS embeds it in the message.
   const embedded = error?.message?.match(/Reference:\s*([A-Z0-9-]+)/i)?.[1];
   return error?.reference
-    || error?.reference_id
     || error?.payload?.reference
     || error?.payload?.reference_id
-    || error?.response?.data?.reference
-    || error?.response?.data?.reference_id
     || embedded;
 }
 
@@ -36,6 +34,6 @@ export const notify = {
   },
   fromError(error, message = 'Something went wrong') {
     const userError = toUserError(error, message);
-    notify.error(userError.message, { reference: userError.reference || 'unavailable' });
+    notify.error(userError.message, { reference: userError.reference });
   },
 };
