@@ -28,9 +28,7 @@ class RegistrationController extends Controller
             'class' => Cors::class,
             'cors' => [
                 // Make sure your frontend domain is listed here
-                'Origin' => array_merge([
-                    'http://localhost:5173',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'], // Allow all headers
                 'Access-Control-Allow-Credentials' => true,
@@ -40,7 +38,7 @@ class RegistrationController extends Controller
             ],
         ];
 
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
     
     public function actionOptions() 

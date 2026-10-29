@@ -12,6 +12,7 @@ return [
     'OPTIONS material-type/all' => 'material-type/options',
     'GET material-type/fields' => 'material-type/fields',
     'OPTIONS material-type/fields' => 'material-type/options',
+    'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
     [
         'class' => 'yii\rest\UrlRule',
         'controller' => [
@@ -84,13 +85,7 @@ return [
             'POST physical-resource/create-or-update' => 'physical-resource/create-or-update-reference',
             'GET physical-resource/references/<offering_id:\d+>' => 'physical-resource/get-references',
             'POST physical-resource/update-order' => 'physical-resource/update-resource-order',
-            'GET physical-resource/by-external-id/<external_id>' => 'physical-resource/get-by-external-id',
             'POST physical-resource/cleanup-references' => 'physical-resource/cleanup-references',
-            'OPTIONS physical-resource/by-external-id/<external_id>' => 'options',
-            'OPTIONS physical-resource/create-or-update' => 'options',
-            'OPTIONS physical-resource/references/<offering_id:\d+>' => 'options',
-            'OPTIONS physical-resource/update-order' => 'options',
-            'OPTIONS physical-resource/cleanup-references' => 'options',
 
             // Add endpoint for course resource order updates
             'POST offering-link/update-resource-order' => 'offering-link/update-resource-order',
@@ -151,4 +146,6 @@ return [
             'OPTIONS staff/grants/<id:\d+>' => 'options',
         ],
     ],
+    // Explicit route files precede REST; this verb-only fallback cannot match business requests.
+    'OPTIONS <path:.*>' => 'cors-preflight/options',
 ];

@@ -12,7 +12,6 @@ class CatalogAvailabilityController extends BaseRestController
     public function behaviors()
     {
         $behaviors = parent::behaviors();
-        $behaviors['corsFilter']['cors']['Origin'][] = 'http://127.0.0.1:8080';
 
         return $behaviors;
     }

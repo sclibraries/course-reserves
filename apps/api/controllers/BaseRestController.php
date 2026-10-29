@@ -9,6 +9,7 @@ use yii\filters\ContentNegotiator;
 use yii\web\Response;
 use app\models\JwtIdentity;
 use app\components\Roles;
+use app\components\CorsOriginPolicy;
 
 /**
  * Base controller for all REST endpoints.
@@ -31,15 +32,7 @@ class BaseRestController extends Controller
         $behaviors['corsFilter'] = [
             'class' => \yii\filters\Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:3001',
-                    'http://localhost:5173',
-                    'http://localhost:5174',
-                    'http://127.0.0.1:3001',
-                    'http://127.0.0.1:5173',
-                    'http://127.0.0.1:5174',
-                    'http://localhost:8080',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method'  => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
                 'Access-Control-Allow-Credentials' => true,
@@ -59,7 +52,7 @@ class BaseRestController extends Controller
             'except' => ['options'],
         ];
 
-        return $behaviors;
+        return CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function beforeAction($action)
@@ -99,15 +92,7 @@ class BaseRestController extends Controller
      */
     private function sendCorsPreflightResponse()
     {
-        $response = Yii::$app->response;
-        $origin   = Yii::$app->request->headers->get('Origin') ?? '*';
-
-        $response->statusCode = 204;
-        $response->headers->set('Access-Control-Allow-Origin',      $origin);
-        $response->headers->set('Access-Control-Allow-Methods',     'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        $response->headers->set('Access-Control-Allow-Headers',     'Authorization, Content-Type, X-Requested-With');
-        $response->headers->set('Access-Control-Allow-Credentials', 'true');
-        $response->headers->set('Access-Control-Max-Age',           '86400');
+        CorsOriginPolicy::configurePreflightResponse();
         Yii::$app->end();
     }
 }

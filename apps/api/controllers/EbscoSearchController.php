@@ -45,16 +45,7 @@ class EbscoSearchController extends ActiveController
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => array_merge([
-                    'http://localhost:3001',
-                    'http://localhost:5173',
-                    'http://localhost:5174',
-                    'http://localhost:8080',
-                    'http://127.0.0.1:3001',
-                    'http://127.0.0.1:5173',
-                    'http://127.0.0.1:5174',
-                    'http://127.0.0.1:8080',
-                ], Yii::$app->params['corsOrigins'] ?? []),
+                'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
                 'Access-Control-Allow-Credentials' => true,
@@ -62,7 +53,7 @@ class EbscoSearchController extends ActiveController
             ],
         ];
 
-        return $behaviors;
+        return \app\components\CorsOriginPolicy::corsFirst($behaviors);
     }
 
     public function beforeAction($action)
@@ -91,17 +82,7 @@ class EbscoSearchController extends ActiveController
 
     private function sendCorsPreflightResponse()
     {
-        $origin = Yii::$app->request->headers->get('Origin');
-        $allowedOrigins = $this->behaviors()['corsFilter']['cors']['Origin'];
-
-        Yii::$app->response->statusCode = 204;
-        if (in_array($origin, $allowedOrigins, true)) {
-            Yii::$app->response->headers->set('Access-Control-Allow-Origin', $origin);
-            Yii::$app->response->headers->set('Access-Control-Allow-Credentials', 'true');
-        }
-        Yii::$app->response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
-        Yii::$app->response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With');
-        Yii::$app->response->headers->set('Access-Control-Max-Age', '86400');
+        \app\components\CorsOriginPolicy::configurePreflightResponse();
         Yii::$app->end();
     }
 
