@@ -47,6 +47,11 @@ class Api114PhysicalVisibilityTest extends \Codeception\Test\Unit
             'start_visibility' => 'not-a-date',
             'end_visibility' => null,
         ]);
+        $unpaddedDate = $this->reference([
+            'use_visibility' => 1,
+            'start_visibility' => '2026-2-01',
+            'end_visibility' => null,
+        ]);
         $invalidRange = $this->reference([
             'use_visibility' => 1,
             'start_visibility' => '2026-11-30',
@@ -62,6 +67,7 @@ class Api114PhysicalVisibilityTest extends \Codeception\Test\Unit
         $this->assertTrue($endOnly->validate(['use_visibility', 'start_visibility', 'end_visibility']));
         $this->assertTrue($disabled->validate(['use_visibility', 'start_visibility', 'end_visibility']));
         $this->assertFalse($invalidDate->validate(['use_visibility', 'start_visibility', 'end_visibility']));
+        $this->assertFalse($unpaddedDate->validate(['use_visibility', 'start_visibility', 'end_visibility']));
         $this->assertFalse($invalidRange->validate(['use_visibility', 'start_visibility', 'end_visibility']));
         $this->assertFalse($invalidFlag->validate(['use_visibility']));
     }

@@ -95,15 +95,12 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             [':id' => $this->submissionId]
         )->queryScalar();
         $snapshot = json_encode([
-            'version' => 1,
             'eds' => ['an' => 'scf.oai.synthetic.folio.ebsco.com.fs00001114.00000000.0000.4000.8000.000000000114'],
             'title' => 'Synthetic frozen v1 title',
         ], JSON_UNESCAPED_SLASHES);
         $db->createCommand()->update('submission_new_resources', [
+            'material_type_id' => $this->materialTypeId('ebook'),
             'source_snapshot_json' => $snapshot,
-            'materialized_resource_id' => 114001,
-            'materialized_course_resource_id' => 114002,
-            'materialized_physical_reference_id' => 114003,
         ], ['id' => $this->itemId])->execute();
 
         $db->createCommand()->insert('submission_publication_state', [
@@ -130,6 +127,22 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             'item_url' => 'https://live.example.test/api114',
         ])->execute();
         $this->resourceId = (int)$db->getLastInsertID();
+        $db->createCommand()->update('submission_new_resources', [
+            'source_resource_id' => (string)$this->resourceId,
+            'materialized_resource_id' => 114001,
+            'materialized_course_resource_id' => 114002,
+            'materialized_physical_reference_id' => 114003,
+        ], ['id' => $this->itemId])->execute();
+        $db->createCommand()->insert('submission_reuse_resources', [
+            'submission_id' => $this->submissionId,
+            'source_resource_id' => $this->resourceId,
+            'material_type_id' => $this->materialTypeId('ebook'),
+            'source_snapshot_json' => json_encode([
+                'eds' => ['an' => 'Synthetic reuse EDS identity'],
+                'title' => 'Synthetic frozen reuse title',
+            ], JSON_UNESCAPED_SLASHES),
+            'item_status' => 'pending',
+        ])->execute();
 
         $this->courseId = $this->insertCourse();
         $this->offeringId = $this->insertOffering($this->courseId);
@@ -186,16 +199,29 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
     {
         $db = \Yii::$app->db;
         $item = $db->createCommand(
-            'SELECT source_snapshot_json, materialized_resource_id, materialized_course_resource_id, '
+            'SELECT id, material_type_id, source_resource_id, source_snapshot_json, '
+            . 'materialized_resource_id, materialized_course_resource_id, '
             . 'materialized_physical_reference_id FROM submission_new_resources WHERE id = :id',
             [':id' => $this->itemId]
         )->queryOne();
         $snapshot = json_decode($item['source_snapshot_json'], true);
         Assert::assertSame(1, $snapshot['version']);
+        Assert::assertSame('Synthetic frozen v1 title', $snapshot['title']);
         Assert::assertArrayHasKey('eds', $snapshot);
         Assert::assertSame('114001', (string)$item['materialized_resource_id']);
         Assert::assertSame('114002', (string)$item['materialized_course_resource_id']);
         Assert::assertSame('114003', (string)$item['materialized_physical_reference_id']);
+
+        $reuse = $db->createCommand(
+            'SELECT id, source_resource_id, material_type_id, source_snapshot_json '
+            . 'FROM submission_reuse_resources WHERE submission_id = :id LIMIT 1',
+            [':id' => $this->submissionId]
+        )->queryOne();
+        $reuseSnapshot = json_decode($reuse['source_snapshot_json'], true);
+        Assert::assertSame(1, $reuseSnapshot['version']);
+        Assert::assertSame('Synthetic frozen reuse title', $reuseSnapshot['title']);
+        Assert::assertSame('Synthetic reuse EDS identity', $reuseSnapshot['eds']['an']);
+        $this->assertVersionOneCopyInputBlockerBoundaries($item, $reuse);
 
         $state = $db->createCommand(
             'SELECT state, draft_revision, published_revision, readiness_source, readiness_reason, '
@@ -225,6 +251,30 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
         Assert::assertSame('API114-MIGRATION-BARCODE', $reference['legacy_identifier']);
         Assert::assertSame('verified', $reference['identity_status']);
         Assert::assertSame('resource_data.eds.an', json_decode($reference['identity_provenance_json'], true)['evidence_source']);
+    }
+
+    private function assertVersionOneCopyInputBlockerBoundaries(array $new, array $reuse)
+    {
+        $projection = new \app\services\SubmissionInputProjection();
+        $newElectronic = $projection->project('new', $new, 'ebook', null, true);
+        $reuseElectronic = $projection->project('reuse', $reuse, 'ebook', null, true);
+        $reusePrint = $projection->project('reuse', $reuse, 'book', null, true);
+        $sourceLessElectronic = $new;
+        $sourceLessElectronic['source_resource_id'] = null;
+        $sourceLess = $projection->project('new', $sourceLessElectronic, 'ebook', null, true);
+
+        Assert::assertContains('copy_inputs_incomplete', $newElectronic['blockers']);
+        Assert::assertContains('copy_inputs_incomplete', $reuseElectronic['blockers']);
+        Assert::assertNotContains('copy_inputs_incomplete', $reusePrint['blockers']);
+        Assert::assertNotContains('copy_inputs_incomplete', $sourceLess['blockers']);
+    }
+
+    private function materialTypeId($name)
+    {
+        return (int)\Yii::$app->db->createCommand(
+            'SELECT material_type_id FROM material_types WHERE LOWER(name) = :name LIMIT 1',
+            [':name' => $name]
+        )->queryScalar();
     }
 
     private function insertCourse()

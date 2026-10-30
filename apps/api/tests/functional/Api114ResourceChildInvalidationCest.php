@@ -3,7 +3,9 @@
 require_once __DIR__ . '/../_support/Api109FunctionalCest.php';
 
 use PHPUnit\Framework\Assert;
+use app\models\SubmissionNewResource;
 use app\services\SubmissionPublicationInvalidator;
+use app\services\ResourceMutationService;
 
 /** Ensures child-only resource writes participate in draft revision tracking. */
 class Api114ResourceChildInvalidationCest extends Api109FunctionalCest
@@ -87,6 +89,33 @@ class Api114ResourceChildInvalidationCest extends Api109FunctionalCest
         $after = $this->currentRevisions($I, $items);
         Assert::assertSame($before['new'], $after['new'], 'The publishing item must not invalidate itself.');
         Assert::assertSame($before['reuse'] + 1, $after['reuse'], 'Other drafts sharing the source still invalidate.');
+    }
+
+    public function testProtectionMaterializationBookkeepingAndSharedSourceMutationSkipOnlyPublisher(FunctionalTester $I)
+    {
+        $items = $this->createDependentItems('bookkeeping-source-mutation');
+        $before = $this->primeRevisions($I, $items);
+        $publisher = SubmissionNewResource::findOne($items['new']['id']);
+        $publisher->materialized_resource_id = $items['resource_id'];
+        $publisher->materialized_course_resource_id = 114001;
+        $publisher->item_status = 'complete';
+        $publisher->materialized_at = '2026-10-30 12:00:00';
+        $publisher->materialized_by_staff_id = 'synthetic-api114-staff';
+        Assert::assertTrue($publisher->save(), 'The publisher bookkeeping row must be persisted.');
+        \Yii::$app->db->createCommand()->update('submission_publication_state', [
+            'state' => 'published',
+            'published_revision' => $before['new'],
+        ], ['item_kind' => 'new', 'item_id' => $items['new']['id']])->execute();
+
+        (new ResourceMutationService())->update(
+            $items['resource_id'],
+            ['name' => 'Synthetic shared-source mutation after bookkeeping'],
+            $items['new']
+        );
+
+        $after = $this->currentRevisions($I, $items);
+        Assert::assertSame($before['new'], $after['new'], 'The bookkeeping publisher draft must remain unchanged.');
+        Assert::assertSame($before['reuse'] + 1, $after['reuse'], 'The other dependent draft must still invalidate.');
     }
 
     private function createDependentItems($suffix)

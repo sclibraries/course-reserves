@@ -18,6 +18,7 @@ class PhysicalResourceReferences extends ActiveRecord
             [['external_resource_id', 'offering_id'], 'required'],
             [['offering_id', 'order', 'folder_id'], 'integer'],
             [['public_note', 'assigned_pages'], 'string'],
+            [['start_visibility', 'end_visibility'], 'validateCanonicalVisibilityDate'],
             [['start_visibility', 'end_visibility'], 'date', 'format' => 'php:Y-m-d'],
             [['use_visibility'], 'boolean'],
             [['end_visibility'], 'validateVisibilityRange'],
@@ -40,6 +41,18 @@ class PhysicalResourceReferences extends ActiveRecord
         if ((int)$this->use_visibility === 1 && $this->start_visibility && $this->$attribute
             && $this->$attribute < $this->start_visibility) {
             $this->addError($attribute, 'Visibility end date must not precede its start date.');
+        }
+    }
+
+    public function validateCanonicalVisibilityDate($attribute, $params = [], $validator = null)
+    {
+        $value = $this->$attribute;
+        if ($value === null || $value === '') {
+            return;
+        }
+        if (!is_string($value) || !preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/D', $value, $matches)
+            || !checkdate((int)$matches[2], (int)$matches[3], (int)$matches[1])) {
+            $this->addError($attribute, 'Visibility dates must use canonical YYYY-MM-DD format.');
         }
     }
 

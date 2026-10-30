@@ -6,10 +6,10 @@ namespace app\services;
 class SubmissionInputProjection
 {
     public const RESOURCE_DATA_FIELDS = [
-        'title' => ['title', 'name'],
-        'authors' => ['authors', 'author', 'contributors'],
+        'title' => ['title', 'name', 'book_title', 'article_title', 'website_title'],
+        'authors' => ['authors', 'author', 'author_editor', 'director_composer_performer', 'contributors'],
         'publisher' => ['publisher'],
-        'publication_year' => ['publicationYear', 'publication_year', 'year'],
+        'publication_year' => ['publicationYear', 'publication_year', 'publication_date', 'year'],
         'isbn' => ['isbn', 'ISBN'],
         'issn' => ['issn', 'ISSN'],
         'doi' => ['doi', 'DOI'],
@@ -91,20 +91,14 @@ class SubmissionInputProjection
         $frozen = isset($source['copy_inputs']) && is_array($source['copy_inputs'])
             ? $source['copy_inputs']
             : [];
-        $frozenPrimary = isset($frozen['primary_link']) && is_array($frozen['primary_link'])
-            ? $frozen['primary_link']
-            : [];
-        $primaryVisibility = $this->pendingOrFrozen(
-            ['use_primary_link_visibility', 'usePrimaryLinkVisibility'],
-            'use_primary_link_visibility', $resourceData, $frozenPrimary
+        list(, $primaryVisibility) = $this->firstValue(
+            $resourceData, ['use_primary_link_visibility', 'usePrimaryLinkVisibility']
         );
-        $primaryStart = $this->pendingOrFrozen(
-            ['primary_link_start_visibility', 'primaryLinkStartVisibility'],
-            'primary_link_start_visibility', $resourceData, $frozenPrimary
+        list(, $primaryStart) = $this->firstValue(
+            $resourceData, ['primary_link_start_visibility', 'primaryLinkStartVisibility']
         );
-        $primaryEnd = $this->pendingOrFrozen(
-            ['primary_link_end_visibility', 'primaryLinkEndVisibility'],
-            'primary_link_end_visibility', $resourceData, $frozenPrimary
+        list(, $primaryEnd) = $this->firstValue(
+            $resourceData, ['primary_link_end_visibility', 'primaryLinkEndVisibility']
         );
 
         $metadata = array_fill_keys(array_keys(SubmissionSourceSnapshot::BIBLIOGRAPHIC_FIELDS), null);
@@ -141,20 +135,46 @@ class SubmissionInputProjection
                 'primary_link_start_visibility' => $this->normalize($primaryStart),
                 'primary_link_end_visibility' => $this->normalize($primaryEnd),
             ],
-            'additional_links' => isset($frozen['additional_links']) && is_array($frozen['additional_links'])
-                ? $frozen['additional_links']
-                : [],
+            'additional_links' => array_key_exists('links', $resourceData)
+                ? $this->additionalLinks(is_array($resourceData['links']) ? $resourceData['links'] : [])
+                : (isset($frozen['additional_links']) && is_array($frozen['additional_links'])
+                    ? $frozen['additional_links']
+                    : []),
             'bibliographic_metadata' => $metadata,
         ];
     }
 
-    private function pendingOrFrozen(array $aliases, $field, array $resourceData, array $frozen)
+    private function additionalLinks(array $links)
     {
-        list($found, $value) = $this->firstValue($resourceData, $aliases);
-        if ($found) {
-            return $value;
+        $projected = [];
+        foreach ($links as $index => $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+            list(, $url) = $this->firstValue($link, ['url', 'link']);
+            $url = $this->normalize($url);
+            if (!is_string($url) || $url === '') {
+                continue;
+            }
+            list(, $label) = $this->firstValue($link, ['title', 'label']);
+            list(, $order) = $this->firstValue($link, ['order']);
+            list(, $useProxy) = $this->firstValue($link, ['use_proxy', 'useProxy']);
+            list(, $useVisibility) = $this->firstValue(
+                $link, ['use_link_visibility', 'useLinkVisibility']
+            );
+            list(, $start) = $this->firstValue($link, ['start_visibility', 'startVisibility']);
+            list(, $end) = $this->firstValue($link, ['end_visibility', 'endVisibility']);
+            $projected[] = [
+                'url' => $url,
+                'label' => $this->normalize($label),
+                'order' => is_numeric($order) ? (int)$order : (int)$index + 1,
+                'use_proxy' => $this->flag($useProxy),
+                'use_link_visibility' => $this->flag($useVisibility),
+                'start_visibility' => $this->normalize($start),
+                'end_visibility' => $this->normalize($end),
+            ];
         }
-        return $frozen[$field] ?? null;
+        return $projected;
     }
 
     private function copyInputsIncomplete(array $source)

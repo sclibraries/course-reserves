@@ -8,14 +8,14 @@ use Yii;
 class SubmissionSourceSnapshot
 {
     public const BIBLIOGRAPHIC_FIELDS = [
-        'title' => ['title'],
-        'authors' => ['authors'],
+        'title' => ['title', 'book_title', 'article_title', 'website_title'],
+        'authors' => ['authors', 'author', 'author_editor', 'director_composer_performer'],
         'publisher' => ['publisher'],
-        'publicationYear' => ['publicationYear', 'publication_year'],
+        'publicationYear' => ['publicationYear', 'publication_year', 'publication_date', 'year'],
         'isbn' => ['isbn'],
         'issn' => ['issn'],
         'doi' => ['doi'],
-        'journalTitle' => ['journalTitle', 'journal_title'],
+        'journalTitle' => ['journalTitle', 'journal_title', 'journal'],
         'volume' => ['volume'],
         'issue' => ['issue'],
         'edition' => ['edition'],
@@ -117,10 +117,14 @@ class SubmissionSourceSnapshot
             $params
         )->queryAll();
         $metadata = array_fill_keys(array_keys(self::BIBLIOGRAPHIC_FIELDS), null);
+        $values = [];
         foreach ($rows as $row) {
-            foreach (self::BIBLIOGRAPHIC_FIELDS as $field => $aliases) {
-                if (in_array($row['field_name'], $aliases, true)) {
-                    $metadata[$field] = $row['field_value'];
+            $values[$row['field_name']] = $row['field_value'];
+        }
+        foreach (self::BIBLIOGRAPHIC_FIELDS as $field => $aliases) {
+            foreach ($aliases as $alias) {
+                if (array_key_exists($alias, $values)) {
+                    $metadata[$field] = $values[$alias];
                     break;
                 }
             }

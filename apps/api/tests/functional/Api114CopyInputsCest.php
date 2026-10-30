@@ -144,6 +144,169 @@ class Api114CopyInputsCest extends Api109FunctionalCest
         Assert::assertSame($before, $after, 'Source edits invalidate the revision without replacing frozen inputs.');
     }
 
+    public function testAdminAuthorMetadataAliasIsCapturedAndFacultyAliasClearWins(FunctionalTester $I)
+    {
+        $articleId = $this->materialTypeId('article');
+        $resourceId = $this->createSource($articleId);
+        $this->request($I, 'PUT', 'resource/update', [
+            'title' => 'Synthetic admin EDS article',
+            'link' => 'https://admin.example.test/article',
+            'metadata' => [
+                'article_title' => 'Synthetic admin EDS article metadata',
+                'author' => 'Synthetic admin EDS author',
+                'journal_title' => 'Synthetic admin journal',
+                'publication_date' => '2025',
+            ],
+        ], ['id' => $resourceId]);
+        $I->seeResponseCodeIs(200);
+
+        $submissionId = $this->createSubmission('admin-author-alias');
+        $itemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :id LIMIT 1',
+            [':id' => $submissionId]
+        )->queryScalar();
+        $item = SubmissionNewResource::findOne($itemId);
+        $item->material_type_id = $articleId;
+        $item->source_resource_id = (string)$resourceId;
+        $item->resource_data = json_encode(['title' => 'Synthetic item with admin author']);
+        Assert::assertTrue($item->save());
+
+        $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $itemId]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame(
+            'Synthetic admin EDS author',
+            $this->response($I)['projection']['copy_inputs']['bibliographic_metadata']['authors']
+        );
+        $captured = $this->response($I)['projection']['copy_inputs']['bibliographic_metadata'];
+        Assert::assertSame('Synthetic admin EDS article metadata', $captured['title']);
+        Assert::assertSame('Synthetic admin journal', $captured['journalTitle']);
+        Assert::assertSame('2025', $captured['publicationYear']);
+
+        $item->resource_data = json_encode([
+            'title' => 'Synthetic item with explicit author clear',
+            'author' => null,
+        ]);
+        Assert::assertTrue($item->save());
+        $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $itemId]);
+        Assert::assertNull(
+            $this->response($I)['projection']['copy_inputs']['bibliographic_metadata']['authors'],
+            'An explicit faculty alias clear must not resurrect the frozen admin author.'
+        );
+    }
+
+    public function testPendingLinksAdditionsAndExplicitClearChangeDraftRevision(FunctionalTester $I)
+    {
+        $ebookId = $this->materialTypeId('ebook');
+        $resourceId = $this->createSource($ebookId);
+        $db = \Yii::$app->db;
+        $db->createCommand()->insert('resource_links', [
+            'resource_id' => $resourceId,
+            'url' => 'https://links.example.test/frozen',
+            'title' => 'Synthetic frozen link',
+            'order' => 1,
+        ])->execute();
+        $submissionId = $this->createSubmission('pending-link-edits');
+        $itemId = (int)$db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :id LIMIT 1',
+            [':id' => $submissionId]
+        )->queryScalar();
+        $item = SubmissionNewResource::findOne($itemId);
+        $item->material_type_id = $ebookId;
+        $item->source_resource_id = (string)$resourceId;
+        $item->resource_data = json_encode(['title' => 'Synthetic pending link item']);
+        Assert::assertTrue($item->save());
+
+        $this->request($I, 'GET', 'workflow-publication/state', [], ['kind' => 'new', 'id' => $itemId]);
+        $I->seeResponseCodeIs(200);
+        $beforeRevision = (int)$this->response($I)['publication']['revision']['draft'];
+        $pendingLinks = [[
+            'url' => 'https://links.example.test/pending',
+            'title' => 'Synthetic pending link',
+            'order' => 4,
+            'use_proxy' => 1,
+            'use_link_visibility' => 1,
+            'start_visibility' => '2027-02-01',
+            'end_visibility' => null,
+        ]];
+        $update = (new \app\services\SubmittedSubmissionUpdateService())->update($submissionId, [
+            'items' => [['id' => $itemId, 'resource_data' => ['links' => $pendingLinks]]],
+        ]);
+        Assert::assertArrayHasKey('submission', $update);
+
+        $this->request($I, 'GET', 'workflow-publication/state', [], ['kind' => 'new', 'id' => $itemId]);
+        Assert::assertSame($beforeRevision + 1, (int)$this->response($I)['publication']['revision']['draft']);
+        $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $itemId]);
+        Assert::assertSame([[
+            'url' => 'https://links.example.test/pending',
+            'label' => 'Synthetic pending link',
+            'order' => 4,
+            'use_proxy' => 1,
+            'use_link_visibility' => 1,
+            'start_visibility' => '2027-02-01',
+            'end_visibility' => null,
+        ]], $this->response($I)['projection']['copy_inputs']['additional_links']);
+
+        $update = (new \app\services\SubmittedSubmissionUpdateService())->update($submissionId, [
+            'items' => [['id' => $itemId, 'resource_data' => ['links' => []]]],
+        ]);
+        Assert::assertArrayHasKey('submission', $update);
+        $this->request($I, 'GET', 'workflow-publication/state', [], ['kind' => 'new', 'id' => $itemId]);
+        Assert::assertSame($beforeRevision + 2, (int)$this->response($I)['publication']['revision']['draft']);
+        $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $itemId]);
+        Assert::assertSame([], $this->response($I)['projection']['copy_inputs']['additional_links']);
+    }
+
+    public function testOmittedPrimaryVisibilityIsItemOwnedForNewAndLegacyReuseItems(FunctionalTester $I)
+    {
+        $ebookId = $this->materialTypeId('ebook');
+        $resourceId = $this->createSource($ebookId);
+        \Yii::$app->db->createCommand()->update('resources', [
+            'use_primary_link_visibility' => 1,
+            'primary_link_start_visibility' => '2027-01-01',
+            'primary_link_end_visibility' => '2027-12-31',
+        ], ['resource_id' => $resourceId])->execute();
+        $submissionId = $this->createSubmission('item-owned-primary-visibility');
+        $newItemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :id LIMIT 1',
+            [':id' => $submissionId]
+        )->queryScalar();
+        $newItem = SubmissionNewResource::findOne($newItemId);
+        $newItem->material_type_id = $ebookId;
+        $newItem->source_resource_id = (string)$resourceId;
+        $newItem->resource_data = json_encode(['title' => 'Synthetic new item without visibility']);
+        Assert::assertTrue($newItem->save());
+        \Yii::$app->db->createCommand()->insert('submission_reuse_resources', [
+            'submission_id' => $submissionId,
+            'source_resource_id' => $resourceId,
+            'material_type_id' => $ebookId,
+            'source_snapshot_json' => json_encode([
+                'version' => 2,
+                'title' => 'Synthetic legacy reuse item',
+                'copy_inputs' => [
+                    'primary_link' => [
+                        'url' => 'https://shared.example.test/source',
+                        'use_primary_link_visibility' => 1,
+                        'primary_link_start_visibility' => '2027-01-01',
+                        'primary_link_end_visibility' => '2027-12-31',
+                    ],
+                ],
+            ], JSON_UNESCAPED_SLASHES),
+            'item_status' => 'pending',
+        ])->execute();
+        $reuseItemId = (int)\Yii::$app->db->getLastInsertID();
+
+        foreach ([['new', $newItemId], ['reuse', $reuseItemId]] as $item) {
+            $this->request($I, 'GET', 'workflow-publication/projection', [], [
+                'kind' => $item[0], 'id' => $item[1],
+            ]);
+            $I->seeResponseCodeIs(200);
+            $primary = $this->response($I)['projection']['copy_inputs']['primary_link'];
+            Assert::assertSame(0, (int)$primary['use_primary_link_visibility']);
+            Assert::assertNull($primary['primary_link_start_visibility']);
+            Assert::assertNull($primary['primary_link_end_visibility']);
+        }
+    }
+
     public function testV1SnapshotBlocksUntilExplicitRefreshEditsDraftAndKeepsPublicationDisabled(FunctionalTester $I)
     {
         $ebookId = $this->materialTypeId('ebook');
@@ -161,6 +324,8 @@ class Api114CopyInputsCest extends Api109FunctionalCest
                 'version' => 1,
                 'title' => 'Synthetic old frozen title',
                 'url' => 'https://old.example.test/item',
+                'eds' => ['an' => 'Synthetic preserved EDS identity'],
+                'legacy_extension' => ['preserve' => true],
             ], JSON_UNESCAPED_SLASHES),
         ], ['id' => $itemId])->execute();
 
@@ -199,7 +364,47 @@ class Api114CopyInputsCest extends Api109FunctionalCest
             [':id' => $itemId]
         )->queryScalar(), true);
         Assert::assertSame(2, $snapshot['version']);
+        Assert::assertSame('Synthetic preserved EDS identity', $snapshot['eds']['an']);
+        Assert::assertSame(['preserve' => true], $snapshot['legacy_extension']);
         $this->assertNoDestination('new', $itemId);
+    }
+
+    public function testSourceLessLegacyReuseRefreshIsRejectedWithoutDroppingFrozenFields(FunctionalTester $I)
+    {
+        $ebookId = $this->materialTypeId('ebook');
+        $submissionId = $this->createSubmission('source-less-legacy-reuse');
+        \Yii::$app->db->createCommand()->insert('submission_reuse_resources', [
+            'submission_id' => $submissionId,
+            'material_type_id' => $ebookId,
+            'source_snapshot_json' => json_encode([
+                'version' => 1,
+                'title' => 'Synthetic legacy reuse title',
+                'url' => 'https://legacy.example.test/reuse',
+                'eds' => ['an' => 'Synthetic EDS identity'],
+                'legacy_extension' => ['kept' => true],
+            ], JSON_UNESCAPED_SLASHES),
+            'item_status' => 'pending',
+        ])->execute();
+        $itemId = (int)\Yii::$app->db->getLastInsertID();
+        $this->claim($I, 'reuse', $itemId);
+        $before = \Yii::$app->db->createCommand(
+            'SELECT source_snapshot_json FROM submission_reuse_resources WHERE id = :id',
+            [':id' => $itemId]
+        )->queryScalar();
+
+        $this->request($I, 'POST', 'workflow-publication/refresh-copy-inputs', [], [
+            'kind' => 'reuse', 'id' => $itemId,
+        ]);
+        $I->seeResponseCodeIs(409);
+        Assert::assertSame(
+            'copy_input_refresh_requires_local_electronic_source',
+            $this->response($I)['error_code']
+        );
+        $after = \Yii::$app->db->createCommand(
+            'SELECT source_snapshot_json FROM submission_reuse_resources WHERE id = :id',
+            [':id' => $itemId]
+        )->queryScalar();
+        Assert::assertSame($before, $after, 'Rejected refresh must preserve the full legacy snapshot.');
     }
 
     public function testDraftNoteAndAssignedPagesLeaveLiveResourceContentUnchanged(FunctionalTester $I)

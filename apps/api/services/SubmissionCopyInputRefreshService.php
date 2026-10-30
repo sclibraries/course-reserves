@@ -29,16 +29,26 @@ class SubmissionCopyInputRefreshService
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
             $resourceId = $item['source_resource_id'] ?? null;
+            $sourceExists = !empty($item['source_resource_found']);
+            $projection = (new SubmissionInputProjection())->project(
+                $kind,
+                $item,
+                $item['material_type'] ?? null,
+                null,
+                $sourceExists
+            );
+            if ($projection['destination_class'] !== 'electronic' || empty($resourceId) || !$sourceExists) {
+                return $this->result(409, [
+                    'error_code' => 'copy_input_refresh_requires_local_electronic_source',
+                ]);
+            }
             $snapshot = SubmissionSourceSnapshot::capture($resourceId);
-            if ($resourceId !== null && trim((string)$resourceId) !== '' && !$snapshot) {
+            if (!$snapshot) {
                 return $this->result(409, ['error_code' => 'source_resource_missing']);
             }
-            if (!$snapshot) {
-                $snapshot = SubmissionSourceSnapshot::emptySnapshot();
-            }
             $previous = json_decode($item['source_snapshot_json'] ?? 'null', true);
-            if (is_array($previous) && isset($previous['eds'])) {
-                $snapshot['eds'] = $previous['eds'];
+            if (is_array($previous)) {
+                $snapshot = array_merge($previous, $snapshot);
             }
 
             $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);

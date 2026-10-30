@@ -25,9 +25,9 @@ class ResourceMutationService
         $this->invalidator = $invalidator ?: new SubmissionPublicationInvalidator();
     }
 
-    public function update($id, array $data)
+    public function update($id, array $data, $publishingItem = null)
     {
-        return Transactional::run(function () use ($id, $data) {
+        return Transactional::run(function () use ($id, $data, $publishingItem) {
             $this->lockResource($id);
             $resource = Resources::findOne($id);
             if (!$resource) {
@@ -59,7 +59,7 @@ class ResourceMutationService
             $this->saveMetadata($id, $metadataData);
             $this->replaceLinks($id, $linksData);
             if ($before !== $this->fingerprint($id)) {
-                $this->invalidator->sourceResource($id);
+                $this->invalidator->sourceResource($id, $publishingItem);
             }
 
             return [

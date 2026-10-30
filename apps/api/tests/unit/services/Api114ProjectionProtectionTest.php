@@ -106,4 +106,34 @@ class Api114ProjectionProtectionTest extends \Codeception\Test\Unit
         $this->assertSame('108-112', $snapshot['assigned_pages']);
         $this->assertSame('101-118', $snapshot['copy_inputs']['bibliographic_metadata']['pages']);
     }
+
+    /** @group protection */
+    public function testProtectionSourceLessElectronicItemsKeepOnlyAllowlistedPendingLinks()
+    {
+        $result = (new SubmissionInputProjection())->project('new', [
+            'id' => 114,
+            'material_type_id' => 9,
+            'resource_data' => json_encode([
+                'links' => [[
+                    'url' => 'https://links.example.test/source-less',
+                    'title' => 'Synthetic submitted link',
+                    'use_proxy' => 1,
+                    'use_link_visibility' => 1,
+                    'start_visibility' => '2027-02-01',
+                    'private_link_property' => 'Synthetic private value',
+                ]],
+            ]),
+        ], 'ebook', null, true);
+
+        $this->assertSame([[
+            'url' => 'https://links.example.test/source-less',
+            'label' => 'Synthetic submitted link',
+            'order' => 1,
+            'use_proxy' => 1,
+            'use_link_visibility' => 1,
+            'start_visibility' => '2027-02-01',
+            'end_visibility' => null,
+        ]], $result['copy_inputs']['additional_links']);
+        $this->assertStringNotContainsString('private_link_property', json_encode($result['copy_inputs']));
+    }
 }
