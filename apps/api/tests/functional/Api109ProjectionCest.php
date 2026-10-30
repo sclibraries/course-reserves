@@ -100,7 +100,7 @@ class Api109ProjectionCest extends Api109FunctionalCest
         $ordinaryProjection = $this->response($I)['projection'];
         Assert::assertSame('Synthetic new title', $ordinaryProjection['inputs']['title']);
         Assert::assertSame($sourceType, $ordinaryProjection['effective_material_type']['id']);
-        Assert::assertSame([], $ordinaryProjection['blockers']);
+        Assert::assertSame(['physical_identity_required'], $ordinaryProjection['blockers']);
         $serialized = SubmissionNewResource::findOne($ordinaryId)->toArray([], ['materialType']);
         Assert::assertSame($sourceType, (int)$serialized['material_type_id']);
         Assert::assertSame('book', $serialized['material_type_key']);

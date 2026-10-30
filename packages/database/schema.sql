@@ -635,6 +635,11 @@ DROP TABLE IF EXISTS `physical_resource_references`;
 CREATE TABLE `physical_resource_references` (
   `reference_id` int(11) NOT NULL AUTO_INCREMENT,
   `external_resource_id` varchar(255) NOT NULL,
+  `folio_instance_id` varchar(255) DEFAULT NULL,
+  `legacy_identifier` varchar(255) DEFAULT NULL,
+  `legacy_identifier_type` varchar(16) DEFAULT NULL,
+  `identity_status` varchar(16) NOT NULL DEFAULT 'unverified',
+  `identity_provenance_json` longtext DEFAULT NULL,
   `resource_type` varchar(50) NOT NULL DEFAULT 'physical',
   `display_name` text NOT NULL,
   `offering_id` int(11) NOT NULL,
@@ -643,6 +648,7 @@ CREATE TABLE `physical_resource_references` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`reference_id`),
   UNIQUE KEY `external_resource_id` (`external_resource_id`,`offering_id`),
+  KEY `idx_prr_folio_instance_offering` (`folio_instance_id`,`offering_id`),
   KEY `offering_id` (`offering_id`),
   CONSTRAINT `physical_resource_references_ibfk_1` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -90,16 +90,16 @@ class SubmissionInputProjectionTest extends \Codeception\Test\Unit
     {
         $projection = new SubmissionInputProjection();
         $cases = [
-            ['book', null, null, 'print', []],
-            ['book', null, 'instance-book', 'print', []],
+            ['book', null, null, 'print', ['physical_identity_required']],
+            ['book', null, 'instance-book', 'print', ['physical_identity_required']],
             ['ebook', null, 'instance-1', 'electronic', []],
             ['article', null, null, 'electronic', []],
             ['chapter', null, null, 'electronic', []],
             ['website', null, null, 'electronic', []],
-            ['video', null, 'instance-2', 'print', []],
+            ['video', null, 'instance-2', 'print', ['physical_identity_required']],
             ['video', 'electronic', null, 'electronic', []],
             ['video', null, null, null, ['destination_class_required']],
-            ['other', 'print', null, 'print', []],
+            ['other', 'print', null, 'print', ['physical_identity_required']],
             ['audiobook', 'print', 'instance-3', null, ['unknown_material_type']],
             [null, 'electronic', 'instance-4', null, ['unknown_material_type']],
         ];
@@ -154,7 +154,28 @@ class SubmissionInputProjectionTest extends \Codeception\Test\Unit
             'source_folio_instance_id' => 'folio-123',
         ], 'book', null, false);
 
-        $this->assertSame(['source_resource_missing'], $dangling['blockers']);
-        $this->assertSame([], $newItem['blockers']);
+        $this->assertSame(['source_resource_missing', 'physical_identity_required'], $dangling['blockers']);
+        $this->assertSame(['physical_identity_required'], $newItem['blockers']);
+    }
+
+    public function testIdentityBlockerAcceptsParsedEvidenceOrMatchingEstablishedIdentityOnlyForPrint()
+    {
+        $accession = 'scf.oai.edge.fivecolleges.folio.ebsco.com.fs00001006.'
+            . '00000000.0000.4000.8000.000000000886';
+        $projection = new SubmissionInputProjection();
+        $parsed = $projection->project('new', [
+            'id' => 12,
+            'resource_data' => json_encode(['eds' => ['an' => $accession]]),
+        ], 'book');
+        $established = $projection->project('reuse', [
+            'id' => 13,
+            'source_folio_instance_id' => '00000000-0000-4000-8000-000000000887',
+            'established_folio_instance_id' => '00000000-0000-4000-8000-000000000887',
+        ], 'book');
+        $electronic = $projection->project('new', ['id' => 14], 'ebook');
+
+        $this->assertSame([], $parsed['blockers']);
+        $this->assertSame([], $established['blockers']);
+        $this->assertSame([], $electronic['blockers']);
     }
 }

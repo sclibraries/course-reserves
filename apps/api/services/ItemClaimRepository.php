@@ -36,7 +36,8 @@ class ItemClaimRepository
         }
         $effectiveType = EffectiveMaterialType::sql('i', 'source');
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
-        $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
+        $sql = 'SELECT i.id, i.submission_id, i.materialized_physical_reference_id, s.offering_id, '
+            . 'i.claimed_by, i.claimed_at, i.last_activity_at, '
             . 'i.assigned_group_id, i.access_path, i.item_status AS status, i.display_order AS position, '
             . 'i.public_note, i.assigned_pages, '
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, '

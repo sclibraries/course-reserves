@@ -106,19 +106,32 @@ class SubmissionItemMaterializationService
 
     private function materializePhysicalReference(SubmissionNewResource $item, FacultySubmission $submission, $folderId)
     {
-        $externalId = $this->hasValue($item->source_barcode)
-            ? trim((string)$item->source_barcode)
-            : trim((string)$item->source_folio_instance_id);
+        $identity = (new PhysicalResourceReferenceIdentity())->resolve(
+            'new', array_merge($item->getAttributes(), ['destination_class' => 'print'])
+        );
+        $externalId = $identity['external_resource_id'];
+        if (!$this->hasValue($externalId)) {
+            throw new BadRequestHttpException('Physical reference is missing an external identifier.');
+        }
 
         $reference = PhysicalResourceReferences::findOne([
             'external_resource_id' => $externalId,
             'offering_id' => $submission->offering_id,
         ]);
+        $isNew = !$reference;
 
         if (!$reference) {
             $reference = new PhysicalResourceReferences();
             $reference->external_resource_id = $externalId;
             $reference->offering_id = $submission->offering_id;
+        }
+
+        if ($isNew || ($identity['identity_status'] === 'verified' && $reference->identity_status !== 'verified')) {
+            $reference->folio_instance_id = $identity['folio_instance_id'];
+            $reference->legacy_identifier = $identity['legacy_identifier'];
+            $reference->legacy_identifier_type = $identity['legacy_identifier_type'];
+            $reference->identity_status = $identity['identity_status'];
+            $reference->identity_provenance_json = json_encode($identity['provenance'], JSON_UNESCAPED_SLASHES);
         }
 
         $reference->resource_type = 'physical';

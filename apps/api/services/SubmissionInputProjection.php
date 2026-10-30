@@ -48,7 +48,6 @@ class SubmissionInputProjection
         } elseif ($destinationClass === null) {
             $blockers[] = 'destination_class_required';
         }
-
         $resourceId = $item['source_resource_id'] ?? null;
         if ($sourceExists === null) {
             $sourceExists = !empty($source) || !$this->hasValue($resourceId);
@@ -56,6 +55,10 @@ class SubmissionInputProjection
         if ($this->hasValue($resourceId) && !$sourceExists) {
             $blockers[] = 'source_resource_missing';
         }
+        $identityItem = $item;
+        $identityItem['destination_class'] = $destinationClass;
+        $identity = (new PhysicalResourceReferenceIdentity())->resolve($kind, $identityItem);
+        $blockers = array_merge($blockers, $identity['blockers']);
 
         return [
             'kind' => $kind,
