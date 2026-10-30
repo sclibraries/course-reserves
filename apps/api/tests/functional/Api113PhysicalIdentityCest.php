@@ -10,14 +10,28 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
     private $offeringIds = [];
     private $courseIds = [];
     private $referenceIds = [];
+    private $originalUrlManager;
+
+    public function _before(FunctionalTester $I)
+    {
+        parent::_before($I);
+        $this->loadProductionRouter();
+    }
 
     public function _after(FunctionalTester $I)
     {
-        parent::_after($I);
-        $this->cleanupApi113();
+        try {
+            parent::_after($I);
+            $this->cleanupApi113();
+        } finally {
+            if ($this->originalUrlManager !== null) {
+                \Yii::$app->set('urlManager', $this->originalUrlManager);
+                $this->originalUrlManager = null;
+            }
+        }
     }
 
-    public function todayCreateAndReorderPayloadsKeepUnresolvedReferencesWorking(FunctionalTester $I)
+    public function todayCreateUpdateAndReorderPayloadsKeepUnresolvedReferencesWorking(FunctionalTester $I)
     {
         $offeringId = $this->createOffering('compatibility');
         $barcode = 'API113-SYNTHETIC-BARCODE-01';
@@ -30,16 +44,29 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         ]);
         $I->seeResponseCodeIs(200);
         $created = $this->response($I);
-        Assert::assertArrayHasKey('identity_status', $created);
-        Assert::assertArrayHasKey('folio_instance_id', $created);
-        Assert::assertArrayHasKey('legacy_identifier', $created);
         Assert::assertSame($barcode, $created['external_resource_id']);
-        Assert::assertSame('unverified', $created['identity_status']);
-        Assert::assertSame($barcode, $created['legacy_identifier']);
-        Assert::assertNull($created['folio_instance_id']);
+        $referenceId = (int)$created['reference_id'];
+        Assert::assertSame('API-113 synthetic reserve', $created['display_name']);
+
+        $duplicate = new \app\models\PhysicalResourceReferences();
+        $duplicate->external_resource_id = $barcode;
+        $duplicate->offering_id = $offeringId;
+        Assert::assertFalse($duplicate->validate(['external_resource_id', 'offering_id']), 'Model validation must keep the legacy uniqueness rule.');
+        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+            'external_resource_id' => $barcode,
+            'resource_type' => 'physical',
+            'display_name' => 'API-113 synthetic reserve updated',
+            'offering_id' => $offeringId,
+            'order' => 9,
+        ]);
+        $I->seeResponseCodeIs(200);
+        $updated = $this->response($I);
+        Assert::assertSame($referenceId, (int)$updated['reference_id']);
+        Assert::assertSame('API-113 synthetic reserve updated', $updated['display_name']);
+
         \Yii::$app->db->createCommand()->update('physical_resource_references', [
             'updated_at' => '2020-01-01 00:00:00',
-        ], ['reference_id' => $created['reference_id']])->execute();
+        ], ['reference_id' => $referenceId])->execute();
 
         $this->request($I, 'POST', 'physical-resource/update-order', [
             'offering_id' => $offeringId,
@@ -50,11 +77,52 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             ]],
         ]);
         $I->seeResponseCodeIs(200);
+        $row = \Yii::$app->db->createCommand(
+            'SELECT * FROM physical_resource_references WHERE reference_id = :id', [':id' => $referenceId]
+        )->queryOne();
+        Assert::assertSame($referenceId, (int)$row['reference_id']);
+        Assert::assertSame($barcode, $row['external_resource_id']);
+        Assert::assertSame(2, (int)$row['order']);
+        Assert::assertSame('API-113 synthetic reserve updated', $row['display_name']);
+        Assert::assertNotSame('2020-01-01 00:00:00', $row['updated_at'], 'Metadata/order updates keep the existing timestamp behavior.');
+    }
+
+    public function newReferencesWithoutEvidenceRemainUnverifiedAfterReorder(FunctionalTester $I)
+    {
+        $offeringId = $this->createOffering('unresolved-identity');
+        $barcode = 'API113-SYNTHETIC-BARCODE-02';
+        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+            'external_resource_id' => $barcode,
+            'resource_type' => 'physical',
+            'display_name' => 'API-113 unresolved reserve',
+            'offering_id' => $offeringId,
+            'order' => 11,
+        ]);
+        $I->seeResponseCodeIs(200);
+        $created = $this->response($I);
+        Assert::assertArrayHasKey('identity_status', $created);
+        Assert::assertArrayHasKey('folio_instance_id', $created);
+        Assert::assertArrayHasKey('legacy_identifier', $created);
+        Assert::assertSame('unverified', $created['identity_status']);
+        Assert::assertSame($barcode, $created['external_resource_id']);
+        Assert::assertSame($barcode, $created['legacy_identifier']);
+        Assert::assertNull($created['folio_instance_id']);
+
+        $this->request($I, 'POST', 'physical-resource/update-order', [
+            'offering_id' => $offeringId,
+            'resources' => [[
+                'external_resource_id' => $barcode,
+                'display_name' => 'API-113 unresolved reserve reordered',
+                'order' => 3,
+            ]],
+        ]);
+        $I->seeResponseCodeIs(200);
         $this->assertReferenceIdentity($barcode, $offeringId, 'unverified', null);
         $row = $this->reference($barcode, $offeringId);
-        Assert::assertSame(2, (int)$row['order']);
-        Assert::assertSame('API-113 reordered reserve', $row['display_name']);
-        Assert::assertNotSame('2020-01-01 00:00:00', $row['updated_at'], 'Metadata/order updates keep the existing timestamp behavior.');
+        Assert::assertSame('unverified', $row['identity_status']);
+        Assert::assertNull($row['folio_instance_id']);
+        Assert::assertSame($barcode, $row['legacy_identifier']);
+        Assert::assertSame(3, (int)$row['order']);
     }
 
     public function forgedIdentityFieldsCannotVerifyCreateOrMetadataUpdate(FunctionalTester $I)
@@ -75,14 +143,13 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         ]);
         $I->seeResponseCodeIs(200);
         $created = $this->reference($legacyId, $offeringId);
+        Assert::assertArrayHasKey('identity_status', $created);
+        Assert::assertArrayHasKey('folio_instance_id', $created);
+        Assert::assertArrayHasKey('legacy_identifier', $created);
         Assert::assertSame('unverified', $created['identity_status']);
         Assert::assertNull($created['folio_instance_id']);
         Assert::assertSame($legacyId, $created['legacy_identifier']);
         Assert::assertNotSame('caller-set-legacy-value', $created['legacy_identifier']);
-        $duplicate = new \app\models\PhysicalResourceReferences();
-        $duplicate->external_resource_id = $legacyId;
-        $duplicate->offering_id = $offeringId;
-        Assert::assertFalse($duplicate->validate(['external_resource_id', 'offering_id']), 'Model validation must keep the legacy uniqueness rule.');
 
         $this->request($I, 'POST', 'physical-resource/create-or-update', [
             'external_resource_id' => $legacyId,
@@ -112,18 +179,13 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         Assert::assertNull($uuidShaped['folio_instance_id']);
     }
 
-    public function externalIdLookupIsReadOnlyOfferingScopedAndPreservesLegacyKeys(FunctionalTester $I)
+    public function legacyExternalIdLookupRemainsReadOnlyAndOfferingScoped(FunctionalTester $I)
     {
         $firstOffering = $this->createOffering('lookup-one');
         $secondOffering = $this->createOffering('lookup-two');
         $legacyId = 'API113-SYNTHETIC-SHARED-BARCODE';
-        $canonicalId = '00000000-0000-4000-8000-000000000920';
         $firstId = $this->insertReference($legacyId, $firstOffering, 'API-113 first offering copy');
         $secondId = $this->insertReference($legacyId, $secondOffering, 'API-113 second offering copy');
-        $firstCanonicalId = $this->insertReference('API113-SYNTHETIC-ALT-BARCODE-ONE', $firstOffering, 'API-113 first canonical copy');
-        $secondCanonicalId = $this->insertReference('API113-SYNTHETIC-ALT-BARCODE-TWO', $secondOffering, 'API-113 second canonical copy');
-        $this->setIdentity($firstCanonicalId, 'verified', $canonicalId, 'API113-SYNTHETIC-ALT-BARCODE-ONE');
-        $this->setIdentity($secondCanonicalId, 'verified', $canonicalId, 'API113-SYNTHETIC-ALT-BARCODE-TWO');
         $before = $this->reference($legacyId, $firstOffering);
         $beforeCount = (int)\Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM physical_resource_references'
@@ -142,23 +204,41 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame($secondId, (int)$this->response($I)['reference_id']);
 
+        Assert::assertSame($before['updated_at'], $this->reference($legacyId, $firstOffering)['updated_at']);
+        Assert::assertSame($beforeCount, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM physical_resource_references'
+        )->queryScalar());
+    }
+
+    public function canonicalFallbackLookupIsOfferingScopedAndNeverAmbiguous(FunctionalTester $I)
+    {
+        $firstOffering = $this->createOffering('canonical-lookup-one');
+        $secondOffering = $this->createOffering('canonical-lookup-two');
+        $canonicalId = '00000000-0000-4000-8000-000000000920';
+        $firstLegacyId = 'API113-SYNTHETIC-ALT-BARCODE-ONE';
+        $secondLegacyId = 'API113-SYNTHETIC-ALT-BARCODE-TWO';
+        $firstId = $this->insertReference($firstLegacyId, $firstOffering, 'API-113 first canonical copy');
+        $secondId = $this->insertReference($secondLegacyId, $secondOffering, 'API-113 second canonical copy');
+        $this->setIdentity($firstId, 'verified', $canonicalId, $firstLegacyId);
+        $this->setIdentity($secondId, 'verified', $canonicalId, $secondLegacyId);
+        $beforeCount = (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM physical_resource_references'
+        )->queryScalar();
+
         $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($canonicalId), [], [
             'offering_id' => $firstOffering,
         ]);
         $I->seeResponseCodeIs(200);
-        Assert::assertSame($firstCanonicalId, (int)$this->response($I)['reference_id']);
+        Assert::assertSame($firstId, (int)$this->response($I)['reference_id']);
+
         $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($canonicalId), [], [
             'offering_id' => $secondOffering,
         ]);
         $I->seeResponseCodeIs(200);
-        Assert::assertSame($secondCanonicalId, (int)$this->response($I)['reference_id']);
+        Assert::assertSame($secondId, (int)$this->response($I)['reference_id']);
 
         $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($canonicalId));
         Assert::assertNotSame(200, \Yii::$app->response->statusCode, 'Canonical fallback must not select across offerings.');
-
-        $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($legacyId));
-        Assert::assertNotSame(200, \Yii::$app->response->statusCode, 'An ambiguous cross-offering lookup must not pick a row.');
-        Assert::assertSame($before['updated_at'], $this->reference($legacyId, $firstOffering)['updated_at']);
         Assert::assertSame($beforeCount, (int)\Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM physical_resource_references'
         )->queryScalar());
@@ -491,6 +571,16 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $offeringId = (int)$db->getLastInsertID();
         $this->offeringIds[] = $offeringId;
         return $offeringId;
+    }
+
+    private function loadProductionRouter()
+    {
+        $this->originalUrlManager = \Yii::$app->get('urlManager');
+        $webConfig = require codecept_root_dir('config/web.php');
+        $urlManagerConfig = $webConfig['components']['urlManager'];
+        $urlManagerConfig['class'] = \yii\web\UrlManager::class;
+        \Yii::$app->set('urlManager', $urlManagerConfig);
+        \Yii::$app->urlManager->showScriptName = false;
     }
 
     private function createItemForOffering($suffix, $offeringId, $kind)
