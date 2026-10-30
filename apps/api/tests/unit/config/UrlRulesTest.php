@@ -136,9 +136,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $publicationRules = [
             'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/state',
             'GET workflow/item/<kind:(new|reuse)>/<id:\\d+>/projection' => 'workflow-publication/projection',
+            'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/refresh-copy-inputs' => 'workflow-publication/refresh-copy-inputs',
             'POST workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/ready',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/publication' => 'workflow-publication/options',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/projection' => 'workflow-publication/options',
+            'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/refresh-copy-inputs' => 'workflow-publication/options',
             'OPTIONS workflow/item/<kind:(new|reuse)>/<id:\\d+>/ready' => 'workflow-publication/options',
         ];
         $corsRules = [
@@ -169,7 +171,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $corsRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(262, $mergedRules);
+        $this->assertCount(264, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -249,6 +251,12 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ]],
             ['OPTIONS', 'workflow/item/reuse/999007219/projection', [
                 'workflow-publication/options', ['kind' => 'reuse', 'id' => '999007219'],
+            ]],
+            ['POST', 'workflow/item/reuse/999007220/refresh-copy-inputs', [
+                'workflow-publication/refresh-copy-inputs', ['kind' => 'reuse', 'id' => '999007220'],
+            ]],
+            ['OPTIONS', 'workflow/item/new/999007221/refresh-copy-inputs', [
+                'workflow-publication/options', ['kind' => 'new', 'id' => '999007221'],
             ]],
             ['POST', 'workflow/item/reuse/999007212/step-result', [
                 'workflow-flow/step-result', ['kind' => 'reuse', 'id' => '999007212'],

@@ -56,7 +56,8 @@ class SubmissionInputProjection
         if ($this->hasValue($resourceId) && !$sourceExists) {
             $blockers[] = 'source_resource_missing';
         }
-        if ($this->copyInputsIncomplete($source, $resourceId)) {
+        if ($destinationClass === 'electronic' && $this->hasValue($resourceId) && $sourceExists
+            && $this->copyInputsIncomplete($source)) {
             $blockers[] = 'copy_inputs_incomplete';
         }
         $identityItem = $item;
@@ -156,20 +157,9 @@ class SubmissionInputProjection
         return $frozen[$field] ?? null;
     }
 
-    private function copyInputsIncomplete(array $source, $resourceId)
+    private function copyInputsIncomplete(array $source)
     {
-        if (!$source) {
-            return $this->hasValue($resourceId);
-        }
-        if (!array_key_exists('version', $source)) {
-            return false;
-        }
-        if ((int)$source['version'] < 2 || !isset($source['copy_inputs']) || !is_array($source['copy_inputs'])) {
-            return true;
-        }
-        return !isset($source['copy_inputs']['primary_link'])
-            || !isset($source['copy_inputs']['additional_links'])
-            || !isset($source['copy_inputs']['bibliographic_metadata']);
+        return isset($source['version']) && (int)$source['version'] === 1;
     }
 
     private function flag($value)
