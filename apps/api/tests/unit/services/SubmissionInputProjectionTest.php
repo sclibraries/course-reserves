@@ -117,6 +117,28 @@ class SubmissionInputProjectionTest extends \Codeception\Test\Unit
         }
     }
 
+    public function testClassificationUsesCanonicalResourceTypeKeyBeforeDisplayName()
+    {
+        $projection = (new SubmissionInputProjection())->project('new', [
+            'id' => 2,
+            'material_type_id' => 10,
+            'resource_data' => json_encode(['materialType' => 'article']),
+        ], 'test-api096-book');
+
+        $this->assertSame('article', $projection['effective_material_type']['key']);
+        $this->assertSame('electronic', $projection['destination_class']);
+        $this->assertSame([], $projection['blockers']);
+
+        $overridden = (new SubmissionInputProjection())->project('new', [
+            'id' => 3,
+            'material_type_id' => 10,
+            'staff_material_type_id' => 11,
+            'resource_data' => json_encode(['materialType' => 'article']),
+        ], 'test-api096-book');
+        $this->assertSame('book', $overridden['effective_material_type']['key']);
+        $this->assertSame('print', $overridden['destination_class']);
+    }
+
     public function testOnlyDanglingLocalResourceReferencesBlockProjection()
     {
         $projection = new SubmissionInputProjection();

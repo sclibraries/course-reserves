@@ -39,10 +39,10 @@ class SubmissionInputProjection
         }
 
         $typeId = EffectiveMaterialType::id($item);
-        $type = strtolower(trim((string)$materialTypeName));
-        $destinationClass = $this->destinationClass($type, $item);
+        $typeKey = EffectiveMaterialType::key($item, $materialTypeName);
+        $destinationClass = $this->destinationClass($typeKey, $item);
         $blockers = [];
-        if ($type === '' || !in_array($type, ['book', 'ebook', 'article', 'chapter', 'website', 'video', 'other'], true)) {
+        if ($typeKey === null) {
             $blockers[] = 'unknown_material_type';
             $destinationClass = null;
         } elseif ($destinationClass === null) {
@@ -63,7 +63,8 @@ class SubmissionInputProjection
             'inputs' => $inputs,
             'effective_material_type' => [
                 'id' => $typeId,
-                'name' => $type === '' ? null : $type,
+                'key' => $typeKey,
+                'name' => $typeKey,
             ],
             'destination_class' => $destinationClass,
             'access_path' => $item['access_path'] ?? null,
@@ -105,15 +106,15 @@ class SubmissionInputProjection
         return $this->field($field, [$field], $corrections, $resourceData, $source, $published);
     }
 
-    private function destinationClass($type, array $item)
+    private function destinationClass($typeKey, array $item)
     {
-        if ($type === 'book') {
+        if ($typeKey === 'book') {
             return 'print';
         }
-        if (in_array($type, ['ebook', 'article', 'chapter', 'website'], true)) {
+        if (in_array($typeKey, ['ebook', 'article', 'chapter', 'website'], true)) {
             return 'electronic';
         }
-        if (in_array($type, ['video', 'other'], true)) {
+        if (in_array($typeKey, ['video', 'other'], true)) {
             $choice = $item['destination_class_choice'] ?? null;
             if (in_array($choice, ['electronic', 'print'], true)) {
                 return $choice;

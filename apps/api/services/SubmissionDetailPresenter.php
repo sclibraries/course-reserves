@@ -91,7 +91,7 @@ class SubmissionDetailPresenter
                 if (!is_array($item) || isset($flowRuns[$kind . ':' . (int)($item['id'] ?? 0)])) {
                     continue;
                 }
-                $materialTypeId = (int)($item['material_type_id'] ?? 0);
+                $materialTypeId = (int)EffectiveMaterialType::id($item);
                 if ($materialTypeId > 0) {
                     $materialTypeIds[$materialTypeId] = true;
                 }
@@ -146,7 +146,7 @@ class SubmissionDetailPresenter
                     ItemReadiness::evaluate($item, $itemAvailability, $instanceId, $run)
                 );
                 $item['allowed_access_paths'] = AccessPathPolicy::allowedForItem($item);
-                $mappedFlow = $run ? null : ($mappedFlows[(int)($item['material_type_id'] ?? 0)] ?? null);
+                $mappedFlow = $run ? null : ($mappedFlows[(int)EffectiveMaterialType::id($item)] ?? null);
                 $item['flow'] = $this->flowStatePresenter->summary($run, $mappedFlow);
                 $item['publication'] = $publicationContracts[$flowKey] ?? null;
                 if ($actor !== null && (int)($item['id'] ?? 0) > 0) {

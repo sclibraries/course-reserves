@@ -31,7 +31,7 @@ class SubmissionPublicationStateService
         return $this->claims->withLinkedItem($kind, $itemId, function ($item) use ($kind, $itemId, $actor) {
             $state = $this->states->lock($kind, $itemId, $item['submission_id']);
             $run = $this->flows->latestRun($kind, $itemId);
-            $mapping = $run ? null : $this->flows->mappedFlow($item['material_type_id']);
+            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
             $lastEvents = $this->states->lastClaimEvents([['kind' => $kind, 'id' => $itemId]]);
             return $this->result(200, [
                 'publication' => $this->policy->present(
@@ -60,7 +60,7 @@ class SubmissionPublicationStateService
             $item = $entry['item'];
             $state = $states[$key] ?? $this->emptyState($submissionId, $entry['kind'], $entry['id']);
             $run = $runs[$key] ?? null;
-            $materialTypeId = (int)($item['material_type_id'] ?? 0);
+            $materialTypeId = (int)EffectiveMaterialType::id($item);
             $mapping = $run ? null : ($mappings[$materialTypeId] ?? null);
             $contracts[$key] = $this->policy->present(
                 $item,
@@ -101,7 +101,7 @@ class SubmissionPublicationStateService
             }
             $state = $this->states->lock($kind, $itemId, $item['submission_id']);
             $run = $this->flows->latestRun($kind, $itemId, true);
-            $mapping = $run ? null : $this->flows->mappedFlow($item['material_type_id']);
+            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
             $context = $this->policy->context($item, $run, $mapping);
             $before = $this->readinessSnapshot($state);
             $this->claims->renewClaimLocked($kind, $itemId, $now);

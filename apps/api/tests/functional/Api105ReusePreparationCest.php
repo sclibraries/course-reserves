@@ -75,6 +75,13 @@ class Api105ReusePreparationCest extends BaseFunctionalCest
         $params = ['kind' => 'reuse', 'id' => $this->itemId];
         $this->request($I, 'GET', 'workflow-flow/item-flow', [], $params);
         $I->seeResponseCodeIs(200);
+        $flow = $this->response($I);
+        Assert::assertSame($this->flowId, $flow['flow']['id']);
+        Assert::assertSame('publish', $flow['current_step']['step']['key']);
+        $draftRevision = (int)\Yii::$app->db->createCommand(
+            'SELECT draft_revision FROM submission_publication_state WHERE item_kind = "reuse" AND item_id = :id',
+            [':id' => $this->itemId]
+        )->queryScalar();
         $this->request($I, 'POST', 'workflow-claim/claim', [], $params);
         $I->seeResponseCodeIs(200);
         $this->request($I, 'POST', 'workflow-flow/step-result', [
@@ -86,6 +93,7 @@ class Api105ReusePreparationCest extends BaseFunctionalCest
         $this->request($I, 'GET', 'workflow-publication/state', [], $params);
         $I->seeResponseCodeIs(200);
         $publication = $this->response($I)['publication'];
+        Assert::assertSame($draftRevision, (int)$publication['revision']['draft']);
         Assert::assertSame('ready', $publication['state']);
         Assert::assertSame('available_online', $publication['readiness']['context']['finish_state']);
         $row = \Yii::$app->db->createCommand(

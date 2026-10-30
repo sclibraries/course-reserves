@@ -155,7 +155,10 @@ class SubmissionNewResource extends ActiveRecord
             unset($fields[$field]);
         }
         $fields['material_type_id'] = function ($model) {
-            return \app\services\EffectiveMaterialType::id($model->getAttributes());
+            return \app\services\EffectiveMaterialType::modelId($model);
+        };
+        $fields['material_type_key'] = function ($model) {
+            return \app\services\EffectiveMaterialType::modelKey($model);
         };
         $fields['resource_data'] = function ($model) {
             return $model->getResourceDataForPresentation();
@@ -216,28 +219,13 @@ class SubmissionNewResource extends ActiveRecord
 
     public function getEffectiveMaterialType()
     {
-        $id = \app\services\EffectiveMaterialType::id($this->getAttributes());
+        $id = \app\services\EffectiveMaterialType::modelId($this);
         return $id ? MaterialTypes::findOne($id) : null;
     }
 
     public function getResourceDataForPresentation()
     {
-        $data = $this->getResourceDataDecoded();
-        if (!is_array($data)) {
-            return $this->resource_data;
-        }
-        $typeId = \app\services\EffectiveMaterialType::id($this->getAttributes());
-        $type = $this->getEffectiveMaterialType();
-        if ($type) {
-            $data['materialType'] = $type->name;
-            if (array_key_exists('material_type_id', $data)) {
-                $data['material_type_id'] = $typeId;
-            }
-        } else {
-            unset($data['materialType']);
-            unset($data['material_type_id']);
-        }
-        return $data;
+        return \app\services\EffectiveMaterialType::resourceDataForModel($this);
     }
 
     private function hasResourceMaterialType()

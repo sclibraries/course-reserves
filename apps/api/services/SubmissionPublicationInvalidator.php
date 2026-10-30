@@ -25,12 +25,14 @@ class SubmissionPublicationInvalidator
         $params = [];
         $newHolders = $this->inList($ids, 'new_type_', $params);
         $reuseHolders = $this->inList($ids, 'reuse_type_', $params);
-        $newType = EffectiveMaterialType::sql('item');
-        $reuseType = EffectiveMaterialType::sql('item');
+        $newType = EffectiveMaterialType::sql('item', 'source');
+        $reuseType = EffectiveMaterialType::sql('item', 'source');
         $rows = Yii::$app->db->createCommand(
-            'SELECT "new" AS kind, id, submission_id FROM submission_new_resources '
-            . 'item WHERE ' . $newType . ' IN (' . $newHolders . ') UNION ALL '
+            'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
+            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
+            . 'WHERE ' . $newType . ' IN (' . $newHolders . ') UNION ALL '
             . 'SELECT "reuse" AS kind, item.id, item.submission_id FROM submission_reuse_resources item '
+            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
             . 'WHERE ' . $reuseType . ' IN (' . $reuseHolders . ') ORDER BY kind, id',
             $params
         )->queryAll();
@@ -58,14 +60,16 @@ class SubmissionPublicationInvalidator
 
     public function unpinnedFlowItems($flowId)
     {
-        $newType = EffectiveMaterialType::sql('item');
-        $reuseType = EffectiveMaterialType::sql('item');
+        $newType = EffectiveMaterialType::sql('item', 'source');
+        $reuseType = EffectiveMaterialType::sql('item', 'source');
         $rows = Yii::$app->db->createCommand(
             'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
+            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
             . 'INNER JOIN material_type_flows mapping ON mapping.material_type_id = ' . $newType . ' '
             . 'WHERE mapping.flow_id = :flow_id AND NOT EXISTS (SELECT 1 FROM item_flow_runs run '
             . 'WHERE run.item_kind = "new" AND run.item_id = item.id) UNION ALL '
             . 'SELECT "reuse" AS kind, item.id, item.submission_id FROM submission_reuse_resources item '
+            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
             . 'INNER JOIN material_type_flows mapping ON mapping.material_type_id = ' . $reuseType . ' '
             . 'WHERE mapping.flow_id = :flow_id AND NOT EXISTS (SELECT 1 FROM item_flow_runs run '
             . 'WHERE run.item_kind = "reuse" AND run.item_id = item.id) ORDER BY kind, id',

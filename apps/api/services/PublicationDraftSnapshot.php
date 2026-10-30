@@ -7,24 +7,16 @@ class PublicationDraftSnapshot
 {
     public static function fromNewItem(array $item)
     {
-        $resourceData = $item['resource_data'] ?? [];
-        if (is_string($resourceData)) {
-            $resourceData = json_decode($resourceData, true);
-        }
-        $resourceData = is_array($resourceData) ? $resourceData : [];
-        unset(
-            $resourceData['notes'], $resourceData['faculty_notes'], $resourceData['internal_note'],
-            $resourceData['staff_notes'], $resourceData['materialType'],
-            $resourceData['material_type_id']
-        );
+        $projection = (new SubmissionInputProjection())->project('new', $item, null, null, true);
         $sourceSnapshot = self::decode($item['source_snapshot_json'] ?? null);
         $staffCorrections = self::decode($item['staff_corrections_json'] ?? null);
 
         return self::sortKeys([
-            'resource_data' => $resourceData,
+            'inputs' => $projection['inputs'],
             'staff_corrections' => $staffCorrections,
             'source_snapshot' => $sourceSnapshot,
             'material_type_id' => EffectiveMaterialType::id($item),
+            'material_type_key' => $projection['effective_material_type']['key'],
             'destination_class_choice' => $item['destination_class_choice'] ?? null,
             'is_reuse' => (int)($item['is_reuse'] ?? 0),
             'source_barcode' => $item['source_barcode'] ?? null,

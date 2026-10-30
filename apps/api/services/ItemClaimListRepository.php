@@ -116,7 +116,7 @@ class ItemClaimListRepository
     private function selectForKind($kind, $condition)
     {
         $table = $this->items->table($kind);
-        $effectiveType = EffectiveMaterialType::sql('i');
+        $effectiveType = EffectiveMaterialType::sql('i', 'source');
         $title = $kind === 'new'
             ? 'CASE WHEN JSON_VALID(i.resource_data) THEN JSON_UNQUOTE(JSON_EXTRACT(i.resource_data, "$.title")) ELSE NULL END'
             : 'NULL';

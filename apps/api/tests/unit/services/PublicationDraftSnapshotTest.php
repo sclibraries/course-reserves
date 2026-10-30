@@ -26,6 +26,25 @@ class PublicationDraftSnapshotTest extends \Codeception\Test\Unit
         $this->assertFalse(PublicationDraftSnapshot::changed($before, $after));
     }
 
+    public function testFacultyCompatibilityDefaultsDoNotChangeProjectedInputs()
+    {
+        $before = [
+            'material_type_id' => 3,
+            'staff_material_type_id' => 5,
+            'resource_data' => json_encode([
+                'title' => 'Faculty title', 'url' => 'https://example.test/item',
+                'materialType' => 'article', 'material_type_id' => 3,
+            ]),
+        ];
+        $after = $before;
+        $after['resource_data'] = json_encode([
+            'title' => 'Faculty title', 'authors' => '', 'url' => 'https://example.test/item',
+            'materialType' => 'article', 'material_type_id' => 3,
+        ]);
+
+        $this->assertFalse(PublicationDraftSnapshot::changed($before, $after));
+    }
+
     public function testSourceSnapshotAndClassificationChoiceArePublishableDraftInputs()
     {
         $before = [

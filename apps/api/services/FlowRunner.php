@@ -64,7 +64,7 @@ class FlowRunner
                 $latest = null;
             }
             if (!$latest) {
-                $mapping = $this->flows->mappedFlow($item['material_type_id']);
+                $mapping = $this->flows->mappedFlow(EffectiveMaterialType::id($item));
                 if ($mapping) {
                     $latest = $this->startRun($kind, $itemId, $item, $mapping, $actor);
                 }

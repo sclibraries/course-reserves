@@ -48,13 +48,15 @@ class SubmissionItemDetailsService
 
             $this->publication->lockForWrite($kind, $id, $item['submission_id']);
             $before = $this->detailSnapshot($kind, $item);
-            $beforeAudit = $this->detailAuditSnapshot($item, $before);
+            $beforeAudit = $this->detailAuditSnapshot($before);
+            $beforeInputAudit = $this->inputAuditSnapshot($before);
             $this->clearInvalidAccessPath($item, $details);
             $this->mergeCorrections($item, $details);
             $this->items->updateDetails($kind, $id, $details, $now);
             $updated = $this->items->find($kind, $id);
             $after = $this->detailSnapshot($kind, $updated);
-            $afterAudit = $this->detailAuditSnapshot($updated, $after);
+            $afterAudit = $this->detailAuditSnapshot($after);
+            $afterInputAudit = $this->inputAuditSnapshot($after);
             if ($before !== $after) {
                 $this->publication->invalidateDraft($kind, $id, $item['submission_id']);
                 $this->supersedeOpenRun($kind, $id, $now);
@@ -63,6 +65,12 @@ class SubmissionItemDetailsService
                 $this->events->record(
                     $item['submission_id'], $id, $actor, 'item_details_updated', null,
                     $beforeAudit, $afterAudit, $kind
+                );
+            }
+            if ($beforeInputAudit !== $afterInputAudit) {
+                $this->events->record(
+                    $item['submission_id'], $id, $actor, 'item_inputs_updated', null,
+                    $beforeInputAudit, $afterInputAudit, $kind
                 );
             }
 
@@ -217,6 +225,7 @@ class SubmissionItemDetailsService
         return [
             'inputs' => $projection['inputs'],
             'material_type_id' => $projection['effective_material_type']['id'],
+            'material_type_key' => $projection['effective_material_type']['key'],
             'destination_class' => $projection['destination_class'],
             'public_note' => $projection['inputs']['public_note'],
             'assigned_pages' => $projection['inputs']['assigned_pages'],
@@ -224,14 +233,25 @@ class SubmissionItemDetailsService
         ];
     }
 
-    private function detailAuditSnapshot(array $item, array $snapshot)
+    private function detailAuditSnapshot(array $snapshot)
     {
-        $snapshot['staff_material_type_id'] = isset($item['staff_material_type_id'])
-            ? (int)$item['staff_material_type_id']
-            : null;
-        $snapshot['destination_class_choice'] = $item['destination_class_choice'] ?? null;
-        $snapshot['staff_corrections'] = $this->decodeMap($item['staff_corrections_json'] ?? null);
-        return $snapshot;
+        return [
+            'public_note' => $snapshot['public_note'],
+            'assigned_pages' => $snapshot['assigned_pages'],
+        ];
+    }
+
+    private function inputAuditSnapshot(array $snapshot)
+    {
+        $inputs = $snapshot['inputs'];
+        unset($inputs['public_note'], $inputs['assigned_pages']);
+        return [
+            'inputs' => $inputs,
+            'material_type_id' => $snapshot['material_type_id'],
+            'material_type_key' => $snapshot['material_type_key'],
+            'destination_class' => $snapshot['destination_class'],
+            'access_path' => $snapshot['access_path'],
+        ];
     }
 
     private function decodeMap($value)

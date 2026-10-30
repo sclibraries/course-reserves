@@ -82,7 +82,10 @@ class SubmissionReuseResource extends ActiveRecord
             unset($fields[$field]);
         }
         $fields['material_type_id'] = function ($model) {
-            return \app\services\EffectiveMaterialType::id($model->getAttributes());
+            return \app\services\EffectiveMaterialType::modelId($model);
+        };
+        $fields['material_type_key'] = function ($model) {
+            return \app\services\EffectiveMaterialType::modelKey($model);
         };
         $fields['materialType'] = function ($model) {
             return $model->getEffectiveMaterialType();
@@ -132,7 +135,7 @@ class SubmissionReuseResource extends ActiveRecord
 
     public function getEffectiveMaterialType()
     {
-        $id = \app\services\EffectiveMaterialType::id($this->getAttributes());
+        $id = \app\services\EffectiveMaterialType::modelId($this);
         return $id ? MaterialTypes::findOne($id) : null;
     }
 }

@@ -34,13 +34,14 @@ class ItemClaimRepository
         )->queryScalar()) {
             return null;
         }
-        $effectiveType = EffectiveMaterialType::sql('i');
+        $effectiveType = EffectiveMaterialType::sql('i', 'source');
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         $sql = 'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
             . 'i.assigned_group_id, i.access_path, i.item_status AS status, i.display_order AS position, '
             . 'i.public_note, i.assigned_pages, '
             . $resourceData . ' AS resource_data, source.name AS source_resource_title, '
-            . 'source.resource_id AS source_resource_found, i.source_resource_id, '
+            . 'source.resource_id AS source_resource_found, source.material_type_id AS source_material_type_id, '
+            . 'i.source_resource_id, '
             . 'i.source_folio_instance_id, i.source_folio_holdings_id, i.source_snapshot_json, '
             . 'i.staff_corrections_json, i.staff_material_type_id, i.destination_class_choice, '
             . 'i.material_type_id AS default_material_type_id, '

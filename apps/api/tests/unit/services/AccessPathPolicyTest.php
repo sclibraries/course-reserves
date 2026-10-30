@@ -23,12 +23,20 @@ class AccessPathPolicyTest extends \Codeception\Test\Unit
         );
     }
 
-    public function testEffectiveMaterialTypeWinsOverStaleSubmissionJson()
+    public function testCanonicalSubmissionTypeKeyWinsOverDisplayNameUnlessStaffOverrodeIt()
     {
+        $this->assertSame(
+            AccessPathPolicy::PATHS,
+            AccessPathPolicy::allowedForItem([
+                'material_type' => 'test-api096-book',
+                'resource_data' => json_encode(['materialType' => 'article']),
+            ])
+        );
         $this->assertSame(
             ['purchase', 'faculty_supplies'],
             AccessPathPolicy::allowedForItem([
-                'material_type' => 'book',
+                'staff_material_type_id' => 8,
+                'material_type' => 'test-api096-book',
                 'resource_data' => json_encode(['materialType' => 'article']),
             ])
         );
