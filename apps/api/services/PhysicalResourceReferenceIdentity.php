@@ -91,7 +91,12 @@ class PhysicalResourceReferenceIdentity
 
     private function legacyIdentifier(array $item)
     {
-        foreach ([['source_barcode', 'barcode'], ['source_folio_instance_id', 'instance'], ['external_resource_id', null]] as $source) {
+        foreach ([
+            ['source_barcode', 'barcode'],
+            ['barcode', 'barcode'],
+            ['source_folio_instance_id', 'instance'],
+            ['external_resource_id', null],
+        ] as $source) {
             $value = $this->value($item[$source[0]] ?? null);
             if ($value !== null) {
                 return [$value, $source[1] ?: ($this->isUuid($value) ? 'instance' : 'barcode')];

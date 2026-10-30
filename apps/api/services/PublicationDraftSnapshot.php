@@ -10,6 +10,9 @@ class PublicationDraftSnapshot
         $projection = (new SubmissionInputProjection())->project('new', $item, null, null, true);
         $sourceSnapshot = self::decode($item['source_snapshot_json'] ?? null);
         $staffCorrections = self::decode($item['staff_corrections_json'] ?? null);
+        $identityItem = $item;
+        $identityItem['destination_class'] = $projection['destination_class'];
+        $physicalIdentity = (new PhysicalResourceReferenceIdentity())->resolve('new', $identityItem);
 
         return self::sortKeys([
             'inputs' => $projection['inputs'],
@@ -17,6 +20,7 @@ class PublicationDraftSnapshot
             'source_snapshot' => $sourceSnapshot,
             'material_type_id' => EffectiveMaterialType::id($item),
             'material_type_key' => $projection['effective_material_type']['key'],
+            'physical_identity' => $physicalIdentity,
             'destination_class_choice' => $item['destination_class_choice'] ?? null,
             'is_reuse' => (int)($item['is_reuse'] ?? 0),
             'source_barcode' => $item['source_barcode'] ?? null,

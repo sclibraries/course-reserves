@@ -47,6 +47,7 @@ class PhysicalResourceController extends Controller
                 'create-or-update-reference' => Roles::STAFF,
                 'update-resource-order' => Roles::STAFF,
                 'cleanup-references' => Roles::STAFF,
+                'get-by-external-id' => Roles::STAFF,
             ],
         ];
         return CorsOriginPolicy::corsFirst($behaviors);
@@ -221,6 +222,21 @@ class PhysicalResourceController extends Controller
             return 0;
         }
 
+        $matchingOfferingIds = PhysicalResourceReferences::find()
+            ->select(['offering_id'])
+            ->where(['external_resource_id' => $ids])
+            ->column();
+        $hasCurrentOfferingMatch = false;
+        foreach ($matchingOfferingIds as $matchingOfferingId) {
+            if ((int)$matchingOfferingId !== (int)$offeringId) {
+                return 0;
+            }
+            $hasCurrentOfferingMatch = true;
+        }
+        if (!$hasCurrentOfferingMatch) {
+            return 0;
+        }
+
         $params = [':offering' => $offeringId];
         $placeholders = [];
         foreach ($ids as $index => $id) {
@@ -232,9 +248,12 @@ class PhysicalResourceController extends Controller
             . 'WHERE pr.offering_id = :offering AND pr.identity_status = "verified" '
             . 'AND pr.external_resource_id NOT IN (' . implode(', ', $placeholders) . ') '
             . 'AND NOT EXISTS (SELECT 1 FROM submission_publication_state ps '
-            . 'WHERE JSON_UNQUOTE(JSON_EXTRACT(ps.published_destination_json, "$.kind")) = "physical" '
-            . 'AND JSON_UNQUOTE(JSON_EXTRACT(ps.published_destination_json, "$.reference_id")) '
-            . '= CAST(pr.reference_id AS CHAR)) '
+            . 'WHERE (JSON_UNQUOTE(JSON_EXTRACT(ps.published_destination_json, "$.kind")) = "physical" '
+            . 'AND JSON_UNQUOTE(JSON_EXTRACT(ps.published_destination_json, "$.physical_reference_id")) '
+            . '= CAST(pr.reference_id AS CHAR)) OR '
+            . '(JSON_UNQUOTE(JSON_EXTRACT(ps.published_snapshot, "$.kind")) = "physical" '
+            . 'AND JSON_UNQUOTE(JSON_EXTRACT(ps.published_snapshot, "$.reference.reference_id")) '
+            . '= CAST(pr.reference_id AS CHAR))) '
             . 'AND NOT EXISTS (SELECT 1 FROM submission_new_resources n '
             . 'WHERE n.materialized_physical_reference_id = pr.reference_id) '
             . 'AND NOT EXISTS (SELECT 1 FROM submission_reuse_resources r '

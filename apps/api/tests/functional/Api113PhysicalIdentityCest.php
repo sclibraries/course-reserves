@@ -252,6 +252,120 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         )->queryScalar());
     }
 
+    public function facultyCannotReadStaffOnlyExternalIdLookup(FunctionalTester $I)
+    {
+        $offeringId = $this->createOffering('faculty-lookup');
+        $externalId = 'API113-FACULTY-LOOKUP-PRIVATE';
+        $referenceId = $this->insertReference($externalId, $offeringId, 'API-113 private lookup row');
+        $this->setIdentity($referenceId, 'unverified', null, $externalId);
+        $facultyToken = \Firebase\JWT\JWT::encode([
+            'iat' => time() - 1,
+            'exp' => time() + 3600,
+            'username' => $this->prefix . 'faculty-lookup',
+            'role' => 'faculty',
+            'id' => 0,
+            'full_name' => 'Synthetic API-113 Faculty',
+            'email' => $this->prefix . 'faculty-lookup@example.test',
+            'institution' => 'SM',
+            'internal_id' => '999113001',
+        ], getenv('JWT_SECRET_KEY'), 'HS256');
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $facultyToken);
+        $I->sendJsonRequest(
+            'GET',
+            'physical-resource/by-external-id/' . rawurlencode($externalId),
+            [],
+            ['offering_id' => $offeringId]
+        );
+        $I->seeResponseCodeIs(403);
+    }
+
+    public function accessionOnlyFacultyEditInvalidatesReadyDraft(FunctionalTester $I)
+    {
+        $submissionUuid = $this->uuid();
+        $facultyUsername = $this->prefix . 'accession-edit-faculty';
+        $submissionId = TestSubmissionFixture::create($submissionUuid, $facultyUsername, [
+            'course_title' => $this->prefix . 'accession-only-edit',
+            'submitted_at' => '2026-10-01 12:00:00',
+        ]);
+        $db = \Yii::$app->db;
+        $itemId = (int)$db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :id LIMIT 1',
+            [':id' => $submissionId]
+        )->queryScalar();
+        $bookId = (int)$db->createCommand(
+            'SELECT material_type_id FROM material_types WHERE name = "book" LIMIT 1'
+        )->queryScalar();
+        $initialAccession = $this->accessionFor('00000000-0000-4000-8000-000000000930');
+        $editedAccession = $this->accessionFor('00000000-0000-4000-8000-000000000931');
+        $identityResolver = new \app\services\PhysicalResourceReferenceIdentity();
+        Assert::assertSame('00000000-0000-4000-8000-000000000930', $identityResolver->resolve('new', [
+            'resource_data' => json_encode(['eds' => ['an' => $initialAccession]]),
+            'destination_class' => 'print',
+        ])['folio_instance_id']);
+        Assert::assertSame('00000000-0000-4000-8000-000000000931', $identityResolver->resolve('new', [
+            'resource_data' => json_encode(['eds' => ['an' => $editedAccession]]),
+            'destination_class' => 'print',
+        ])['folio_instance_id']);
+        $db->createCommand()->update('submission_new_resources', [
+            'material_type_id' => $bookId,
+            'resource_data' => json_encode([
+                'title' => 'API-113 accession-only draft',
+                'materialType' => 'book',
+                'eds' => ['an' => $initialAccession],
+            ]),
+        ], ['id' => $itemId])->execute();
+        $db->createCommand()->insert('submission_publication_state', [
+            'item_kind' => 'new',
+            'item_id' => $itemId,
+            'submission_id' => $submissionId,
+            'state' => 'ready',
+            'draft_revision' => 1,
+            'pending_changes' => 'none',
+            'readiness_source' => 'manual',
+            'readiness_reason' => 'Synthetic ready state for accession edit',
+            'readiness_revision' => 1,
+            'readiness_context_json' => json_encode(['source' => 'manual', 'revision' => 1]),
+            'reconciliation_status' => 'not_reconciled',
+        ])->execute();
+        $facultyToken = \Firebase\JWT\JWT::encode([
+            'iat' => time() - 1,
+            'exp' => time() + 3600,
+            'username' => $facultyUsername,
+            'role' => 'faculty',
+            'id' => 0,
+            'full_name' => 'Synthetic API-113 Faculty',
+            'email' => $facultyUsername . '@example.test',
+            'institution' => 'SM',
+            'internal_id' => '999113002',
+        ], getenv('JWT_SECRET_KEY'), 'HS256');
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $facultyToken);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', [
+            'items' => [[
+                'item_uuid' => (string)$itemId,
+                'resource_data' => ['eds' => ['an' => $editedAccession]],
+            ]],
+        ], ['id' => $submissionUuid]);
+        $I->seeResponseCodeIs(200);
+
+        $savedData = json_decode((string)$db->createCommand(
+            'SELECT resource_data FROM submission_new_resources WHERE id = :id', [':id' => $itemId]
+        )->queryScalar(), true);
+        Assert::assertSame($editedAccession, $savedData['eds']['an']);
+        $state = $db->createCommand(
+            'SELECT state, draft_revision, readiness_source, readiness_reason, readiness_revision, readiness_context_json '
+            . 'FROM submission_publication_state WHERE item_kind = "new" AND item_id = :id',
+            [':id' => $itemId]
+        )->queryOne();
+        Assert::assertSame('pending', $state['state']);
+        Assert::assertSame('2', $state['draft_revision']);
+        Assert::assertNull($state['readiness_source']);
+        Assert::assertNull($state['readiness_reason']);
+        Assert::assertNull($state['readiness_revision']);
+        Assert::assertNull($state['readiness_context_json']);
+    }
+
     public function anonymousReferenceListKeepsProvenanceAndLegacyFieldsPrivate(FunctionalTester $I)
     {
         $offeringId = $this->createOffering('anonymous-output');
@@ -292,14 +406,18 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $offeringId = $this->createOffering('cleanup-primary');
         $otherOfferingId = $this->createOffering('cleanup-other');
         $eligible = $this->insertReference('API113-CLEANUP-ELIGIBLE', $offeringId, 'API-113 eligible');
+        $present = $this->insertReference('API113-RESOURCE-STILL-PRESENT', $offeringId, 'API-113 still present');
         $unverified = $this->insertReference('API113-CLEANUP-UNVERIFIED', $offeringId, 'API-113 unverified');
         $published = $this->insertReference('00000000-0000-4000-8000-000000000903', $offeringId, 'API-113 published');
+        $publishedSnapshot = $this->insertReference('00000000-0000-4000-8000-000000000908', $offeringId, 'API-113 snapshot-published');
         $newMarker = $this->insertReference('00000000-0000-4000-8000-000000000904', $offeringId, 'API-113 new marker');
         $reuseMarker = $this->insertReference('00000000-0000-4000-8000-000000000905', $offeringId, 'API-113 reuse marker');
         $otherCourse = $this->insertReference('00000000-0000-4000-8000-000000000906', $otherOfferingId, 'API-113 other offering');
         $this->setIdentity($eligible, 'verified', 'API113-CLEANUP-ELIGIBLE', null);
+        $this->setIdentity($present, 'verified', 'API113-RESOURCE-STILL-PRESENT', null);
         $this->setIdentity($unverified, 'unverified', null, 'API113-CLEANUP-UNVERIFIED');
         $this->setIdentity($published, 'verified', '00000000-0000-4000-8000-000000000903', null);
+        $this->setIdentity($publishedSnapshot, 'verified', '00000000-0000-4000-8000-000000000908', null);
         $this->setIdentity($newMarker, 'verified', '00000000-0000-4000-8000-000000000904', null);
         $this->setIdentity($reuseMarker, 'verified', '00000000-0000-4000-8000-000000000905', null);
         $this->setIdentity($otherCourse, 'verified', '00000000-0000-4000-8000-000000000906', null);
@@ -310,7 +428,19 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             'item_id' => $publishedItem['id'],
             'submission_id' => $publishedItem['submission_id'],
             'state' => 'published',
-            'published_destination_json' => json_encode(['kind' => 'physical', 'reference_id' => $published]),
+            'published_destination_json' => json_encode(['kind' => 'physical', 'physical_reference_id' => $published]),
+            'reconciliation_status' => 'verified',
+        ])->execute();
+        $publishedSnapshotItem = $this->createItemForOffering('published-snapshot-only', $offeringId, 'new');
+        \Yii::$app->db->createCommand()->insert('submission_publication_state', [
+            'item_kind' => 'new',
+            'item_id' => $publishedSnapshotItem['id'],
+            'submission_id' => $publishedSnapshotItem['submission_id'],
+            'state' => 'published',
+            'published_snapshot' => json_encode([
+                'kind' => 'physical',
+                'reference' => ['reference_id' => $publishedSnapshot],
+            ]),
             'reconciliation_status' => 'verified',
         ])->execute();
         $newItem = $this->createItemForOffering('new-marker', $offeringId, 'new');
@@ -335,7 +465,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         ]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame(0, $this->referenceCount($eligible));
-        foreach ([$unverified, $published, $newMarker, $reuseMarker, $otherCourse] as $retainedId) {
+        foreach ([$present, $unverified, $published, $publishedSnapshot, $newMarker, $reuseMarker, $otherCourse] as $retainedId) {
             Assert::assertSame(1, $this->referenceCount($retainedId), 'Protected reference ' . $retainedId . ' must remain.');
         }
     }
@@ -345,8 +475,10 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $offeringId = $this->createOffering('cleanup-validation');
         $otherOfferingId = $this->createOffering('cleanup-validation-other');
         $localId = $this->insertReference('API113-VALIDATION-LOCAL', $offeringId, 'API-113 local');
+        $partialId = $this->insertReference('API113-VALIDATION-PARTIAL', $offeringId, 'API-113 partial-list local');
         $otherId = $this->insertReference('API113-VALIDATION-OTHER', $otherOfferingId, 'API-113 other');
         $this->setIdentity($localId, 'verified', 'API113-VALIDATION-LOCAL', null);
+        $this->setIdentity($partialId, 'verified', 'API113-VALIDATION-PARTIAL', null);
         $this->setIdentity($otherId, 'verified', 'API113-VALIDATION-OTHER', null);
 
         $this->request($I, 'POST', 'physical-resource/cleanup-references', [
@@ -362,14 +494,43 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             'folio_resource_ids' => ['API113-VALIDATION-LOCAL'],
         ]);
         Assert::assertSame(1, $this->referenceCount($localId));
+        Assert::assertSame(1, $this->referenceCount($partialId));
         Assert::assertSame(1, $this->referenceCount($otherId));
 
         $this->request($I, 'POST', 'physical-resource/cleanup-references', [
             'offering_id' => $offeringId,
-            'folio_resource_ids' => [$otherId],
+            'folio_resource_ids' => ['API113-VALIDATION-UNKNOWN'],
         ]);
         $I->seeResponseCodeIs(200);
-        Assert::assertSame(0, $this->referenceCount($localId));
+        Assert::assertSame(1, $this->referenceCount($localId));
+        Assert::assertSame(1, $this->referenceCount($partialId));
+        Assert::assertSame(1, $this->referenceCount($otherId));
+
+        $this->request($I, 'POST', 'physical-resource/cleanup-references', [
+            'offering_id' => $offeringId,
+            'folio_resource_ids' => ['API113-VALIDATION-OTHER'],
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame(1, $this->referenceCount($localId));
+        Assert::assertSame(1, $this->referenceCount($partialId));
+        Assert::assertSame(1, $this->referenceCount($otherId));
+
+        $this->request($I, 'POST', 'physical-resource/cleanup-references', [
+            'offering_id' => $offeringId,
+            'folio_resource_ids' => ['API113-VALIDATION-LOCAL', 'API113-VALIDATION-OTHER'],
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame(1, $this->referenceCount($localId));
+        Assert::assertSame(1, $this->referenceCount($partialId));
+        Assert::assertSame(1, $this->referenceCount($otherId));
+
+        $this->request($I, 'POST', 'physical-resource/cleanup-references', [
+            'offering_id' => $offeringId,
+            'folio_resource_ids' => ['API113-VALIDATION-LOCAL'],
+        ]);
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame(1, $this->referenceCount($localId));
+        Assert::assertSame(0, $this->referenceCount($partialId), 'Partial lists remove only omitted eligible references.');
         Assert::assertSame(1, $this->referenceCount($otherId));
     }
 
@@ -404,8 +565,10 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             $knownNew = '00000000-0000-4000-8000-000000000911';
             $knownReuse = '00000000-0000-4000-8000-000000000912';
             $conflicting = '00000000-0000-4000-8000-000000000913';
+            $reuseBarcode = 'API113-MIGRATION-REUSE-BARCODE';
             $validNew = $this->createItemForOffering('migration-new-valid', $offering, 'new');
             $validReuse = $this->createItemForOffering('migration-reuse-valid', $offering, 'reuse');
+            $barcodeReuse = $this->createItemForOffering('migration-reuse-barcode', $offering, 'reuse');
             $conflictItem = $this->createItemForOffering('migration-conflict', $offering, 'new');
             $duplicateOne = $this->createItemForOffering('migration-duplicate-one', $offering, 'new');
             $duplicateTwo = $this->createItemForOffering('migration-duplicate-two', $offering, 'new');
@@ -416,6 +579,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
 
             $newRef = $this->insertReference($knownNew, $offering, 'API-113 migration new verified');
             $reuseRef = $this->insertReference($knownReuse, $offering, 'API-113 migration reuse verified');
+            $barcodeReuseRef = $this->insertReference($reuseBarcode, $offering, 'API-113 migration reuse barcode');
             $barcodeRef = $this->insertReference('API113-MIGRATION-OLD-BARCODE', $offering, 'API-113 migration barcode');
             $conflictRef = $this->insertReference($conflicting, $offering, 'API-113 migration conflict');
             $duplicateRef = $this->insertReference('00000000-0000-4000-8000-000000000914', $offering, 'API-113 duplicate claimant');
@@ -426,16 +590,34 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
 
             $this->setMigrationEvidence('new', $validNew['id'], $this->accessionFor($knownNew), $knownNew);
             $this->setMigrationEvidence('reuse', $validReuse['id'], $this->accessionFor($knownReuse), $knownReuse);
+            $this->setMigrationEvidence('reuse', $barcodeReuse['id'], null, null);
+            $db->createCommand()->update('submission_reuse_resources', [
+                'barcode' => $reuseBarcode,
+            ], ['id' => $barcodeReuse['id']])->execute();
             $this->setMigrationEvidence('new', $conflictItem['id'], $this->accessionFor($conflicting), '00000000-0000-4000-8000-000000000999');
-            $this->setMigrationEvidence('new', $duplicateOne['id'], $this->accessionFor('000000000914'), '00000000-0000-4000-8000-000000000914');
-            $this->setMigrationEvidence('new', $duplicateTwo['id'], $this->accessionFor('000000000914'), '00000000-0000-4000-8000-000000000914');
-            $this->setMigrationEvidence('new', $wrongOfferingItem['id'], $this->accessionFor('000000000915'), '00000000-0000-4000-8000-000000000915');
-            $this->setMigrationEvidence('new', $directItem['id'], $this->accessionFor('000000000916'), '00000000-0000-4000-8000-000000000916');
-            $this->setMigrationEvidence('new', $verifiedStatusOnly['id'], $this->accessionFor('000000000917'), '00000000-0000-4000-8000-000000000917');
-            $this->setMigrationEvidence('new', $missingMarker['id'], $this->accessionFor('000000000918'), '00000000-0000-4000-8000-000000000918');
+            $this->setMigrationEvidence('new', $duplicateOne['id'], $this->accessionFor('00000000-0000-4000-8000-000000000914'), '00000000-0000-4000-8000-000000000914');
+            $this->setMigrationEvidence('new', $duplicateTwo['id'], $this->accessionFor('00000000-0000-4000-8000-000000000914'), '00000000-0000-4000-8000-000000000914');
+            $this->setMigrationEvidence('new', $wrongOfferingItem['id'], $this->accessionFor('00000000-0000-4000-8000-000000000915'), '00000000-0000-4000-8000-000000000915');
+            $this->setMigrationEvidence('new', $directItem['id'], $this->accessionFor('00000000-0000-4000-8000-000000000916'), '00000000-0000-4000-8000-000000000916');
+            $this->setMigrationEvidence('new', $verifiedStatusOnly['id'], $this->accessionFor('00000000-0000-4000-8000-000000000917'), '00000000-0000-4000-8000-000000000917');
+            $this->setMigrationEvidence('new', $missingMarker['id'], $this->accessionFor('00000000-0000-4000-8000-000000000918'), '00000000-0000-4000-8000-000000000918');
+
+            foreach ([
+                ['new', $validNew['id'], $knownNew],
+                ['reuse', $validReuse['id'], $knownReuse],
+                ['new', $duplicateOne['id'], '00000000-0000-4000-8000-000000000914'],
+                ['new', $duplicateTwo['id'], '00000000-0000-4000-8000-000000000914'],
+                ['new', $wrongOfferingItem['id'], '00000000-0000-4000-8000-000000000915'],
+                ['new', $directItem['id'], '00000000-0000-4000-8000-000000000916'],
+                ['new', $verifiedStatusOnly['id'], '00000000-0000-4000-8000-000000000917'],
+                ['new', $missingMarker['id'], '00000000-0000-4000-8000-000000000918'],
+            ] as $evidenceFixture) {
+                $this->assertMigrationEvidenceVerified($evidenceFixture[0], $evidenceFixture[1], $evidenceFixture[2]);
+            }
 
             $this->setMarker('new', $validNew['id'], $newRef);
             $this->setMarker('reuse', $validReuse['id'], $reuseRef);
+            $this->setMarker('reuse', $barcodeReuse['id'], $barcodeReuseRef);
             $this->setMarker('new', $conflictItem['id'], $conflictRef);
             $this->setMarker('new', $duplicateOne['id'], $duplicateRef);
             $this->setMarker('new', $duplicateTwo['id'], $duplicateRef);
@@ -450,7 +632,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             ])->execute();
 
             $timestamps = [];
-            foreach ([$newRef, $reuseRef, $barcodeRef, $conflictRef, $duplicateRef, $wrongOfferingRef, $directRef, $statusRef, $missingRef] as $referenceId) {
+            foreach ([$newRef, $reuseRef, $barcodeReuseRef, $barcodeRef, $conflictRef, $duplicateRef, $wrongOfferingRef, $directRef, $statusRef, $missingRef] as $referenceId) {
                 $timestamps[$referenceId] = $this->referenceById($referenceId);
             }
             $publicationBefore = $db->createCommand(
@@ -465,6 +647,9 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             $this->assertIdentityColumnsExist();
             $this->assertMigratedIdentity($newRef, 'verified', $knownNew);
             $this->assertMigratedIdentity($reuseRef, 'verified', $knownReuse);
+            $this->assertMigratedIdentity($barcodeReuseRef, 'unverified', null);
+            Assert::assertSame($reuseBarcode, $this->referenceById($barcodeReuseRef)['legacy_identifier']);
+            Assert::assertSame('barcode', $this->referenceById($barcodeReuseRef)['legacy_identifier_type']);
             Assert::assertSame($knownNew, $this->referenceById($newRef)['external_resource_id']);
             Assert::assertSame($knownReuse, $this->referenceById($reuseRef)['external_resource_id']);
             $this->assertMigratedIdentity($barcodeRef, 'unverified', null);
@@ -473,6 +658,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             }
             $this->assertMigrationProvenance($newRef, 'new', $validNew['id'], 'resource_data.eds.an', $this->accessionFor($knownNew));
             $this->assertMigrationProvenance($reuseRef, 'reuse', $validReuse['id'], 'source_snapshot_json.eds.an', $this->accessionFor($knownReuse));
+            $this->assertMigrationProvenance($barcodeReuseRef, 'reuse', $barcodeReuse['id'], 'barcode', $reuseBarcode);
 
             foreach ($timestamps as $referenceId => $before) {
                 $after = $this->referenceById($referenceId);
@@ -659,6 +845,18 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             $data['resource_data'] = json_encode(['title' => 'API-113 synthetic migration item', 'eds' => ['an' => $accession]]);
         }
         \Yii::$app->db->createCommand()->update($table, $data, ['id' => $itemId])->execute();
+    }
+
+    private function assertMigrationEvidenceVerified($kind, $itemId, $expectedInstanceId)
+    {
+        $table = $kind === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
+        $item = \Yii::$app->db->createCommand(
+            'SELECT * FROM ' . $table . ' WHERE id = :id', [':id' => $itemId]
+        )->queryOne();
+        $item['destination_class'] = 'print';
+        $resolved = (new \app\services\PhysicalResourceReferenceIdentity())->resolve($kind, $item);
+        Assert::assertSame('verified', $resolved['identity_status'], 'Fixture identity evidence must verify independently.');
+        Assert::assertSame($expectedInstanceId, $resolved['folio_instance_id'], 'Fixture accession must resolve to its full UUID.');
     }
 
     private function setMarker($kind, $itemId, $referenceId)

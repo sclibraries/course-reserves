@@ -66,11 +66,12 @@ class m261030_000001_add_physical_reference_identity extends Migration
                 . 'WHERE item.materialized_physical_reference_id IS NOT NULL'
             )->queryAll();
             foreach ($rows as $row) {
+                $barcode = $row['source_barcode'];
                 $row['kind'] = $kind;
                 $row['resource_data'] = $kind === 'new' ? $row['evidence_json'] : null;
                 $row['source_snapshot_json'] = $kind === 'reuse' ? $row['evidence_json'] : null;
-                $row['source_barcode'] = $kind === 'new' ? $row['source_barcode'] : null;
-                $row['barcode'] = $kind === 'reuse' ? $row['source_barcode'] : null;
+                $row['source_barcode'] = $kind === 'new' ? $barcode : null;
+                $row['barcode'] = $kind === 'reuse' ? $barcode : null;
                 $claimants[(int)$row['reference_id']][] = $row;
             }
         }
