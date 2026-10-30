@@ -5,6 +5,7 @@ require_once __DIR__ . '/../_support/Api109FunctionalCest.php';
 use PHPUnit\Framework\Assert;
 use app\models\Resources;
 use app\models\SubmissionNewResource;
+use app\models\SubmissionReuseResource;
 
 class Api109ProjectionCest extends Api109FunctionalCest
 {
@@ -17,6 +18,7 @@ class Api109ProjectionCest extends Api109FunctionalCest
         Assert::assertGreaterThan(0, $sourceType);
         Assert::assertGreaterThan(0, $ebookType);
         $sourceId = $this->createSource($sourceType);
+        $ebookSourceId = $this->createSource($ebookType);
         $id = (int)$db->createCommand(
             'SELECT GREATEST(COALESCE((SELECT MAX(id) FROM submission_new_resources), 0), '
             . 'COALESCE((SELECT MAX(id) FROM submission_reuse_resources), 0)) + 1000'
@@ -26,15 +28,15 @@ class Api109ProjectionCest extends Api109FunctionalCest
         $db->createCommand()->insert('submission_new_resources', [
             'id' => $id,
             'submission_id' => $submissionId,
-            'material_type_id' => $ebookType,
+            'material_type_id' => null,
             'is_reuse' => 1,
-            'source_resource_id' => (string)$sourceId,
+            'source_resource_id' => (string)$ebookSourceId,
             'source_folio_instance_id' => 'folio-instance-api109',
             'source_folio_holdings_id' => 'folio-holdings-api109',
             'resource_data' => json_encode([
                 'title' => 'Faculty saved title',
                 'url' => 'https://faculty.example.test/item',
-                'materialType' => 'book',
+                'materialType' => 'ebook',
             ]),
             'source_snapshot_json' => json_encode([
                 'title' => 'Frozen shared title',
@@ -50,7 +52,7 @@ class Api109ProjectionCest extends Api109FunctionalCest
             'id' => $id,
             'submission_id' => $submissionId,
             'source_resource_id' => $sourceId,
-            'material_type_id' => $sourceType,
+            'material_type_id' => null,
             'source_snapshot_json' => json_encode([
                 'title' => 'Frozen legacy reuse title',
                 'url' => 'https://shared.example.test/reuse',
@@ -61,8 +63,9 @@ class Api109ProjectionCest extends Api109FunctionalCest
         $db->createCommand()->insert('submission_new_resources', [
             'id' => $ordinaryId,
             'submission_id' => $submissionId,
-            'material_type_id' => $sourceType,
+            'material_type_id' => null,
             'is_reuse' => 0,
+            'source_resource_id' => (string)$sourceId,
             'resource_data' => json_encode(['title' => 'Synthetic new title']),
             'item_status' => 'pending',
         ])->execute();
@@ -71,12 +74,17 @@ class Api109ProjectionCest extends Api109FunctionalCest
         $I->seeResponseCodeIs(200);
         $newProjection = $this->response($I)['projection'];
         Assert::assertSame('new', $newProjection['kind']);
+        Assert::assertSame($ebookType, $newProjection['effective_material_type']['id']);
+        Assert::assertSame('ebook', $newProjection['effective_material_type']['key']);
         Assert::assertSame('Course-only title', $newProjection['inputs']['title']);
         Assert::assertNull($newProjection['inputs']['url']);
         Assert::assertSame('electronic', $newProjection['destination_class']);
-        Assert::assertSame((string)$sourceId, $newProjection['source']['resource_id']);
+        Assert::assertSame((string)$ebookSourceId, $newProjection['source']['resource_id']);
         Assert::assertSame('folio-instance-api109', $newProjection['source']['folio_instance_id']);
         Assert::assertSame('folio-holdings-api109', $newProjection['source']['folio_holdings_id']);
+        $newReuseSerialized = SubmissionNewResource::findOne($id)->toArray([], ['materialType']);
+        Assert::assertSame($ebookType, (int)$newReuseSerialized['material_type_id']);
+        Assert::assertSame('ebook', $newReuseSerialized['material_type_key']);
 
         $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'reuse', 'id' => $id]);
         $I->seeResponseCodeIs(200);
@@ -84,12 +92,18 @@ class Api109ProjectionCest extends Api109FunctionalCest
         Assert::assertSame('reuse', $reuseProjection['kind']);
         Assert::assertSame('Frozen legacy reuse title', $reuseProjection['inputs']['title']);
         Assert::assertSame('print', $reuseProjection['destination_class']);
+        $reuseSerialized = SubmissionReuseResource::findOne($id)->toArray();
+        Assert::assertSame($sourceType, (int)$reuseSerialized['material_type_id']);
 
         $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $ordinaryId]);
         $I->seeResponseCodeIs(200);
         $ordinaryProjection = $this->response($I)['projection'];
         Assert::assertSame('Synthetic new title', $ordinaryProjection['inputs']['title']);
+        Assert::assertSame($sourceType, $ordinaryProjection['effective_material_type']['id']);
         Assert::assertSame([], $ordinaryProjection['blockers']);
+        $serialized = SubmissionNewResource::findOne($ordinaryId)->toArray([], ['materialType']);
+        Assert::assertSame($sourceType, (int)$serialized['material_type_id']);
+        Assert::assertSame('book', $serialized['material_type_key']);
         $this->assertNoDestination('new', $id);
         $this->assertNoDestination('reuse', $id);
         $this->assertNoDestination('new', $ordinaryId);

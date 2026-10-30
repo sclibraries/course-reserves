@@ -91,6 +91,7 @@ class SubmissionInputProjectionTest extends \Codeception\Test\Unit
         $projection = new SubmissionInputProjection();
         $cases = [
             ['book', null, null, 'print', []],
+            ['book', null, 'instance-book', 'print', []],
             ['ebook', null, 'instance-1', 'electronic', []],
             ['article', null, null, 'electronic', []],
             ['chapter', null, null, 'electronic', []],
