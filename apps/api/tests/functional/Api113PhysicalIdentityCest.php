@@ -35,7 +35,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
     {
         $offeringId = $this->createOffering('compatibility');
         $barcode = 'API113-SYNTHETIC-BARCODE-01';
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $barcode,
             'resource_type' => 'physical',
             'display_name' => 'API-113 synthetic reserve',
@@ -52,7 +52,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $duplicate->external_resource_id = $barcode;
         $duplicate->offering_id = $offeringId;
         Assert::assertFalse($duplicate->validate(['external_resource_id', 'offering_id']), 'Model validation must keep the legacy uniqueness rule.');
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $barcode,
             'resource_type' => 'physical',
             'display_name' => 'API-113 synthetic reserve updated',
@@ -68,7 +68,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             'updated_at' => '2020-01-01 00:00:00',
         ], ['reference_id' => $referenceId])->execute();
 
-        $this->request($I, 'POST', 'physical-resource/update-order', [
+        $this->request($I, 'POST', 'physical-resource/update-resource-order', [
             'offering_id' => $offeringId,
             'resources' => [[
                 'external_resource_id' => $barcode,
@@ -91,7 +91,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
     {
         $offeringId = $this->createOffering('unresolved-identity');
         $barcode = 'API113-SYNTHETIC-BARCODE-02';
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $barcode,
             'resource_type' => 'physical',
             'display_name' => 'API-113 unresolved reserve',
@@ -108,7 +108,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         Assert::assertSame($barcode, $created['legacy_identifier']);
         Assert::assertNull($created['folio_instance_id']);
 
-        $this->request($I, 'POST', 'physical-resource/update-order', [
+        $this->request($I, 'POST', 'physical-resource/update-resource-order', [
             'offering_id' => $offeringId,
             'resources' => [[
                 'external_resource_id' => $barcode,
@@ -130,7 +130,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $offeringId = $this->createOffering('forged-input');
         $legacyId = 'API113-SYNTHETIC-FORGED-ID';
         $forgedCanonicalId = '00000000-0000-4000-8000-000000000901';
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $legacyId,
             'resource_type' => 'physical',
             'display_name' => 'API-113 forged identity title',
@@ -151,7 +151,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         Assert::assertSame($legacyId, $created['legacy_identifier']);
         Assert::assertNotSame('caller-set-legacy-value', $created['legacy_identifier']);
 
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $legacyId,
             'resource_type' => 'physical',
             'display_name' => 'API-113 ordinary metadata correction',
@@ -167,7 +167,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         Assert::assertNull($updated['folio_instance_id']);
 
         $uuidShapedKey = '00000000-0000-4000-8000-000000000907';
-        $this->request($I, 'POST', 'physical-resource/create-or-update', [
+        $this->request($I, 'POST', 'physical-resource/create-or-update-reference', [
             'external_resource_id' => $uuidShapedKey,
             'resource_type' => 'physical',
             'display_name' => 'API-113 UUID-shaped legacy identifier',
@@ -253,7 +253,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $this->setIdentity($unverifiedId, 'unverified', null, 'API113-SYNTHETIC-BARCODE-02');
 
         $I->deleteHeader('Authorization');
-        $I->sendJsonRequest('GET', 'physical-resource/references/' . $offeringId, []);
+        $I->sendJsonRequest('GET', 'physical-resource/get-references?offering_id=' . $offeringId, []);
         $I->seeResponseCodeIs(200);
         $rows = $this->response($I);
         $byId = [];
@@ -766,7 +766,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
     private function getOfferingReferences(FunctionalTester $I, $offeringId)
     {
         $I->deleteHeader('Authorization');
-        $I->sendJsonRequest('GET', 'physical-resource/references/' . $offeringId, []);
+        $I->sendJsonRequest('GET', 'physical-resource/get-references?offering_id=' . $offeringId, []);
         $I->seeResponseCodeIs(200);
         return $this->response($I);
     }
