@@ -191,7 +191,7 @@ abstract class Api109FunctionalCest extends BaseFunctionalCest
         ], getenv('JWT_SECRET_KEY'), 'HS256');
     }
 
-    protected function uuid()
+    private function uuid()
     {
         $bytes = random_bytes(16);
         $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
