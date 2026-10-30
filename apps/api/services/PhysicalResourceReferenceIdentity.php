@@ -71,7 +71,9 @@ class PhysicalResourceReferenceIdentity
         ];
 
         $blockers = [];
-        $destinationClass = $item['destination_class'] ?? 'print';
+        $destinationClass = array_key_exists('destination_class', $item)
+            ? $item['destination_class']
+            : 'print';
         if ($destinationClass === 'print' && !$verified) {
             $blockers[] = 'physical_identity_required';
         }

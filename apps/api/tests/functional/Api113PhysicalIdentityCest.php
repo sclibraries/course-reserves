@@ -497,6 +497,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             $db->schema->refresh();
             $this->assertIdentityColumnsExist();
 
+            require_once \Yii::getAlias('@app/migrations/m261030_000001_add_physical_reference_identity.php');
             $migration = new m261030_000001_add_physical_reference_identity();
             $verifiedBeforeRerun = $this->referenceById($referenceId);
             $migration->safeUp();
