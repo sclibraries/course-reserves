@@ -37,6 +37,7 @@ class SubmissionInputProjection
         foreach (['public_note', 'assigned_pages'] as $field) {
             $inputs[$field] = $this->itemField($field, $item, $corrections, $resourceData, $source, $published);
         }
+        $copyInputs = $this->copyInputs($resourceData, $corrections, $source, $inputs);
 
         $typeId = EffectiveMaterialType::id($item);
         $typeKey = EffectiveMaterialType::key($item, $materialTypeName);
@@ -55,6 +56,9 @@ class SubmissionInputProjection
         if ($this->hasValue($resourceId) && !$sourceExists) {
             $blockers[] = 'source_resource_missing';
         }
+        if ($this->copyInputsIncomplete($source, $resourceId)) {
+            $blockers[] = 'copy_inputs_incomplete';
+        }
         $identityItem = $item;
         $identityItem['destination_class'] = $destinationClass;
         $identity = (new PhysicalResourceReferenceIdentity())->resolve($kind, $identityItem);
@@ -64,6 +68,7 @@ class SubmissionInputProjection
             'kind' => $kind,
             'id' => (int)($item['id'] ?? 0),
             'inputs' => $inputs,
+            'copy_inputs' => $copyInputs,
             'effective_material_type' => [
                 'id' => $typeId,
                 'key' => $typeKey,
@@ -78,6 +83,98 @@ class SubmissionInputProjection
             ],
             'blockers' => array_values(array_unique($blockers)),
         ];
+    }
+
+    private function copyInputs(array $resourceData, array $corrections, array $source, array $inputs)
+    {
+        $frozen = isset($source['copy_inputs']) && is_array($source['copy_inputs'])
+            ? $source['copy_inputs']
+            : [];
+        $frozenPrimary = isset($frozen['primary_link']) && is_array($frozen['primary_link'])
+            ? $frozen['primary_link']
+            : [];
+        $primaryVisibility = $this->pendingOrFrozen(
+            ['use_primary_link_visibility', 'usePrimaryLinkVisibility'],
+            'use_primary_link_visibility', $resourceData, $frozenPrimary
+        );
+        $primaryStart = $this->pendingOrFrozen(
+            ['primary_link_start_visibility', 'primaryLinkStartVisibility'],
+            'primary_link_start_visibility', $resourceData, $frozenPrimary
+        );
+        $primaryEnd = $this->pendingOrFrozen(
+            ['primary_link_end_visibility', 'primaryLinkEndVisibility'],
+            'primary_link_end_visibility', $resourceData, $frozenPrimary
+        );
+
+        $metadata = array_fill_keys(array_keys(SubmissionSourceSnapshot::BIBLIOGRAPHIC_FIELDS), null);
+        $frozenMetadata = isset($frozen['bibliographic_metadata']) && is_array($frozen['bibliographic_metadata'])
+            ? $frozen['bibliographic_metadata']
+            : [];
+        $inputFields = [
+            'title' => 'title', 'authors' => 'authors', 'publisher' => 'publisher',
+            'publicationYear' => 'publication_year', 'isbn' => 'isbn', 'issn' => 'issn', 'doi' => 'doi',
+        ];
+        foreach (SubmissionSourceSnapshot::BIBLIOGRAPHIC_FIELDS as $field => $aliases) {
+            $correctionField = $field === 'publicationYear' ? 'publication_year' : $field;
+            if (array_key_exists($correctionField, $corrections)) {
+                $metadata[$field] = $this->normalize($corrections[$correctionField]);
+                continue;
+            }
+            list($found, $value) = $this->firstValue($resourceData, $aliases);
+            if ($found) {
+                $metadata[$field] = $this->normalize($value);
+            } elseif (array_key_exists($field, $frozenMetadata)) {
+                $metadata[$field] = $this->normalize($frozenMetadata[$field]);
+            } elseif (array_key_exists($field, $source)) {
+                $metadata[$field] = $this->normalize($source[$field]);
+            } elseif (isset($inputFields[$field])) {
+                $metadata[$field] = $inputs[$inputFields[$field]];
+            }
+        }
+
+        return [
+            'primary_link' => [
+                'url' => $inputs['url'],
+                'use_proxy' => $this->flag($inputs['use_proxy']),
+                'use_primary_link_visibility' => $this->flag($primaryVisibility),
+                'primary_link_start_visibility' => $this->normalize($primaryStart),
+                'primary_link_end_visibility' => $this->normalize($primaryEnd),
+            ],
+            'additional_links' => isset($frozen['additional_links']) && is_array($frozen['additional_links'])
+                ? $frozen['additional_links']
+                : [],
+            'bibliographic_metadata' => $metadata,
+        ];
+    }
+
+    private function pendingOrFrozen(array $aliases, $field, array $resourceData, array $frozen)
+    {
+        list($found, $value) = $this->firstValue($resourceData, $aliases);
+        if ($found) {
+            return $value;
+        }
+        return $frozen[$field] ?? null;
+    }
+
+    private function copyInputsIncomplete(array $source, $resourceId)
+    {
+        if (!$source) {
+            return $this->hasValue($resourceId);
+        }
+        if (!array_key_exists('version', $source)) {
+            return false;
+        }
+        if ((int)$source['version'] < 2 || !isset($source['copy_inputs']) || !is_array($source['copy_inputs'])) {
+            return true;
+        }
+        return !isset($source['copy_inputs']['primary_link'])
+            || !isset($source['copy_inputs']['additional_links'])
+            || !isset($source['copy_inputs']['bibliographic_metadata']);
+    }
+
+    private function flag($value)
+    {
+        return in_array($value, [true, 1, '1'], true) ? 1 : 0;
     }
 
     private function field($field, array $aliases, array $corrections, array $resourceData, array $source, array $published)

@@ -78,9 +78,9 @@ class SubmissionPublicationInvalidator
         $this->invalidateRows($rows);
     }
 
-    public function sourceResource($resourceId)
+    public function sourceResource($resourceId, $publishingItem = null)
     {
-        Transactional::run(function () use ($resourceId) {
+        Transactional::run(function () use ($resourceId, $publishingItem) {
             $rows = Yii::$app->db->createCommand(
                 'SELECT "new" AS kind, id, submission_id FROM submission_new_resources '
                 . 'WHERE source_resource_id = :new_id UNION ALL '
@@ -88,13 +88,18 @@ class SubmissionPublicationInvalidator
                 . 'WHERE source_resource_id = :reuse_id ORDER BY kind, id',
                 [':new_id' => (string)$resourceId, ':reuse_id' => (int)$resourceId]
             )->queryAll();
-            $this->invalidateRows($rows, true);
+            $this->invalidateRows($rows, true, $publishingItem);
         });
     }
 
-    private function invalidateRows(array $rows, $draft = false)
+    private function invalidateRows(array $rows, $draft = false, $publishingItem = null)
     {
         foreach ($rows as $row) {
+            if ($draft && is_array($publishingItem)
+                && ($publishingItem['kind'] ?? null) === $row['kind']
+                && (int)($publishingItem['id'] ?? 0) === (int)$row['id']) {
+                continue;
+            }
             Yii::$app->db->createCommand(
                 'SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
                 [':id' => (int)$row['submission_id']]

@@ -34,6 +34,7 @@ class Resources extends \yii\db\ActiveRecord
     public $material_type_name;
     public $course_count;
     public $order; // Add order property to hold the join table's order value
+    public $suppressSourceInvalidation = false;
     
     /**
      * {@inheritdoc}
@@ -65,7 +66,7 @@ class Resources extends \yii\db\ActiveRecord
     {
         return [
             [['name'], 'required'],
-            [['description', 'internal_note', 'external_note'], 'string'],
+            [['description', 'internal_note', 'external_note', 'assigned_pages'], 'string'],
             [['material_type_id', 'folder_id', 'order', 'use_primary_link_visibility'], 'integer'],
             [['created_at'], 'safe'],
             [['name'], 'string', 'max' => 1025],
@@ -112,9 +113,11 @@ class Resources extends \yii\db\ActiveRecord
         parent::afterSave($insert, $changedAttributes);
         $sourceFields = [
             'name', 'item_url', 'description', 'material_type_id',
-            'start_visibility', 'end_visibility', 'use_proxy',
+            'start_visibility', 'end_visibility', 'use_proxy', 'use_primary_link_visibility',
+            'primary_link_start_visibility', 'primary_link_end_visibility',
         ];
-        if ($insert || array_intersect($sourceFields, array_keys($changedAttributes))) {
+        if (!$this->suppressSourceInvalidation
+            && ($insert || array_intersect($sourceFields, array_keys($changedAttributes)))) {
             (new \app\services\SubmissionPublicationInvalidator())->sourceResource($this->resource_id);
         }
     }

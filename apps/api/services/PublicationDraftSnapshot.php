@@ -16,6 +16,7 @@ class PublicationDraftSnapshot
 
         return self::sortKeys([
             'inputs' => $projection['inputs'],
+            'copy_inputs' => $projection['copy_inputs'],
             'staff_corrections' => $staffCorrections,
             'source_snapshot' => $sourceSnapshot,
             'material_type_id' => EffectiveMaterialType::id($item),

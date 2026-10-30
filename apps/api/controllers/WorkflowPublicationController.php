@@ -27,6 +27,7 @@ class WorkflowPublicationController extends Controller
         return ApiAccessBehaviors::withRoleRules($behaviors, [
             'state' => Roles::STAFF,
             'projection' => Roles::STAFF,
+            'refresh-copy-inputs' => Roles::STAFF,
             'ready' => Roles::STAFF,
             'options' => Roles::STAFF,
         ]);
@@ -51,7 +52,8 @@ class WorkflowPublicationController extends Controller
 
     public function actionRefreshCopyInputs($kind, $id)
     {
-        throw new \BadMethodCallException('not implemented');
+        return $this->respond(Yii::$container->get(\app\services\SubmissionCopyInputRefreshService::class)
+            ->refresh($kind, $id, $this->actor()));
     }
 
     public function actionReady($kind, $id)
