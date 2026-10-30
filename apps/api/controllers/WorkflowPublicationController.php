@@ -49,6 +49,11 @@ class WorkflowPublicationController extends Controller
             ->project($kind, $id));
     }
 
+    public function actionRefreshCopyInputs($kind, $id)
+    {
+        throw new \BadMethodCallException('not implemented');
+    }
+
     public function actionReady($kind, $id)
     {
         $body = Yii::$app->request->getBodyParams();
