@@ -54,24 +54,18 @@ class m261030_000001_add_physical_reference_identity extends Migration
 
         $claimants = [];
         foreach ([
-            'new' => ['submission_new_resources', 'resource_data', 'source_barcode'],
-            'reuse' => ['submission_reuse_resources', 'source_snapshot_json', 'barcode'],
-        ] as $kind => $source) {
+            'new' => 'submission_new_resources',
+            'reuse' => 'submission_reuse_resources',
+        ] as $kind => $table) {
             $rows = $this->db->createCommand(
-                'SELECT item.id, item.materialized_physical_reference_id AS reference_id, '
-                . 'item.' . $source[1] . ' AS evidence_json, item.source_folio_instance_id, '
-                . 'item.' . $source[2] . ' AS source_barcode, submission.offering_id '
-                . 'FROM ' . $source[0] . ' item INNER JOIN faculty_submissions submission '
+                'SELECT item.*, item.materialized_physical_reference_id AS reference_id, '
+                . 'submission.offering_id FROM ' . $table . ' item '
+                . 'INNER JOIN faculty_submissions submission '
                 . 'ON submission.submission_id = item.submission_id '
                 . 'WHERE item.materialized_physical_reference_id IS NOT NULL'
             )->queryAll();
             foreach ($rows as $row) {
-                $barcode = $row['source_barcode'];
                 $row['kind'] = $kind;
-                $row['resource_data'] = $kind === 'new' ? $row['evidence_json'] : null;
-                $row['source_snapshot_json'] = $kind === 'reuse' ? $row['evidence_json'] : null;
-                $row['source_barcode'] = $kind === 'new' ? $barcode : null;
-                $row['barcode'] = $kind === 'reuse' ? $barcode : null;
                 $claimants[(int)$row['reference_id']][] = $row;
             }
         }
