@@ -48,6 +48,37 @@ class MigrationRollback
         return implode("\n", $output);
     }
 
+    public static function addColumn($tableName, $columnName, $type)
+    {
+        $db = \Yii::$app->db;
+        if ($db->isActive) {
+            $transaction = $db->getTransaction();
+            if ($transaction !== null && $transaction->isActive) {
+                $transaction->commit();
+            }
+            $db->close();
+        }
+
+        $code = 'define("YII_ENV", "test");'
+            . 'require "config/environment.php";'
+            . 'require "vendor/autoload.php";'
+            . 'require "vendor/yiisoft/yii2/Yii.php";'
+            . '$config = yii\\helpers\\ArrayHelper::merge('
+            . 'require "config/console.php", '
+            . '["components" => ["db" => require "config/test_db.php"]]);'
+            . '$application = new yii\\console\\Application($config);'
+            . '$application->db->createCommand()->addColumn('
+            . var_export($tableName, true) . ', '
+            . var_export($columnName, true) . ', '
+            . var_export($type, true) . ')->execute();';
+
+        $output = [];
+        $exitCode = 0;
+        exec('cd /app && php -r ' . escapeshellarg($code) . ' 2>&1', $output, $exitCode);
+        Assert::assertSame(0, $exitCode, implode("\n", $output));
+        return implode("\n", $output);
+    }
+
     private static function appliedVersionsFrom($targetVersion)
     {
         $versions = \Yii::$app->db->createCommand(

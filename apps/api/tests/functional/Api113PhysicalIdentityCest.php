@@ -29,6 +29,14 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
                 $this->originalUrlManager = null;
             }
         }
+
+        $I->amOnPage('/');
+        $I->seeResponseCodeIs(200);
+        Assert::assertSame(
+            '{"service":"course-reserves-api","status":"ok"}',
+            $I->grabPageSource(),
+            'The application root must still respond after API-113 cleanup.'
+        );
     }
 
     public function todayCreateUpdateAndReorderPayloadsKeepUnresolvedReferencesWorking(FunctionalTester $I)
@@ -492,15 +500,14 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             $this->setMigrationEvidence('new', $this->createItemForOffering('migration-timestamp', $offeringId, 'new')['id'], null, null);
             $before = $this->referenceById($referenceId);
 
-            $db->createCommand()->addColumn('physical_resource_references', 'folio_instance_id', 'varchar(255) NULL')->execute();
+            MigrationRollback::addColumn('physical_resource_references', 'folio_instance_id', 'varchar(255) NULL');
             MigrationRollback::migrate('up');
             $db->schema->refresh();
             $this->assertIdentityColumnsExist();
 
-            require_once \Yii::getAlias('@app/migrations/m261030_000001_add_physical_reference_identity.php');
-            $migration = new m261030_000001_add_physical_reference_identity();
             $verifiedBeforeRerun = $this->referenceById($referenceId);
-            $migration->safeUp();
+            $db->createCommand()->delete('{{%migration}}', ['version' => $this->migrationVersion])->execute();
+            MigrationRollback::migrate('up');
             $db->schema->refresh();
             $this->assertIdentityColumnsExist();
             Assert::assertSame($before['external_resource_id'], $this->referenceById($referenceId)['external_resource_id']);
@@ -580,6 +587,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $webConfig = require codecept_root_dir('config/web.php');
         $urlManagerConfig = $webConfig['components']['urlManager'];
         $urlManagerConfig['class'] = \yii\web\UrlManager::class;
+        $urlManagerConfig['cache'] = null;
         \Yii::$app->set('urlManager', $urlManagerConfig);
         \Yii::$app->urlManager->showScriptName = false;
     }
