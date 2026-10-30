@@ -38,6 +38,8 @@ use yii\behaviors\TimestampBehavior;
  */
 class SubmissionNewResource extends ActiveRecord
 {
+    use SubmissionResourceProjectionTrait;
+
     const PRIORITY_HIGH = 'high';
     const PRIORITY_MEDIUM = 'medium';
     const PRIORITY_LOW = 'low';
@@ -93,17 +95,7 @@ class SubmissionNewResource extends ActiveRecord
         if (!parent::beforeSave($insert)) {
             return false;
         }
-        if ($this->hasAttribute('source_snapshot_json')) {
-            $sourceChanged = $insert || (string)$this->getOldAttribute('source_resource_id')
-                !== (string)$this->source_resource_id;
-            if ($sourceChanged || !$this->source_snapshot_json) {
-                $snapshot = \app\services\SubmissionSourceSnapshot::capture($this->source_resource_id);
-                $this->source_snapshot_json = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_SLASHES) : null;
-                if ($snapshot && $this->material_type_id === null && !$this->hasResourceMaterialType()) {
-                    $this->material_type_id = $snapshot['material_type_id'];
-                }
-            }
-        }
+        $this->captureSourceSnapshot($insert, true);
         return true;
     }
 
@@ -148,27 +140,9 @@ class SubmissionNewResource extends ActiveRecord
     public function fields()
     {
         $fields = parent::fields();
-        foreach ([
+        $fields = $this->effectiveMaterialTypeFields($fields, [
             'claimed_by', 'claimed_by_staff_id', 'claimed_at', 'last_activity_at', 'assigned_group_id',
-            'staff_material_type_id', 'destination_class_choice', 'source_snapshot_json', 'staff_corrections_json',
-        ] as $field) {
-            unset($fields[$field]);
-        }
-        $fields['material_type_id'] = function ($model) {
-            return \app\services\EffectiveMaterialType::modelId($model);
-        };
-        $fields['material_type_key'] = function ($model) {
-            return \app\services\EffectiveMaterialType::modelKey($model);
-        };
-        $fields['resource_data'] = function ($model) {
-            return $model->getResourceDataForPresentation();
-        };
-        // Only add materialType relation, NOT submission to avoid circular reference
-        // (FacultySubmission already includes newResources)
-        $fields['materialType'] = function ($model) {
-            return $model->getEffectiveMaterialType();
-        };
-        
+        ], true);
         return $fields;
     }
     
@@ -225,13 +199,7 @@ class SubmissionNewResource extends ActiveRecord
 
     public function getResourceDataForPresentation()
     {
-        return \app\services\EffectiveMaterialType::resourceDataForModel($this);
-    }
-
-    private function hasResourceMaterialType()
-    {
-        $data = $this->getResourceDataDecoded();
-        return is_array($data) && (array_key_exists('materialType', $data) || array_key_exists('material_type_id', $data));
+        return $this->resourceDataForPresentation();
     }
 
     /**
