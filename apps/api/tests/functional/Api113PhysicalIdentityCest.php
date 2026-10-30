@@ -237,7 +237,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $I->seeResponseCodeIs(200);
         Assert::assertSame($secondId, (int)$this->response($I)['reference_id']);
 
-        $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($canonicalId));
+        $this->request($I, 'GET', 'physical-resource/by-external-id/' . rawurlencode($canonicalId), []);
         Assert::assertNotSame(200, \Yii::$app->response->statusCode, 'Canonical fallback must not select across offerings.');
         Assert::assertSame($beforeCount, (int)\Yii::$app->db->createCommand(
             'SELECT COUNT(*) FROM physical_resource_references'
@@ -727,7 +727,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         $indexes = \Yii::$app->db->schema->getTableIndexes('physical_resource_references', true);
         $hasExistingUniqueKey = false;
         foreach ($indexes as $index) {
-            if ($index->unique && $index->columnNames === ['external_resource_id', 'offering_id']) {
+            if ($index->isUnique && $index->columnNames === ['external_resource_id', 'offering_id']) {
                 $hasExistingUniqueKey = true;
             }
         }
