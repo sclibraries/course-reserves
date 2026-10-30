@@ -168,7 +168,7 @@ class Api114CopyInputsCest extends Api109FunctionalCest
         $item = SubmissionNewResource::findOne($itemId);
         $item->material_type_id = $articleId;
         $item->source_resource_id = (string)$resourceId;
-        $item->resource_data = json_encode(['title' => 'Synthetic item with admin author']);
+        $item->resource_data = json_encode([]);
         Assert::assertTrue($item->save());
 
         $this->request($I, 'GET', 'workflow-publication/projection', [], ['kind' => 'new', 'id' => $itemId]);
