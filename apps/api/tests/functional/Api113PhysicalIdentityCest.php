@@ -656,9 +656,9 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
             foreach ([$conflictRef, $duplicateRef, $wrongOfferingRef, $directRef, $statusRef, $missingRef] as $referenceId) {
                 $this->assertMigratedIdentity($referenceId, 'unverified', null);
             }
-            $this->assertMigrationProvenance($newRef, 'new', $validNew['id'], 'resource_data.eds.an', $this->accessionFor($knownNew));
-            $this->assertMigrationProvenance($reuseRef, 'reuse', $validReuse['id'], 'source_snapshot_json.eds.an', $this->accessionFor($knownReuse));
-            $this->assertMigrationProvenance($barcodeReuseRef, 'reuse', $barcodeReuse['id'], 'barcode', $reuseBarcode);
+            $this->assertMigrationProvenance($newRef, 'new', $validNew['id'], 'resource_data.eds.an', $this->accessionFor($knownNew), 'verified');
+            $this->assertMigrationProvenance($reuseRef, 'reuse', $validReuse['id'], 'source_snapshot_json.eds.an', $this->accessionFor($knownReuse), 'verified');
+            $this->assertMigrationProvenance($barcodeReuseRef, 'reuse', $barcodeReuse['id'], 'barcode', $reuseBarcode, 'unverified');
 
             foreach ($timestamps as $referenceId => $before) {
                 $after = $this->referenceById($referenceId);
@@ -868,7 +868,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         ], ['id' => $itemId])->execute();
     }
 
-    private function assertMigrationProvenance($referenceId, $kind, $itemId, $field, $value)
+    private function assertMigrationProvenance($referenceId, $kind, $itemId, $field, $value, $expectedOutcome)
     {
         $json = (string)\Yii::$app->db->createCommand(
             'SELECT identity_provenance_json FROM physical_resource_references WHERE reference_id = :id',
@@ -879,7 +879,7 @@ class Api113PhysicalIdentityCest extends Api109FunctionalCest
         Assert::assertSame($itemId, (int)$provenance['item_id']);
         Assert::assertSame($field, $provenance['matched_field']);
         Assert::assertSame($value, $provenance['matched_value']);
-        Assert::assertSame('verified', $provenance['outcome']);
+        Assert::assertSame($expectedOutcome, $provenance['outcome']);
         Assert::assertArrayHasKey('evidence_source', $provenance);
         Assert::assertArrayHasKey('reason', $provenance);
     }
