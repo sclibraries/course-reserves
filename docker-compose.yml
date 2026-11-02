@@ -30,7 +30,7 @@ services:
       - app_network
 
   # ─────────────────────────────────────────────
-  # PHP 7.2 + Apache  (Yii2 backend)
+  # PHP 7.4 + Apache  (Yii2 backend)
   # ─────────────────────────────────────────────
   backend:
     build:

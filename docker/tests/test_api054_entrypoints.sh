@@ -155,19 +155,19 @@ for environment in unset staging dev test prod; do
     if [ "$environment" = unset ]; then
         bootstrap_result=$(docker run --rm --network none \
             -v "$ROOT/apps/api:/app:ro" -v "$ROOT/apps/api/vendor:/app/vendor:ro" \
-            php:7.2 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
+            php:7.4 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
         docker_bootstrap_result=$(docker run --rm --network none \
             -v "$ROOT/apps/api:/app:ro" -v "$ROOT/apps/api/vendor:/app/vendor:ro" \
             -v "$ROOT/docker/test/bootstrap.php:/app/tests/_bootstrap.php:ro" \
-            php:7.2 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
+            php:7.4 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
     else
         bootstrap_result=$(docker run --rm --network none -e YII_ENV="$environment" \
             -v "$ROOT/apps/api:/app:ro" -v "$ROOT/apps/api/vendor:/app/vendor:ro" \
-            php:7.2 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
+            php:7.4 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
         docker_bootstrap_result=$(docker run --rm --network none -e YII_ENV="$environment" \
             -v "$ROOT/apps/api:/app:ro" -v "$ROOT/apps/api/vendor:/app/vendor:ro" \
             -v "$ROOT/docker/test/bootstrap.php:/app/tests/_bootstrap.php:ro" \
-            php:7.2 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
+            php:7.4 php -r 'require "/app/tests/_bootstrap.php"; echo YII_ENV . ":" . (YII_DEBUG ? "1" : "0");')
     fi
     [ "$bootstrap_result" = 'test:0' ] || { printf 'tests/_bootstrap.php (%s) -> %s\n' "$environment" "$bootstrap_result" >&2; exit 1; }
     [ "$docker_bootstrap_result" = 'test:0' ] || { printf 'docker/test/bootstrap.php (%s) -> %s\n' "$environment" "$docker_bootstrap_result" >&2; exit 1; }
