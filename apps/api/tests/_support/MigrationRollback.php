@@ -73,6 +73,10 @@ class MigrationRollback
             . var_export($columnName, true) . ', '
             . var_export($type, true) . ')->execute();';
 
+        if (Cx037DeprecationGuard::enabled()) {
+            $code = 'require ' . var_export(__DIR__ . '/deprecation-handler.php', true) . ';' . $code;
+        }
+
         $output = [];
         $exitCode = 0;
         exec('cd /app && ' . self::phpCommand() . ' -r ' . escapeshellarg($code) . ' 2>&1', $output, $exitCode);
