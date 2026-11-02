@@ -64,14 +64,22 @@ class PublicationDestinationSnapshot
             return null;
         }
 
-        $snapshot = array_intersect_key($row, array_flip([
-            'reference_id', 'external_resource_id', 'resource_type', 'display_name', 'offering_id',
-            'folder_id', 'order', 'created_at', 'updated_at', 'public_note', 'assigned_pages',
-        ]));
-        $snapshot['external_id'] = $row['external_resource_id'];
-        $snapshot['destination_kind'] = 'physical';
-        $snapshot['physical_reference_id'] = (int)$row['reference_id'];
-        $snapshot['offering_id'] = (int)$row['offering_id'];
+        $snapshot = [
+            'reference_id' => $row['reference_id'],
+            'external_resource_id' => $row['external_resource_id'],
+            'resource_type' => $row['resource_type'],
+            'display_name' => $row['display_name'],
+            'offering_id' => (int)$row['offering_id'],
+            'folder_id' => $row['folder_id'],
+            'order' => $row['order'],
+            'created_at' => $row['created_at'],
+            'updated_at' => $row['updated_at'],
+            'public_note' => $row['public_note'],
+            'assigned_pages' => $row['assigned_pages'],
+            'external_id' => $row['external_resource_id'],
+            'destination_kind' => 'physical',
+            'physical_reference_id' => (int)$row['reference_id'],
+        ];
         if ($row['identity_status'] === 'verified' && trim((string)$row['folio_instance_id']) !== '') {
             $snapshot['folio_instance_id'] = $row['folio_instance_id'];
         }
