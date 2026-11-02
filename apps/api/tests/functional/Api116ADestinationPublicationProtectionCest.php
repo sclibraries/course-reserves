@@ -4,6 +4,31 @@ use PHPUnit\Framework\Assert;
 
 class Api116ADestinationPublicationProtectionCest extends Api116ADestinationRegistryTestBase
 {
+    private $originalUrlManager;
+
+    public function _before(FunctionalTester $I)
+    {
+        parent::_before($I);
+        $this->originalUrlManager = \Yii::$app->get('urlManager');
+        $webConfig = require codecept_root_dir('config/web.php');
+        $urlManagerConfig = $webConfig['components']['urlManager'];
+        $urlManagerConfig['class'] = \yii\web\UrlManager::class;
+        \Yii::$app->set('urlManager', $urlManagerConfig);
+        \Yii::$app->urlManager->showScriptName = false;
+    }
+
+    public function _after(FunctionalTester $I)
+    {
+        try {
+            parent::_after($I);
+        } finally {
+            if ($this->originalUrlManager !== null) {
+                \Yii::$app->set('urlManager', $this->originalUrlManager);
+                $this->originalUrlManager = null;
+            }
+        }
+    }
+
     public function testProtectionReadinessGateStillReportsPublicationUnavailable(FunctionalTester $I)
     {
         $itemId = (int)$this->owner['id'];
