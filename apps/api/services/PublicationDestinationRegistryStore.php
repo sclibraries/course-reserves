@@ -154,19 +154,6 @@ class PublicationDestinationRegistryStore
                 === (int)$pointer['id'];
     }
 
-    protected function transactionHasWrites()
-    {
-        try {
-            $rows = $this->db->createCommand(
-                'SELECT trx_rows_modified FROM information_schema.INNODB_TRX '
-                . 'WHERE trx_mysql_thread_id = CONNECTION_ID()'
-            )->queryScalar();
-            return $rows !== false && (int)$rows > 0;
-        } catch (\Throwable $exception) {
-            return false;
-        }
-    }
-
     protected function snapshotJson(array $snapshot)
     {
         $json = json_encode($snapshot, JSON_UNESCAPED_SLASHES);

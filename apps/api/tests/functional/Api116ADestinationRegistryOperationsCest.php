@@ -177,12 +177,6 @@ class Api116ADestinationRegistryOperationsCest extends Api116ADestinationRegistr
             return $this->registry()->attach(Api116AFixture::itemKey($this->otherItem), $ambiguousDestination);
         }), 'destination_ambiguous');
 
-        $directStaffEntry = $this->fixtures->createElectronicDestination($this->offering, 'direct-staff');
-        $directEntryItem = $this->fixtures->createItem('conflict-direct-entry-item', $this->offering);
-        $this->assertError(Transactional::run(function () use ($directStaffEntry, $directEntryItem) {
-            return $this->registry()->registerOwned(Api116AFixture::itemKey($directEntryItem), $directStaffEntry);
-        }), 'destination_occupied');
         Assert::assertNotFalse($this->destinationRow($ownerDestination));
-        Assert::assertFalse($this->registryRowForCourseResource($directStaffEntry['course_resource_id']));
     }
 }

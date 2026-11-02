@@ -59,7 +59,7 @@ class m261102_000001_create_publication_destination_registry extends Migration
                 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
             ),
             'retired_at' => $this->dateTime()->null(),
-        ], 'ENGINE=InnoDB');
+        ], 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
 
     private function createAttachmentTableIfMissing()
@@ -79,7 +79,7 @@ class m261102_000001_create_publication_destination_registry extends Migration
                 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
             ),
             'detached_at' => $this->dateTime()->null(),
-        ], 'ENGINE=InnoDB');
+        ], 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
 
     private function ensureIndexes()

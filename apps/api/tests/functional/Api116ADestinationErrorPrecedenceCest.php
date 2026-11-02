@@ -128,19 +128,27 @@ class Api116ADestinationErrorPrecedenceCest extends Api116ADestinationRegistryTe
         $attachmentsTargetId = $this->insertDestination($attachmentsTargetPointer);
         $attachmentSourceItem = $this->fixtures->createItem('precedence-attached-source', $this->offering);
         $this->insertAttachment($attachmentsTargetId, $attachmentSourceItem);
-        $this->assertError(Transactional::run(function () use ($attachmentsTargetId) {
+        $this->assertError(Transactional::run(function () use ($attachmentsTargetId, $attachmentsTargetPointer, $neutralItem) {
             return $this->registry()->registerOwned(
                 Api116AFixture::itemKey($neutralItem),
                 $attachmentsTargetPointer
             );
         }), 'destination_has_attachments');
 
-        $occupiedLivePointer = $this->fixtures->createElectronicDestination($this->offering, 'precedence-occupied-live');
-        $this->assertError(Transactional::run(function () use ($occupiedLivePointer) {
+        $unregisteredLivePointer = $this->fixtures->createElectronicDestination(
+            $this->offering,
+            'precedence-unregistered-live'
+        );
+        $this->success(Transactional::run(function () use ($unregisteredLivePointer, $neutralItem) {
             return $this->registry()->registerOwned(
                 Api116AFixture::itemKey($neutralItem),
-                $occupiedLivePointer
+                $unregisteredLivePointer
             );
-        }), 'destination_occupied');
+        }));
+        $registered = $this->registryRowForCourseResource($unregisteredLivePointer['course_resource_id']);
+        Assert::assertSame('new', $registered['owner_item_kind']);
+        Assert::assertSame((string)$neutralItem['id'], $registered['owner_item_id']);
+        Assert::assertSame('1', $registered['owner_live']);
+        Assert::assertSame('published', $registered['ownership_source']);
     }
 }

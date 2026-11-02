@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use yii\db\IntegrityException;
+
 /** Owns destination and attachment history without changing publication state. */
 class PublicationDestinationRegistry extends PublicationDestinationRegistryLifecycle
 {
@@ -61,10 +63,6 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
                 }
                 return $this->error('destination_occupied');
             }
-            if (!$this->transactionHasWrites()) {
-                return $this->error('destination_occupied');
-            }
-
             $this->db->createCommand()->insert('publication_destinations', [
                 'destination_kind' => $pointer['kind'],
                 'course_resource_id' => $pointer['kind'] === 'electronic' ? $pointer['id'] : null,
@@ -77,9 +75,52 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
                 'ownership_source' => 'published',
             ])->execute();
             return $this->success(['destination' => $this->destination((int)$this->db->getLastInsertID())]);
-        }, function () {
-            return $this->error('destination_occupied');
+        }, function (IntegrityException $exception) use ($item, $destination) {
+            $key = $this->itemKey($item);
+            $pointer = $this->pointerKey($destination);
+            if (!$key || !$pointer) {
+                throw $exception;
+            }
+            return $this->registrationRaceResult($exception, $key, $pointer);
         });
+    }
+
+    private function registrationRaceResult(IntegrityException $exception, array $key, array $pointer)
+    {
+        $info = $exception->errorInfo;
+        $message = $info[2] ?? '';
+        $isRegistryDuplicate = ($info[0] ?? null) === '23000'
+            && (int)($info[1] ?? 0) === 1062
+            && is_string($message)
+            && (strpos($message, 'uq_pub_dest_course_resource') !== false
+                || strpos($message, 'uq_pub_dest_physical_reference') !== false
+                || strpos($message, 'uq_pub_dest_owner_live') !== false);
+        if (!$isRegistryDuplicate) {
+            throw $exception;
+        }
+
+        $owner = $this->ownerForItem($key);
+        $destination = $this->destinationForPointer($pointer);
+        $attachment = $this->attachmentForItem($key);
+        if ($owner && $destination && (int)$owner['id'] === (int)$destination['id']) {
+            return $this->success(['destination' => $destination]);
+        }
+        if ($owner) {
+            return $this->error('item_already_owns');
+        }
+        if ($attachment) {
+            return $this->error('item_already_attached');
+        }
+        if ($destination) {
+            if ((int)$destination['owner_live'] === 1) {
+                return $this->error('destination_already_owned');
+            }
+            if ($this->hasLiveAttachments($destination['id'])) {
+                return $this->error('destination_has_attachments');
+            }
+            return $this->error('destination_occupied');
+        }
+        throw $exception;
     }
 
     public function attach(array $item, $destinationId)
