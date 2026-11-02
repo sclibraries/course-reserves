@@ -301,6 +301,9 @@ class Api105PublicationMigrationCest extends BaseFunctionalCest
             [':prefix' => $this->prefix . '%']
         )->queryColumn();
         if ($submissionIds) {
+            foreach ($submissionIds as $submissionId) {
+                TestSubmissionFixture::deleteApi116ARowsForSubmission($submissionId);
+            }
             $db->createCommand()->delete('faculty_submissions', ['submission_id' => $submissionIds])->execute();
         }
         if ($courseIds) {

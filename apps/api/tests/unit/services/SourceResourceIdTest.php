@@ -15,6 +15,15 @@ class SourceResourceIdTest extends \Codeception\Test\Unit
         }
     }
 
+    public function testProtectionApi116ASourceLookupHonorsSignedIntAndUuidBoundaries()
+    {
+        $this->assertSame(1, SourceResourceId::canonical('1'));
+        $this->assertSame(2147483647, SourceResourceId::canonical('2147483647'));
+        $this->assertNull(SourceResourceId::canonical('2147483648'));
+        $this->assertNull(SourceResourceId::canonical('81390788-f8c0-4000-8000-000000001164'));
+        $this->assertNull(SourceResourceId::canonical('4e5a0000-0000-4000-8000-000000001164'));
+    }
+
     public function testSqlExpressionMatchesTheSameCaseTableWithoutWarnings()
     {
         $expression = SourceResourceId::sqlValue('source_value.raw_value');
