@@ -43,7 +43,8 @@ class MigrationRollback
 
         $output = [];
         $exitCode = 0;
-        exec('cd /app && php yii migrate/' . $direction . ' 1 --interactive=0 2>&1', $output, $exitCode);
+        $phpCommand = self::phpCommand();
+        exec('cd /app && ' . $phpCommand . ' yii migrate/' . $direction . ' 1 --interactive=0 2>&1', $output, $exitCode);
         Assert::assertSame(0, $exitCode, implode("\n", $output));
         return implode("\n", $output);
     }
@@ -72,11 +73,25 @@ class MigrationRollback
             . var_export($columnName, true) . ', '
             . var_export($type, true) . ')->execute();';
 
+        if (getenv('API_TEST_DEPRECATIONS') === '1') {
+            $code = 'require ' . var_export(__DIR__ . '/deprecation-handler.php', true) . ';' . $code;
+        }
+
         $output = [];
         $exitCode = 0;
         exec('cd /app && php -r ' . escapeshellarg($code) . ' 2>&1', $output, $exitCode);
         Assert::assertSame(0, $exitCode, implode("\n", $output));
         return implode("\n", $output);
+    }
+
+    private static function phpCommand()
+    {
+        $command = 'php';
+        if (getenv('API_TEST_DEPRECATIONS') === '1') {
+            $command .= ' -d auto_prepend_file=' . escapeshellarg(__DIR__ . '/deprecation-handler.php');
+        }
+
+        return $command;
     }
 
     private static function appliedVersionsFrom($targetVersion)

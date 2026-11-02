@@ -28,6 +28,16 @@ class EbscoSearchControllerTest extends \Codeception\Test\Unit
         }
     }
 
+    public function testSearchQuerySanitizationNormalizesUnicodeToNfc()
+    {
+        $controller = new EbscoSearchController('ebsco-search', \Yii::$app);
+
+        $this->assertSame(
+            "Caf\u{00E9} noir",
+            $this->invokeMethod($controller, 'sanitizeUtf8Query', ["Cafe\u{0301} noir"])
+        );
+    }
+
     public function testSearchAndRetrieveDecodeItemAndBibEntityTitles()
     {
         $record = [
