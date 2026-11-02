@@ -153,4 +153,99 @@ class Api116ADestinationErrorPrecedenceCest extends Api116ADestinationRegistryTe
         Assert::assertSame('1', $registered['owner_live']);
         Assert::assertSame('published', $registered['ownership_source']);
     }
+
+    public function testFollowValidatesReplacementWithoutItemsAndChecksMissingBeforeRetired(FunctionalTester $I)
+    {
+        $retiredId = $this->insertDestination([
+            'destination_kind' => 'electronic',
+            'offering_id' => $this->offering,
+            'origin_offering_id' => $this->offering,
+            'retired_at' => '2026-10-01 00:00:00',
+        ]);
+        $this->assertError(Transactional::run(function () use ($retiredId) {
+            return $this->registry()->follow($retiredId, [
+                'destination_kind' => 'electronic',
+                'course_resource_id' => 2147483000,
+            ]);
+        }), 'destination_missing');
+
+        $source = $this->fixtures->createElectronicDestination($this->offering, 'follow-no-items-source');
+        $sourceId = $this->insertDestination($source);
+        $otherOfferingPointer = $this->fixtures->createElectronicDestination(
+            $this->otherOffering,
+            'follow-no-items-other-offering'
+        );
+        $this->insertDestination($otherOfferingPointer);
+        $this->assertError(Transactional::run(function () use ($sourceId, $otherOfferingPointer) {
+            return $this->registry()->follow($sourceId, $otherOfferingPointer);
+        }), 'offering_mismatch');
+
+        $unverified = $this->fixtures->createPhysicalDestination(
+            $this->offering,
+            'follow-no-items-unverified',
+            '00000000-0000-4000-8000-000000001181',
+            'unverified'
+        );
+        $this->assertError(Transactional::run(function () use ($sourceId, $unverified) {
+            return $this->registry()->follow($sourceId, $unverified);
+        }), 'destination_unresolved');
+
+        $instanceId = '00000000-0000-4000-8000-000000001182';
+        $ambiguous = $this->fixtures->createPhysicalDestination(
+            $this->offering,
+            'follow-no-items-ambiguous-a',
+            $instanceId
+        );
+        $this->fixtures->createPhysicalDestination(
+            $this->offering,
+            'follow-no-items-ambiguous-b',
+            $instanceId
+        );
+        $this->assertError(Transactional::run(function () use ($sourceId, $ambiguous) {
+            return $this->registry()->follow($sourceId, $ambiguous);
+        }), 'destination_ambiguous');
+    }
+
+    public function testFollowOfferingMismatchAcrossItemsPrecedesEarlierPhysicalIdentityFailure(FunctionalTester $I)
+    {
+        $instanceId = '00000000-0000-4000-8000-000000001183';
+        $firstItem = $this->fixtures->createItem('follow-first-identity-mismatch', $this->offering);
+        $this->setIdentity($firstItem, '00000000-0000-4000-8000-000000001184');
+        $secondItem = $this->fixtures->createItem('follow-second-offering-mismatch', $this->otherOffering);
+        $source = $this->fixtures->createElectronicDestination($this->offering, 'follow-multiple-source');
+        $sourceId = $this->insertDestination($source);
+        $this->insertAttachment($sourceId, $firstItem);
+        $this->insertAttachment($sourceId, $secondItem);
+        $replacement = $this->fixtures->createPhysicalDestination(
+            $this->offering,
+            'follow-multiple-replacement',
+            $instanceId
+        );
+
+        $this->assertError(Transactional::run(function () use ($sourceId, $replacement) {
+            return $this->registry()->follow($sourceId, $replacement);
+        }), 'offering_mismatch');
+    }
+
+    public function testFollowItemOwnershipConflictPrecedesReplacementRegistryConflict(FunctionalTester $I)
+    {
+        $item = $this->fixtures->createItem('follow-item-conflict', $this->offering);
+        $source = $this->fixtures->createElectronicDestination($this->offering, 'follow-item-conflict-source');
+        $sourceId = $this->insertDestination($source);
+        $this->insertAttachment($sourceId, $item);
+        $replacement = $this->fixtures->createElectronicDestination(
+            $this->offering,
+            'follow-item-conflict-replacement'
+        );
+        $this->insertDestination($replacement, [
+            'owner_item_kind' => $item['kind'],
+            'owner_item_id' => $item['id'],
+            'owner_live' => 1,
+            'ownership_source' => 'published',
+        ]);
+
+        $this->assertError(Transactional::run(function () use ($sourceId, $replacement) {
+            return $this->registry()->follow($sourceId, $replacement);
+        }), 'item_already_owns');
+    }
 }

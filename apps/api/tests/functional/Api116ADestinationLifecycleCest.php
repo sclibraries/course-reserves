@@ -134,6 +134,23 @@ class Api116ADestinationLifecycleCest extends Api116ADestinationRegistryTestBase
         Assert::assertSame('Synthetic physical note follow-physical', $snapshot['public_note']);
         Assert::assertSame('Synthetic physical pages follow-physical', $snapshot['assigned_pages']);
         Assert::assertSame($instanceId, $snapshot['folio_instance_id']);
+        Assert::assertSame([
+            'reference_id' => $beforePhysicalReference['reference_id'],
+            'external_resource_id' => $beforePhysicalReference['external_resource_id'],
+            'resource_type' => $beforePhysicalReference['resource_type'],
+            'display_name' => $beforePhysicalReference['display_name'],
+            'offering_id' => (int)$physical['offering_id'],
+            'folder_id' => $beforePhysicalReference['folder_id'],
+            'order' => $beforePhysicalReference['order'],
+            'created_at' => $beforePhysicalReference['created_at'],
+            'updated_at' => $beforePhysicalReference['updated_at'],
+            'public_note' => $beforePhysicalReference['public_note'],
+            'assigned_pages' => $beforePhysicalReference['assigned_pages'],
+            'external_id' => $beforePhysicalReference['external_resource_id'],
+            'destination_kind' => 'physical',
+            'physical_reference_id' => (int)$physical['physical_reference_id'],
+            'folio_instance_id' => $instanceId,
+        ], $snapshot, 'The frozen physical snapshot includes every contracted field and no internal identity evidence.');
         Assert::assertArrayNotHasKey('course_resource_id', $snapshot);
         Assert::assertArrayNotHasKey('identity_provenance_json', $snapshot);
         Assert::assertSame($beforePhysicalReference, \Yii::$app->db->createCommand(
@@ -190,5 +207,82 @@ class Api116ADestinationLifecycleCest extends Api116ADestinationRegistryTestBase
         }
         Assert::assertSame($beforeDestination, $this->destinationRow($destinationId));
         Assert::assertSame($beforeAttachments, $this->attachmentRows($this->attached));
+    }
+
+    public function testRetireFinalizesADeletedPointerWithLiveOwnerAndAttachments(FunctionalTester $I)
+    {
+        $pointer = $this->registerOwner('implicit-retire');
+        $destinationId = $this->destinationIdForCourseResource($pointer['course_resource_id']);
+        $this->success(Transactional::run(function () use ($destinationId) {
+            return $this->registry()->attach(Api116AFixture::itemKey($this->attached), $destinationId);
+        }));
+        \Yii::$app->db->createCommand()->delete('course_resources', [
+            'course_resource_id' => $pointer['course_resource_id'],
+        ])->execute();
+        $implicit = $this->destinationRow($destinationId);
+        Assert::assertNull($implicit['retired_at']);
+        Assert::assertSame('1', $implicit['owner_live']);
+        Assert::assertSame('1', $this->attachmentRows($this->attached)[0]['live']);
+
+        $this->success(Transactional::run(function () use ($destinationId) {
+            return $this->registry()->retire($destinationId);
+        }));
+
+        $retired = $this->destinationRow($destinationId);
+        Assert::assertNotNull($retired['retired_at']);
+        Assert::assertNull($retired['owner_live']);
+        Assert::assertNull($retired['course_resource_id']);
+        Assert::assertSame('released', $retired['ownership_source']);
+        $attachment = $this->attachmentRows($this->attached)[0];
+        Assert::assertNull($attachment['live']);
+        Assert::assertNotNull($attachment['detached_at']);
+        $this->success(Transactional::run(function () use ($destinationId) {
+            return $this->registry()->retire($destinationId);
+        }));
+        Assert::assertSame($retired, $this->destinationRow($destinationId));
+        Assert::assertSame($attachment, $this->attachmentRows($this->attached)[0]);
+    }
+
+    public function testFollowPropagatesNonDuplicateIntegrityException(FunctionalTester $I)
+    {
+        $instanceId = '00000000-0000-4000-8000-000000001185';
+        $this->setIdentity($this->owner, $instanceId);
+        $this->setIdentity($this->attached, $instanceId);
+        $pointer = $this->registerOwner('follow-integrity-error');
+        $destinationId = $this->destinationIdForCourseResource($pointer['course_resource_id']);
+        $this->success(Transactional::run(function () use ($destinationId) {
+            return $this->registry()->attach(Api116AFixture::itemKey($this->attached), $destinationId);
+        }));
+        $replacement = $this->fixtures->createPhysicalDestination(
+            $this->offering,
+            'follow-integrity-error-physical',
+            $instanceId
+        );
+        $beforeDestination = $this->destinationRow($destinationId);
+        $beforeAttachment = $this->attachmentRows($this->attached)[0];
+        $outer = \Yii::$app->db->getTransaction();
+        if ($outer !== null && $outer->isActive) {
+            $outer->commit();
+        }
+        \Yii::$app->db->createCommand(
+            'CREATE TRIGGER ' . $this->triggerName . ' BEFORE UPDATE ON publication_attachments '
+            . 'FOR EACH ROW SIGNAL SQLSTATE "23000" SET MYSQL_ERRNO = 1452, '
+            . 'MESSAGE_TEXT = "Synthetic API-116A unrelated follow integrity error"'
+        )->execute();
+        try {
+            try {
+                $this->registry()->follow($destinationId, $replacement);
+                Assert::fail('A non-duplicate integrity error must propagate from follow().');
+            } catch (\yii\db\IntegrityException $exception) {
+                Assert::assertStringContainsString(
+                    'Synthetic API-116A unrelated follow integrity error',
+                    $exception->getMessage()
+                );
+            }
+        } finally {
+            \Yii::$app->db->createCommand('DROP TRIGGER IF EXISTS ' . $this->triggerName)->execute();
+        }
+        Assert::assertSame($beforeDestination, $this->destinationRow($destinationId));
+        Assert::assertSame($beforeAttachment, $this->attachmentRows($this->attached)[0]);
     }
 }

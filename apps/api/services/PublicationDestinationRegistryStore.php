@@ -73,35 +73,40 @@ class PublicationDestinationRegistryStore
         )->queryOne();
     }
 
-    protected function destination($id)
+    protected function destination($id, $forUpdate = false)
     {
         return is_numeric($id) && (int)$id > 0
-            ? $this->db->createCommand('SELECT * FROM publication_destinations WHERE id = :id', [':id' => (int)$id])->queryOne()
+            ? $this->db->createCommand(
+                'SELECT * FROM publication_destinations WHERE id = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
+                [':id' => (int)$id]
+            )->queryOne()
             : null;
     }
 
-    protected function destinationForPointer(array $pointer)
+    protected function destinationForPointer(array $pointer, $forUpdate = false)
     {
         $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
         return $this->db->createCommand(
-            'SELECT * FROM publication_destinations WHERE `' . $column . '` = :id', [':id' => $pointer['id']]
+            'SELECT * FROM publication_destinations WHERE `' . $column . '` = :id'
+            . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => $pointer['id']]
         )->queryOne();
     }
 
-    protected function ownerForItem(array $key)
+    protected function ownerForItem(array $key, $forUpdate = false)
     {
         return $this->db->createCommand(
             'SELECT * FROM publication_destinations WHERE owner_item_kind = :kind '
-            . 'AND owner_item_id = :id AND owner_live = 1 LIMIT 1',
+            . 'AND owner_item_id = :id AND owner_live = 1 LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
             [':kind' => $key['kind'], ':id' => $key['id']]
         )->queryOne();
     }
 
-    protected function attachmentForItem(array $key)
+    protected function attachmentForItem(array $key, $forUpdate = false)
     {
         return $this->db->createCommand(
             'SELECT * FROM publication_attachments WHERE item_kind = :kind AND item_id = :id '
-            . 'AND live = 1 ORDER BY id LIMIT 1', [':kind' => $key['kind'], ':id' => $key['id']]
+            . 'AND live = 1 ORDER BY id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
+            [':kind' => $key['kind'], ':id' => $key['id']]
         )->queryOne();
     }
 
@@ -118,10 +123,11 @@ class PublicationDestinationRegistryStore
         return $this->db->createCommand('SELECT * FROM publication_attachments WHERE id = :id', [':id' => $id])->queryOne();
     }
 
-    protected function hasLiveAttachments($destinationId)
+    protected function hasLiveAttachments($destinationId, $forUpdate = false)
     {
         return (bool)$this->db->createCommand(
-            'SELECT 1 FROM publication_attachments WHERE destination_id = :id AND live = 1 LIMIT 1',
+            'SELECT 1 FROM publication_attachments WHERE destination_id = :id AND live = 1 LIMIT 1'
+            . ($forUpdate ? ' FOR UPDATE' : ''),
             [':id' => $destinationId]
         )->queryScalar();
     }

@@ -23,10 +23,11 @@ class PublicationDestinationSnapshot
             . 'cr.start_visibility, cr.end_visibility, cr.use_resource_visibility, '
             . 'cr.primary_link_start_visibility, cr.primary_link_end_visibility, cr.use_primary_link_visibility, '
             . 'resource.legacy_resource_id, resource.name, resource.item_url, resource.use_proxy, '
-            . 'resource.folder_id, resource.description, resource.external_note, resource.start_visibility AS '
-            . 'resource_start_visibility, resource.end_visibility AS resource_end_visibility, '
+            . 'COALESCE(cr.folder_id, resource.folder_id) AS folder_id, folder.name AS folder_name, '
+            . 'resource.description, resource.external_note, '
             . 'resource.institution, resource.material_type_id, resource.created_at '
             . 'FROM course_resources cr INNER JOIN resources resource ON resource.resource_id = cr.resource_id '
+            . 'LEFT JOIN folders folder ON folder.folder_id = COALESCE(cr.folder_id, resource.folder_id) '
             . 'WHERE cr.course_resource_id = :id',
             [':id' => (int)$courseResourceId]
         )->queryOne();
@@ -35,8 +36,6 @@ class PublicationDestinationSnapshot
         }
 
         $resource = $row;
-        $resource['start_visibility'] = $row['start_visibility'] ?: $row['resource_start_visibility'];
-        $resource['end_visibility'] = $row['end_visibility'] ?: $row['resource_end_visibility'];
         $resource['metadata'] = $this->db->createCommand(
             'SELECT metadata_id, resource_id, field_name, field_value, created_at FROM resource_metadata '
             . 'WHERE resource_id = :id ORDER BY metadata_id', [':id' => $row['resource_id']]
@@ -52,7 +51,6 @@ class PublicationDestinationSnapshot
         $snapshot['offering_id'] = (int)$row['offering_id'];
         $snapshot['course_resource_id'] = (int)$row['course_resource_id'];
         $snapshot['resource_id'] = (int)$row['resource_id'];
-        unset($snapshot['resource_start_visibility'], $snapshot['resource_end_visibility']);
         return ['row' => $row, 'snapshot' => $snapshot];
     }
 
@@ -70,6 +68,7 @@ class PublicationDestinationSnapshot
             'reference_id', 'external_resource_id', 'resource_type', 'display_name', 'offering_id',
             'folder_id', 'order', 'created_at', 'updated_at', 'public_note', 'assigned_pages',
         ]));
+        $snapshot['external_id'] = $row['external_resource_id'];
         $snapshot['destination_kind'] = 'physical';
         $snapshot['physical_reference_id'] = (int)$row['reference_id'];
         $snapshot['offering_id'] = (int)$row['offering_id'];
@@ -82,6 +81,15 @@ class PublicationDestinationSnapshot
     /** Returns a conflict code for an ineligible physical row, or null when it qualifies. */
     public function physicalError($kind, array $item, array $reference)
     {
+        $error = $this->physicalIdentityError($kind, $item, $reference);
+        if ($error !== null) {
+            return $error;
+        }
+        return $this->physicalAmbiguityError($reference);
+    }
+
+    public function physicalIdentityError($kind, array $item, array $reference)
+    {
         if ($reference['identity_status'] !== 'verified' || trim((string)$reference['folio_instance_id']) === '') {
             return 'destination_unresolved';
         }
@@ -91,6 +99,19 @@ class PublicationDestinationSnapshot
             return 'destination_unresolved';
         }
 
+        return null;
+    }
+
+    public function physicalDestinationError(array $reference)
+    {
+        if ($reference['identity_status'] !== 'verified' || trim((string)$reference['folio_instance_id']) === '') {
+            return 'destination_unresolved';
+        }
+        return $this->physicalAmbiguityError($reference);
+    }
+
+    private function physicalAmbiguityError(array $reference)
+    {
         $duplicates = (int)$this->db->createCommand(
             'SELECT COUNT(*) FROM physical_resource_references WHERE offering_id = :offering '
             . 'AND identity_status = "verified" AND LOWER(folio_instance_id) = LOWER(:instance)',

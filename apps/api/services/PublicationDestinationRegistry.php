@@ -81,27 +81,25 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
             if (!$key || !$pointer) {
                 throw $exception;
             }
-            return $this->registrationRaceResult($exception, $key, $pointer);
+            return Transactional::run(function () use ($exception, $key, $pointer) {
+                return $this->registrationRaceResult($exception, $key, $pointer);
+            });
         });
     }
 
     private function registrationRaceResult(IntegrityException $exception, array $key, array $pointer)
     {
-        $info = $exception->errorInfo;
-        $message = $info[2] ?? '';
-        $isRegistryDuplicate = ($info[0] ?? null) === '23000'
-            && (int)($info[1] ?? 0) === 1062
-            && is_string($message)
-            && (strpos($message, 'uq_pub_dest_course_resource') !== false
-                || strpos($message, 'uq_pub_dest_physical_reference') !== false
-                || strpos($message, 'uq_pub_dest_owner_live') !== false);
-        if (!$isRegistryDuplicate) {
+        if (!PublicationDestinationDuplicateKey::name($exception, [
+            'uq_pub_dest_course_resource',
+            'uq_pub_dest_physical_reference',
+            'uq_pub_dest_owner_live',
+        ])) {
             throw $exception;
         }
 
-        $owner = $this->ownerForItem($key);
-        $destination = $this->destinationForPointer($pointer);
-        $attachment = $this->attachmentForItem($key);
+        $owner = $this->ownerForItem($key, true);
+        $destination = $this->destinationForPointer($pointer, true);
+        $attachment = $this->attachmentForItem($key, true);
         if ($owner && $destination && (int)$owner['id'] === (int)$destination['id']) {
             return $this->success(['destination' => $destination]);
         }
@@ -115,7 +113,7 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
             if ((int)$destination['owner_live'] === 1) {
                 return $this->error('destination_already_owned');
             }
-            if ($this->hasLiveAttachments($destination['id'])) {
+            if ($this->hasLiveAttachments($destination['id'], true)) {
                 return $this->error('destination_has_attachments');
             }
             return $this->error('destination_occupied');
@@ -125,33 +123,47 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
 
     public function attach(array $item, $destinationId)
     {
-        return Transactional::run(function () use ($item, $destinationId) {
+        return $this->attachWithDestination($item, $destinationId, null);
+    }
+
+    private function attachWithDestination(array $item, $destinationId, $currentDestination)
+    {
+        return Transactional::run(function () use ($item, $destinationId, $currentDestination) {
             $key = $this->itemKey($item);
-            $destination = $this->destination($destinationId);
+            $pointer = is_array($destinationId) ? $this->pointerKey($destinationId) : null;
+            $destination = $currentDestination ?: ($pointer
+                ? $this->destinationForPointer($pointer)
+                : $this->destination($destinationId));
             $row = $key ? $this->loadItem($key) : null;
-            $entry = $destination ? $this->destinationEntry($destination) : null;
+            $entry = $pointer ? $this->loadPointer($pointer) : ($destination ? $this->destinationEntry($destination) : null);
             $owner = $key ? $this->ownerForItem($key) : null;
             $attachment = $key ? $this->attachmentForItem($key) : null;
             $this->lockContext(
                 [$this->itemContext($key, $row)], [$destination, $owner], [$entry], [$attachment]
             );
 
-            $destination = $this->destination($destinationId);
-            if (!$destination) {
+            $destination = $currentDestination
+                ? $this->destination($destinationId, true)
+                : ($pointer ? $this->destinationForPointer($pointer) : $this->destination($destinationId));
+            $entry = $pointer ? $this->loadPointer($pointer) : ($destination ? $this->destinationEntry($destination) : null);
+            if (!$destination && !$pointer) {
                 return $this->error('destination_missing');
             }
-            if ($this->isRetired($destination)) {
+            if ($destination && $this->isRetired($destination)) {
                 return $this->error('destination_retired');
             }
             $row = $key ? $this->loadItem($key) : null;
-            $entry = $this->destinationEntry($destination);
             if ($entry === null) {
                 return $this->error('destination_missing');
             }
             if (!$row) {
                 return $this->error('item_missing');
             }
-            $error = $this->offeringError($row, $entry['row']['offering_id'], $destination['offering_id']);
+            $error = $this->offeringError(
+                $row,
+                $entry['row']['offering_id'],
+                $destination['offering_id'] ?? $entry['row']['offering_id']
+            );
             if ($error !== null) {
                 return $this->error($error);
             }
@@ -162,7 +174,7 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
 
             $owner = $this->ownerForItem($key);
             $attachment = $this->attachmentForItem($key);
-            if ($attachment && (int)$attachment['destination_id'] === (int)$destination['id']) {
+            if ($destination && $attachment && (int)$attachment['destination_id'] === (int)$destination['id']) {
                 return $this->success(['attachment' => $attachment]);
             }
             if ($owner) {
@@ -170,6 +182,17 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
             }
             if ($attachment) {
                 return $this->error('item_already_attached');
+            }
+            if (!$destination) {
+                $this->db->createCommand()->insert('publication_destinations', [
+                    'destination_kind' => $pointer['kind'],
+                    'course_resource_id' => $pointer['kind'] === 'electronic' ? $pointer['id'] : null,
+                    'physical_reference_id' => $pointer['kind'] === 'physical' ? $pointer['id'] : null,
+                    'offering_id' => $entry['row']['offering_id'],
+                    'origin_offering_id' => $entry['row']['offering_id'],
+                    'ownership_source' => 'none',
+                ])->execute();
+                $destination = $this->destination((int)$this->db->getLastInsertID());
             }
             $json = $this->snapshotJson($entry['snapshot']);
             $this->db->createCommand()->insert('publication_attachments', [
@@ -180,8 +203,47 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
                 'live' => 1,
             ])->execute();
             return $this->success(['attachment' => $this->attachment((int)$this->db->getLastInsertID())]);
-        }, function () {
-            return $this->error('item_already_attached');
+        }, function (IntegrityException $exception) use ($item, $destinationId) {
+            return $this->attachmentRaceResult($exception, $item, $destinationId);
+        });
+    }
+
+    private function attachmentRaceResult(IntegrityException $exception, array $item, $destinationId)
+    {
+        $pointer = is_array($destinationId) ? $this->pointerKey($destinationId) : null;
+        $key = $this->itemKey($item);
+        $duplicate = PublicationDestinationDuplicateKey::name($exception, [
+            'uq_pub_dest_course_resource',
+            'uq_pub_dest_physical_reference',
+            'uq_pub_attach_item_live',
+        ]);
+        if (!$key || !$duplicate) {
+            throw $exception;
+        }
+
+        return Transactional::run(function () use ($exception, $destinationId, $pointer, $key, $duplicate) {
+            $attachment = $this->attachmentForItem($key, true);
+            if ($duplicate === 'uq_pub_attach_item_live') {
+                if (!$attachment) {
+                    throw $exception;
+                }
+                $expectedDestination = $pointer
+                    ? $this->destinationForPointer($pointer, true)
+                    : $this->destination($destinationId, true);
+                if ($expectedDestination && (int)$attachment['destination_id'] === (int)$expectedDestination['id']) {
+                    return $this->success(['attachment' => $attachment]);
+                }
+                return $this->error('item_already_attached');
+            }
+
+            if (!$pointer) {
+                throw $exception;
+            }
+            $destination = $this->destinationForPointer($pointer, true);
+            if (!$destination) {
+                throw $exception;
+            }
+            return $this->attachWithDestination($item, $destination['id'], $destination);
         });
     }
 

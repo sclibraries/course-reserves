@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use yii\db\IntegrityException;
+
 /** Handles registry lifecycle transitions. */
 class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegistryStore
 {
@@ -32,7 +34,7 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
             if (!$destination) {
                 return $this->error('destination_missing');
             }
-            if ($this->isRetired($destination)) {
+            if ($destination['retired_at'] !== null) {
                 return $this->success(['destination' => $destination]);
             }
             $entry = $this->destinationEntry($destination);
@@ -45,7 +47,7 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
             if (!$destination) {
                 return $this->error('destination_missing');
             }
-            if ($this->isRetired($destination)) {
+            if ($destination['retired_at'] !== null) {
                 return $this->success(['destination' => $destination]);
             }
             $values = [
@@ -92,7 +94,7 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
             $destination = $this->destination($destinationId);
             $pointer = $this->pointerKey($newPointer);
             $entry = $pointer ? $this->loadPointer($pointer) : null;
-            if (!$destination) {
+            if (!$destination || !$entry) {
                 return $this->error('destination_missing');
             }
             if ($this->isRetired($destination)) {
@@ -105,15 +107,18 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
             $this->lockContext($items, [$destination], [$this->destinationEntry($destination), $entry], $attachments);
 
             $destination = $this->destination($destinationId);
-            if (!$destination) {
+            $entry = $pointer ? $this->loadPointer($pointer) : null;
+            if (!$destination || !$entry) {
                 return $this->error('destination_missing');
             }
             if ($this->isRetired($destination)) {
                 return $this->error('destination_retired');
             }
-            $entry = $pointer ? $this->loadPointer($pointer) : null;
-            if ($entry === null) {
-                return $this->error('destination_missing');
+            $registryOffering = $destination['offering_id'];
+            $replacementOffering = $entry['row']['offering_id'];
+            if (empty($registryOffering) || empty($replacementOffering)
+                || (int)$registryOffering !== (int)$replacementOffering) {
+                return $this->error('offering_mismatch');
             }
             $rowItems = $this->loadContextItems($items);
             foreach ($rowItems as $context) {
@@ -121,9 +126,36 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
                 if ($error !== null) {
                     return $this->error($error);
                 }
-                $error = $this->physicalError(['kind' => $context['kind'], 'id' => $context['id']], $context['row'], $entry);
+            }
+            if ($entry['kind'] === 'physical') {
+                foreach ($rowItems as $context) {
+                    $error = $this->snapshots->physicalIdentityError(
+                        $context['kind'],
+                        $context['row'],
+                        $entry['row']
+                    );
+                    if ($error !== null) {
+                        return $this->error($error);
+                    }
+                }
+                $error = $this->snapshots->physicalDestinationError($entry['row']);
                 if ($error !== null) {
                     return $this->error($error);
+                }
+            }
+            foreach ($attachments as $attachment) {
+                $key = ['kind' => $attachment['item_kind'], 'id' => (int)$attachment['item_id']];
+                if ($this->ownerForItem($key)) {
+                    return $this->error('item_already_owns');
+                }
+            }
+            if ($destination['owner_live'] == 1 && $destination['owner_item_kind'] !== null) {
+                $ownerKey = [
+                    'kind' => $destination['owner_item_kind'],
+                    'id' => (int)$destination['owner_item_id'],
+                ];
+                if ($this->attachmentForItem($ownerKey)) {
+                    return $this->error('item_already_attached');
                 }
             }
             if ($this->samePointer($destination, $pointer)) {
@@ -147,8 +179,34 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
                 ], ['id' => $attachment['id'], 'live' => 1])->execute();
             }
             return $this->success(['destination' => $this->destination($destinationId)]);
-        }, function () {
-            return $this->error('destination_occupied');
+        }, function (IntegrityException $exception) use ($destinationId, $newPointer) {
+            return $this->followRaceResult($exception, $destinationId, $newPointer);
+        });
+    }
+
+    private function followRaceResult(IntegrityException $exception, $destinationId, array $newPointer)
+    {
+        $pointer = $this->pointerKey($newPointer);
+        if (!$pointer || !PublicationDestinationDuplicateKey::name($exception, [
+            'uq_pub_dest_course_resource',
+            'uq_pub_dest_physical_reference',
+        ])) {
+            throw $exception;
+        }
+
+        return Transactional::run(function () use ($exception, $destinationId, $pointer) {
+            $destination = $this->destination($destinationId, true);
+            if (!$destination) {
+                throw $exception;
+            }
+            $conflict = $this->destinationForPointer($pointer, true);
+            if ($this->samePointer($destination, $pointer)) {
+                return $this->success(['destination' => $destination]);
+            }
+            if ($conflict && (int)$conflict['id'] !== (int)$destinationId) {
+                return $this->error('destination_occupied');
+            }
+            throw $exception;
         });
     }
 }
