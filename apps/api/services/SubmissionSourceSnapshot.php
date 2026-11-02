@@ -9,7 +9,8 @@ class SubmissionSourceSnapshot
 {
     public static function capture($resourceId)
     {
-        if ($resourceId === null || trim((string)$resourceId) === '') {
+        $resourceId = SourceResourceId::canonical($resourceId);
+        if ($resourceId === null) {
             return null;
         }
         $source = Yii::$app->db->createCommand(

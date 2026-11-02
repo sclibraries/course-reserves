@@ -25,11 +25,11 @@ class EffectiveMaterialType
         if ($id !== null) {
             return $id;
         }
-        $sourceId = $model->source_resource_id;
-        if ($sourceId === null || $sourceId === '') {
+        $sourceId = SourceResourceId::canonical($model->source_resource_id);
+        if ($sourceId === null) {
             return null;
         }
-        $source = \app\models\Resources::findOne(['resource_id' => $sourceId]);
+        $source = \app\models\Resources::findOne($sourceId);
         return $source && $source->material_type_id !== null ? (int)$source->material_type_id : null;
     }
 

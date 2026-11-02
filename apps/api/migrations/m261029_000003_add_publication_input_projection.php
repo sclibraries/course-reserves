@@ -1,5 +1,6 @@
 <?php
 
+use app\services\SourceResourceId;
 use yii\db\Migration;
 
 class m261029_000003_add_publication_input_projection extends Migration
@@ -23,9 +24,10 @@ class m261029_000003_add_publication_input_projection extends Migration
         $this->createIndexIfMissing('idx_reuse_staff_material_type', 'submission_reuse_resources', 'staff_material_type_id');
 
         foreach (['submission_new_resources', 'submission_reuse_resources'] as $table) {
+            $this->clearNoncanonicalSnapshots($table);
             $this->execute(
                 'UPDATE ' . $table . ' item INNER JOIN resources source '
-                . 'ON source.resource_id = item.source_resource_id '
+                . 'ON source.resource_id = ' . SourceResourceId::sqlValue('item.source_resource_id') . ' '
                 . 'SET item.material_type_id = source.material_type_id WHERE item.material_type_id IS NULL'
             );
         }
@@ -58,12 +60,21 @@ class m261029_000003_add_publication_input_projection extends Migration
     {
         $this->execute(
             'UPDATE ' . $table . ' item INNER JOIN resources source '
-            . 'ON source.resource_id = item.source_resource_id '
+            . 'ON source.resource_id = ' . SourceResourceId::sqlValue('item.source_resource_id') . ' '
             . 'SET item.source_snapshot_json = JSON_OBJECT('
             . '"title", source.name, "url", source.item_url, "description", source.description, '
             . '"material_type_id", source.material_type_id, "display_start_date", source.start_visibility, '
             . '"display_end_date", source.end_visibility, "use_proxy", source.use_proxy) '
             . 'WHERE item.source_snapshot_json IS NULL'
+        );
+    }
+
+    private function clearNoncanonicalSnapshots($table)
+    {
+        $this->execute(
+            'UPDATE ' . $table . ' SET source_snapshot_json = NULL '
+            . 'WHERE source_snapshot_json IS NOT NULL AND '
+            . SourceResourceId::sqlValue('source_resource_id') . ' IS NULL'
         );
     }
 

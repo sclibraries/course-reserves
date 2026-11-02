@@ -25,11 +25,12 @@ class SubmissionPublicationInvalidator
         $params = [];
         $newHolders = $this->inList($ids, 'new_type_', $params);
         $reuseHolders = $this->inList($ids, 'reuse_type_', $params);
+        $newSourceId = SourceResourceId::sqlValue('item.source_resource_id');
         $newType = EffectiveMaterialType::sql('item', 'source');
         $reuseType = EffectiveMaterialType::sql('item', 'source');
         $rows = Yii::$app->db->createCommand(
             'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
-            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
+            . 'LEFT JOIN resources source ON source.resource_id = ' . $newSourceId . ' '
             . 'WHERE ' . $newType . ' IN (' . $newHolders . ') UNION ALL '
             . 'SELECT "reuse" AS kind, item.id, item.submission_id FROM submission_reuse_resources item '
             . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
@@ -62,9 +63,10 @@ class SubmissionPublicationInvalidator
     {
         $newType = EffectiveMaterialType::sql('item', 'source');
         $reuseType = EffectiveMaterialType::sql('item', 'source');
+        $newSourceId = SourceResourceId::sqlValue('item.source_resource_id');
         $rows = Yii::$app->db->createCommand(
             'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
-            . 'LEFT JOIN resources source ON source.resource_id = item.source_resource_id '
+            . 'LEFT JOIN resources source ON source.resource_id = ' . $newSourceId . ' '
             . 'INNER JOIN material_type_flows mapping ON mapping.material_type_id = ' . $newType . ' '
             . 'WHERE mapping.flow_id = :flow_id AND NOT EXISTS (SELECT 1 FROM item_flow_runs run '
             . 'WHERE run.item_kind = "new" AND run.item_id = item.id) UNION ALL '
@@ -82,8 +84,8 @@ class SubmissionPublicationInvalidator
     {
         Transactional::run(function () use ($resourceId, $publishingItem) {
             $rows = Yii::$app->db->createCommand(
-                'SELECT "new" AS kind, id, submission_id FROM submission_new_resources '
-                . 'WHERE source_resource_id = :new_id UNION ALL '
+                'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
+                . 'WHERE ' . SourceResourceId::sqlValue('item.source_resource_id') . ' = :new_id UNION ALL '
                 . 'SELECT "reuse" AS kind, id, submission_id FROM submission_reuse_resources '
                 . 'WHERE source_resource_id = :reuse_id ORDER BY kind, id',
                 [':new_id' => (string)$resourceId, ':reuse_id' => (int)$resourceId]

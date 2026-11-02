@@ -37,9 +37,8 @@ class SubmissionInputProjectionService
                     ]
                 )->queryScalar() ?: null;
             }
-            $hasSource = $item['source_resource_id'] !== null
-                && trim((string)$item['source_resource_id']) !== '';
-            $sourceExists = !$hasSource || $item['source_resource_found'] !== null;
+            $hasCanonicalSourceId = SourceResourceId::canonical($item['source_resource_id'] ?? null) !== null;
+            $sourceExists = !$hasCanonicalSourceId || $item['source_resource_found'] !== null;
             return $this->result(200, [
                 'projection' => $this->projection->project(
                     $kind,

@@ -29,7 +29,8 @@ class SubmissionCopyInputRefreshService
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
             $resourceId = $item['source_resource_id'] ?? null;
-            $sourceExists = !empty($item['source_resource_found']);
+            $canonicalResourceId = SourceResourceId::canonical($resourceId);
+            $sourceExists = $canonicalResourceId !== null && !empty($item['source_resource_found']);
             $projection = (new SubmissionInputProjection())->project(
                 $kind,
                 $item,
@@ -37,12 +38,12 @@ class SubmissionCopyInputRefreshService
                 null,
                 $sourceExists
             );
-            if ($projection['destination_class'] !== 'electronic' || empty($resourceId) || !$sourceExists) {
+            if ($projection['destination_class'] !== 'electronic' || $canonicalResourceId === null || !$sourceExists) {
                 return $this->result(409, [
                     'error_code' => 'copy_input_refresh_requires_local_electronic_source',
                 ]);
             }
-            $snapshot = SubmissionSourceSnapshot::capture($resourceId);
+            $snapshot = SubmissionSourceSnapshot::capture($canonicalResourceId);
             if (!$snapshot) {
                 return $this->result(409, ['error_code' => 'source_resource_missing']);
             }

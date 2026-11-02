@@ -148,8 +148,9 @@ class SubmissionItemMaterializationService
 
     private function resolveElectronicResource(SubmissionNewResource $item, $folderId)
     {
-        if ($this->hasValue($item->source_resource_id) && is_numeric($item->source_resource_id)) {
-            $resource = Resources::findOne((int)$item->source_resource_id);
+        $sourceResourceId = SourceResourceId::canonical($item->source_resource_id);
+        if ($sourceResourceId !== null) {
+            $resource = Resources::findOne($sourceResourceId);
             if (!$resource) {
                 throw new BadRequestHttpException('Source resource was not found.');
             }

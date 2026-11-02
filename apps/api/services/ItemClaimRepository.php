@@ -35,6 +35,9 @@ class ItemClaimRepository
             return null;
         }
         $effectiveType = EffectiveMaterialType::sql('i', 'source');
+        $sourceResourceId = $kind === 'new'
+            ? SourceResourceId::sqlValue('i.source_resource_id')
+            : 'i.source_resource_id';
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         $sql = 'SELECT i.id, i.submission_id, i.materialized_physical_reference_id, s.offering_id, '
             . 'i.claimed_by, i.claimed_at, i.last_activity_at, '
@@ -54,7 +57,7 @@ class ItemClaimRepository
             . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
-            . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
+            . 'LEFT JOIN resources source ON source.resource_id = ' . $sourceResourceId . ' '
             . 'LEFT JOIN material_types mt ON mt.material_type_id = ' . $effectiveType . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
             . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '

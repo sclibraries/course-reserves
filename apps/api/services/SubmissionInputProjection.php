@@ -32,13 +32,14 @@ class SubmissionInputProjection
             $blockers[] = 'destination_class_required';
         }
         $resourceId = $item['source_resource_id'] ?? null;
+        $canonicalResourceId = SourceResourceId::canonical($resourceId);
         if ($sourceExists === null) {
-            $sourceExists = !empty($source) || !$this->hasValue($resourceId);
+            $sourceExists = $canonicalResourceId === null || !empty($source);
         }
-        if ($this->hasValue($resourceId) && !$sourceExists) {
+        if ($canonicalResourceId !== null && !$sourceExists) {
             $blockers[] = 'source_resource_missing';
         }
-        if ($destinationClass === 'electronic' && $this->hasValue($resourceId) && $sourceExists
+        if ($destinationClass === 'electronic' && $canonicalResourceId !== null && $sourceExists
             && $this->copyInputsIncomplete($source)) {
             $blockers[] = 'copy_inputs_incomplete';
         }
@@ -60,7 +61,7 @@ class SubmissionInputProjection
             'destination_class' => $destinationClass,
             'access_path' => $item['access_path'] ?? null,
             'source' => [
-                'resource_id' => $this->stringValue($resourceId),
+                'resource_id' => $canonicalResourceId === null ? null : (string)$canonicalResourceId,
                 'folio_instance_id' => $this->stringValue($item['source_folio_instance_id'] ?? null),
                 'folio_holdings_id' => $this->folioHoldingsId($item, $resourceData),
             ],

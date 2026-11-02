@@ -9,7 +9,7 @@ class ItemClaimListRepository
 {
     private $items;
 
-    public function __construct(ItemClaimRepository $items = null)
+    public function __construct(?ItemClaimRepository $items = null)
     {
         $this->items = $items ?: new ItemClaimRepository();
     }
@@ -117,6 +117,9 @@ class ItemClaimListRepository
     {
         $table = $this->items->table($kind);
         $effectiveType = EffectiveMaterialType::sql('i', 'source');
+        $sourceResourceId = $kind === 'new'
+            ? SourceResourceId::sqlValue('i.source_resource_id')
+            : 'i.source_resource_id';
         $title = $kind === 'new'
             ? 'CASE WHEN JSON_VALID(i.resource_data) THEN JSON_UNQUOTE(JSON_EXTRACT(i.resource_data, "$.title")) ELSE NULL END'
             : 'NULL';
@@ -131,7 +134,7 @@ class ItemClaimListRepository
             . 's.submitted_at, ' . ItemClaimRepository::claimedByDisplayNameSql() . ' AS claimed_by_display, '
             . 'group_ref.name AS assigned_group_name '
             . 'FROM ' . $table . ' i INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
-            . 'LEFT JOIN resources source ON source.resource_id = i.source_resource_id '
+            . 'LEFT JOIN resources source ON source.resource_id = ' . $sourceResourceId . ' '
             . 'LEFT JOIN material_types mt ON mt.material_type_id = ' . $effectiveType . ' '
             . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
             . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
