@@ -222,28 +222,38 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
         }
 
         return Transactional::run(function () use ($exception, $destinationId, $pointer, $key, $duplicate) {
+            $row = $this->loadItem($key);
+            $destination = $pointer
+                ? $this->destinationForPointer($pointer)
+                : $this->destination($destinationId);
+            $entry = $pointer
+                ? $this->loadPointer($pointer)
+                : ($destination ? $this->destinationEntry($destination) : null);
+            $owner = $this->ownerForItem($key);
+            $attachment = $this->attachmentForItem($key);
+            $this->lockContext(
+                [$this->itemContext($key, $row)], [$destination, $owner], [$entry], [$attachment]
+            );
+
+            $destination = $pointer
+                ? $this->destinationForPointer($pointer, true)
+                : $this->destination($destinationId, true);
+            $this->ownerForItem($key, true);
             $attachment = $this->attachmentForItem($key, true);
             if ($duplicate === 'uq_pub_attach_item_live') {
                 if (!$attachment) {
                     throw $exception;
                 }
-                $expectedDestination = $pointer
-                    ? $this->destinationForPointer($pointer, true)
-                    : $this->destination($destinationId, true);
-                if ($expectedDestination && (int)$attachment['destination_id'] === (int)$expectedDestination['id']) {
+                if ($destination && (int)$attachment['destination_id'] === (int)$destination['id']) {
                     return $this->success(['attachment' => $attachment]);
                 }
                 return $this->error('item_already_attached');
             }
 
-            if (!$pointer) {
+            if (!$pointer || !$destination) {
                 throw $exception;
             }
-            $destination = $this->destinationForPointer($pointer, true);
-            if (!$destination) {
-                throw $exception;
-            }
-            return $this->attachWithDestination($item, $destination['id'], $destination);
+            return $this->attachWithDestination($key, $destination['id'], $destination);
         });
     }
 
