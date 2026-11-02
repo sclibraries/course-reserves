@@ -82,13 +82,22 @@ class SubmissionPublicationInvalidator
 
     public function sourceResource($resourceId, $publishingItem = null)
     {
+        $resourceId = SourceResourceId::canonical($resourceId);
+        if ($resourceId === null) {
+            return;
+        }
         Transactional::run(function () use ($resourceId, $publishingItem) {
             $rows = Yii::$app->db->createCommand(
                 'SELECT "new" AS kind, item.id, item.submission_id FROM submission_new_resources item '
-                . 'WHERE ' . SourceResourceId::sqlValue('item.source_resource_id') . ' = :new_id UNION ALL '
+                . 'WHERE item.source_resource_id = :new_id '
+                . 'AND BINARY item.source_resource_id = BINARY :new_id_exact UNION ALL '
                 . 'SELECT "reuse" AS kind, id, submission_id FROM submission_reuse_resources '
                 . 'WHERE source_resource_id = :reuse_id ORDER BY kind, id',
-                [':new_id' => (string)$resourceId, ':reuse_id' => (int)$resourceId]
+                [
+                    ':new_id' => (string)$resourceId,
+                    ':new_id_exact' => (string)$resourceId,
+                    ':reuse_id' => (int)$resourceId,
+                ]
             )->queryAll();
             $this->invalidateRows($rows, true, $publishingItem);
         });

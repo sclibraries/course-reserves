@@ -219,18 +219,68 @@ class Api118SourceResourceIdCest extends Api109FunctionalCest
         $bookId = $this->materialTypeId('book');
         $this->createCoercionTargets($bookId);
         $items = $this->createUuidItems('no-uuid-invalidation');
+        $db = \Yii::$app->db;
+        $db->createCommand()->insert('submission_new_resources', [
+            'submission_id' => $items[0]['submission_id'],
+            'source_resource_id' => '81390788',
+            'resource_data' => json_encode(['title' => 'Synthetic canonical dependent']),
+            'item_status' => 'pending',
+        ])->execute();
+        $canonicalItem = ['id' => (int)$db->getLastInsertID()];
+        $allItems = $items;
+        $allItems[] = $canonicalItem;
         $this->mapTypesToSameFlow([$bookId]);
-        $revisions = [];
-        foreach ($items as $item) {
+
+        $readinessContext = ['synthetic' => 'API-118 invalidation readiness'];
+        $seedReady = function ($itemId) use ($db, $readinessContext) {
+            return $db->createCommand()->update('submission_publication_state', [
+                'state' => 'ready',
+                'readiness_source' => 'manual',
+                'readiness_reason' => 'Synthetic API-118 readiness',
+                'readiness_revision' => 1,
+                'readiness_context_json' => json_encode($readinessContext),
+            ], ['item_kind' => 'new', 'item_id' => $itemId])->execute();
+        };
+        $assertReadiness = function ($itemId, $ready) use ($db, $readinessContext) {
+            $state = $db->createCommand(
+                'SELECT state, draft_revision, readiness_source, readiness_reason, readiness_revision, '
+                . 'readiness_context_json FROM submission_publication_state '
+                . 'WHERE item_kind = "new" AND item_id = :id', [':id' => $itemId]
+            )->queryOne();
+            Assert::assertNotFalse($state);
+            Assert::assertSame($ready ? 'ready' : 'pending', $state['state']);
+            Assert::assertSame(1, (int)$state['draft_revision']);
+            Assert::assertSame($ready ? 'manual' : null, $state['readiness_source']);
+            Assert::assertSame($ready ? 'Synthetic API-118 readiness' : null, $state['readiness_reason']);
+            Assert::assertSame($ready ? 1 : null, $state['readiness_revision'] === null
+                ? null : (int)$state['readiness_revision']);
+            Assert::assertSame(
+                $ready ? $readinessContext : null,
+                json_decode($state['readiness_context_json'] ?: 'null', true)
+            );
+        };
+
+        foreach ($allItems as $item) {
             $this->setClaimedByStaff($item['id']);
             $this->publicationRevisionFromRoute($I, $item['id']);
-            $revisions[$item['id']] = (int)$this->publicationRevision('new', $item['id']);
+            Assert::assertSame(1, $seedReady($item['id']));
+            $assertReadiness($item['id'], true);
         }
 
         $invalidator = new SubmissionPublicationInvalidator();
         $invalidator->materialTypes([$bookId]);
+        foreach ($items as $item) {
+            $assertReadiness($item['id'], true);
+        }
+        $assertReadiness($canonicalItem['id'], false);
+
+        Assert::assertSame(1, $seedReady($canonicalItem['id']));
+        $assertReadiness($canonicalItem['id'], true);
         $invalidator->unpinnedFlowItems($this->flowId);
-        $this->assertRevisionsUnchanged($I, $items, $revisions);
+        foreach ($items as $item) {
+            $assertReadiness($item['id'], true);
+        }
+        $assertReadiness($canonicalItem['id'], false);
     }
 
     public function testProtectionUuidRowsIgnoreSourceSaveDeleteAndChildLinkInvalidation(FunctionalTester $I)
