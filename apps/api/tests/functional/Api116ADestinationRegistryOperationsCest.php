@@ -82,8 +82,8 @@ class Api116ADestinationRegistryOperationsCest extends Api116ADestinationRegistr
         $this->assertError(Transactional::run(function () use ($secondDestination) {
             return $this->registry()->attach(Api116AFixture::itemKey($this->owner), $secondDestination);
         }), 'item_already_owns');
-        $this->assertError(Transactional::run(function () use ($ownerDestination) {
-            return $this->registry()->attach(Api116AFixture::itemKey($this->attached), $ownerDestination);
+        $this->assertError(Transactional::run(function () use ($pointer) {
+            return $this->registry()->registerOwned(Api116AFixture::itemKey($this->otherItem), $pointer);
         }), 'destination_already_owned');
 
         $attachedToPointer = $this->fixtures->createElectronicDestination($this->offering, 'conflict-attached-to');

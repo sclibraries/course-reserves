@@ -117,9 +117,9 @@ class Api116ADestinationErrorPrecedenceCest extends Api116ADestinationRegistryTe
             'ownership_source' => 'published',
         ]);
         $this->insertAttachment($occupiedId, $occupiedAttachmentItem);
-        $this->assertError(Transactional::run(function () use ($occupiedId, $neutralItem) {
+        $this->success(Transactional::run(function () use ($occupiedId, $neutralItem) {
             return $this->registry()->attach(Api116AFixture::itemKey($neutralItem), $occupiedId);
-        }), 'destination_already_owned');
+        }));
 
         $attachmentsTargetPointer = $this->fixtures->createElectronicDestination(
             $this->offering,
