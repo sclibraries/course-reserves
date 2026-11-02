@@ -16,6 +16,8 @@ class Api118SourceResourceIdMigrationCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->migrateFullChainUp();
+        \Yii::$app->db->schema->refresh();
         $db = \Yii::$app->db;
         $this->originalResourcesAutoIncrement = (int)$db->createCommand(
             'SELECT AUTO_INCREMENT FROM information_schema.TABLES '
@@ -26,29 +28,44 @@ class Api118SourceResourceIdMigrationCest extends BaseFunctionalCest
     public function _after(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
-        if ($this->submissionId) {
-            $db->createCommand()->delete('workflow_events', ['submission_id' => $this->submissionId])->execute();
-            $db->createCommand()->delete('submission_publication_state', ['submission_id' => $this->submissionId])->execute();
-            foreach ($this->itemIds as $itemId) {
-                $db->createCommand()->delete('item_flow_runs', [
-                    'item_kind' => 'new', 'item_id' => $itemId,
-                ])->execute();
+        try {
+            if ($this->submissionId) {
+                $db->createCommand()->delete('workflow_events', ['submission_id' => $this->submissionId])->execute();
+                if ($db->schema->getTableSchema('submission_publication_state', true)) {
+                    $db->createCommand()->delete(
+                        'submission_publication_state', ['submission_id' => $this->submissionId]
+                    )->execute();
+                }
+                foreach ($this->itemIds as $itemId) {
+                    $db->createCommand()->delete('item_flow_runs', [
+                        'item_kind' => 'new', 'item_id' => $itemId,
+                    ])->execute();
+                }
+            }
+            TestSubmissionFixture::delete($this->submissionUuid);
+            foreach ($this->resourceIds as $resourceId) {
+                $db->createCommand()->delete('resource_links', ['resource_id' => $resourceId])->execute();
+                $db->createCommand()->delete('resource_metadata', ['resource_id' => $resourceId])->execute();
+                $db->createCommand()->delete('resources', ['resource_id' => $resourceId])->execute();
+            }
+        } finally {
+            try {
+                $this->migrateFullChainUp();
+            } finally {
+                try {
+                    $db->schema->refresh();
+                    if ($this->originalResourcesAutoIncrement > 0) {
+                        $db->createCommand()->execute('ALTER TABLE resources AUTO_INCREMENT = '
+                            . (int)$this->originalResourcesAutoIncrement);
+                    }
+                } finally {
+                    $this->submissionUuid = null;
+                    $this->submissionId = null;
+                    $this->itemIds = [];
+                    $this->resourceIds = [];
+                }
             }
         }
-        TestSubmissionFixture::delete($this->submissionUuid);
-        foreach ($this->resourceIds as $resourceId) {
-            $db->createCommand()->delete('resource_links', ['resource_id' => $resourceId])->execute();
-            $db->createCommand()->delete('resource_metadata', ['resource_id' => $resourceId])->execute();
-            $db->createCommand()->delete('resources', ['resource_id' => $resourceId])->execute();
-        }
-        if ($this->originalResourcesAutoIncrement > 0) {
-            $db->createCommand()->execute('ALTER TABLE resources AUTO_INCREMENT = '
-                . (int)$this->originalResourcesAutoIncrement);
-        }
-        $this->submissionUuid = null;
-        $this->submissionId = null;
-        $this->itemIds = [];
-        $this->resourceIds = [];
     }
 
     public function testMigrationFreezesOnlyCanonicalIdsOnFreshDataAndPreservesNulls(FunctionalTester $I)

@@ -383,7 +383,7 @@ class Api118SourceResourceIdCest extends Api109FunctionalCest
 
     private function insertCourse()
     {
-        $uuid = $this->uuid();
+        $uuid = $this->uuidForFixture();
         \Yii::$app->db->createCommand()->insert('courses', [
             'permanent_course_uuid' => $uuid,
             'course_name' => $this->prefix . 'API-118 materialization course',
@@ -398,7 +398,7 @@ class Api118SourceResourceIdCest extends Api109FunctionalCest
     {
         $db = \Yii::$app->db;
         $db->createCommand()->insert('course_offerings', [
-            'offering_uuid' => $this->uuid(),
+            'offering_uuid' => $this->uuidForFixture(),
             'course_id' => $courseId,
             'folio_course_id' => 'api118-listing-' . bin2hex(random_bytes(3)),
             'term_id' => 'api118-term-' . bin2hex(random_bytes(3)),
@@ -412,11 +412,20 @@ class Api118SourceResourceIdCest extends Api109FunctionalCest
 
     private function setClaimedByStaff($itemId)
     {
+        $now = date('Y-m-d H:i:s');
         \Yii::$app->db->createCommand()->update('submission_new_resources', [
             'claimed_by' => $this->prefix . 'staff',
-            'claimed_at' => '2026-10-01 12:00:00',
-            'last_activity_at' => '2026-10-01 12:00:00',
+            'claimed_at' => $now,
+            'last_activity_at' => $now,
         ], ['id' => $itemId])->execute();
+    }
+
+    private function uuidForFixture()
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 
     private function publicationRevisionFromRoute(FunctionalTester $I, $itemId)
