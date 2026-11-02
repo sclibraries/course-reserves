@@ -29,6 +29,11 @@ class Cx037DeprecationGuard
         }
 
         define('CX037_DEPRECATION_GUARD_ACTIVE', true);
+        if (getenv('API_TEST_DEPRECATIONS_CHILD') === '1' && !defined('YII_ENV_TEST')) {
+            // Yii's test-mode exception handler can return with exit code 0.
+            define('YII_ENV_TEST', false);
+        }
+
         error_reporting(E_ALL);
 
         set_error_handler(function ($severity, $message, $file, $line) {

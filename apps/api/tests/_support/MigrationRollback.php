@@ -73,13 +73,9 @@ class MigrationRollback
             . var_export($columnName, true) . ', '
             . var_export($type, true) . ')->execute();';
 
-        if (Cx037DeprecationGuard::enabled()) {
-            $code = 'require ' . var_export(__DIR__ . '/deprecation-handler.php', true) . ';' . $code;
-        }
-
         $output = [];
         $exitCode = 0;
-        exec('cd /app && php -r ' . escapeshellarg($code) . ' 2>&1', $output, $exitCode);
+        exec('cd /app && ' . self::phpCommand() . ' -r ' . escapeshellarg($code) . ' 2>&1', $output, $exitCode);
         Assert::assertSame(0, $exitCode, implode("\n", $output));
         return implode("\n", $output);
     }
@@ -88,7 +84,8 @@ class MigrationRollback
     {
         $command = 'php';
         if (Cx037DeprecationGuard::enabled()) {
-            $command .= ' -d auto_prepend_file=' . escapeshellarg(__DIR__ . '/deprecation-handler.php');
+            $command = 'API_TEST_DEPRECATIONS_CHILD=1 ' . $command
+                . ' -d auto_prepend_file=' . escapeshellarg(__DIR__ . '/deprecation-handler.php');
         }
 
         return $command;
