@@ -1100,6 +1100,49 @@ CREATE TABLE `users` (
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+CREATE TABLE `publication_destinations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `destination_kind` enum('electronic','physical') NOT NULL,
+  `course_resource_id` int(11) DEFAULT NULL,
+  `physical_reference_id` int(11) DEFAULT NULL,
+  `offering_id` int(11) DEFAULT NULL,
+  `origin_offering_id` int(11) NOT NULL,
+  `owner_item_kind` enum('new','reuse') DEFAULT NULL,
+  `owner_item_id` bigint(20) unsigned DEFAULT NULL,
+  `owner_live` tinyint(4) DEFAULT NULL,
+  `ownership_source` enum('published','released','none') NOT NULL DEFAULT 'none',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `retired_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pub_dest_course_resource` (`course_resource_id`),
+  UNIQUE KEY `uq_pub_dest_physical_reference` (`physical_reference_id`),
+  UNIQUE KEY `uq_pub_dest_owner_live` (`owner_item_kind`,`owner_item_id`,`owner_live`),
+  KEY `idx_pub_dest_offering` (`offering_id`),
+  CONSTRAINT `fk_pub_dest_offering` FOREIGN KEY (`offering_id`) REFERENCES `course_offerings` (`offering_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_pub_dest_course_resource` FOREIGN KEY (`course_resource_id`) REFERENCES `course_resources` (`course_resource_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_pub_dest_physical_reference` FOREIGN KEY (`physical_reference_id`) REFERENCES `physical_resource_references` (`reference_id`) ON DELETE SET NULL,
+  CONSTRAINT `chk_pub_dest_pointer_shape` CHECK (
+    (`course_resource_id` IS NULL AND `physical_reference_id` IS NULL) OR
+    (`destination_kind` = 'electronic' AND `course_resource_id` IS NOT NULL AND `physical_reference_id` IS NULL) OR
+    (`destination_kind` = 'physical' AND `course_resource_id` IS NULL AND `physical_reference_id` IS NOT NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `publication_attachments` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `destination_id` int(11) NOT NULL,
+  `item_kind` enum('new','reuse') NOT NULL,
+  `item_id` bigint(20) unsigned NOT NULL,
+  `attached_snapshot_json` longtext NOT NULL,
+  `live` tinyint(4) DEFAULT NULL,
+  `attached_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `detached_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pub_attach_item_live` (`item_kind`,`item_id`,`live`),
+  KEY `idx_pub_attach_destination` (`destination_id`),
+  CONSTRAINT `fk_pub_attach_destination` FOREIGN KEY (`destination_id`) REFERENCES `publication_destinations` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
