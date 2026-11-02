@@ -50,7 +50,7 @@ class Api116ADestinationRegistryOperationsCest extends Api116ADestinationRegistr
         Assert::assertSame($pointer['offering_id'], $snapshot['offering_id']);
         Assert::assertSame($pointer['course_resource_id'], $snapshot['course_resource_id']);
         Assert::assertSame($pointer['resource_id'], $snapshot['resource_id']);
-        Assert::assertSame('Synthetic API-116A live owned-live', $snapshot['name']);
+        Assert::assertSame($this->fixtures->electronicResourceName('owned-live'), $snapshot['name']);
         Assert::assertSame('Synthetic public note owned-live', $snapshot['external_note']);
         Assert::assertSame('Synthetic public metadata owned-live', $snapshot['metadata'][0]['field_value']);
         Assert::assertSame('Synthetic public link owned-live', $snapshot['links'][0]['title']);

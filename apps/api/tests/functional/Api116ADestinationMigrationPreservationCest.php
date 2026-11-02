@@ -71,7 +71,10 @@ class Api116ADestinationMigrationPreservationCest extends Api116ADestinationMigr
             Assert::assertSame($frozenInputs, $this->fixtures->itemRow($item)['source_snapshot_json']);
             Assert::assertSame($beforeElectronicContent, $this->electronicLiveContent($destination));
             Assert::assertSame($item['id'], (int)$this->attachmentRow($item)['item_id']);
-            Assert::assertSame('Synthetic API-116A live preserve-live', $this->snapshot($item)['name']);
+            Assert::assertSame(
+                $this->fixtures->electronicResourceName('preserve-live'),
+                $this->snapshot($item)['name']
+            );
         });
     }
 }

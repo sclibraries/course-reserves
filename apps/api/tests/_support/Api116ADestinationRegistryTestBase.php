@@ -32,7 +32,7 @@ class Api116ADestinationRegistryTestBase extends Api109FunctionalCest
     public function _after(FunctionalTester $I)
     {
         $db = \Yii::$app->db;
-        $db->createCommand()->execute('DROP TRIGGER IF EXISTS ' . $this->triggerName);
+        $db->createCommand('DROP TRIGGER IF EXISTS ' . $this->triggerName)->execute();
         if ($db->schema->getTableSchema('publication_attachments', true) && $this->destinationIds) {
             $db->createCommand()->delete('publication_attachments', ['destination_id' => $this->destinationIds])->execute();
         }

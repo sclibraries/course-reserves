@@ -152,7 +152,7 @@ class Api116AFixture
     {
         $db = \Yii::$app->db;
         $db->createCommand()->insert('resources', [
-            'name' => $this->prefix . 'live ' . $suffix,
+            'name' => $this->electronicResourceName($suffix),
             'item_url' => 'https://example.test/api116a/' . rawurlencode($suffix),
             'description' => 'Synthetic live description ' . $suffix,
             'internal_note' => 'Synthetic private note ' . $suffix,
@@ -186,6 +186,11 @@ class Api116AFixture
             'course_resource_id' => $courseResourceId,
             'resource_id' => $resourceId,
         ];
+    }
+
+    public function electronicResourceName($suffix)
+    {
+        return $this->prefix . 'live ' . $suffix;
     }
 
     public function createPhysicalDestination($offeringId, $suffix, $instanceId, $identityStatus = 'verified')
@@ -266,7 +271,7 @@ class Api116AFixture
         }
         foreach ($this->autoIncrements as $table => $value) {
             if ($value > 0 && $db->schema->getTableSchema($table, true)) {
-                $db->createCommand()->execute('ALTER TABLE ' . $table . ' AUTO_INCREMENT = ' . (int)$value);
+                $db->createCommand('ALTER TABLE ' . $table . ' AUTO_INCREMENT = ' . (int)$value)->execute();
             }
         }
         $this->submissions = [];

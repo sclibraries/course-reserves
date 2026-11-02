@@ -111,9 +111,10 @@ class Api116ADestinationMigrationRecoveryCest extends Api116ADestinationMigratio
             $db->schema->refresh();
             Assert::assertNull($db->schema->getTableSchema('publication_attachments', true));
             Assert::assertNull($db->schema->getTableSchema('publication_destinations', true));
-            Assert::assertSame('Synthetic API-116A live partial-live', $this->resourceContent(
-                $destination['resource_id']
-            )['name']);
+            Assert::assertSame(
+                $this->fixtures->electronicResourceName('partial-live'),
+                $this->resourceContent($destination['resource_id'])['name']
+            );
             Assert::assertSame($beforeItem, $this->fixtures->itemRow($item));
             Assert::assertSame($beforeElectronicContent, $this->electronicLiveContent($destination));
             Assert::assertSame($beforePhysicalIdentity, $this->physicalIdentity($physical['physical_reference_id']));
@@ -168,7 +169,11 @@ class Api116ADestinationMigrationRecoveryCest extends Api116ADestinationMigratio
             Assert::assertSame($beforeDestination, $db->createCommand(
                 'SELECT * FROM publication_destinations WHERE id = :id', [':id' => $destinationId]
             )->queryOne());
-            Assert::assertFalse($db->schema->getTableSchema('publication_attachments', true)->isView);
+            Assert::assertSame('BASE TABLE', $db->createCommand(
+                'SELECT TABLE_TYPE FROM information_schema.TABLES '
+                . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table',
+                [':table' => 'publication_attachments']
+            )->queryScalar());
         });
     }
 }

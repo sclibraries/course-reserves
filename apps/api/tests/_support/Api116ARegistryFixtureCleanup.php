@@ -22,8 +22,8 @@ class Api116ARegistryFixtureCleanup
             return;
         }
 
-        $ids = $db->createCommand()->select('id')->from('publication_destinations')
-            ->where(array_merge(['or'], $conditions))->queryColumn();
+        $ids = (new \yii\db\Query())->select('id')->from('publication_destinations')
+            ->where(array_merge(['or'], $conditions))->column();
         if ($ids) {
             $db->createCommand()->delete('publication_attachments', ['destination_id' => $ids])->execute();
             $db->createCommand()->delete('publication_destinations', ['id' => $ids])->execute();

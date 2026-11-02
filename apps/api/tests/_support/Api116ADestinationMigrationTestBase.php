@@ -162,7 +162,7 @@ class Api116ADestinationMigrationTestBase extends BaseFunctionalCest
         Assert::assertSame($destination['offering_id'], $snapshot['offering_id']);
         Assert::assertSame($destination['course_resource_id'], $snapshot['course_resource_id']);
         Assert::assertSame($destination['resource_id'], $snapshot['resource_id']);
-        Assert::assertSame('Synthetic API-116A live backfill-shared', $snapshot['name']);
+        Assert::assertSame($this->fixtures->electronicResourceName('backfill-shared'), $snapshot['name']);
         Assert::assertSame('Synthetic public note backfill-shared', $snapshot['external_note']);
         Assert::assertStringNotContainsString('Synthetic private note', json_encode($snapshot));
         Assert::assertStringNotContainsString('same-id-new draft', json_encode($snapshot));
@@ -273,7 +273,7 @@ class Api116ADestinationMigrationTestBase extends BaseFunctionalCest
     protected function createPartiallyAppliedTables($includeAttachments = true)
     {
         $db = \Yii::$app->db;
-        $db->createCommand()->execute(
+        $db->createCommand(
             'CREATE TABLE publication_destinations ('
             . 'id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, '
             . 'destination_kind ENUM("electronic","physical") NOT NULL, '
@@ -283,9 +283,9 @@ class Api116ADestinationMigrationTestBase extends BaseFunctionalCest
             . 'ownership_source VARCHAR(16) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, '
             . 'updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, '
             . 'retired_at DATETIME NULL) ENGINE=InnoDB'
-        );
+        )->execute();
         if ($includeAttachments) {
-            $db->createCommand()->execute(
+            $db->createCommand(
                 'CREATE TABLE publication_attachments ('
                 . 'id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, destination_id INT NOT NULL, '
                 . 'item_kind VARCHAR(16) NOT NULL, item_id BIGINT UNSIGNED NOT NULL, '
@@ -293,7 +293,7 @@ class Api116ADestinationMigrationTestBase extends BaseFunctionalCest
                 . 'attached_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, '
                 . 'updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, '
                 . 'detached_at DATETIME NULL) ENGINE=InnoDB'
-            );
+            )->execute();
         }
     }
 }

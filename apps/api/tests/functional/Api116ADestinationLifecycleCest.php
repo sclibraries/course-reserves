@@ -168,10 +168,10 @@ class Api116ADestinationLifecycleCest extends Api116ADestinationRegistryTestBase
         $physical = $this->fixtures->createPhysicalDestination($this->offering, 'rollback-physical', $instanceId);
         $beforeDestination = $this->destinationRow($destinationId);
         $beforeAttachments = $this->attachmentRows($this->attached);
-        \Yii::$app->db->createCommand()->execute(
+        \Yii::$app->db->createCommand(
             'CREATE TRIGGER ' . $this->triggerName . ' BEFORE UPDATE ON publication_attachments '
             . 'FOR EACH ROW SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "Synthetic API-116A rollback"'
-        );
+        )->execute();
         try {
             try {
                 Transactional::run(function () use ($destinationId, $physical) {
@@ -182,7 +182,7 @@ class Api116ADestinationLifecycleCest extends Api116ADestinationRegistryTestBase
                 Assert::assertStringContainsString('Synthetic API-116A rollback', $exception->getMessage());
             }
         } finally {
-            \Yii::$app->db->createCommand()->execute('DROP TRIGGER IF EXISTS ' . $this->triggerName);
+            \Yii::$app->db->createCommand('DROP TRIGGER IF EXISTS ' . $this->triggerName)->execute();
         }
         Assert::assertSame($beforeDestination, $this->destinationRow($destinationId));
         Assert::assertSame($beforeAttachments, $this->attachmentRows($this->attached));
