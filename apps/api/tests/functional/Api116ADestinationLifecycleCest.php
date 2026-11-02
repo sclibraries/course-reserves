@@ -168,6 +168,10 @@ class Api116ADestinationLifecycleCest extends Api116ADestinationRegistryTestBase
         $physical = $this->fixtures->createPhysicalDestination($this->offering, 'rollback-physical', $instanceId);
         $beforeDestination = $this->destinationRow($destinationId);
         $beforeAttachments = $this->attachmentRows($this->attached);
+        $outer = \Yii::$app->db->getTransaction();
+        if ($outer !== null && $outer->isActive) {
+            $outer->commit();
+        }
         \Yii::$app->db->createCommand(
             'CREATE TRIGGER ' . $this->triggerName . ' BEFORE UPDATE ON publication_attachments '
             . 'FOR EACH ROW SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "Synthetic API-116A rollback"'

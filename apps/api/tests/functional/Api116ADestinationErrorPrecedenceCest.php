@@ -128,9 +128,10 @@ class Api116ADestinationErrorPrecedenceCest extends Api116ADestinationRegistryTe
         $attachmentsTargetId = $this->insertDestination($attachmentsTargetPointer);
         $attachmentSourceItem = $this->fixtures->createItem('precedence-attached-source', $this->offering);
         $this->insertAttachment($attachmentsTargetId, $attachmentSourceItem);
-        $this->assertError(Transactional::run(function () use ($attachmentsTargetId, $attachmentsTargetPointer, $neutralItem) {
+        $freshOwnerA = $this->fixtures->createItem('precedence-fresh-a', $this->offering);
+        $this->assertError(Transactional::run(function () use ($attachmentsTargetId, $attachmentsTargetPointer, $freshOwnerA) {
             return $this->registry()->registerOwned(
-                Api116AFixture::itemKey($neutralItem),
+                Api116AFixture::itemKey($freshOwnerA),
                 $attachmentsTargetPointer
             );
         }), 'destination_has_attachments');
@@ -139,15 +140,16 @@ class Api116ADestinationErrorPrecedenceCest extends Api116ADestinationRegistryTe
             $this->offering,
             'precedence-unregistered-live'
         );
-        $this->success(Transactional::run(function () use ($unregisteredLivePointer, $neutralItem) {
+        $freshOwnerB = $this->fixtures->createItem('precedence-fresh-b', $this->offering);
+        $this->success(Transactional::run(function () use ($unregisteredLivePointer, $freshOwnerB) {
             return $this->registry()->registerOwned(
-                Api116AFixture::itemKey($neutralItem),
+                Api116AFixture::itemKey($freshOwnerB),
                 $unregisteredLivePointer
             );
         }));
         $registered = $this->registryRowForCourseResource($unregisteredLivePointer['course_resource_id']);
         Assert::assertSame('new', $registered['owner_item_kind']);
-        Assert::assertSame((string)$neutralItem['id'], $registered['owner_item_id']);
+        Assert::assertSame((string)$freshOwnerB['id'], $registered['owner_item_id']);
         Assert::assertSame('1', $registered['owner_live']);
         Assert::assertSame('published', $registered['ownership_source']);
     }
