@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/_support/deprecation-handler.php';
+
 define('YII_ENV', 'test');
 require_once '/app/config/environment.php';
 require_once '/app/vendor/yiisoft/yii2/Yii.php';

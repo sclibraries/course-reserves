@@ -73,7 +73,7 @@ class MigrationRollback
             . var_export($columnName, true) . ', '
             . var_export($type, true) . ')->execute();';
 
-        if (getenv('API_TEST_DEPRECATIONS') === '1') {
+        if (Cx037DeprecationGuard::enabled()) {
             $code = 'require ' . var_export(__DIR__ . '/deprecation-handler.php', true) . ';' . $code;
         }
 
@@ -87,7 +87,7 @@ class MigrationRollback
     private static function phpCommand()
     {
         $command = 'php';
-        if (getenv('API_TEST_DEPRECATIONS') === '1') {
+        if (Cx037DeprecationGuard::enabled()) {
             $command .= ' -d auto_prepend_file=' . escapeshellarg(__DIR__ . '/deprecation-handler.php');
         }
 

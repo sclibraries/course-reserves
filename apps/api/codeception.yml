@@ -1,5 +1,7 @@
 actor: Tester
 bootstrap: _bootstrap.php
+params:
+    - tests/_support/codeception-params.php
 paths:
     tests: tests
     log: tests/_output
@@ -8,6 +10,8 @@ paths:
 settings:
     memory_limit: 1024M
     colors: true
+    error_level: "%CX037_ERROR_LEVEL%"
+    convert_deprecations_to_exceptions: "%CX037_CONVERT_DEPRECATIONS_TO_EXCEPTIONS%"
 modules:
     config:
         Yii2:
