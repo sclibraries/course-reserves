@@ -4,6 +4,7 @@ namespace tests\unit\services;
 
 use app\services\SubmissionInputProjection;
 use app\services\PublicationDraftSnapshot;
+use app\services\SubmissionBibliographicFieldAliases;
 
 class Api114ProjectionProtectionTest extends \Codeception\Test\Unit
 {
@@ -135,5 +136,51 @@ class Api114ProjectionProtectionTest extends \Codeception\Test\Unit
             'end_visibility' => null,
         ]], $result['copy_inputs']['additional_links']);
         $this->assertStringNotContainsString('private_link_property', json_encode($result['copy_inputs']));
+    }
+
+    public function testEveryBibliographicAliasClearMatchesInputAndCopyProjection()
+    {
+        $aliases = SubmissionBibliographicFieldAliases::FIELDS;
+        $this->assertSame([
+            'title' => ['title', 'name', 'book_title', 'article_title', 'website_title'],
+            'authors' => ['authors', 'author', 'author_editor', 'director_composer_performer', 'contributors'],
+            'publisher' => ['publisher'],
+            'publicationYear' => ['publicationYear', 'publication_year', 'publication_date', 'year'],
+            'isbn' => ['isbn', 'ISBN'],
+            'issn' => ['issn', 'ISSN'],
+            'doi' => ['doi', 'DOI'],
+        ], array_intersect_key($aliases, array_fill_keys([
+            'title', 'authors', 'publisher', 'publicationYear', 'isbn', 'issn', 'doi',
+        ], true)));
+
+        $frozen = array_fill_keys(array_keys($aliases), 'Synthetic frozen bibliographic value');
+        $projection = new SubmissionInputProjection();
+        foreach ($aliases as $canonical => $fieldAliases) {
+            $inputField = SubmissionBibliographicFieldAliases::inputField($canonical);
+            foreach ($fieldAliases as $alias) {
+                foreach ([null, ''] as $clear) {
+                    $result = $projection->project('new', [
+                        'id' => 114,
+                        'material_type_id' => 9,
+                        'resource_data' => json_encode([$alias => $clear]),
+                        'source_snapshot_json' => json_encode([
+                            'version' => 2,
+                            'copy_inputs' => ['bibliographic_metadata' => $frozen],
+                        ]),
+                    ], 'ebook', null, true);
+
+                    $this->assertNull(
+                        $result['copy_inputs']['bibliographic_metadata'][$canonical],
+                        'Copy inputs should honor clear alias ' . $alias . '.'
+                    );
+                    if ($inputField !== null) {
+                        $this->assertNull(
+                            $result['inputs'][$inputField],
+                            'Pending inputs should honor clear alias ' . $alias . '.'
+                        );
+                    }
+                }
+            }
+        }
     }
 }

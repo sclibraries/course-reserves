@@ -5,24 +5,6 @@ namespace app\services;
 /** Builds the allowlisted draft input without writing a destination. */
 class SubmissionInputProjection
 {
-    public const RESOURCE_DATA_FIELDS = [
-        'title' => ['title', 'name', 'book_title', 'article_title', 'website_title'],
-        'authors' => ['authors', 'author', 'author_editor', 'director_composer_performer', 'contributors'],
-        'publisher' => ['publisher'],
-        'publication_year' => ['publicationYear', 'publication_year', 'publication_date', 'year'],
-        'isbn' => ['isbn', 'ISBN'],
-        'issn' => ['issn', 'ISSN'],
-        'doi' => ['doi', 'DOI'],
-        'database' => ['database', 'databaseName', 'database_name'],
-        'accession_number' => ['accessionNumber', 'accession_number'],
-        'record_url' => ['recordUrl', 'record_url', 'pLink'],
-        'url' => ['fullTextUrl', 'url', 'item_url', 'link'],
-        'description' => ['description', 'abstract'],
-        'display_start_date' => ['displayStartDate', 'startVisibility', 'start_visibility'],
-        'display_end_date' => ['displayEndDate', 'endVisibility', 'end_visibility'],
-        'use_proxy' => ['useProxy', 'use_proxy'],
-    ];
-
     public function project($kind, array $item, $materialTypeName, $publishedSnapshot = null, $sourceExists = null)
     {
         $resourceData = $this->decode($item['resource_data'] ?? null);
@@ -31,7 +13,7 @@ class SubmissionInputProjection
         $published = $this->publishedResource($publishedSnapshot);
         $inputs = [];
 
-        foreach (self::RESOURCE_DATA_FIELDS as $field => $aliases) {
+        foreach (SubmissionBibliographicFieldAliases::resourceDataFields() as $field => $aliases) {
             $inputs[$field] = $this->field($field, $aliases, $corrections, $resourceData, $source, $published);
         }
         foreach (['public_note', 'assigned_pages'] as $field) {
@@ -101,29 +83,25 @@ class SubmissionInputProjection
             $resourceData, ['primary_link_end_visibility', 'primaryLinkEndVisibility']
         );
 
-        $metadata = array_fill_keys(array_keys(SubmissionSourceSnapshot::BIBLIOGRAPHIC_FIELDS), null);
+        $metadata = array_fill_keys(array_keys(SubmissionBibliographicFieldAliases::FIELDS), null);
         $frozenMetadata = isset($frozen['bibliographic_metadata']) && is_array($frozen['bibliographic_metadata'])
             ? $frozen['bibliographic_metadata']
             : [];
-        $inputFields = [
-            'title' => 'title', 'authors' => 'authors', 'publisher' => 'publisher',
-            'publicationYear' => 'publication_year', 'isbn' => 'isbn', 'issn' => 'issn', 'doi' => 'doi',
-        ];
-        foreach (SubmissionSourceSnapshot::BIBLIOGRAPHIC_FIELDS as $field => $aliases) {
+        foreach (SubmissionBibliographicFieldAliases::FIELDS as $field => $aliases) {
             $correctionField = $field === 'publicationYear' ? 'publication_year' : $field;
             if (array_key_exists($correctionField, $corrections)) {
                 $metadata[$field] = $this->normalize($corrections[$correctionField]);
                 continue;
             }
-            list($found, $value) = $this->firstValue($resourceData, $aliases);
+            list($found, $value) = SubmissionBibliographicFieldAliases::firstPresent($resourceData, $field);
             if ($found) {
                 $metadata[$field] = $this->normalize($value);
             } elseif (array_key_exists($field, $frozenMetadata)) {
                 $metadata[$field] = $this->normalize($frozenMetadata[$field]);
             } elseif (array_key_exists($field, $source)) {
                 $metadata[$field] = $this->normalize($source[$field]);
-            } elseif (isset($inputFields[$field])) {
-                $metadata[$field] = $inputs[$inputFields[$field]];
+            } elseif (SubmissionBibliographicFieldAliases::inputField($field) !== null) {
+                $metadata[$field] = $inputs[SubmissionBibliographicFieldAliases::inputField($field)];
             }
         }
 
@@ -192,7 +170,12 @@ class SubmissionInputProjection
         if (array_key_exists($field, $corrections)) {
             return $this->normalize($corrections[$field]);
         }
-        list($found, $value) = $this->firstValue($resourceData, $aliases);
+        $canonical = SubmissionBibliographicFieldAliases::canonicalForInput($field);
+        if ($canonical === null) {
+            list($found, $value) = $this->firstValue($resourceData, $aliases);
+        } else {
+            list($found, $value) = SubmissionBibliographicFieldAliases::firstPresent($resourceData, $canonical);
+        }
         if ($found) {
             return $this->normalize($value);
         }

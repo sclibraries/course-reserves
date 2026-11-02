@@ -14,6 +14,8 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
     private $referenceId;
     private $submissionId;
     private $itemId;
+    private $unversionedNewItemId;
+    private $unversionedReuseItemId;
 
     public function _after(FunctionalTester $I)
     {
@@ -43,6 +45,7 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
         MigrationRollback::withTargetDown($this->migrationVersion, function () {
             $db = \Yii::$app->db;
             $this->createPreservationFixtures();
+            $this->createUnversionedSnapshotFixtures();
 
             // Model an interrupted DDL migration with only a subset of its columns present.
             MigrationRollback::addColumn('resources', 'assigned_pages', 'TEXT NULL');
@@ -52,6 +55,7 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
 
             $this->assertDestinationColumnsAndDefaults();
             $this->assertExistingDataWasPreserved();
+            $this->assertUnversionedSnapshotsWereVersioned();
 
             // Reapplying an already completed migration must be safe and must not reset API-105 state.
             $db->createCommand()->delete('migration', ['version' => $this->migrationVersion])->execute();
@@ -59,6 +63,7 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             $db->schema->refresh();
             $this->assertDestinationColumnsAndDefaults();
             $this->assertExistingDataWasPreserved();
+            $this->assertUnversionedSnapshotsWereVersioned();
 
             MigrationRollback::migrate('down');
             $db->schema->refresh();
@@ -75,6 +80,7 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             Assert::assertArrayHasKey('external_note', $db->schema->getTableSchema('resources', true)->columns);
             Assert::assertArrayHasKey('folio_instance_id', $db->schema->getTableSchema('physical_resource_references', true)->columns);
             $this->assertExistingDataWasPreserved();
+            $this->assertUnversionedSnapshotsWereVersioned();
         });
     }
 
@@ -95,12 +101,15 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             [':id' => $this->submissionId]
         )->queryScalar();
         $snapshot = json_encode([
+            'version' => 1,
             'eds' => ['an' => 'scf.oai.synthetic.folio.ebsco.com.fs00001114.00000000.0000.4000.8000.000000000114'],
             'title' => 'Synthetic frozen v1 title',
         ], JSON_UNESCAPED_SLASHES);
         $db->createCommand()->update('submission_new_resources', [
-            'material_type_id' => $this->materialTypeId('ebook'),
             'source_snapshot_json' => $snapshot,
+            'materialized_resource_id' => 114001,
+            'materialized_course_resource_id' => 114002,
+            'materialized_physical_reference_id' => 114003,
         ], ['id' => $this->itemId])->execute();
 
         $db->createCommand()->insert('submission_publication_state', [
@@ -127,22 +136,6 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             'item_url' => 'https://live.example.test/api114',
         ])->execute();
         $this->resourceId = (int)$db->getLastInsertID();
-        $db->createCommand()->update('submission_new_resources', [
-            'source_resource_id' => (string)$this->resourceId,
-            'materialized_resource_id' => 114001,
-            'materialized_course_resource_id' => 114002,
-            'materialized_physical_reference_id' => 114003,
-        ], ['id' => $this->itemId])->execute();
-        $db->createCommand()->insert('submission_reuse_resources', [
-            'submission_id' => $this->submissionId,
-            'source_resource_id' => $this->resourceId,
-            'material_type_id' => $this->materialTypeId('ebook'),
-            'source_snapshot_json' => json_encode([
-                'eds' => ['an' => 'Synthetic reuse EDS identity'],
-                'title' => 'Synthetic frozen reuse title',
-            ], JSON_UNESCAPED_SLASHES),
-            'item_status' => 'pending',
-        ])->execute();
 
         $this->courseId = $this->insertCourse();
         $this->offeringId = $this->insertOffering($this->courseId);
@@ -162,6 +155,34 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
             'order' => 4,
         ])->execute();
         $this->referenceId = (int)$db->getLastInsertID();
+    }
+
+    private function createUnversionedSnapshotFixtures()
+    {
+        $db = \Yii::$app->db;
+        $db->createCommand()->insert('submission_new_resources', [
+            'submission_id' => $this->submissionId,
+            'material_type_id' => $this->materialTypeId('ebook'),
+            'source_resource_id' => (string)$this->resourceId,
+            'resource_data' => json_encode(['title' => 'Synthetic unversioned new item']),
+            'source_snapshot_json' => json_encode([
+                'eds' => ['an' => 'Synthetic unversioned new EDS identity'],
+                'title' => 'Synthetic unversioned new title',
+            ], JSON_UNESCAPED_SLASHES),
+            'item_status' => 'pending',
+        ])->execute();
+        $this->unversionedNewItemId = (int)$db->getLastInsertID();
+        $db->createCommand()->insert('submission_reuse_resources', [
+            'submission_id' => $this->submissionId,
+            'source_resource_id' => $this->resourceId,
+            'material_type_id' => $this->materialTypeId('ebook'),
+            'source_snapshot_json' => json_encode([
+                'eds' => ['an' => 'Synthetic unversioned reuse EDS identity'],
+                'title' => 'Synthetic unversioned reuse title',
+            ], JSON_UNESCAPED_SLASHES),
+            'item_status' => 'pending',
+        ])->execute();
+        $this->unversionedReuseItemId = (int)$db->getLastInsertID();
     }
 
     private function assertDestinationColumnsAndDefaults()
@@ -199,8 +220,7 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
     {
         $db = \Yii::$app->db;
         $item = $db->createCommand(
-            'SELECT id, material_type_id, source_resource_id, source_snapshot_json, '
-            . 'materialized_resource_id, materialized_course_resource_id, '
+            'SELECT source_snapshot_json, materialized_resource_id, materialized_course_resource_id, '
             . 'materialized_physical_reference_id FROM submission_new_resources WHERE id = :id',
             [':id' => $this->itemId]
         )->queryOne();
@@ -211,17 +231,6 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
         Assert::assertSame('114001', (string)$item['materialized_resource_id']);
         Assert::assertSame('114002', (string)$item['materialized_course_resource_id']);
         Assert::assertSame('114003', (string)$item['materialized_physical_reference_id']);
-
-        $reuse = $db->createCommand(
-            'SELECT id, source_resource_id, material_type_id, source_snapshot_json '
-            . 'FROM submission_reuse_resources WHERE submission_id = :id LIMIT 1',
-            [':id' => $this->submissionId]
-        )->queryOne();
-        $reuseSnapshot = json_decode($reuse['source_snapshot_json'], true);
-        Assert::assertSame(1, $reuseSnapshot['version']);
-        Assert::assertSame('Synthetic frozen reuse title', $reuseSnapshot['title']);
-        Assert::assertSame('Synthetic reuse EDS identity', $reuseSnapshot['eds']['an']);
-        $this->assertVersionOneCopyInputBlockerBoundaries($item, $reuse);
 
         $state = $db->createCommand(
             'SELECT state, draft_revision, published_revision, readiness_source, readiness_reason, '
@@ -251,6 +260,38 @@ class Api114DestinationMigrationCest extends BaseFunctionalCest
         Assert::assertSame('API114-MIGRATION-BARCODE', $reference['legacy_identifier']);
         Assert::assertSame('verified', $reference['identity_status']);
         Assert::assertSame('resource_data.eds.an', json_decode($reference['identity_provenance_json'], true)['evidence_source']);
+    }
+
+    private function assertUnversionedSnapshotsWereVersioned()
+    {
+        $db = \Yii::$app->db;
+        $new = $db->createCommand(
+            'SELECT id, source_resource_id, material_type_id, source_snapshot_json '
+            . 'FROM submission_new_resources WHERE id = :id',
+            [':id' => $this->unversionedNewItemId]
+        )->queryOne();
+        $newSnapshot = json_decode($new['source_snapshot_json'], true);
+        Assert::assertSame(1, $newSnapshot['version']);
+        Assert::assertSame('Synthetic unversioned new title', $newSnapshot['title']);
+        Assert::assertSame('Synthetic unversioned new EDS identity', $newSnapshot['eds']['an']);
+
+        $reuse = $db->createCommand(
+            'SELECT id, source_resource_id, material_type_id, source_snapshot_json '
+            . 'FROM submission_reuse_resources WHERE id = :id',
+            [':id' => $this->unversionedReuseItemId]
+        )->queryOne();
+        $reuseSnapshot = json_decode($reuse['source_snapshot_json'], true);
+        Assert::assertSame(1, $reuseSnapshot['version']);
+        Assert::assertSame('Synthetic unversioned reuse title', $reuseSnapshot['title']);
+        Assert::assertSame('Synthetic unversioned reuse EDS identity', $reuseSnapshot['eds']['an']);
+        Assert::assertSame(
+            (string)$this->resourceId,
+            (string)$db->createCommand(
+                'SELECT resource_id FROM resources WHERE resource_id = :id',
+                [':id' => $this->resourceId]
+            )->queryScalar()
+        );
+        $this->assertVersionOneCopyInputBlockerBoundaries($new, $reuse);
     }
 
     private function assertVersionOneCopyInputBlockerBoundaries(array $new, array $reuse)

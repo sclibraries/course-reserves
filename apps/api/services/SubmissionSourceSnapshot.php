@@ -7,21 +7,6 @@ use Yii;
 /** Captures the versioned, allowlisted source inputs a course-specific copy needs. */
 class SubmissionSourceSnapshot
 {
-    public const BIBLIOGRAPHIC_FIELDS = [
-        'title' => ['title', 'book_title', 'article_title', 'website_title'],
-        'authors' => ['authors', 'author', 'author_editor', 'director_composer_performer'],
-        'publisher' => ['publisher'],
-        'publicationYear' => ['publicationYear', 'publication_year', 'publication_date', 'year'],
-        'isbn' => ['isbn'],
-        'issn' => ['issn'],
-        'doi' => ['doi'],
-        'journalTitle' => ['journalTitle', 'journal_title', 'journal'],
-        'volume' => ['volume'],
-        'issue' => ['issue'],
-        'edition' => ['edition'],
-        'pages' => ['pages'],
-    ];
-
     public static function capture($resourceId)
     {
         if ($resourceId === null || trim((string)$resourceId) === '') {
@@ -73,7 +58,9 @@ class SubmissionSourceSnapshot
                     'primary_link_end_visibility' => null,
                 ],
                 'additional_links' => [],
-                'bibliographic_metadata' => array_fill_keys(array_keys(self::BIBLIOGRAPHIC_FIELDS), null),
+                'bibliographic_metadata' => array_fill_keys(
+                    array_keys(SubmissionBibliographicFieldAliases::FIELDS), null
+                ),
             ],
         ];
     }
@@ -100,10 +87,7 @@ class SubmissionSourceSnapshot
 
     private static function bibliographicMetadata($resourceId)
     {
-        $fieldNames = [];
-        foreach (self::BIBLIOGRAPHIC_FIELDS as $aliases) {
-            $fieldNames = array_merge($fieldNames, $aliases);
-        }
+        $fieldNames = SubmissionBibliographicFieldAliases::allAliases();
         $holders = [];
         $params = [':resource_id' => (int)$resourceId];
         foreach (array_values(array_unique($fieldNames)) as $index => $fieldName) {
@@ -116,19 +100,10 @@ class SubmissionSourceSnapshot
             . 'AND field_name IN (' . implode(', ', $holders) . ') ORDER BY field_name, field_value',
             $params
         )->queryAll();
-        $metadata = array_fill_keys(array_keys(self::BIBLIOGRAPHIC_FIELDS), null);
         $values = [];
         foreach ($rows as $row) {
             $values[$row['field_name']] = $row['field_value'];
         }
-        foreach (self::BIBLIOGRAPHIC_FIELDS as $field => $aliases) {
-            foreach ($aliases as $alias) {
-                if (array_key_exists($alias, $values)) {
-                    $metadata[$field] = $values[$alias];
-                    break;
-                }
-            }
-        }
-        return $metadata;
+        return SubmissionBibliographicFieldAliases::canonicalize($values);
     }
 }

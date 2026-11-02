@@ -131,7 +131,7 @@ class SubmissionItemDetailsService
                 return ['error_code' => 'invalid_item_detail', 'field' => 'corrections'];
             }
             $corrections = [];
-            $allowed = array_keys(SubmissionInputProjection::RESOURCE_DATA_FIELDS);
+            $allowed = array_keys(SubmissionBibliographicFieldAliases::resourceDataFields());
             foreach ($payload['corrections'] as $field => $value) {
                 if (!in_array($field, $allowed, true)) {
                     return ['error_code' => 'invalid_item_detail', 'field' => 'corrections'];
