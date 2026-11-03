@@ -18,6 +18,7 @@ define('YII_ENV', 'test');
 require_once $apiRoot . '/config/environment.php';
 require_once $apiRoot . '/vendor/autoload.php';
 require_once $apiRoot . '/vendor/yiisoft/yii2/Yii.php';
+\Yii::setAlias('@app', $apiRoot);
 require_once __DIR__ . '/PublicationDestinationConcurrencyProbe.php';
 require_once __DIR__ . '/PublicationDestinationConcurrencyCommand.php';
 
