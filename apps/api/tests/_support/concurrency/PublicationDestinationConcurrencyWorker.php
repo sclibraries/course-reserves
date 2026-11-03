@@ -183,29 +183,57 @@ function assertVisible($db, $sql, $id)
 
 function runLockProbe(array $row, $db)
 {
-    $queries = [
-        'submission' => ['SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE', [':id' => $row['id']]],
-        'new_item' => ['SELECT id FROM submission_new_resources WHERE id = :id FOR UPDATE', [':id' => $row['id']]],
-        'reuse_item' => ['SELECT id FROM submission_reuse_resources WHERE id = :id FOR UPDATE', [':id' => $row['id']]],
-        'state' => [
-            'SELECT item_id FROM submission_publication_state WHERE item_kind = :kind AND item_id = :id FOR UPDATE',
-            [':kind' => $row['item_kind'], ':id' => $row['id']],
-        ],
-        'attachment' => ['SELECT id FROM publication_attachments WHERE id = :id FOR UPDATE', [':id' => $row['id']]],
-        'destination' => ['SELECT id FROM publication_destinations WHERE id = :id FOR UPDATE', [':id' => $row['id']]],
-        'offering' => ['SELECT offering_id FROM course_offerings WHERE offering_id = :id FOR UPDATE', [':id' => $row['id']]],
-        'resource' => ['SELECT resource_id FROM resources WHERE resource_id = :id FOR UPDATE', [':id' => $row['id']]],
-        'course_resource' => ['SELECT course_resource_id FROM course_resources WHERE course_resource_id = :id FOR UPDATE', [':id' => $row['id']]],
-        'physical_reference' => ['SELECT reference_id FROM physical_resource_references WHERE reference_id = :id FOR UPDATE', [':id' => $row['id']]],
-    ];
-    if (!isset($queries[$row['kind']])) {
-        throw new \RuntimeException('Unsupported lock probe row kind.');
+    $id = $row['id'] ?? null;
+    switch ($row['kind'] ?? null) {
+        case 'submission':
+            $query = 'SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'new_item':
+            $query = 'SELECT id FROM submission_new_resources WHERE id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'reuse_item':
+            $query = 'SELECT id FROM submission_reuse_resources WHERE id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'state':
+            $query = 'SELECT item_id FROM submission_publication_state '
+                . 'WHERE item_kind = :kind AND item_id = :id FOR UPDATE';
+            $params = [':kind' => $row['item_kind'], ':id' => $id];
+            break;
+        case 'attachment':
+            $query = 'SELECT id FROM publication_attachments WHERE id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'destination':
+            $query = 'SELECT id FROM publication_destinations WHERE id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'offering':
+            $query = 'SELECT offering_id FROM course_offerings WHERE offering_id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'resource':
+            $query = 'SELECT resource_id FROM resources WHERE resource_id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'course_resource':
+            $query = 'SELECT course_resource_id FROM course_resources WHERE course_resource_id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        case 'physical_reference':
+            $query = 'SELECT reference_id FROM physical_resource_references WHERE reference_id = :id FOR UPDATE';
+            $params = [':id' => $id];
+            break;
+        default:
+            throw new \RuntimeException('Unsupported lock probe row kind.');
     }
 
     $transaction = $db->beginTransaction();
     $db->createCommand('SET SESSION innodb_lock_wait_timeout = 1')->execute();
     try {
-        $db->createCommand($queries[$row['kind']][0], $queries[$row['kind']][1])->queryScalar();
+        $db->createCommand($query, $params)->queryScalar();
         return ['kind' => $row['kind'], 'outcome' => 'acquired'];
     } catch (\yii\db\Exception $exception) {
         $errorCode = isset($exception->errorInfo[1]) ? (int)$exception->errorInfo[1] : null;

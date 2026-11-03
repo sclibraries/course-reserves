@@ -21,7 +21,8 @@ class PublicationDestinationConcurrencyProbeInsert
         if ($phase === 'locked' && (int)$attempt === 1) {
             $this->coverage = $context['required'] ?? null;
         }
-        if ($this->request && !$this->inserted && $phase === 'before_insert'
+        $insertPhase = $this->request['phase'] ?? 'before_insert';
+        if ($this->request && !$this->inserted && $phase === $insertPhase
             && (int)$attempt === 1 && ($context['table'] ?? null) === ($this->request['table'] ?? null)) {
             $transaction = $this->db->getTransaction();
             if ($transaction === null || !$transaction->isActive || !is_array($this->coverage)) {

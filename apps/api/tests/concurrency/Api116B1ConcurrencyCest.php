@@ -897,7 +897,7 @@ class Api116B1ConcurrencyCest
         ]);
     }
 
-    public function test28FollowDuplicateRecoveryReturnsOccupiedWithoutMovingTheDestination(ConcurrencyTester $I)
+    public function test28FollowFindsCompetingPointerDuringLockedValidationWithoutMovingTheDestination(ConcurrencyTester $I)
     {
         $owner = $this->item('follow-recovery-owner');
         $oldPointer = $this->electronic('follow-recovery-old');
@@ -907,7 +907,8 @@ class Api116B1ConcurrencyCest
         $this->tracker->trackDestination($destinationId);
         $oldRow = $this->row('publication_destinations', 'id = :id', [':id' => $destinationId]);
 
-        $probeInsert = $this->competingDestinationInsert($newPointer);
+        // Locked validation sees the competing pointer first, so this operation cannot reach duplicate-key recovery.
+        $probeInsert = array_merge($this->competingDestinationInsert($newPointer), ['phase' => 'locked']);
         $ready = $this->startOperation('follow-recovery-a', 'follow', [
             'destination_id' => $destinationId,
             'pointer' => $newPointer,
@@ -916,20 +917,19 @@ class Api116B1ConcurrencyCest
         $this->assertWorkerReadyForDatabase($ready);
         $this->supervisor->awaitPhase('follow-recovery-a', 'discovered', 1);
         $this->supervisor->release('follow-recovery-a', 'discovered', 1);
-        $this->supervisor->awaitPhase('follow-recovery-a', 'locked', 1);
+        $locked = $this->supervisor->awaitPhase('follow-recovery-a', 'locked', 1);
+        $competingDestinationId = (int)$locked['context']['injected_id'];
+        $this->tracker->trackDestination($competingDestinationId);
+        $competingRow = $this->row('publication_destinations', 'id = :id', [':id' => $competingDestinationId]);
         $this->supervisor->release('follow-recovery-a', 'locked', 1);
-        $beforeInsert = $this->supervisor->awaitPhase('follow-recovery-a', 'before_insert', 1);
-        $this->tracker->trackDestination((int)$beforeInsert['context']['injected_id']);
-        $this->supervisor->release('follow-recovery-a', 'before_insert', 1);
-        $recovery = $this->supervisor->awaitPhase('follow-recovery-a', 'recovery_entered');
-        Assert::assertSame(1062, (int)$recovery['context']['mysql_code']);
-        $this->supervisor->release('follow-recovery-a', 'recovery_entered', $recovery['attempt']);
-        $recoveryLock = $this->supervisor->advanceToPhase('follow-recovery-a', 'locked');
-        $this->supervisor->release('follow-recovery-a', 'locked', $recoveryLock['attempt']);
         $result = $this->supervisor->complete('follow-recovery-a');
         $this->assertStatus($result, 409, 'destination_occupied');
-        $this->assertContainsPhase('follow-recovery-a', 'recovery_entered');
+        Assert::assertNotContains('recovery_entered', $this->phases('follow-recovery-a'));
+        Assert::assertNotContains('before_insert', $this->phases('follow-recovery-a'));
         Assert::assertSame($oldRow, $this->row('publication_destinations', 'id = :id', [':id' => $destinationId]));
+        Assert::assertSame($competingRow, $this->row(
+            'publication_destinations', 'id = :id', [':id' => $competingDestinationId]
+        ));
         Assert::assertSame((string)$oldPointer['course_resource_id'], $oldRow['course_resource_id']);
         Assert::assertSame(1, $this->destinationCountForPointer($oldPointer));
         Assert::assertSame(1, $this->destinationCountForPointer($newPointer));
