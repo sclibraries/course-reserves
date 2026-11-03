@@ -44,8 +44,10 @@ class Api116B1ConcurrencyCest
     public function test00PreflightRequiresProcOpenAndARealPipeRoundTrip(ConcurrencyTester $I)
     {
         Assert::assertTrue(function_exists('proc_open'), 'The test image must provide proc_open.');
-        $ready = $this->launch('preflight', 'preflight', []);
+        $this->supervisor->start('preflight', ['op' => 'preflight']);
+        $ready = $this->supervisor->awaitPhase('preflight', 'ready', 0);
         Assert::assertNotSame($this->parentConnectionId, $ready['connection_id']);
+        $this->supervisor->release('preflight', 'ready', 0);
         $result = $this->supervisor->complete('preflight');
         Assert::assertSame(['round_trip' => true], $result['result']);
         Assert::assertSame(
@@ -203,7 +205,7 @@ class Api116B1ConcurrencyCest
         $attachedNew = $this->item('stage-attached-new', $this->offering);
         $attachedReuse = $this->item('stage-attached-reuse', $this->offering, 'legacy_reuse');
         foreach ([$owner, $attachedNew, $attachedReuse] as $item) {
-            $fixture->setIdentity($item, $instance);
+            $this->setIdentity($item, $instance);
             $this->tracker->insertPublicationState($item);
         }
 
@@ -1002,7 +1004,7 @@ class Api116B1ConcurrencyCest
         $item = $this->item('stale-item-identity');
         $oldInstance = $this->instanceId();
         $newInstance = $this->instanceId();
-        $this->tracker->fixture()->setIdentity($item, $oldInstance);
+        $this->setIdentity($item, $oldInstance);
         $pointer = $this->physical('stale-item-physical', $oldInstance);
         $destinationId = $this->tracker->insertDestination($pointer);
         $this->tracker->insertPublicationState($item);
@@ -1013,7 +1015,7 @@ class Api116B1ConcurrencyCest
         ]);
         $this->assertWorkerReadyForDatabase($ready);
         $this->supervisor->awaitPhase('stale-item-a', 'discovered', 1);
-        $this->tracker->fixture()->setIdentity($item, $newInstance);
+        $this->setIdentity($item, $newInstance);
         $this->supervisor->release('stale-item-a', 'discovered', 1);
         $result = $this->supervisor->complete('stale-item-a');
         $this->assertStatus($result, 409, 'destination_unresolved');
@@ -1134,7 +1136,7 @@ class Api116B1ConcurrencyCest
     {
         $item = $this->item('stale-physical-ambiguity');
         $instance = $this->instanceId();
-        $this->tracker->fixture()->setIdentity($item, $instance);
+        $this->setIdentity($item, $instance);
         $pointer = $this->physical('stale-physical-candidate-one', $instance);
         $destinationId = $this->tracker->insertDestination($pointer);
         $ready = $this->startOperation('stale-physical-a', 'attach_by_id', [
@@ -1275,6 +1277,32 @@ class Api116B1ConcurrencyCest
             ':id' => $winnerDestination['id'],
         ]));
         $this->tracker->trackDestination((int)$winnerDestination['id']);
+    }
+
+    private function setIdentity(array $item, $instanceId)
+    {
+        $table = $item['kind'] === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
+        $column = $item['kind'] === 'new' ? 'resource_data' : 'source_snapshot_json';
+        $frozenInput = [
+            'version' => 1,
+            'title' => 'Synthetic frozen input',
+            'eds' => ['an' => Api116AFixture::accession($instanceId)],
+        ];
+        $values = [
+            $column => json_encode($frozenInput),
+            'staff_corrections_json' => '{"title":"Synthetic correction"}',
+        ];
+        if ($item['kind'] === 'new') {
+            $values['resource_data'] = json_encode([
+                'title' => 'Synthetic draft input',
+                'eds' => ['an' => Api116AFixture::accession($instanceId)],
+            ]);
+            $values['source_snapshot_json'] = json_encode([
+                'version' => 1,
+                'title' => 'Synthetic frozen input',
+            ]);
+        }
+        \Yii::$app->db->createCommand()->update($table, $values, ['id' => $item['id']])->execute();
     }
 
     private function item($suffix, $offeringId = null, $representation = 'new')
