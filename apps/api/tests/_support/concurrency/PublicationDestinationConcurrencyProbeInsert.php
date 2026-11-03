@@ -23,7 +23,8 @@ class PublicationDestinationConcurrencyProbeInsert
         }
         $insertPhase = $this->request['phase'] ?? 'before_insert';
         if ($this->request && !$this->inserted && $phase === $insertPhase
-            && (int)$attempt === 1 && ($context['table'] ?? null) === ($this->request['table'] ?? null)) {
+            && (int)$attempt === 1 && (!isset($context['table'])
+                || $context['table'] === ($this->request['table'] ?? null))) {
             $transaction = $this->db->getTransaction();
             if ($transaction === null || !$transaction->isActive || !is_array($this->coverage)) {
                 throw new \RuntimeException('Probe insert requires an active locked attempt.');

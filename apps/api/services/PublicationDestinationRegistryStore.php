@@ -8,6 +8,7 @@ use Yii;
 class PublicationDestinationRegistryStore
 {
     protected $db;
+    protected $lookups;
     protected $lock;
     protected $snapshots;
     protected $probe;
@@ -20,10 +21,11 @@ class PublicationDestinationRegistryStore
         ?PublicationDestinationProbe $probe = null
     ) {
         $this->db = $db ?: Yii::$app->db;
+        $this->lookups = new PublicationDestinationRegistryLookup($this->db);
         $this->lock = $lock ?: new PublicationDestinationLock(null, $this->db);
         $this->snapshots = $snapshots ?: new PublicationDestinationSnapshot($this->db);
         $this->probe = $probe ?: new NullPublicationDestinationProbe();
-        $this->stager = new PublicationDestinationRegistryStage($this->db, $this->lock, $this->probe);
+        $this->stager = new PublicationDestinationRegistryStage($this->lock, $this->probe);
     }
 
     protected function validatePointer(array $pointer, $forUpdate = false, ?callable $guard = null)
@@ -82,6 +84,9 @@ class PublicationDestinationRegistryStore
     protected function loadItem(array $key, $forUpdate = false, ?callable $guard = null)
     {
         $table = $key['kind'] === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
+        if ($guard !== null) {
+            call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
+        }
         $row = $this->db->createCommand(
             'SELECT * FROM ' . $table . ' WHERE id = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
             [':id' => $key['id']]
@@ -105,51 +110,33 @@ class PublicationDestinationRegistryStore
 
     protected function destination($id, $forUpdate = false, ?callable $guard = null)
     {
-        $destination = is_numeric($id) && (int)$id > 0
+        $validId = is_numeric($id) && (int)$id > 0;
+        if ($validId && $guard !== null) {
+            call_user_func($guard, 'destination_ids', $id);
+        }
+        return $validId
             ? $this->db->createCommand(
                 'SELECT * FROM publication_destinations WHERE id = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
                 [':id' => (int)$id]
             )->queryOne()
             : null;
-        if ($destination && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $destination['id']);
-        }
-        return $destination;
     }
 
-    protected function destinationForPointer(array $pointer, $forUpdate = false)
+    protected function destinationForPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
     {
-        $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
-        return $this->db->createCommand(
-            'SELECT * FROM publication_destinations WHERE `' . $column . '` = :id'
-            . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => $pointer['id']]
-        )->queryOne();
-    }
-
-    protected function loadDestinationForPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
-    {
-        $destination = $this->destinationForPointer($pointer, $forUpdate);
-        if ($destination && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $destination['id']);
-        }
-        return $destination;
+        return $this->lookups->destinationForPointer($pointer, $forUpdate, $guard);
     }
 
     protected function ownerForItem(array $key, $forUpdate = false, ?callable $guard = null)
     {
-        $owner = $this->db->createCommand(
-            'SELECT * FROM publication_destinations WHERE owner_item_kind = :kind '
-            . 'AND owner_item_id = :id AND owner_live = 1 LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
-            [':kind' => $key['kind'], ':id' => $key['id']]
-        )->queryOne();
-        if ($owner && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $owner['id']);
-        }
-        return $owner;
+        return $this->lookups->ownerForItem($key, $forUpdate, $guard);
     }
 
     protected function attachmentForItem(array $key, $forUpdate = false, ?callable $guard = null)
     {
+        if ($guard !== null) {
+            call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
+        }
         $attachment = $this->db->createCommand(
             'SELECT * FROM publication_attachments WHERE item_kind = :kind AND item_id = :id '
             . 'AND live = 1 ORDER BY id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
@@ -164,6 +151,9 @@ class PublicationDestinationRegistryStore
 
     protected function attachmentsForDestination($id, $forUpdate = false, ?callable $guard = null)
     {
+        if ($guard !== null) {
+            call_user_func($guard, 'destination_ids', $id);
+        }
         $attachments = $this->db->createCommand(
             'SELECT * FROM publication_attachments WHERE destination_id = :id AND live = 1 ORDER BY id'
             . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => $id]
@@ -231,9 +221,6 @@ class PublicationDestinationRegistryStore
         $key = $destination['owner_live'] == 1 && $destination['owner_item_kind'] !== null
             ? ['kind' => $destination['owner_item_kind'], 'id' => (int)$destination['owner_item_id']]
             : null;
-        if ($key && $guard !== null) {
-            call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
-        }
         return $key ? $this->itemContext($key, $this->loadItem($key, $forUpdate, $guard)) : null;
     }
 
@@ -242,9 +229,6 @@ class PublicationDestinationRegistryStore
         $contexts = [];
         foreach ($attachments as $attachment) {
             $key = ['kind' => $attachment['item_kind'], 'id' => (int)$attachment['item_id']];
-            if ($guard !== null) {
-                call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
-            }
             $contexts[] = $this->itemContext($key, $this->loadItem($key, $forUpdate, $guard));
         }
         return $contexts;

@@ -130,7 +130,7 @@ class PublicationDestinationRegistryLifecycle extends PublicationDestinationRegi
                 $destination = $this->destination($destinationId, $current, $guard);
                 $oldEntry = $destination ? $this->destinationEntry($destination, $current, $guard) : null;
                 $entry = $pointer ? $this->loadPointer($pointer, $current, $guard) : null;
-                $conflict = $pointer ? $this->loadDestinationForPointer($pointer, $current, $guard) : null;
+                $conflict = $pointer ? $this->destinationForPointer($pointer, $current, $guard) : null;
                 $attachments = $destination
                     ? $this->attachmentsForDestination($destinationId, $current, $guard) : [];
                 $itemContexts = $this->contextsForAttachments($attachments, $current, $guard);

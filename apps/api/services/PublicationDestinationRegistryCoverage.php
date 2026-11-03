@@ -11,6 +11,23 @@ class PublicationDestinationRegistryCoverage
         'destination_pointers', 'new_item_ids', 'reuse_item_ids', 'publication_state_items', 'attachment_ids',
     ];
 
+    private const RANKS = [
+        'offering_ids' => 0,
+        'resource_ids' => 1,
+        'resource_metadata_ids' => 2,
+        'resource_link_ids' => 2,
+        'folder_ids' => 2,
+        'course_resource_ids' => 3,
+        'physical_reference_ids' => 4,
+        'destination_ids' => 5,
+        'destination_pointers' => 5,
+        'submission_ids' => 6,
+        'new_item_ids' => 7,
+        'reuse_item_ids' => 8,
+        'publication_state_items' => 9,
+        'attachment_ids' => 10,
+    ];
+
     public function fromContext(array $context)
     {
         $coverage = array_fill_keys(self::BUCKETS, []);
@@ -84,11 +101,51 @@ class PublicationDestinationRegistryCoverage
         return $coverage;
     }
 
-    public function assertContains(array $coverage, $bucket, $id)
+    public function highestRank(array $coverage)
     {
-        if (!isset($coverage[$bucket]) || !in_array((int)$id, $coverage[$bucket], true)) {
-            throw new PublicationDestinationRestartRequired('A destination key is outside acquired coverage.');
+        $highest = -1;
+        foreach ($coverage as $bucket => $ids) {
+            if ($ids) {
+                $highest = max($highest, $this->rank($bucket));
+            }
         }
+        return $highest;
+    }
+
+    public function assertSafeToLock(array $coverage, $bucket, $id, $highestRank)
+    {
+        $rank = $this->rank($bucket);
+        if ($this->contains($coverage, $bucket, $id)) {
+            return $highestRank;
+        }
+        if ($rank < $highestRank) {
+            throw new PublicationDestinationRestartRequired(
+                'A destination key would require a lock before the current lock frontier.'
+            );
+        }
+        return max($highestRank, $rank);
+    }
+
+    private function rank($bucket)
+    {
+        if (!isset(self::RANKS[$bucket])) {
+            throw new \InvalidArgumentException('Unknown destination lock bucket: ' . $bucket);
+        }
+        return self::RANKS[$bucket];
+    }
+
+    private function contains(array $coverage, $bucket, $id)
+    {
+        foreach ($coverage[$bucket] ?? [] as $member) {
+            if (is_array($member) && is_array($id)) {
+                if ($member['kind'] === ($id['kind'] ?? null) && (int)$member['id'] === (int)($id['id'] ?? 0)) {
+                    return true;
+                }
+            } elseif (!is_array($member) && !is_array($id) && (int)$member === (int)$id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function addItem(array &$coverage, array $context)

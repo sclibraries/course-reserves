@@ -19,6 +19,7 @@ class PublicationDestinationSnapshot
     public function electronic($courseResourceId, $forUpdate = false, ?callable $guard = null)
     {
         $suffix = $forUpdate ? ' FOR UPDATE' : '';
+        $this->guard($guard, 'course_resource_ids', $courseResourceId);
         $courseResource = $this->db->createCommand(
             'SELECT course_resource_id, offering_id, resource_id, `order`, start_visibility, end_visibility, '
             . 'use_resource_visibility, primary_link_start_visibility, primary_link_end_visibility, '
@@ -28,7 +29,6 @@ class PublicationDestinationSnapshot
         if (!$courseResource) {
             return null;
         }
-        $this->guard($guard, 'course_resource_ids', $courseResource['course_resource_id']);
         $this->guard($guard, 'offering_ids', $courseResource['offering_id']);
         $this->guard($guard, 'resource_ids', $courseResource['resource_id']);
 
@@ -96,6 +96,7 @@ class PublicationDestinationSnapshot
 
     public function physical($referenceId, $forUpdate = false, ?callable $guard = null)
     {
+        $this->guard($guard, 'physical_reference_ids', $referenceId);
         $reference = $this->db->createCommand(
             'SELECT * FROM physical_resource_references WHERE reference_id = :id'
             . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => (int)$referenceId]
@@ -103,7 +104,6 @@ class PublicationDestinationSnapshot
         if (!$reference) {
             return null;
         }
-        $this->guard($guard, 'physical_reference_ids', $reference['reference_id']);
         $this->guard($guard, 'offering_ids', $reference['offering_id']);
         $ambiguityIds = $this->physicalCandidateIds($reference, $forUpdate, $guard);
 

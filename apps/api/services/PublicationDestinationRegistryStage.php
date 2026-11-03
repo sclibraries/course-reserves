@@ -5,14 +5,12 @@ namespace app\services;
 /** Runs discovery, ordered locking and current validation for one registry attempt. */
 class PublicationDestinationRegistryStage
 {
-    private $db;
     private $lock;
     private $coverage;
     private $probe;
 
-    public function __construct($db, PublicationDestinationLock $lock, PublicationDestinationProbe $probe)
+    public function __construct(PublicationDestinationLock $lock, PublicationDestinationProbe $probe)
     {
-        $this->db = $db;
         $this->lock = $lock;
         $this->coverage = new PublicationDestinationRegistryCoverage();
         $this->probe = $probe;
@@ -29,27 +27,17 @@ class PublicationDestinationRegistryStage
             'acquired' => $required,
         ]);
 
-        $guard = function ($bucket, $id) use ($required) {
-            $this->coverage->assertContains($required, $bucket, $id);
+        $highestRank = $this->coverage->highestRank($required);
+        $guard = function ($bucket, $id) use ($required, &$highestRank) {
+            $highestRank = $this->coverage->assertSafeToLock($required, $bucket, $id, $highestRank);
         };
-        $savepoint = 'api116b1_registry_stage';
-        $this->db->schema->createSavepoint($savepoint);
-        try {
-            $current = call_user_func($collect, true, $guard);
-        } catch (\Throwable $exception) {
-            $this->db->schema->rollBackSavepoint($savepoint);
-            throw $exception;
-        }
+        $current = call_user_func($collect, true, $guard);
         $currentCoverage = $this->coverage->fromContext($current);
         if (!$this->coverageContains($required, $currentCoverage)) {
             if (!$this->onlyWinnerRowsChanged($required, $currentCoverage)
                 || $finish === null || !call_user_func($finish, $current)) {
-                $this->db->schema->rollBackSavepoint($savepoint);
                 throw new PublicationDestinationRestartRequired('Destination lock coverage changed.');
             }
-            $this->db->schema->releaseSavepoint($savepoint);
-        } else {
-            $this->db->schema->rollBackSavepoint($savepoint);
         }
         return call_user_func($apply, $current, $attempt);
     }

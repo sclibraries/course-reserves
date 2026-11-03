@@ -25,7 +25,7 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
                 $itemContext = $this->itemContext($key, $row);
                 $entry = $pointer ? $this->loadPointer($pointer, $current, $stageGuard) : null;
                 $registryRow = $pointer
-                    ? $this->loadDestinationForPointer($pointer, $current, $stageGuard)
+                    ? $this->destinationForPointer($pointer, $current, $stageGuard)
                     : null;
                 $targetAttachments = $registryRow
                     ? $this->attachmentsForDestination($registryRow['id'], $current, $stageGuard) : [];
@@ -133,7 +133,7 @@ class PublicationDestinationRegistry extends PublicationDestinationRegistryLifec
                     };
                 }
                 $destination = $pointer
-                    ? $this->loadDestinationForPointer($pointer, $current, $stageGuard)
+                    ? $this->destinationForPointer($pointer, $current, $stageGuard)
                     : $this->destination($destinationId, $current, $stageGuard);
                 $entry = $pointer
                     ? $this->loadPointer($pointer, $current, $stageGuard)
