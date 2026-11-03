@@ -7,6 +7,15 @@ use yii\db\IntegrityException;
 /** Owns destination and attachment history without changing publication state. */
 class PublicationDestinationRegistry extends PublicationDestinationRegistryLifecycle
 {
+    public function __construct(
+        $db = null,
+        ?PublicationDestinationLock $lock = null,
+        ?PublicationDestinationSnapshot $snapshots = null,
+        ?PublicationDestinationProbe $probe = null
+    ) {
+        parent::__construct($db, $lock, $snapshots, $probe);
+    }
+
     public function registerOwned(array $item, array $destination)
     {
         return Transactional::run(function () use ($item, $destination) {

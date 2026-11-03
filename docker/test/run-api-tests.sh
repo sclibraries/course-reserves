@@ -12,6 +12,26 @@ compose() {
     docker compose -f docker-compose.test.yml -p "$project_name" "$@"
 }
 
+backend() {
+    if [ "${API_TEST_DEPRECATIONS+x}" = "x" ]; then
+        compose exec -T -e "API_TEST_DEPRECATIONS=$API_TEST_DEPRECATIONS" backend "$@"
+    else
+        compose exec -T backend "$@"
+    fi
+}
+
+run_suite() {
+    suite=$1
+    if backend php -d register_argc_argv=On vendor/bin/codecept run "$suite" --no-colors; then
+        printf '%s suite exit code: 0\n' "$suite"
+        return 0
+    else
+        suite_exit_code=$?
+        printf '%s suite exit code: %s\n' "$suite" "$suite_exit_code"
+        return "$suite_exit_code"
+    fi
+}
+
 cleanup() {
     exit_code=$?
     trap - EXIT
@@ -23,8 +43,8 @@ cleanup() {
 trap cleanup EXIT
 
 compose up -d --build --wait
-compose exec -T backend php yii migrate/up --interactive=0
-migration_output=$(compose exec -T backend php yii migrate/up --interactive=0)
+backend php yii migrate/up --interactive=0
+migration_output=$(backend php yii migrate/up --interactive=0)
 printf '%s\n' "$migration_output"
 case "$migration_output" in
     *"No new migrations found"*) ;;
@@ -33,22 +53,35 @@ case "$migration_output" in
         exit 1
         ;;
 esac
-compose exec -T backend php yii dev-seed/test-courses
+backend php yii dev-seed/test-courses
 
-if compose exec -T backend php -d register_argc_argv=On vendor/bin/codecept run unit --no-colors; then
+if run_suite unit; then
     unit_exit_code=0
 else
     unit_exit_code=$?
 fi
-printf 'Unit suite exit code: %s\n' "$unit_exit_code"
 
-if compose exec -T backend php -d register_argc_argv=On vendor/bin/codecept run functional --no-colors; then
+if run_suite functional; then
     functional_exit_code=0
 else
     functional_exit_code=$?
 fi
-printf 'Functional suite exit code: %s\n' "$functional_exit_code"
 
-if [ "$unit_exit_code" -ne 0 ] || [ "$functional_exit_code" -ne 0 ]; then
+if run_suite concurrency; then
+    concurrency_first_exit_code=0
+else
+    concurrency_first_exit_code=$?
+fi
+
+if run_suite concurrency; then
+    concurrency_second_exit_code=0
+else
+    concurrency_second_exit_code=$?
+fi
+
+if [ "$unit_exit_code" -ne 0 ] \
+    || [ "$functional_exit_code" -ne 0 ] \
+    || [ "$concurrency_first_exit_code" -ne 0 ] \
+    || [ "$concurrency_second_exit_code" -ne 0 ]; then
     exit 1
 fi

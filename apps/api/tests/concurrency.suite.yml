@@ -1,0 +1,7 @@
+# Independent connections must not inherit Codeception's per-test transaction.
+class_name: ConcurrencyTester
+modules:
+    enabled:
+      - Yii2:
+            configFile: 'config/test.php'
+            transaction: false

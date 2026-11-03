@@ -10,12 +10,19 @@ class PublicationDestinationRegistryStore
     protected $db;
     protected $lock;
     protected $snapshots;
+    protected $probe;
 
-    public function __construct($db = null, ?PublicationDestinationLock $lock = null, ?PublicationDestinationSnapshot $snapshots = null)
+    public function __construct(
+        $db = null,
+        ?PublicationDestinationLock $lock = null,
+        ?PublicationDestinationSnapshot $snapshots = null,
+        ?PublicationDestinationProbe $probe = null
+    )
     {
         $this->db = $db ?: Yii::$app->db;
         $this->lock = $lock ?: new PublicationDestinationLock();
         $this->snapshots = $snapshots ?: new PublicationDestinationSnapshot($this->db);
+        $this->probe = $probe ?: new NullPublicationDestinationProbe();
     }
     protected function validatePointer(array $pointer)
     {
