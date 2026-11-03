@@ -6,7 +6,6 @@ require_once __DIR__ . '/../_support/concurrency/PublicationDestinationConcurren
 require_once __DIR__ . '/../_support/concurrency/PublicationDestinationConcurrencySqlObserver.php';
 
 use app\services\PublicationDestinationContention;
-use app\services\PublicationDestinationProbe;
 use app\services\PublicationDestinationRegistry;
 use app\services\PublicationDestinationRestartRequired;
 use app\services\PublicationDestinationTransaction;
@@ -513,6 +512,7 @@ class Api116B1ConcurrencyCest
         $secondDiscovery = $this->supervisor->awaitPhase('follow-a', 'discovered', 2);
         Assert::assertContains($attachedY['id'], $secondDiscovery['context']['required']['reuse_item_ids']);
         Assert::assertContains($attachedY['submission_id'], $secondDiscovery['context']['required']['submission_ids']);
+        $this->supervisor->release('follow-a', 'discovered', 2);
         $follow = $this->supervisor->complete('follow-a');
         $this->assertStatus($follow, 200);
         $this->assertAttemptStages('follow-a', 2);
@@ -634,6 +634,7 @@ class Api116B1ConcurrencyCest
         $this->supervisor->release('retire-a', 'locked', 1);
         $secondDiscovery = $this->supervisor->awaitPhase('retire-a', 'discovered', 2);
         Assert::assertContains($newlyAttached['id'], $secondDiscovery['context']['required']['reuse_item_ids']);
+        $this->supervisor->release('retire-a', 'discovered', 2);
         $this->supervisor->awaitPhase('retire-a', 'locked', 2);
 
         $probeRows = [
@@ -756,24 +757,23 @@ class Api116B1ConcurrencyCest
         $this->tracker->insertPublicationState($item);
         $stateBefore = $this->stateRow($item);
         $inputBefore = $this->itemInput($item);
+        $probeInsert = $this->competingAttachmentInsert(
+            $destinationId,
+            $item,
+            'Synthetic competing content captured before recovery'
+        );
         $aReady = $this->startOperation('attach-recovery-a', 'attach_by_id', [
             'item' => $item,
             'destination_id' => $destinationId,
+            'probe_insert' => $probeInsert,
         ]);
         $this->assertWorkerReadyForDatabase($aReady);
         $this->supervisor->awaitPhase('attach-recovery-a', 'discovered', 1);
         $this->supervisor->release('attach-recovery-a', 'discovered', 1);
         $this->supervisor->awaitPhase('attach-recovery-a', 'locked', 1);
         $this->supervisor->release('attach-recovery-a', 'locked', 1);
-        $this->supervisor->awaitPhase('attach-recovery-a', 'before_insert', 1);
-
-        $winnerResult = $this->insertCompetingAttachment(
-            'attach-recovery-insert-winner',
-            $destinationId,
-            $item,
-            'Synthetic competing content captured before recovery'
-        );
-        $winnerId = (int)$winnerResult['result']['id'];
+        $beforeInsert = $this->supervisor->awaitPhase('attach-recovery-a', 'before_insert', 1);
+        $winnerId = (int)$beforeInsert['context']['injected_id'];
         $winnerRow = $this->row('publication_attachments', 'id = :id', [':id' => $winnerId]);
         $this->supervisor->release('attach-recovery-a', 'before_insert', 1);
         $recovery = $this->supervisor->awaitPhase('attach-recovery-a', 'recovery_entered');
@@ -818,19 +818,19 @@ class Api116B1ConcurrencyCest
     {
         $item = $this->item('pointer-recovery-item');
         $pointer = $this->electronic('pointer-recovery-entry');
+        $probeInsert = $this->competingDestinationInsert($pointer);
         $aReady = $this->startOperation('pointer-recovery-a', 'attach_by_pointer', [
             'item' => $item,
             'pointer' => $pointer,
+            'probe_insert' => $probeInsert,
         ]);
         $this->assertWorkerReadyForDatabase($aReady);
         $this->supervisor->awaitPhase('pointer-recovery-a', 'discovered', 1);
         $this->supervisor->release('pointer-recovery-a', 'discovered', 1);
         $this->supervisor->awaitPhase('pointer-recovery-a', 'locked', 1);
         $this->supervisor->release('pointer-recovery-a', 'locked', 1);
-        $this->supervisor->awaitPhase('pointer-recovery-a', 'before_insert', 1);
-
-        $competitor = $this->insertCompetingDestination('pointer-recovery-insert-winner', $pointer);
-        $retiredId = (int)$competitor['result']['id'];
+        $beforeInsert = $this->supervisor->awaitPhase('pointer-recovery-a', 'before_insert', 1);
+        $retiredId = (int)$beforeInsert['context']['injected_id'];
         $this->tracker->trackDestination($retiredId);
         $this->supervisor->release('pointer-recovery-a', 'before_insert', 1);
         $recovery = $this->supervisor->awaitPhase('pointer-recovery-a', 'recovery_entered');
@@ -858,24 +858,24 @@ class Api116B1ConcurrencyCest
         $item = $this->item('register-recovery-owner');
         $pointer = $this->electronic('register-recovery-entry');
         $this->tracker->insertPublicationState($item);
+        $probeInsert = $this->competingDestinationInsert($pointer, [
+            'owner_item_kind' => $item['kind'],
+            'owner_item_id' => $item['id'],
+            'owner_live' => 1,
+            'ownership_source' => 'published',
+        ]);
         $ready = $this->startOperation('register-recovery-a', 'register_owned', [
             'item' => $item,
             'pointer' => $pointer,
+            'probe_insert' => $probeInsert,
         ]);
         $this->assertWorkerReadyForDatabase($ready);
         $this->supervisor->awaitPhase('register-recovery-a', 'discovered', 1);
         $this->supervisor->release('register-recovery-a', 'discovered', 1);
         $this->supervisor->awaitPhase('register-recovery-a', 'locked', 1);
         $this->supervisor->release('register-recovery-a', 'locked', 1);
-        $this->supervisor->awaitPhase('register-recovery-a', 'before_insert', 1);
-
-        $competitor = $this->insertCompetingDestination('register-recovery-winner', $pointer, [
-            'owner_item_kind' => $item['kind'],
-            'owner_item_id' => $item['id'],
-            'owner_live' => 1,
-            'ownership_source' => 'published',
-        ]);
-        $winnerId = (int)$competitor['result']['id'];
+        $beforeInsert = $this->supervisor->awaitPhase('register-recovery-a', 'before_insert', 1);
+        $winnerId = (int)$beforeInsert['context']['injected_id'];
         $this->tracker->trackDestination($winnerId);
         $winner = $this->row('publication_destinations', 'id = :id', [':id' => $winnerId]);
         $this->supervisor->release('register-recovery-a', 'before_insert', 1);
@@ -907,18 +907,19 @@ class Api116B1ConcurrencyCest
         $this->tracker->trackDestination($destinationId);
         $oldRow = $this->row('publication_destinations', 'id = :id', [':id' => $destinationId]);
 
+        $probeInsert = $this->competingDestinationInsert($newPointer);
         $ready = $this->startOperation('follow-recovery-a', 'follow', [
             'destination_id' => $destinationId,
             'pointer' => $newPointer,
+            'probe_insert' => $probeInsert,
         ]);
         $this->assertWorkerReadyForDatabase($ready);
         $this->supervisor->awaitPhase('follow-recovery-a', 'discovered', 1);
         $this->supervisor->release('follow-recovery-a', 'discovered', 1);
         $this->supervisor->awaitPhase('follow-recovery-a', 'locked', 1);
         $this->supervisor->release('follow-recovery-a', 'locked', 1);
-        $this->supervisor->awaitPhase('follow-recovery-a', 'before_insert', 1);
-        $competitor = $this->insertCompetingDestination('follow-recovery-conflict', $newPointer);
-        $this->tracker->trackDestination((int)$competitor['result']['id']);
+        $beforeInsert = $this->supervisor->awaitPhase('follow-recovery-a', 'before_insert', 1);
+        $this->tracker->trackDestination((int)$beforeInsert['context']['injected_id']);
         $this->supervisor->release('follow-recovery-a', 'before_insert', 1);
         $recovery = $this->supervisor->awaitPhase('follow-recovery-a', 'recovery_entered');
         Assert::assertSame(1062, (int)$recovery['context']['mysql_code']);
@@ -985,6 +986,7 @@ class Api116B1ConcurrencyCest
         ]);
         $this->assertWorkerReadyForDatabase($ready);
         $this->supervisor->awaitPhase('stale-offering-a', 'discovered', 1);
+        $this->supervisor->release('stale-offering-a', 'discovered', 1);
         \Yii::$app->db->createCommand()->update('faculty_submissions', [
             'offering_id' => $this->otherOffering,
         ], ['submission_id' => $item['submission_id']])->execute();
@@ -1166,23 +1168,23 @@ class Api116B1ConcurrencyCest
         $pointer = $this->electronic($retireFirst ? 'recovery-retire-first-entry' : 'recovery-first-entry');
         $destinationId = $this->tracker->insertDestination($pointer);
         $this->tracker->insertPublicationState($item);
+        $probeInsert = $this->competingAttachmentInsert(
+            $destinationId,
+            $item,
+            'Synthetic recovery winner ' . ($retireFirst ? 'retire-first' : 'recovery-first')
+        );
         $aReady = $this->startOperation('recovery-attach-a', 'attach_by_id', [
             'item' => $item,
             'destination_id' => $destinationId,
+            'probe_insert' => $probeInsert,
         ]);
         $this->assertWorkerReadyForDatabase($aReady);
         $this->supervisor->awaitPhase('recovery-attach-a', 'discovered', 1);
         $this->supervisor->release('recovery-attach-a', 'discovered', 1);
         $this->supervisor->awaitPhase('recovery-attach-a', 'locked', 1);
         $this->supervisor->release('recovery-attach-a', 'locked', 1);
-        $this->supervisor->awaitPhase('recovery-attach-a', 'before_insert', 1);
-        $injected = $this->insertCompetingAttachment(
-            'recovery-competing-attachment',
-            $destinationId,
-            $item,
-            'Synthetic recovery winner ' . ($retireFirst ? 'retire-first' : 'recovery-first')
-        );
-        $injectedId = (int)$injected['result']['id'];
+        $beforeInsert = $this->supervisor->awaitPhase('recovery-attach-a', 'before_insert', 1);
+        $injectedId = (int)$beforeInsert['context']['injected_id'];
         $this->supervisor->release('recovery-attach-a', 'before_insert', 1);
         $recovery = $this->supervisor->awaitPhase('recovery-attach-a', 'recovery_entered');
         Assert::assertSame(1062, (int)$recovery['context']['mysql_code']);
@@ -1226,6 +1228,9 @@ class Api116B1ConcurrencyCest
         $item = $this->item($lazyPointer ? 'lazy-attach-race-item' : 'registered-attach-race-item');
         $pointer = $this->electronic($lazyPointer ? 'lazy-attach-race-entry' : 'registered-attach-race-entry');
         $destinationId = $lazyPointer ? null : $this->tracker->insertDestination($pointer);
+        $parentDestination = $lazyPointer ? null : $this->row(
+            'publication_destinations', 'id = :id', [':id' => $destinationId]
+        );
         $this->tracker->insertPublicationState($item);
         $operation = $lazyPointer ? 'attach_by_pointer' : 'attach_by_id';
         $arguments = $lazyPointer ? ['pointer' => $pointer] : ['destination_id' => $destinationId];
@@ -1258,8 +1263,12 @@ class Api116B1ConcurrencyCest
         $winnerDestination = $this->row('publication_destinations', 'id = :id', [
             ':id' => $winner['destination_id'],
         ]);
-        Assert::assertSame($aReady['session_time'], $winnerDestination['created_at']);
-        Assert::assertSame($aReady['session_time'], $winnerDestination['updated_at']);
+        $expectedDestinationCreatedAt = $lazyPointer
+            ? $aReady['session_time'] : $parentDestination['created_at'];
+        $expectedDestinationUpdatedAt = $lazyPointer
+            ? $aReady['session_time'] : $parentDestination['updated_at'];
+        Assert::assertSame($expectedDestinationCreatedAt, $winnerDestination['created_at']);
+        Assert::assertSame($expectedDestinationUpdatedAt, $winnerDestination['updated_at']);
 
         $this->supervisor->release('identical-attach-b', 'locked', 1);
         $this->supervisor->release('identical-attach-a', 'committed', 1);
@@ -1356,7 +1365,7 @@ class Api116B1ConcurrencyCest
         return $result;
     }
 
-    private function insertCompetingAttachment($label, $destinationId, array $item, $name)
+    private function competingAttachmentInsert($destinationId, array $item, $name)
     {
         $values = [
             'destination_id' => $destinationId,
@@ -1372,13 +1381,13 @@ class Api116B1ConcurrencyCest
             'updated_at' => '2026-10-02 06:07:08',
             'live' => 1,
         ];
-        return $this->runOperation($label, 'insert_competing_row', [
+        return [
             'table' => 'publication_attachments',
             'values' => $values,
-        ]);
+        ];
     }
 
-    private function insertCompetingDestination($label, array $pointer, array $overrides = [])
+    private function competingDestinationInsert(array $pointer, array $overrides = [])
     {
         $values = array_merge([
             'destination_kind' => $pointer['destination_kind'],
@@ -1393,10 +1402,10 @@ class Api116B1ConcurrencyCest
             'owner_live' => null,
             'ownership_source' => 'none',
         ], $overrides);
-        return $this->runOperation($label, 'insert_competing_row', [
+        return [
             'table' => 'publication_destinations',
             'values' => $values,
-        ]);
+        ];
     }
 
     private function assertWorkerReadyForDatabase(array $ready)
@@ -1503,18 +1512,7 @@ class Api116B1ConcurrencyCest
 
     private function recordingProbe()
     {
-        return new class implements PublicationDestinationProbe {
-            public $events = [];
-
-            public function checkpoint($phase, $attempt, array $context = [])
-            {
-                $this->events[] = [
-                    'phase' => $phase,
-                    'attempt' => (int)$attempt,
-                    'context' => $context,
-                ];
-            }
-        };
+        return new PublicationDestinationConcurrencyRecordingProbe();
     }
 
     private function normalizeCoverage(array $coverage)

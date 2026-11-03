@@ -20,6 +20,7 @@ require_once $apiRoot . '/vendor/autoload.php';
 require_once $apiRoot . '/vendor/yiisoft/yii2/Yii.php';
 \Yii::setAlias('@app', $apiRoot);
 require_once __DIR__ . '/PublicationDestinationConcurrencyProbe.php';
+require_once __DIR__ . '/PublicationDestinationConcurrencyProbeInsert.php';
 require_once __DIR__ . '/PublicationDestinationConcurrencyCommand.php';
 
 $testDbConfig = require $apiRoot . '/config/test_db.php';
@@ -117,8 +118,10 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt, arr
     }
 
     assertFixtureManifest($request['manifest'] ?? [], $db);
-    $probe = new PublicationDestinationConcurrencyProbe($operation, function ($value) use (&$attempt) {
+    $probeInsert = new PublicationDestinationConcurrencyProbeInsert($db, $request['probe_insert'] ?? null);
+    $probe = new PublicationDestinationConcurrencyProbe($operation, function ($phase, $value, $context) use (&$attempt, $probeInsert) {
         $attempt = (int)$value;
+        return $probeInsert->checkpoint($phase, $value, $context);
     });
     $registry = new PublicationDestinationRegistry($db, null, null, $probe);
     $item = $request['item'] ?? [];

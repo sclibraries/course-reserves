@@ -18,8 +18,12 @@ class PublicationDestinationConcurrencyProbe implements PublicationDestinationPr
 
     public function checkpoint($phase, $attempt, array $context = [])
     {
+        $hookContext = [];
         if ($this->onCheckpoint !== null) {
-            call_user_func($this->onCheckpoint, $attempt);
+            $hookContext = call_user_func($this->onCheckpoint, $phase, $attempt, $context);
+            if (is_array($hookContext)) {
+                $context = array_merge($context, $hookContext);
+            }
         }
         PublicationDestinationConcurrencyWire::write(STDOUT, [
             'op' => $this->operation,
