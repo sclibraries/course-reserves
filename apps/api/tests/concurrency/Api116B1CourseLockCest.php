@@ -211,7 +211,7 @@ class Api116B1CourseLockCest extends Api116B1ConcurrencyCase
         $this->pauseAt($a, $operations[$a][0], $operations[$a][1], 'locked');
         $this->assertContended($this->lockProbe('offering', $this->offering));
         $this->pauseAt($b, $operations[$b][0], $operations[$b][1], 'discovered');
-        $this->releaseIntoBlock($b);
+        $this->releaseIntoBlock($b, 'offering', $this->offering);
         $this->supervisor->release($a, 'locked', 1);
         $results = [$a => $this->supervisor->complete($a)];
         $afterA = ['destination_after_a' => $this->destinationRow($destinationId), 'attachments_after_a' => $this->attachmentRows($item)];
@@ -235,7 +235,7 @@ class Api116B1CourseLockCest extends Api116B1ConcurrencyCase
         $this->pauseAt($a, $operations[$a][0], $operations[$a][1], 'locked');
         $this->assertContended($this->lockProbe('destination', $orphan));
         $this->pauseAt($b, $operations[$b][0], $operations[$b][1], 'discovered');
-        $this->releaseIntoBlock($b);
+        $this->releaseIntoBlock($b, 'destination', $orphan);
         $this->supervisor->release($a, 'locked', 1);
         $results = [$a => $this->supervisor->complete($a)];
         $afterA = $this->row('publication_attachments', 'id = :id', [':id' => $attachmentId]);

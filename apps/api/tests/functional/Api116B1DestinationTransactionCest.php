@@ -33,11 +33,16 @@ class Api116B1DestinationTransactionCest extends BaseFunctionalCest
         $this->prefix = 'test-api116b1-tx-' . substr(md5(uniqid('', true)), 0, 8);
     }
 
+    /** Cleans up on the committed connection, where deletes are real, and only then restores Codeception's. */
     public function _after(FunctionalTester $I)
     {
-        call_user_func($this->restore);
-        \Yii::$app->db->createCommand('DELETE FROM courses WHERE course_number LIKE :p', [':p' => $this->prefix . '%'])->execute();
-        Assert::assertSame([], $this->courseNames());
+        try {
+            \Yii::$app->db->createCommand('DELETE FROM courses WHERE course_number LIKE :p', [':p' => $this->prefix . '%'])->execute();
+            Assert::assertSame(0, Api116B1CommittedConnection::level());
+            Assert::assertSame([], $this->courseNames());
+        } finally {
+            call_user_func($this->restore);
+        }
     }
 
     public function testOutermostDeadlockThreeTimesRaisesContentionAfterExactlyThreeAttempts(FunctionalTester $I)
@@ -192,6 +197,88 @@ class Api116B1DestinationTransactionCest extends BaseFunctionalCest
         Assert::assertSame([$this->prefix . '-inner-2', $this->prefix . '-outer-2'], $this->courseNames());
     }
 
+    /** Review #1: a deadlock inside a Transactional block in the registry callback is still classified and retried. */
+    public function testOutermostRetriesADeadlockRaisedInsideATransactionalBlock(FunctionalTester $I)
+    {
+        $probe = new PublicationDestinationConcurrencyRecordingProbe();
+        $result = PublicationDestinationTransaction::run(function ($attempt) {
+            $this->insertCourse('-outer-' . $attempt);
+            return Transactional::run(function () use ($attempt) {
+                $this->insertCourse('-inner-' . $attempt);
+                if ($attempt === 1) {
+                    throw $this->deadlock();
+                }
+                return 'inner block done on ' . $attempt;
+            });
+        }, $probe);
+        Assert::assertSame('inner block done on 2', $result);
+        Assert::assertSame(
+            ['attempt_started:1', 'attempt_failed:1:1213', 'attempt_started:2', 'before_commit:2', 'committed:2'],
+            $this->events($probe)
+        );
+        Assert::assertSame([$this->prefix . '-inner-2', $this->prefix . '-outer-2'], $this->courseNames());
+        Assert::assertSame(0, Api116B1CommittedConnection::level());
+    }
+
+    /** Review #1, nested: caller block -> registry -> Transactional block -> deadlock raises RestartRequired(1213). */
+    public function testNestedDeadlockInsideATransactionalBlockRaisesRestartRequired(FunctionalTester $I)
+    {
+        $probe = new PublicationDestinationConcurrencyRecordingProbe();
+        $levelAtRestart = null;
+        try {
+            Transactional::run(function () use ($probe, &$levelAtRestart) {
+                $this->insertCourse('-caller');
+                try {
+                    return PublicationDestinationTransaction::run(function () {
+                        return Transactional::run(function () {
+                            $this->insertCourse('-inner-block');
+                            throw $this->deadlock();
+                        });
+                    }, $probe);
+                } finally {
+                    $levelAtRestart = Api116B1CommittedConnection::level();
+                }
+            });
+            Assert::fail('A deadlock inside the nested registry call must raise RestartRequired.');
+        } catch (\Throwable $exception) {
+            Assert::assertInstanceOf(PublicationDestinationRestartRequired::class, $exception, $this->describe($exception));
+            Assert::assertSame(1213, (int)$exception->getPrevious()->errorInfo[1]);
+        }
+        Assert::assertSame(0, $levelAtRestart);
+        Assert::assertSame(['attempt_started:1', 'attempt_failed:1:1213'], $this->events($probe));
+        $this->assertCleanAfterFailure();
+    }
+
+    /**
+     * Review #2: when the real rollback after a 1205 fails (the server connection is gone), the original cause is
+     * kept, the cleanup failure is recorded and the connection is closed instead of being reused.
+     */
+    public function testOutermostFailedRealRollbackClosesTheConnectionAndKeepsTheCause(FunctionalTester $I)
+    {
+        $probe = new PublicationDestinationConcurrencyRecordingProbe();
+        $closedAfterFailure = null;
+        // The killed connection gets its own PDO, so Codeception never hands that dead PDO to later code.
+        $committed = \Yii::$app->db;
+        \Yii::$app->set('db', Api116B1CommittedConnection::open($committed, [\PDO::ATTR_CASE => \PDO::CASE_NATURAL, \PDO::ATTR_TIMEOUT => 7]));
+        try {
+            PublicationDestinationTransaction::run(function () {
+                $this->insertCourse('-before-lost-connection');
+                $this->killCurrentConnection();
+                throw $this->failure(1205);
+            }, $probe);
+            Assert::fail('Expected destination_contention.');
+        } catch (\Throwable $exception) {
+            $closedAfterFailure = !\Yii::$app->db->getIsActive();
+            Assert::assertInstanceOf(PublicationDestinationContention::class, $exception, $this->describe($exception));
+            Assert::assertSame(1205, (int)$exception->getPrevious()->errorInfo[1], 'The original cause is kept.');
+        } finally {
+            \Yii::$app->set('db', $committed);
+        }
+        Assert::assertTrue($closedAfterFailure, 'A connection whose rollback failed is closed, not reused.');
+        Assert::assertSame(['attempt_started:1', 'cleanup_failed:1', 'attempt_failed:1:1205'], $this->events($probe));
+        $this->assertCleanAfterFailure();
+    }
+
     /** Callers at level 1 or >= 2 (Transactional wrappers that wrote rows) see only the restart, never a second error. */
     private function assertNestedRestart($levels, $code)
     {
@@ -272,6 +359,16 @@ class Api116B1DestinationTransactionCest extends BaseFunctionalCest
         $pdo = new \PDOException('SQLSTATE[' . $state . ']: ' . $class . ': ' . $code . ' ' . $text);
         $pdo->errorInfo = [$state, $code, $text];
         return \Yii::$app->db->getSchema()->convertException($pdo, 'INSERT INTO publication_destinations (id) VALUES (7)');
+    }
+
+    /** Kills this connection from another one, so its next statement, the rollback, really fails. */
+    private function killCurrentConnection()
+    {
+        $id = (int)\Yii::$app->db->createCommand('SELECT CONNECTION_ID()')->queryScalar();
+        $original = \Yii::$app->db;
+        $killer = new \yii\db\Connection(['dsn' => $original->dsn, 'username' => $original->username, 'password' => $original->password]);
+        $killer->createCommand('KILL ' . $id)->execute();
+        $killer->close();
     }
 
     private function insertCourse($suffix)

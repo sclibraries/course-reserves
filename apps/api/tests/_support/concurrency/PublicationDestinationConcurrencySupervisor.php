@@ -25,7 +25,8 @@ class PublicationDestinationConcurrencySupervisor
         }
         $apiRoot = dirname(__DIR__, 3);
         $workerPath = __DIR__ . '/PublicationDestinationConcurrencyWorker.php';
-        $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($workerPath);
+        // An argv array starts PHP directly (no shell), so terminating the process terminates the worker itself.
+        $command = [PHP_BINARY, $workerPath];
         $descriptors = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -156,7 +157,7 @@ class PublicationDestinationConcurrencySupervisor
         }
     }
 
-    /** Proves a released worker stays blocked: it emits nothing and does not exit for the given time. */
+    /** Fails if the worker emits a frame or exits within the given time; on its own this proves no lock wait. */
     public function assertSilent($label, $seconds)
     {
         $until = microtime(true) + $seconds;
@@ -402,14 +403,22 @@ class PublicationDestinationConcurrencySupervisor
         }
     }
 
-    /** Reads both pipes to EOF before closing, so frames written just before exit are never lost. */
+    /**
+     * Reads both pipes to EOF before closing, so frames written just before exit are never lost. The drain is
+     * bounded (2 s), so a pipe some other process still holds can never hang shutdown.
+     */
     private function closeAndReap($label, $strict = true)
     {
+        $until = microtime(true) + 2.0;
         foreach ([1 => 'stdout', 2 => 'stderr'] as $index => $buffer) {
             $pipe = $this->workers[$label]['pipes'][$index];
-            if (is_resource($pipe)) {
-                stream_set_blocking($pipe, true);
-                $this->workers[$label][$buffer] .= (string)stream_get_contents($pipe);
+            while (is_resource($pipe) && !feof($pipe) && microtime(true) < $until) {
+                $read = [$pipe];
+                $write = null;
+                $except = null;
+                if (@stream_select($read, $write, $except, 0, 50000)) {
+                    $this->workers[$label][$buffer] .= (string)fread($pipe, 8192);
+                }
             }
         }
         $this->workers[$label]['stdout_eof'] = true;

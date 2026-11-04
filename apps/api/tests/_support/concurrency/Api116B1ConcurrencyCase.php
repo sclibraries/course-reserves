@@ -18,6 +18,8 @@ abstract class Api116B1ConcurrencyCase
     protected $offering;
     protected $otherOffering;
     protected $parentConnectionId;
+    /** Worker connection ids by label, from each worker's ready frame. */
+    protected $connections = [];
 
     public function _before(ConcurrencyTester $I)
     {
@@ -86,6 +88,7 @@ abstract class Api116B1ConcurrencyCase
         Assert::assertSame('reserves_test', $ready['database']);
         Assert::assertSame('REPEATABLE-READ', $ready['isolation_level']);
         Assert::assertSame(10, (int)$ready['lock_wait_timeout']);
+        $this->connections[$label] = (int)$ready['connection_id'];
         $this->supervisor->release($label, 'ready', 0);
         return $ready;
     }
@@ -105,11 +108,46 @@ abstract class Api116B1ConcurrencyCase
         return $this->supervisor->advanceToPhase($label, $phase);
     }
 
-    /** Releases a worker that waits at discovery, then proves it does not reach its lock while another holds it. */
-    protected function releaseIntoBlock($label)
+    /** Releases a worker waiting at discovery and proves it then waits on the row lock another worker holds. */
+    protected function releaseIntoBlock($label, $kind, $id)
     {
-        $this->supervisor->release($label, 'discovered', 1);
-        $this->supervisor->assertSilent($label, 1.5);
+        $tables = ['offering' => 'course_offerings', 'destination' => 'publication_destinations'];
+        $this->releaseIntoWait($label, 'discovered', function () use ($kind, $id) {
+            return $this->lockProbe($kind, $id);
+        }, '/\bFROM\s+`?' . $tables[$kind] . '`?\b.*\bFOR\s+UPDATE\b/is');
+    }
+
+    /**
+     * Database lock witness (no timing assumption): the witness probe gets exactly 1205 before the worker is released
+     * and again while it waits; meanwhile the worker's own connection (visible in PROCESSLIST, same account) is still
+     * executing the same matching statement, for over 1 s and then over 2 s, and the worker emits no frame.
+     */
+    protected function releaseIntoWait($label, $phase, callable $witness, $statementPattern)
+    {
+        $this->assertContended(call_user_func($witness));
+        $this->supervisor->release($label, $phase, 1);
+        $this->awaitWaiting($label, $statementPattern, 1000);
+        $this->assertContended(call_user_func($witness));
+        $this->awaitWaiting($label, $statementPattern, 2000);
+    }
+
+    private function awaitWaiting($label, $statementPattern, $minimumMs)
+    {
+        $deadline = microtime(true) + 8.0;
+        while (true) {
+            $this->supervisor->assertSilent($label, 0.05);
+            $thread = \Yii::$app->db->createCommand(
+                'SELECT COMMAND, TIME_MS, INFO FROM information_schema.PROCESSLIST WHERE ID = :id',
+                [':id' => $this->connections[$label]]
+            )->queryOne();
+            if ($thread && $thread['COMMAND'] === 'Query' && preg_match($statementPattern, (string)$thread['INFO'])
+                && (float)$thread['TIME_MS'] >= $minimumMs) {
+                return;
+            }
+            if (microtime(true) > $deadline) {
+                Assert::fail($label . ' is not waiting in ' . $statementPattern . ': ' . json_encode($thread));
+            }
+        }
     }
 
     protected function lockProbe($kind, $id)

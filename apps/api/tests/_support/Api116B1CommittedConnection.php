@@ -9,22 +9,31 @@ class Api116B1CommittedConnection
     public static function swap()
     {
         $original = \Yii::$app->db;
-        // A distinct attribute set gives a separate PDO; the forced transaction Codeception opens on it is ended here.
-        $fresh = new \yii\db\Connection([
-            'dsn' => $original->dsn,
-            'username' => $original->username,
-            'password' => $original->password,
-            'charset' => $original->charset,
-            'attributes' => [\PDO::ATTR_CASE => \PDO::CASE_NATURAL],
-        ]);
-        $fresh->open();
-        self::unwind($fresh);
+        $fresh = self::open($original, [\PDO::ATTR_CASE => \PDO::CASE_NATURAL]);
         \Yii::$app->set('db', $fresh);
         return function () use ($original, $fresh) {
             self::unwind($fresh);
             \Yii::$app->set('db', $original);
             $fresh->close();
         };
+    }
+
+    /**
+     * A distinct attribute set gives a separate PDO (Codeception caches one PDO per attribute set and hands it back on
+     * reopen); the forced transaction Codeception opens on it is ended here.
+     */
+    public static function open($like, array $attributes)
+    {
+        $connection = new \yii\db\Connection([
+            'dsn' => $like->dsn,
+            'username' => $like->username,
+            'password' => $like->password,
+            'charset' => $like->charset,
+            'attributes' => $attributes,
+        ]);
+        $connection->open();
+        self::unwind($connection);
+        return $connection;
     }
 
     public static function level()

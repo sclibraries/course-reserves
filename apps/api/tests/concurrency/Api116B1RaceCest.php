@@ -103,7 +103,7 @@ class Api116B1RaceCest extends Api116B1ConcurrencyCase
         list($a, $b) = $attachFirst ? ['c4-attach', 'c4-follow'] : ['c4-follow', 'c4-attach'];
         $this->pauseAt($a, $operations[$a][0], $operations[$a][1], 'locked');
         $this->pauseAt($b, $operations[$b][0], $operations[$b][1], 'discovered');
-        $this->releaseIntoBlock($b);
+        $this->releaseIntoBlock($b, 'offering', $this->offering);
         $this->supervisor->release($a, 'locked', 1);
         $this->assertStatus($this->supervisor->complete($a), 200);
         $this->assertStatus($this->supervisor->complete($b), 200);

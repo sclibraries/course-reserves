@@ -120,8 +120,8 @@ class Api116B1DeadlockCest extends Api116B1ConcurrencyCase
 
     /**
      * Two courses attach lazy pointers whose course_resource ids sit in one registry index gap. Both pause before
-     * inserting; A is released and proven blocked on B's gap lock, then B is released into the deadlock. The victim
-     * is held at attempt_failed (after its rollback) until the survivor has committed.
+     * inserting; A is released and proven blocked by a database lock witness, then B is released into the deadlock.
+     * The victim is held at attempt_failed (after its rollback) until the survivor has committed.
      */
     private function runDeadlock(array $pair, callable $extra)
     {
@@ -132,8 +132,14 @@ class Api116B1DeadlockCest extends Api116B1ConcurrencyCase
             Assert::assertSame('publication_destinations', $frame['context']['table']);
         }
         $this->assertGapIsEmpty($pair);
-        $this->supervisor->release('c7-a', 'before_insert', 1);
-        $this->supervisor->assertSilent('c7-a', 1.0);
+        // Witness: a direct insert into the shared gap waits (1205) on the gap locks both workers hold; A, once
+        // released, is seen executing its INSERT while still blocked. Only then is B released into the deadlock.
+        $gapInsert = ['table' => 'publication_destinations', 'values' => $this->competingDestination([
+            'course_resource_id' => $pair['c7-a']['pointer']['course_resource_id'],
+        ])];
+        $this->releaseIntoWait('c7-a', 'before_insert', function () use ($gapInsert) {
+            return $this->runOperation('c7-gap-witness-' . uniqid(), 'insert_probe', $gapInsert)['result'];
+        }, '/^\s*INSERT\s+INTO\s+`?publication_destinations`?/i');
         $this->supervisor->release('c7-b', 'before_insert', 1);
 
         $results = [];

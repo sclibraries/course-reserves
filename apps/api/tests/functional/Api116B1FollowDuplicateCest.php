@@ -36,10 +36,14 @@ class Api116B1FollowDuplicateCest extends BaseFunctionalCest
 
     public function _after(FunctionalTester $I)
     {
-        $db = \Yii::$app->db;
-        $db->createCommand()->delete('publication_destinations', ['id' => [$this->sourceId, $this->occupiedId]])->execute();
-        $this->fixtures->cleanup();
-        call_user_func($this->restore);
+        try {
+            \Yii::$app->db->createCommand()->delete('publication_destinations', ['id' => [$this->sourceId, $this->occupiedId]])
+                ->execute();
+            $this->fixtures->cleanup();
+            Assert::assertSame([], $this->rows(), 'Cleanup is committed on the committed connection.');
+        } finally {
+            call_user_func($this->restore);
+        }
     }
 
     public function testOutermostFollowDuplicateRestartsAndReturnsTheCurrentConflict(FunctionalTester $I)
