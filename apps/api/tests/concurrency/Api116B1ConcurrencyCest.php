@@ -661,7 +661,20 @@ class Api116B1ConcurrencyCest
         $retire = $this->supervisor->complete('retire-a');
         $this->assertStatus($retire, 200);
         $this->assertAttemptStages('retire-a', 2);
-        $this->assertSqlLockOrder($retire['queries'], [
+        $retireAttempts = $this->lockAttempts($retire['queries']);
+        Assert::assertCount(2, $retireAttempts, 'Each attempt opens with exactly one offering lock call.');
+        foreach ($retireAttempts[0] as $query) {
+            Assert::assertFalse(
+                stripos($query, 'FOR UPDATE') !== false && stripos($query, 'submission_reuse_resources') !== false,
+                'The first attempt must not lock the undiscovered reuse item.'
+            );
+        }
+        $this->assertSqlLockOrder($retireAttempts[0], [
+            'course_offerings', 'resources', 'course_resources', 'publication_destinations',
+            'faculty_submissions', 'submission_new_resources',
+            'submission_publication_state', 'publication_attachments',
+        ]);
+        $this->assertSqlLockOrder($retireAttempts[1], [
             'course_offerings', 'resources', 'course_resources', 'publication_destinations',
             'faculty_submissions', 'submission_new_resources', 'submission_reuse_resources',
             'submission_publication_state', 'publication_attachments',
@@ -1533,6 +1546,23 @@ class Api116B1ConcurrencyCest
         }
         unset($members);
         return $coverage;
+    }
+
+    /** Splits executed SQL into attempts: a new attempt starts at an offering lock once locks were taken. */
+    private function lockAttempts(array $queries)
+    {
+        $attempts = [[]];
+        $locked = false;
+        foreach ($queries as $query) {
+            $locking = stripos($query, 'FOR UPDATE') !== false;
+            if ($locking && $locked && preg_match('/\bFROM\s+`?course_offerings\b/i', $query)) {
+                $attempts[] = [];
+                $locked = false;
+            }
+            $attempts[count($attempts) - 1][] = $query;
+            $locked = $locked || $locking;
+        }
+        return $attempts;
     }
 
     private function assertSqlLockOrder(array $queries, array $expectedTables)
