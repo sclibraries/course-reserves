@@ -2,7 +2,7 @@
 
 namespace app\services;
 
-/** Reads destination rows without locking uncovered earlier-ranked rows. */
+/** Reads owner rows without locking uncovered earlier-ranked destinations. */
 class PublicationDestinationRegistryLookup
 {
     private $db;
@@ -12,13 +12,19 @@ class PublicationDestinationRegistryLookup
         $this->db = $db;
     }
 
-    public function destinationForPointer(array $pointer, $forUpdate, ?callable $guard)
+    public function destinationForPointer(array $pointer, $forUpdate = false, $destinationId = null)
     {
         $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
-        if ($guard !== null) {
-            call_user_func($guard, 'destination_pointers', $pointer);
+        $where = '`' . $column . '` = :id';
+        $params = [':id' => $pointer['id']];
+        if ($destinationId !== null) {
+            $where .= ' AND id = :destination_id';
+            $params[':destination_id'] = (int)$destinationId;
         }
-        return $this->byPredicate('`' . $column . '` = :id', [':id' => $pointer['id']], $forUpdate, $guard);
+        return $this->db->createCommand(
+            'SELECT * FROM publication_destinations WHERE ' . $where . ($forUpdate ? ' FOR UPDATE' : ''),
+            $params
+        )->queryOne();
     }
 
     public function ownerForItem(array $key, $forUpdate, ?callable $guard)

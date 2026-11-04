@@ -122,9 +122,24 @@ class PublicationDestinationRegistryStore
             : null;
     }
 
-    protected function destinationForPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
+    protected function destinationForPointer(array $pointer, $forUpdate = false)
     {
-        return $this->lookups->destinationForPointer($pointer, $forUpdate, $guard);
+        return $this->lookups->destinationForPointer($pointer, $forUpdate);
+    }
+
+    protected function loadDestinationForPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
+    {
+        if ($guard === null) {
+            return $this->destinationForPointer($pointer, $forUpdate);
+        }
+        call_user_func($guard, 'destination_pointers', $pointer);
+        $destination = $this->destinationForPointer($pointer, false);
+        if ($destination) {
+            call_user_func($guard, 'destination_ids', $destination['id']);
+        }
+        return $destination && $forUpdate
+            ? $this->lookups->destinationForPointer($pointer, true, $destination['id'])
+            : $destination;
     }
 
     protected function ownerForItem(array $key, $forUpdate = false, ?callable $guard = null)
