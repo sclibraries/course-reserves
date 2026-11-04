@@ -16,6 +16,7 @@ class PublicationDestinationTransaction
         'uq_pub_dest_course_resource', 'uq_pub_dest_physical_reference', 'uq_pub_dest_owner_live',
         'uq_pub_attach_item_live',
     ];
+    private const SAVEPOINT_MISSING = 1305;
 
     public static function run(callable $callback, ?PublicationDestinationProbe $probe = null)
     {
@@ -34,12 +35,12 @@ class PublicationDestinationTransaction
             } catch (\Throwable $exception) {
                 $cause = $exception instanceof PublicationDestinationRestartRequired ? $exception->getPrevious() : $exception;
                 $code = self::failureCode($cause);
-                self::unwind($db);
+                $cleaned = self::unwind($db, $code === 1213, $probe, $attempt);
                 if ($code === null) {
                     throw $exception;
                 }
                 $probe->checkpoint('attempt_failed', $attempt, ['mysql_code' => $code]);
-                if ($code === 1205 || $attempt === 3) {
+                if ($code === 1205 || $attempt === 3 || !$cleaned) {
                     throw new PublicationDestinationContention('Destination operation hit lock contention.', 0, $cause);
                 }
                 continue;
@@ -59,7 +60,7 @@ class PublicationDestinationTransaction
             if ($code === null) {
                 throw $exception;
             }
-            self::unwind($db);
+            self::unwind($db, $code === 1213, $probe, 1);
             $probe->checkpoint('attempt_failed', 1, ['mysql_code' => $code]);
             throw new PublicationDestinationRestartRequired('Destination operation must restart.', 0, $exception);
         }
@@ -67,7 +68,7 @@ class PublicationDestinationTransaction
 
     private static function failureCode($exception)
     {
-        $code = $exception instanceof \yii\db\Exception ? (int)($exception->errorInfo[1] ?? 0) : 0;
+        $code = self::mysqlCode($exception);
         if ($code === 1062) {
             return $exception instanceof IntegrityException
                 && PublicationDestinationDuplicateKey::name($exception, self::REGISTRY_KEYS) !== null ? 1062 : null;
@@ -75,15 +76,31 @@ class PublicationDestinationTransaction
         return in_array($code, [1205, 1213], true) ? $code : null;
     }
 
-    /** Rolls back every Yii level. After a deadlock the server has already rolled back, so savepoint errors are moot. */
-    private static function unwind($db)
+    private static function mysqlCode($exception)
+    {
+        return $exception instanceof \yii\db\Exception ? (int)($exception->errorInfo[1] ?? 0) : 0;
+    }
+
+    /**
+     * Rolls back every Yii level and returns whether that succeeded. After a deadlock the server has already rolled
+     * back, so a missing savepoint is expected; any other rollback failure may leave a server transaction open, so
+     * the connection is closed (the server then rolls back) and the failure is recorded.
+     */
+    private static function unwind($db, $serverRolledBack, PublicationDestinationProbe $probe, $attempt)
     {
         while (($transaction = $db->getTransaction()) !== null) {
             try {
                 $transaction->rollBack();
-            } catch (\Exception $alreadyRolledBack) {
-                // rollBack() lowers the level before it talks to the server, so the loop always ends.
+            } catch (\Exception $error) {
+                if ($serverRolledBack && self::mysqlCode($error) === self::SAVEPOINT_MISSING) {
+                    continue;
+                }
+                Yii::error('Destination rollback failed; closing the connection: ' . $error->getMessage(), __METHOD__);
+                $probe->checkpoint('cleanup_failed', $attempt, ['error' => get_class($error)]);
+                $db->close();
+                return false;
             }
         }
+        return true;
     }
 }

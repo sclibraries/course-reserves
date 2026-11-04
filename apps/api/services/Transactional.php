@@ -19,19 +19,33 @@ class Transactional
             return $result;
         } catch (IntegrityException $exception) {
             self::runFailureCallback($onFailure, $exception);
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+            self::rollBack($transaction);
             if ($onIntegrity) {
                 return $onIntegrity($exception);
             }
             throw $exception;
         } catch (\Throwable $exception) {
             self::runFailureCallback($onFailure, $exception);
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
+            self::rollBack($transaction);
             throw $exception;
+        }
+    }
+
+    /**
+     * A missing savepoint means the server already rolled the whole transaction back (a deadlock); the original
+     * exception then propagates instead of the rollback error, so outer handlers can still classify it.
+     */
+    private static function rollBack($transaction)
+    {
+        if (!$transaction->isActive) {
+            return;
+        }
+        try {
+            $transaction->rollBack();
+        } catch (\yii\db\Exception $exception) {
+            if ((int)($exception->errorInfo[1] ?? 0) !== 1305) {
+                throw $exception;
+            }
         }
     }
 
