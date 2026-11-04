@@ -2,7 +2,13 @@
 
 namespace app\services;
 
-/** Reads owner rows without locking uncovered earlier-ranked destinations. */
+/**
+ * Reads destination rows by pointer or owner item.
+ *
+ * Under the ordered locks these are locking reads: a snapshot read would miss a winner committed after discovery.
+ * They are keyed by a pointer or item that is already locked, and every writer locks that key before touching
+ * such a row, so the read cannot wait on a holder of a later-ranked lock.
+ */
 class PublicationDestinationRegistryLookup
 {
     private $db;
@@ -12,18 +18,12 @@ class PublicationDestinationRegistryLookup
         $this->db = $db;
     }
 
-    public function destinationForPointer(array $pointer, $forUpdate = false, $destinationId = null)
+    public function destinationForPointer(array $pointer, $forUpdate = false)
     {
         $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
-        $where = '`' . $column . '` = :id';
-        $params = [':id' => $pointer['id']];
-        if ($destinationId !== null) {
-            $where .= ' AND id = :destination_id';
-            $params[':destination_id'] = (int)$destinationId;
-        }
         return $this->db->createCommand(
-            'SELECT * FROM publication_destinations WHERE ' . $where . ($forUpdate ? ' FOR UPDATE' : ''),
-            $params
+            'SELECT * FROM publication_destinations WHERE `' . $column . '` = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
+            [':id' => $pointer['id']]
         )->queryOne();
     }
 
@@ -32,36 +32,14 @@ class PublicationDestinationRegistryLookup
         if ($guard !== null) {
             call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
         }
-        return $this->byPredicate(
-            'owner_item_kind = :kind AND owner_item_id = :id AND owner_live = 1',
-            [':kind' => $key['kind'], ':id' => $key['id']], $forUpdate, $guard
-        );
-    }
-
-    private function byPredicate($where, array $params, $forUpdate, ?callable $guard)
-    {
-        if ($forUpdate && $guard !== null) {
-            $id = $this->db->createCommand(
-                'SELECT id FROM publication_destinations WHERE ' . $where . ' ORDER BY id LIMIT 1', $params
-            )->queryScalar();
-            if (!$id) {
-                return null;
-            }
-            call_user_func($guard, 'destination_ids', $id);
-            $params[':destination_id'] = (int)$id;
-            return $this->db->createCommand(
-                'SELECT * FROM publication_destinations WHERE id = :destination_id AND ' . $where . ' FOR UPDATE',
-                $params
-            )->queryOne();
-        }
-
-        $row = $this->db->createCommand(
-            'SELECT * FROM publication_destinations WHERE ' . $where
-            . ($forUpdate ? ' FOR UPDATE' : ''), $params
+        $owner = $this->db->createCommand(
+            'SELECT * FROM publication_destinations WHERE owner_item_kind = :kind AND owner_item_id = :id '
+            . 'AND owner_live = 1 LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
+            [':kind' => $key['kind'], ':id' => $key['id']]
         )->queryOne();
-        if ($row && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $row['id']);
+        if ($owner && $guard !== null) {
+            call_user_func($guard, 'destination_ids', $owner['id']);
         }
-        return $row;
+        return $owner;
     }
 }
