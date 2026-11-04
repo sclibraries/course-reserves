@@ -251,32 +251,105 @@ class Api116B1DestinationTransactionCest extends BaseFunctionalCest
 
     /**
      * Review #2: when the real rollback after a 1205 fails (the server connection is gone), the original cause is
-     * kept, the cleanup failure is recorded and the connection is closed instead of being reused.
+     * kept, the cleanup failure is recorded and the connection is closed; the SAME connection object then reopens
+     * and runs successful transactions.
      */
     public function testOutermostFailedRealRollbackClosesTheConnectionAndKeepsTheCause(FunctionalTester $I)
     {
-        $probe = new PublicationDestinationConcurrencyRecordingProbe();
-        $closedAfterFailure = null;
-        // The killed connection gets its own PDO, so Codeception never hands that dead PDO to later code.
-        $committed = \Yii::$app->db;
-        \Yii::$app->set('db', Api116B1CommittedConnection::open($committed, [\PDO::ATTR_CASE => \PDO::CASE_NATURAL, \PDO::ATTR_TIMEOUT => 7]));
+        $this->assertFailedRollbackRecovers(PublicationDestinationContention::class, function (callable $operation) {
+            return $operation();
+        });
+    }
+
+    /** Review #2, nested: a caller's Transactional block sees RestartRequired(1205); the same connection recovers. */
+    public function testNestedFailedRealRollbackClosesTheConnectionAndKeepsTheCause(FunctionalTester $I)
+    {
+        $this->assertFailedRollbackRecovers(PublicationDestinationRestartRequired::class, function (callable $operation) {
+            return Transactional::run(function () use ($operation) {
+                $this->insertCourse('-caller-before-lost-connection');
+                return $operation();
+            });
+        });
+    }
+
+    /** Fix round 2: a missing savepoint without a deadlock surfaces; the integrity handler gives no normal result. */
+    public function testMissingSavepointWithoutDeadlockSurfacesInsteadOfTheIntegrityResult(FunctionalTester $I)
+    {
+        $handled = false;
+        $this->assertMissingSavepointSurfaces(function () use (&$handled) {
+            return Transactional::run(function () {
+                $this->insertCourse('-inner-integrity');
+                \Yii::$app->db->createCommand('RELEASE SAVEPOINT LEVEL1')->execute();
+                throw $this->failure(1062);
+            }, function () use (&$handled) {
+                $handled = true;
+                return 'normal conflict result';
+            });
+        });
+        Assert::assertFalse($handled, 'The integrity handler must not turn a failed rollback into a normal result.');
+    }
+
+    /** Fix round 2: the same for any other failure; the 1305 rollback error propagates. */
+    public function testMissingSavepointWithoutDeadlockSurfacesForAnyOtherFailure(FunctionalTester $I)
+    {
+        $this->assertMissingSavepointSurfaces(function () {
+            return Transactional::run(function () {
+                $this->insertCourse('-inner-runtime');
+                \Yii::$app->db->createCommand('RELEASE SAVEPOINT LEVEL1')->execute();
+                throw new \RuntimeException('Synthetic failure without a deadlock.');
+            });
+        });
+    }
+
+    private function assertMissingSavepointSurfaces(callable $innerBlock)
+    {
         try {
-            PublicationDestinationTransaction::run(function () {
-                $this->insertCourse('-before-lost-connection');
-                $this->killCurrentConnection();
-                throw $this->failure(1205);
-            }, $probe);
-            Assert::fail('Expected destination_contention.');
+            Transactional::run(function () use ($innerBlock) {
+                $this->insertCourse('-outer');
+                return call_user_func($innerBlock);
+            });
+            Assert::fail('A failed rollback must surface.');
         } catch (\Throwable $exception) {
-            $closedAfterFailure = !\Yii::$app->db->getIsActive();
-            Assert::assertInstanceOf(PublicationDestinationContention::class, $exception, $this->describe($exception));
-            Assert::assertSame(1205, (int)$exception->getPrevious()->errorInfo[1], 'The original cause is kept.');
+            Assert::assertInstanceOf(\yii\db\Exception::class, $exception, $this->describe($exception));
+            Assert::assertSame(1305, (int)$exception->errorInfo[1], 'The rollback error surfaces.');
+        }
+        $this->assertCleanAfterFailure();
+    }
+
+    /** Runs a registry call whose connection is killed before a 1205, through the given caller shape. */
+    private function assertFailedRollbackRecovers($expected, callable $caller)
+    {
+        $probe = new PublicationDestinationConcurrencyRecordingProbe();
+        $committed = \Yii::$app->db;
+        $connection = Api116B1CommittedConnection::unforced($committed);
+        \Yii::$app->set('db', $connection);
+        try {
+            try {
+                $caller(function () use ($probe) {
+                    return PublicationDestinationTransaction::run(function () {
+                        $this->insertCourse('-before-lost-connection');
+                        $this->killCurrentConnection();
+                        throw $this->failure(1205);
+                    }, $probe);
+                });
+                Assert::fail('Expected ' . $expected);
+            } catch (\Throwable $exception) {
+                Assert::assertInstanceOf($expected, $exception, $this->describe($exception));
+                Assert::assertSame(1205, (int)$exception->getPrevious()->errorInfo[1], 'The original cause is kept.');
+            }
+            Assert::assertFalse($connection->getIsActive(), 'A connection whose rollback failed is closed, not reused.');
+            Assert::assertSame(['attempt_started:1', 'cleanup_failed:1', 'attempt_failed:1:1205'], $this->events($probe));
+            Assert::assertSame($connection, \Yii::$app->db);
+            $this->assertCleanAfterFailure();
+            Assert::assertSame('reopened', PublicationDestinationTransaction::run(function () {
+                $this->insertCourse('-registry-after-reopen');
+                return 'reopened';
+            }));
+            Assert::assertSame([$this->prefix . '-new-transaction', $this->prefix . '-registry-after-reopen'], $this->courseNames());
         } finally {
             \Yii::$app->set('db', $committed);
+            $connection->close();
         }
-        Assert::assertTrue($closedAfterFailure, 'A connection whose rollback failed is closed, not reused.');
-        Assert::assertSame(['attempt_started:1', 'cleanup_failed:1', 'attempt_failed:1:1205'], $this->events($probe));
-        $this->assertCleanAfterFailure();
     }
 
     /** Callers at level 1 or >= 2 (Transactional wrappers that wrote rows) see only the restart, never a second error. */

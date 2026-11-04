@@ -36,6 +36,25 @@ class Api116B1CommittedConnection
         return $connection;
     }
 
+    /**
+     * A connection Codeception's transaction forcer never sees: an instance handler marks EVENT_AFTER_OPEN handled,
+     * so the class-level forcer neither wraps it in a transaction nor caches its PDO. Reopening the same object
+     * therefore really connects anew, which lets a test prove recovery after the connection was closed.
+     */
+    public static function unforced($like)
+    {
+        $connection = new \yii\db\Connection([
+            'dsn' => $like->dsn,
+            'username' => $like->username,
+            'password' => $like->password,
+            'charset' => $like->charset,
+        ]);
+        $connection->on(\yii\db\Connection::EVENT_AFTER_OPEN, function ($event) {
+            $event->handled = true;
+        });
+        return $connection;
+    }
+
     public static function level()
     {
         $transaction = \Yii::$app->db->getTransaction();
