@@ -4,15 +4,20 @@ namespace app\services;
 
 use Yii;
 
-/** Shared closure discovery, current reads and ordered locking for registry operations. */
+/**
+ * Shared reads for registry operations.
+ *
+ * Each attempt discovers its course with plain reads, takes the course lock (or, with no course, a row lock on its
+ * anchor row) and then validates only fresh locking reads: FOR UPDATE for the rows it validates or writes, and the
+ * snapshot's shared content in share mode. Locking reads see current committed data, also inside an older caller
+ * view, and their next-key locks keep a missing key missing until commit.
+ */
 class PublicationDestinationRegistryStore
 {
     protected $db;
-    protected $lookups;
     protected $lock;
     protected $snapshots;
     protected $probe;
-    protected $stager;
 
     public function __construct(
         $db = null,
@@ -21,47 +26,57 @@ class PublicationDestinationRegistryStore
         ?PublicationDestinationProbe $probe = null
     ) {
         $this->db = $db ?: Yii::$app->db;
-        $this->lookups = new PublicationDestinationRegistryLookup($this->db);
-        $this->lock = $lock ?: new PublicationDestinationLock(null, $this->db);
+        $this->lock = $lock ?: new PublicationDestinationLock();
         $this->snapshots = $snapshots ?: new PublicationDestinationSnapshot($this->db);
         $this->probe = $probe ?: new NullPublicationDestinationProbe();
-        $this->stager = new PublicationDestinationRegistryStage($this->lock, $this->probe);
     }
 
-    protected function validatePointer(array $pointer, $forUpdate = false, ?callable $guard = null)
+    /** Ends discovery: locks the course, or the anchor rows when discovery found no course. */
+    protected function lockFirst($attempt, $offeringId, array $anchor)
     {
-        if ($pointer['kind'] === 'electronic') {
-            return $this->snapshots->electronic($pointer['id'], $forUpdate, $guard);
-        }
-        if ($pointer['kind'] === 'physical') {
-            return $this->snapshots->physical($pointer['id'], $forUpdate, $guard);
-        }
-        return null;
+        $this->probe->checkpoint('discovered', $attempt);
+        $this->lock->lock($offeringId ? ['offering_ids' => [$offeringId]] : $anchor);
+        $this->probe->checkpoint('locked', $attempt);
     }
 
-    protected function loadPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
+    /** Plain reads: the destination's course, else its (or the given) pointer entry's, else the item's. */
+    protected function discoverCourse(?array $destination, ?array $pointer = null, ?array $key = null)
     {
-        $entry = $this->validatePointer($pointer, $forUpdate, $guard);
-        if ($entry !== null) {
-            $entry['kind'] = $pointer['kind'];
-            $entry['pointer_id'] = $pointer['id'];
+        if (!empty($destination['offering_id'])) {
+            return (int)$destination['offering_id'];
         }
-        return $entry;
+        $pointer = $destination ? $this->pointerKey($destination) : $pointer;
+        $offering = $pointer ? $this->db->createCommand($pointer['kind'] === 'electronic'
+            ? 'SELECT offering_id FROM course_resources WHERE course_resource_id = :id'
+            : 'SELECT offering_id FROM physical_resource_references WHERE reference_id = :id', [':id' => $pointer['id']])
+            ->queryScalar() : null;
+        if (!$offering && $key) {
+            $offering = $this->db->createCommand(
+                'SELECT s.offering_id FROM ' . $this->itemTable($key) . ' i '
+                . 'JOIN faculty_submissions s ON s.submission_id = i.submission_id WHERE i.id = :id',
+                [':id' => $key['id']]
+            )->queryScalar();
+        }
+        return $offering ? (int)$offering : null;
     }
 
-    protected function destinationEntry(array $destination, $forUpdate = false, ?callable $guard = null)
+    protected function itemAnchor(?array $key)
     {
-        if ($this->isRetired($destination)) {
-            return null;
-        }
-        $pointer = $this->pointerKey($destination);
-        if ($pointer) {
-            $bucket = $pointer['kind'] === 'electronic' ? 'course_resource_ids' : 'physical_reference_ids';
-            if ($guard !== null) {
-                call_user_func($guard, $bucket, $pointer['id']);
-            }
-        }
-        return $pointer ? $this->loadPointer($pointer, $forUpdate, $guard) : null;
+        return $key ? [$key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids' => [$key['id']]] : [];
+    }
+
+    protected function loadPointer(array $pointer)
+    {
+        $entry = $pointer['kind'] === 'electronic'
+            ? $this->snapshots->electronic($pointer['id'], true)
+            : $this->snapshots->physical($pointer['id'], true);
+        return $entry === null ? null : $entry + ['kind' => $pointer['kind']];
+    }
+
+    protected function destinationEntry(array $destination)
+    {
+        $pointer = $this->isRetired($destination) ? null : $this->pointerKey($destination);
+        return $pointer ? $this->loadPointer($pointer) : null;
     }
 
     protected function pointerKey(array $pointer)
@@ -81,107 +96,84 @@ class PublicationDestinationRegistryStore
             : null;
     }
 
-    protected function loadItem(array $key, $forUpdate = false, ?callable $guard = null)
+    protected function ownerKey(array $destination)
     {
-        $table = $key['kind'] === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
-        if ($guard !== null) {
-            call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
-        }
-        $row = $this->db->createCommand(
-            'SELECT * FROM ' . $table . ' WHERE id = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
-            [':id' => $key['id']]
-        )->queryOne();
-        if (!$row) {
-            return null;
-        }
-        if ($guard !== null && !empty($row['submission_id'])) {
-            call_user_func($guard, 'submission_ids', $row['submission_id']);
-        }
-        $submission = $this->db->createCommand(
-            'SELECT offering_id FROM faculty_submissions WHERE submission_id = :id'
-            . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => $row['submission_id']]
-        )->queryOne();
-        if (!$submission) {
-            return null;
-        }
-        $row['offering_id'] = $submission['offering_id'];
-        return $row;
-    }
-
-    protected function destination($id, $forUpdate = false, ?callable $guard = null)
-    {
-        $validId = is_numeric($id) && (int)$id > 0;
-        if ($validId && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $id);
-        }
-        return $validId
-            ? $this->db->createCommand(
-                'SELECT * FROM publication_destinations WHERE id = :id' . ($forUpdate ? ' FOR UPDATE' : ''),
-                [':id' => (int)$id]
-            )->queryOne()
+        return $destination['owner_live'] == 1 && $destination['owner_item_kind'] !== null
+            ? ['kind' => $destination['owner_item_kind'], 'id' => (int)$destination['owner_item_id']]
             : null;
     }
 
-    protected function destinationForPointer(array $pointer, $forUpdate = false)
+    /** The item row with its submission's current offering, both locked; null when either is missing. */
+    protected function loadItem(array $key)
     {
-        return $this->lookups->destinationForPointer($pointer, $forUpdate);
-    }
-
-    protected function loadDestinationForPointer(array $pointer, $forUpdate = false, ?callable $guard = null)
-    {
-        if ($guard !== null) {
-            call_user_func($guard, 'destination_pointers', $pointer);
-        }
-        $destination = $this->destinationForPointer($pointer, $forUpdate);
-        if ($destination && $guard !== null) {
-            call_user_func($guard, 'destination_ids', $destination['id']);
-        }
-        return $destination;
-    }
-
-    protected function ownerForItem(array $key, $forUpdate = false, ?callable $guard = null)
-    {
-        return $this->lookups->ownerForItem($key, $forUpdate, $guard);
-    }
-
-    protected function attachmentForItem(array $key, $forUpdate = false, ?callable $guard = null)
-    {
-        if ($guard !== null) {
-            call_user_func($guard, $key['kind'] === 'new' ? 'new_item_ids' : 'reuse_item_ids', $key['id']);
-        }
-        $attachment = $this->db->createCommand(
-            'SELECT * FROM publication_attachments WHERE item_kind = :kind AND item_id = :id '
-            . 'AND live = 1 ORDER BY id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
-            [':kind' => $key['kind'], ':id' => $key['id']]
+        $row = $this->db->createCommand(
+            'SELECT * FROM ' . $this->itemTable($key) . ' WHERE id = :id FOR UPDATE', [':id' => $key['id']]
         )->queryOne();
-        if ($attachment && $guard !== null) {
-            call_user_func($guard, 'attachment_ids', $attachment['id']);
-            call_user_func($guard, 'destination_ids', $attachment['destination_id']);
-        }
-        return $attachment;
+        $submission = $row ? $this->db->createCommand(
+            'SELECT offering_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
+            [':id' => $row['submission_id']]
+        )->queryOne() : false;
+        return $submission ? array_merge($row, ['offering_id' => $submission['offering_id']]) : null;
     }
 
-    protected function attachmentsForDestination($id, $forUpdate = false, ?callable $guard = null)
+    /** Item contexts (kind, id, row) for the keys whose rows exist. */
+    protected function loadItems(array $keys)
     {
-        if ($guard !== null) {
-            call_user_func($guard, 'destination_ids', $id);
-        }
-        $attachments = $this->db->createCommand(
-            'SELECT * FROM publication_attachments WHERE destination_id = :id AND live = 1 ORDER BY id'
-            . ($forUpdate ? ' FOR UPDATE' : ''), [':id' => $id]
-        )->queryAll();
-        foreach ($attachments as $attachment) {
-            if ($guard !== null) {
-                call_user_func($guard, 'attachment_ids', $attachment['id']);
+        $items = [];
+        foreach ($keys as $key) {
+            $row = $this->loadItem($key);
+            if ($row) {
+                $items[] = $key + ['row' => $row];
             }
         }
-        return $attachments;
+        return $items;
+    }
+
+    protected function destination($id, $forUpdate = false)
+    {
+        return is_numeric($id) && (int)$id > 0 ? $this->one(
+            'SELECT * FROM publication_destinations WHERE id = :id', [':id' => (int)$id], $forUpdate
+        ) : null;
+    }
+
+    /** Test seam (API-116A): keep the name and signature. */
+    protected function destinationForPointer(array $pointer, $forUpdate = false)
+    {
+        $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
+        return $this->one(
+            'SELECT * FROM publication_destinations WHERE `' . $column . '` = :id', [':id' => $pointer['id']], $forUpdate
+        );
+    }
+
+    protected function ownerForItem(array $key, $forUpdate = false)
+    {
+        return $this->one(
+            'SELECT * FROM publication_destinations WHERE owner_item_kind = :kind AND owner_item_id = :id AND owner_live = 1',
+            [':kind' => $key['kind'], ':id' => $key['id']],
+            $forUpdate
+        );
+    }
+
+    protected function attachmentForItem(array $key, $forUpdate = false)
+    {
+        return $this->one(
+            'SELECT * FROM publication_attachments WHERE item_kind = :kind AND item_id = :id AND live = 1',
+            [':kind' => $key['kind'], ':id' => $key['id']],
+            $forUpdate
+        );
+    }
+
+    protected function liveAttachments($destinationId)
+    {
+        return $this->db->createCommand(
+            'SELECT * FROM publication_attachments WHERE destination_id = :id AND live = 1 ORDER BY id FOR UPDATE',
+            [':id' => $destinationId]
+        )->queryAll();
     }
 
     protected function attachment($id)
     {
-        return $this->db->createCommand('SELECT * FROM publication_attachments WHERE id = :id', [':id' => $id])
-            ->queryOne();
+        return $this->one('SELECT * FROM publication_attachments WHERE id = :id', [':id' => $id]);
     }
 
     protected function offeringError(array $item, $pointerOffering, $registryOffering)
@@ -192,13 +184,19 @@ class PublicationDestinationRegistryStore
             ? 'offering_mismatch' : null;
     }
 
-    protected function physicalError(array $key, array $item, array $entry)
+    /** For a physical entry: every item's identity, then the entry's own identity and ambiguity. */
+    protected function physicalError(array $items, array $entry)
     {
         if ($entry['kind'] !== 'physical') {
             return null;
         }
-        $error = $this->snapshots->physicalIdentityError($key['kind'], $item, $entry['row']);
-        return $error !== null ? $error : (count($entry['ambiguity_ids'] ?? []) > 1 ? 'destination_ambiguous' : null);
+        foreach ($items as $item) {
+            $error = $this->snapshots->physicalIdentityError($item['kind'], $item['row'], $entry['row']);
+            if ($error !== null) {
+                return $error;
+            }
+        }
+        return $this->snapshots->physicalDestinationError($entry['row'], $entry['ambiguity_ids']);
     }
 
     protected function isRetired(array $destination)
@@ -223,67 +221,6 @@ class PublicationDestinationRegistryStore
         return $json;
     }
 
-    protected function itemContext($key, $row)
-    {
-        return $key ? ['kind' => $key['kind'], 'id' => (int)$key['id'], 'row' => $row] : null;
-    }
-
-    protected function ownerContext(array $destination, $forUpdate = false, ?callable $guard = null)
-    {
-        $key = $destination['owner_live'] == 1 && $destination['owner_item_kind'] !== null
-            ? ['kind' => $destination['owner_item_kind'], 'id' => (int)$destination['owner_item_id']]
-            : null;
-        return $key ? $this->itemContext($key, $this->loadItem($key, $forUpdate, $guard)) : null;
-    }
-
-    protected function contextsForAttachments(array $attachments, $forUpdate = false, ?callable $guard = null)
-    {
-        $contexts = [];
-        foreach ($attachments as $attachment) {
-            $key = ['kind' => $attachment['item_kind'], 'id' => (int)$attachment['item_id']];
-            $contexts[] = $this->itemContext($key, $this->loadItem($key, $forUpdate, $guard));
-        }
-        return $contexts;
-    }
-
-    protected function itemRelationships(array $items, $forUpdate = false, ?callable $guard = null)
-    {
-        $owners = [];
-        $attachmentsByItem = [];
-        $attachments = [];
-        $destinations = [];
-        $entries = [];
-        foreach ($items as $item) {
-            if (!$item) {
-                continue;
-            }
-            $key = ['kind' => $item['kind'], 'id' => (int)$item['id']];
-            $owners[$key['kind'] . ':' . $key['id']] = $this->ownerForItem($key, $forUpdate, $guard);
-            $attachment = $this->attachmentForItem($key, $forUpdate, $guard);
-            $attachmentsByItem[$key['kind'] . ':' . $key['id']] = $attachment;
-            if ($owners[$key['kind'] . ':' . $key['id']]) {
-                $destinations[] = $owners[$key['kind'] . ':' . $key['id']];
-            }
-            if ($attachment) {
-                $attachments[] = $attachment;
-                $destination = $this->destination($attachment['destination_id'], $forUpdate, $guard);
-                if ($destination) {
-                    $destinations[] = $destination;
-                }
-            }
-        }
-        foreach ($destinations as $destination) {
-            $entries[] = $this->destinationEntry($destination, $forUpdate, $guard);
-        }
-        return [
-            'owners' => $owners,
-            'attachments_by_item' => $attachmentsByItem,
-            'attachments' => $attachments,
-            'destinations' => $destinations,
-            'entries' => $entries,
-        ];
-    }
-
     protected function success(array $body)
     {
         return ['status' => 200, 'body' => $body];
@@ -292,5 +229,15 @@ class PublicationDestinationRegistryStore
     protected function error($code)
     {
         return ['status' => 409, 'body' => ['error_code' => $code]];
+    }
+
+    private function itemTable(array $key)
+    {
+        return $key['kind'] === 'new' ? 'submission_new_resources' : 'submission_reuse_resources';
+    }
+
+    private function one($sql, array $params, $forUpdate = false)
+    {
+        return $this->db->createCommand($sql . ($forUpdate ? ' FOR UPDATE' : ''), $params)->queryOne() ?: null;
     }
 }

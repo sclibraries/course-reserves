@@ -8,18 +8,13 @@ use Yii;
 class PublicationDestinationLock
 {
     private $selectForUpdate;
-    private $db;
 
     private const LOCKS = [
         ['offering_ids', 'course_offerings', 'offering_id'],
         ['resource_ids', 'resources', 'resource_id'],
-        ['resource_metadata_ids', 'resource_metadata', 'metadata_id'],
-        ['resource_link_ids', 'resource_links', 'link_id'],
-        ['folder_ids', 'folders', 'folder_id'],
         ['course_resource_ids', 'course_resources', 'course_resource_id'],
         ['physical_reference_ids', 'physical_resource_references', 'reference_id'],
         ['destination_ids', 'publication_destinations', 'id'],
-        ['destination_pointers', 'publication_destinations', ''],
         ['submission_ids', 'faculty_submissions', 'submission_id'],
         ['new_item_ids', 'submission_new_resources', 'id'],
         ['reuse_item_ids', 'submission_reuse_resources', 'id'],
@@ -27,10 +22,9 @@ class PublicationDestinationLock
         ['attachment_ids', 'publication_attachments', 'id'],
     ];
 
-    public function __construct(?callable $selectForUpdate = null, $db = null)
+    public function __construct(?callable $selectForUpdate = null)
     {
         $this->selectForUpdate = $selectForUpdate;
-        $this->db = $db;
     }
 
     public function lock(array $affectedIds)
@@ -42,8 +36,6 @@ class PublicationDestinationLock
             }
             if ($this->selectForUpdate !== null) {
                 call_user_func($this->selectForUpdate, $table, $values);
-            } elseif ($input === 'destination_pointers') {
-                $this->lockDestinationPointers($affectedIds[$input]);
             } elseif ($input === 'publication_state_items') {
                 $this->lockPublicationState($affectedIds[$input]);
             } else {
@@ -75,8 +67,7 @@ class PublicationDestinationLock
             $slots[] = $slot;
             $params[$slot] = $id;
         }
-        $db = $this->db ?: Yii::$app->db;
-        $db->createCommand(
+        Yii::$app->db->createCommand(
             'SELECT `' . $column . '` FROM `' . $table . '` WHERE `' . $column . '` IN ('
             . implode(',', $slots) . ') ORDER BY `' . $column . '` FOR UPDATE',
             $params
@@ -96,51 +87,11 @@ class PublicationDestinationLock
             $params[':item' . $index] = (int)$item['id'];
         }
         if ($clauses) {
-            $db = $this->db ?: Yii::$app->db;
-            $db->createCommand(
+            Yii::$app->db->createCommand(
                 'SELECT item_id FROM submission_publication_state WHERE ' . implode(' OR ', $clauses)
                 . " ORDER BY FIELD(item_kind, 'new', 'reuse'), item_id FOR UPDATE",
                 $params
             )->queryAll();
-        }
-    }
-
-    private function lockDestinationPointers(array $pointers)
-    {
-        usort($pointers, function ($a, $b) {
-            return $a['kind'] === $b['kind']
-                ? (int)$a['id'] <=> (int)$b['id']
-                : ($a['kind'] === 'electronic' ? -1 : 1);
-        });
-        foreach ($pointers as $index => $pointer) {
-            if (!is_array($pointer) || !in_array($pointer['kind'] ?? null, ['electronic', 'physical'], true)) {
-                continue;
-            }
-            $column = $pointer['kind'] === 'electronic' ? 'course_resource_id' : 'physical_reference_id';
-            $db = $this->db ?: Yii::$app->db;
-            $transaction = $db->getTransaction();
-            $savepoint = 'api116b1_pointer_' . (int)$index;
-            if ($transaction !== null && $transaction->isActive) {
-                $db->schema->createSavepoint($savepoint);
-            }
-            try {
-                $ids = $db->createCommand(
-                    'SELECT id FROM publication_destinations WHERE `' . $column . '` = :id ORDER BY id FOR UPDATE',
-                    [':id' => (int)$pointer['id']]
-                )->queryColumn();
-            } catch (\Throwable $exception) {
-                if ($transaction !== null && $transaction->isActive) {
-                    $db->schema->rollBackSavepoint($savepoint);
-                }
-                throw $exception;
-            }
-            if ($transaction !== null && $transaction->isActive) {
-                if ($ids) {
-                    $db->schema->releaseSavepoint($savepoint);
-                } else {
-                    $db->schema->rollBackSavepoint($savepoint);
-                }
-            }
         }
     }
 }
