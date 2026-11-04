@@ -14,6 +14,7 @@ class PublicationDestinationConcurrencyFixtureTracker
     private $pointers = [];
     private $destinationIds = [];
     private $folderIds = [];
+    private $callerNames = [];
 
     public function __construct($prefix)
     {
@@ -56,6 +57,22 @@ class PublicationDestinationConcurrencyFixtureTracker
     public function trackFolder($folderId)
     {
         $this->folderIds[(int)$folderId] = (int)$folderId;
+    }
+
+    /** Names the synthetic courses rows a nested worker's caller transaction writes, so cleanup can find them. */
+    public function callerName($label)
+    {
+        $name = $this->prefix . 'caller-' . $label;
+        $this->callerNames[] = $name;
+        return $name;
+    }
+
+    public function callerRows($name)
+    {
+        return \Yii::$app->db->createCommand(
+            'SELECT course_number FROM courses WHERE course_number LIKE :name ORDER BY course_number',
+            [':name' => $name . '-L%']
+        )->queryColumn();
     }
 
     public function insertDestination(array $pointer, array $values = [])
@@ -144,6 +161,10 @@ class PublicationDestinationConcurrencyFixtureTracker
         }
 
         $this->fixture->cleanup();
+        foreach ($this->callerNames as $name) {
+            $db->createCommand('DELETE FROM courses WHERE course_number LIKE :name', [':name' => $name . '-L%'])->execute();
+            \PHPUnit\Framework\Assert::assertSame([], $this->callerRows($name), 'Caller rows remain after cleanup.');
+        }
         foreach ($this->folderIds as $folderId) {
             $db->createCommand()->delete('folders', ['folder_id' => $folderId])->execute();
         }

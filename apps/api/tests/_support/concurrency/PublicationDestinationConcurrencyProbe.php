@@ -4,7 +4,7 @@ require_once __DIR__ . '/PublicationDestinationConcurrencyWire.php';
 
 use app\services\PublicationDestinationProbe;
 
-/** Pipe-backed phase barrier injected into a worker's real registry. */
+/** Pipe-backed phase barrier injected into a worker's real registry; 'abort' makes the operation throw. */
 class PublicationDestinationConcurrencyProbe implements PublicationDestinationProbe
 {
     private $operation;
@@ -33,6 +33,9 @@ class PublicationDestinationConcurrencyProbe implements PublicationDestinationPr
         ]);
 
         $answer = PublicationDestinationConcurrencyWire::read(STDIN);
+        if (($answer['command'] ?? null) === 'abort') {
+            throw new \RuntimeException('Concurrency worker aborted by test at ' . $phase . '.');
+        }
         if (($answer['command'] ?? null) !== 'go'
             || ($answer['phase'] ?? null) !== $phase
             || (int)($answer['attempt'] ?? -1) !== (int)$attempt) {

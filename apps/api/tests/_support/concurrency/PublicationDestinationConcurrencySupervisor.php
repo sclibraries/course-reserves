@@ -134,28 +134,82 @@ class PublicationDestinationConcurrencySupervisor
         ]);
     }
 
+    /** Returns [label, frame] for the first unacknowledged frame from any of the given workers. */
+    public function nextAny(array $labels)
+    {
+        while (true) {
+            foreach ($labels as $label) {
+                if ($this->workers[$label]['waiting'] === null && $this->workers[$label]['events']) {
+                    return [$label, $this->next($label)];
+                }
+            }
+            foreach ($labels as $label) {
+                if ($this->workers[$label]['waiting'] === null && !$this->workers[$label]['events']
+                    && ($this->workers[$label]['closed'] || $this->workers[$label]['stdout_eof'])) {
+                    $this->fail($this->eofMessage($label));
+                }
+            }
+            $this->guard(function () {
+                $this->assertBeforeDeadline();
+                $this->pump(0.05);
+            });
+        }
+    }
+
+    /** Proves a released worker stays blocked: it emits nothing and does not exit for the given time. */
+    public function assertSilent($label, $seconds)
+    {
+        $until = microtime(true) + $seconds;
+        while (microtime(true) < $until) {
+            $this->guard(function () {
+                $this->pump(0.05);
+            });
+            if ($this->workers[$label]['events'] || $this->workers[$label]['closed']) {
+                $this->fail('Worker advanced while it should be blocked: ' . $label);
+            }
+        }
+    }
+
+    /** Answers the pending barrier with abort, so the worker's operation throws and rolls back. */
+    public function abort($label)
+    {
+        $frame = $this->workers[$label]['waiting'] ?? null;
+        if ($frame === null) {
+            $this->fail('No worker phase is waiting to be aborted: ' . $label);
+        }
+        $this->workers[$label]['waiting'] = null;
+        $this->writeFrame($label, ['command' => 'abort', 'phase' => $frame['phase'], 'attempt' => (int)$frame['attempt']]);
+        $result = $this->next($label);
+        if ($result['phase'] !== 'result' || !empty($result['ok'])
+            || strpos((string)($result['error'] ?? ''), 'aborted by test') === false) {
+            $this->fail('Aborted worker did not roll back and report the abort: ' . $label . $this->stderrSuffix($label));
+        }
+        $this->waitForExit($label, false);
+        return $result;
+    }
+
     /** Automatically acknowledges phases until the worker returns its result. */
     public function complete($label)
     {
         while (true) {
             $frame = $this->next($label);
             if ($frame['phase'] === 'result') {
-                if (empty($frame['ok'])) {
-                    $this->waitForExit($label, false);
-                    $this->fail(
-                        'Worker operation failed: ' . ($frame['error'] ?? 'unknown error')
-                        . $this->stderrSuffix($label),
-                        false
-                    );
-                }
-                $this->waitForExit($label);
-                if (in_array((int)($frame['mysql_code'] ?? 0), [1205, 1213], true)) {
-                    $this->fail('Unexpected operation lock error ' . $frame['mysql_code'] . '.', false);
-                }
-                return $frame;
+                return $this->finish($label, $frame);
             }
             $this->release($label, $frame['phase'], $frame['attempt']);
         }
+    }
+
+    /** Accepts a worker's result frame: it must succeed and the worker must exit cleanly. */
+    public function finish($label, array $frame)
+    {
+        if (empty($frame['ok'])) {
+            $this->waitForExit($label, false);
+            $this->fail('Worker operation failed: ' . ($frame['error'] ?? 'unknown error')
+                . ' (MySQL ' . ($frame['mysql_code'] ?? 'none') . ')' . $this->stderrSuffix($label), false);
+        }
+        $this->waitForExit($label);
+        return $frame;
     }
 
     public function history($label)
@@ -203,7 +257,7 @@ class PublicationDestinationConcurrencySupervisor
                 continue;
             }
             @proc_terminate($worker['process'], 9);
-            $this->closeAndReap($label);
+            $this->closeAndReap($label, false);
         }
     }
 
@@ -282,8 +336,8 @@ class PublicationDestinationConcurrencySupervisor
                 throw new \RuntimeException('Malformed concurrency frame from ' . $label . ': ' . $line);
             }
             if (!in_array($frame['phase'], [
-                'ready', 'discovered', 'locked', 'before_insert', 'recovery_entered',
-                'before_commit', 'committed', 'result',
+                'ready', 'attempt_started', 'discovered', 'locked', 'before_insert', 'recovery_entered',
+                'attempt_failed', 'before_commit', 'committed', 'result',
             ], true)) {
                 throw new \RuntimeException('Unknown concurrency phase from ' . $label . ': ' . $frame['phase']);
             }
@@ -348,8 +402,17 @@ class PublicationDestinationConcurrencySupervisor
         }
     }
 
-    private function closeAndReap($label)
+    /** Reads both pipes to EOF before closing, so frames written just before exit are never lost. */
+    private function closeAndReap($label, $strict = true)
     {
+        foreach ([1 => 'stdout', 2 => 'stderr'] as $index => $buffer) {
+            $pipe = $this->workers[$label]['pipes'][$index];
+            if (is_resource($pipe)) {
+                stream_set_blocking($pipe, true);
+                $this->workers[$label][$buffer] .= (string)stream_get_contents($pipe);
+            }
+        }
+        $this->workers[$label]['stdout_eof'] = true;
         $worker = $this->workers[$label];
         foreach ($worker['pipes'] as $pipe) {
             if (is_resource($pipe)) {
@@ -361,6 +424,12 @@ class PublicationDestinationConcurrencySupervisor
             $this->workers[$label]['exit_code'] = (int)$closedCode;
         }
         $this->workers[$label]['closed'] = true;
+        if ($strict) {
+            $this->parseFrames($label);
+            if ($this->workers[$label]['stdout'] !== '') {
+                throw new \RuntimeException('Worker ended with an incomplete JSON frame: ' . $label);
+            }
+        }
     }
 
     private function hasActiveWorkers()
@@ -390,6 +459,16 @@ class PublicationDestinationConcurrencySupervisor
     {
         return $this->workers[$label]['stderr'] !== ''
             ? "\nWorker stderr:\n" . $this->workers[$label]['stderr'] : '';
+    }
+
+    private function guard(callable $callback)
+    {
+        try {
+            call_user_func($callback);
+        } catch (\Throwable $exception) {
+            $this->stopAll();
+            throw $exception;
+        }
     }
 
     private function fail($message, $stop = true)
