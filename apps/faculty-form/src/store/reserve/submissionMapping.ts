@@ -3,7 +3,8 @@ import { fromServer } from '@/utils/listLayout';
 
 type MaterialResourceData = Partial<Pick<
   CourseItem,
-  'doi' | 'issn' | 'journalTitle' | 'volume' | 'issue' | 'eds'
+  'doi' | 'issn' | 'journalTitle' | 'volume' | 'issue' | 'eds' |
+  'isbn' | 'publisher' | 'url' | 'displayStartDate' | 'displayEndDate'
 >>;
 
 interface BackendMaterial {
@@ -16,6 +17,7 @@ interface BackendMaterial {
   position_in_folder?: number;
   barcode?: string;
   call_number?: string;
+  faculty_notes?: string | null;
   folder_name?: string;
   resource_data?: MaterialResourceData | string | null;
 }
@@ -91,6 +93,12 @@ const mapMaterial = (
     doi: resourceData.doi,
     issn: resourceData.issn,
     journalTitle: resourceData.journalTitle,
+    isbn: resourceData.isbn,
+    publisher: resourceData.publisher,
+    url: resourceData.url,
+    displayStartDate: resourceData.displayStartDate,
+    displayEndDate: resourceData.displayEndDate,
+    notes: material.faculty_notes ?? undefined,
     volume: resourceData.volume,
     issue: resourceData.issue,
     eds: resourceData.eds,
