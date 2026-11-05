@@ -4,8 +4,21 @@ import { fromServer } from '@/utils/listLayout';
 type MaterialResourceData = Partial<Pick<
   CourseItem,
   'doi' | 'issn' | 'journalTitle' | 'volume' | 'issue' | 'eds' |
-  'isbn' | 'publisher' | 'url' | 'displayStartDate' | 'displayEndDate'
->>;
+  'isbn' | 'publisher' | 'publicationYear' | 'edition' | 'pages' | 'chapterTitle' |
+  'copy' | 'url' | 'displayStartDate' | 'displayEndDate' | 'instanceId' | 'instanceHrid' |
+  'holdingsId' | 'temporaryLocationId' | 'temporaryLocationObject' |
+  'permanentLocationId' | 'permanentLocationObject' | 'copiedItem'
+>> & { journal?: string };
+
+interface BackendResourceRow {
+  id: string | number;
+  is_reuse?: boolean;
+  position_in_folder?: number | null;
+  source_resource_id?: string | null;
+  source_folio_instance_id?: string | null;
+  faculty_notes?: string | null;
+  resource_data?: MaterialResourceData | string | null;
+}
 
 interface BackendMaterial {
   id: string | number;
@@ -14,11 +27,11 @@ interface BackendMaterial {
   material_type: string;
   status: string;
   display_order: number;
-  position_in_folder?: number;
+  is_reuse?: boolean;
+  position_in_folder?: number | null;
   barcode?: string;
   call_number?: string;
-  faculty_notes?: string | null;
-  folder_name?: string;
+  folder_name?: string | null;
   resource_data?: MaterialResourceData | string | null;
 }
 
@@ -51,6 +64,8 @@ export interface BackendSubmission {
   proxy_can_edit?: boolean;
   folders?: BackendFolder[];
   unfoldered_items?: BackendMaterial[];
+  newResources?: BackendResourceRow[];
+  reuseResources?: BackendResourceRow[];
   submission_notes?: string | null;
   needed_by_date?: string | null;
   draft_version?: number;
@@ -76,10 +91,14 @@ const parseResourceData = (resourceData?: BackendMaterial['resource_data']): Mat
 
 const mapMaterial = (
   material: BackendMaterial,
+  resourceRow: BackendResourceRow | undefined,
   folderId?: string,
   includeBackendId = false
 ): CourseItem => {
-  const resourceData = parseResourceData(material.resource_data);
+  const resourceData = parseResourceData(material.resource_data ?? resourceRow?.resource_data);
+  const journalTitle = resourceData.journalTitle !== undefined
+    ? resourceData.journalTitle
+    : resourceData.journal;
 
   return {
     id: `material-${material.id}`,
@@ -92,28 +111,51 @@ const mapMaterial = (
     callNumber: material.call_number,
     doi: resourceData.doi,
     issn: resourceData.issn,
-    journalTitle: resourceData.journalTitle,
+    journalTitle,
     isbn: resourceData.isbn,
     publisher: resourceData.publisher,
+    publicationYear: resourceData.publicationYear,
+    edition: resourceData.edition,
+    pages: resourceData.pages,
+    chapterTitle: resourceData.chapterTitle,
+    copy: resourceData.copy,
     url: resourceData.url,
     displayStartDate: resourceData.displayStartDate,
     displayEndDate: resourceData.displayEndDate,
-    notes: material.faculty_notes ?? undefined,
+    notes: resourceRow?.faculty_notes ?? undefined,
     volume: resourceData.volume,
     issue: resourceData.issue,
     eds: resourceData.eds,
+    instanceId: resourceData.instanceId ?? resourceRow?.source_folio_instance_id ?? undefined,
+    instanceHrid: resourceData.instanceHrid,
+    holdingsId: resourceData.holdingsId ?? resourceRow?.source_resource_id ?? undefined,
+    temporaryLocationId: resourceData.temporaryLocationId,
+    temporaryLocationObject: resourceData.temporaryLocationObject,
+    permanentLocationId: resourceData.permanentLocationId,
+    permanentLocationObject: resourceData.permanentLocationObject,
+    copiedItem: resourceData.copiedItem,
     ...(folderId ? { folderId } : {}),
     displayOrder: material.display_order,
   };
 };
 
 const mapSubmissionItems = (submission: BackendSubmission, includeBackendIds: boolean) => {
+  // Index item rows omit faculty notes and folder positions, so join the allowlisted resource rows by id.
+  const resourceRows = [...(submission.newResources || []), ...(submission.reuseResources || [])];
+  const findResourceRow = (material: BackendMaterial) => resourceRows.find((row) => (
+    String(row.id) === String(material.id) && (
+      typeof row.is_reuse !== 'boolean' || typeof material.is_reuse !== 'boolean' || row.is_reuse === material.is_reuse
+    )
+  ));
   const folders = (submission.folders || []).map((folder) => {
     const folderId = `folder-${folder.id}`;
-    const folderItems = (folder.items || []).map((material, index) => ({
-      item: mapMaterial(material, folderId, includeBackendIds),
-      order: material.position_in_folder ?? index,
-    })).sort((left, right) => left.order - right.order);
+    const folderItems = (folder.items || []).map((material, index) => {
+      const resourceRow = findResourceRow(material);
+      return {
+        item: mapMaterial(material, resourceRow, folderId, includeBackendIds),
+        order: resourceRow?.position_in_folder ?? material.position_in_folder ?? index,
+      };
+    }).sort((left, right) => left.order - right.order);
 
     return {
       id: folderId,
@@ -127,7 +169,7 @@ const mapSubmissionItems = (submission: BackendSubmission, includeBackendIds: bo
   });
 
   const unfolderedItems = (submission.unfoldered_items || [])
-    .map((material) => mapMaterial(material, undefined, includeBackendIds))
+    .map((material) => mapMaterial(material, findResourceRow(material), undefined, includeBackendIds))
     .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
   const items = [...folders.flatMap((folder) => folder.folderItems), ...unfolderedItems];
@@ -189,6 +231,13 @@ export const mapSubmissionIndexItem = (submission: BackendSubmission): CourseRes
     courseAssignmentId: submission.its_course_id || legacyCourseAssignmentId,
     ...(submission.academic_period ? { academicPeriod: submission.academic_period } : {}),
     ...(typeof submission.draft_version === 'number' ? { draftVersion: submission.draft_version } : {}),
+    // The current index response includes these loaded resource relations; legacy rows may not.
+    ...(submission.newResources !== undefined || submission.reuseResources !== undefined
+      ? {
+          submissionNotes: submission.submission_notes ?? null,
+          neededByDate: submission.needed_by_date ?? null,
+        }
+      : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
   };
@@ -216,7 +265,7 @@ export const mapSubmissionDetailItem = (submission: BackendSubmission): CourseRe
     ...(typeof submission.draft_version === 'number' ? { draftVersion: submission.draft_version } : {}),
     ...mapLockFields(submission),
     ...mapProxyFields(submission),
-    submissionNotes: submission.submission_notes || null,
-    neededByDate: submission.needed_by_date || null,
+    submissionNotes: submission.submission_notes ?? null,
+    neededByDate: submission.needed_by_date ?? null,
   };
 };
