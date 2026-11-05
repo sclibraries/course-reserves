@@ -1,22 +1,23 @@
 import type { CourseFolder, CourseItem, CourseReserve } from './types';
 import { fromServer } from '@/utils/listLayout';
 
-type MaterialResourceData = Partial<Pick<
+type MaterialResourceData = Omit<Partial<Pick<
   CourseItem,
   'doi' | 'issn' | 'journalTitle' | 'volume' | 'issue' | 'eds' |
   'isbn' | 'publisher' | 'publicationYear' | 'edition' | 'pages' | 'chapterTitle' |
   'copy' | 'url' | 'displayStartDate' | 'displayEndDate' | 'instanceId' | 'instanceHrid' |
   'holdingsId' | 'temporaryLocationId' | 'temporaryLocationObject' |
   'permanentLocationId' | 'permanentLocationObject' | 'copiedItem'
->> & { journal?: string };
+>>, 'journalTitle'> & { journalTitle?: string | null; journal?: string | null };
 
 interface BackendResourceRow {
   id: string | number;
-  is_reuse?: boolean;
+  is_reuse?: boolean | 0 | 1;
   position_in_folder?: number | null;
   source_resource_id?: string | null;
   source_folio_instance_id?: string | null;
   faculty_notes?: string | null;
+  assignedPages?: string | null;
   resource_data?: MaterialResourceData | string | null;
 }
 
@@ -96,9 +97,9 @@ const mapMaterial = (
   includeBackendId = false
 ): CourseItem => {
   const resourceData = parseResourceData(material.resource_data ?? resourceRow?.resource_data);
-  const journalTitle = resourceData.journalTitle !== undefined
-    ? resourceData.journalTitle
-    : resourceData.journal;
+  const journalTitle = resourceData.journal !== undefined
+    ? resourceData.journal ?? ''
+    : resourceData.journalTitle ?? undefined;
 
   return {
     id: `material-${material.id}`,
@@ -123,12 +124,13 @@ const mapMaterial = (
     displayStartDate: resourceData.displayStartDate,
     displayEndDate: resourceData.displayEndDate,
     notes: resourceRow?.faculty_notes ?? undefined,
+    sourceResourceId: resourceRow?.source_resource_id ?? undefined,
     volume: resourceData.volume,
     issue: resourceData.issue,
     eds: resourceData.eds,
     instanceId: resourceData.instanceId ?? resourceRow?.source_folio_instance_id ?? undefined,
     instanceHrid: resourceData.instanceHrid,
-    holdingsId: resourceData.holdingsId ?? resourceRow?.source_resource_id ?? undefined,
+    holdingsId: resourceData.holdingsId,
     temporaryLocationId: resourceData.temporaryLocationId,
     temporaryLocationObject: resourceData.temporaryLocationObject,
     permanentLocationId: resourceData.permanentLocationId,
@@ -144,7 +146,8 @@ const mapSubmissionItems = (submission: BackendSubmission, includeBackendIds: bo
   const resourceRows = [...(submission.newResources || []), ...(submission.reuseResources || [])];
   const findResourceRow = (material: BackendMaterial) => resourceRows.find((row) => (
     String(row.id) === String(material.id) && (
-      typeof row.is_reuse !== 'boolean' || typeof material.is_reuse !== 'boolean' || row.is_reuse === material.is_reuse
+      row.is_reuse === undefined || typeof material.is_reuse !== 'boolean' ||
+      (row.is_reuse === true || row.is_reuse === 1) === material.is_reuse
     )
   ));
   const folders = (submission.folders || []).map((folder) => {

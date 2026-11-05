@@ -86,9 +86,10 @@ export interface CourseItem {
   // Physical item metadata (for reuse from previous courses)
   barcode?: string; // Maps to source_barcode
   callNumber?: string; // Maps to source_call_number
+  sourceResourceId?: string; // Original resource identity, distinct from FOLIO holdings
   copy?: string; // Copy number
   instanceId?: string; // FOLIO instance ID - maps to source_folio_instance_id
-  holdingsId?: string; // FOLIO holdings ID - maps to source_resource_id
+  holdingsId?: string; // Verified FOLIO holdings ID
   instanceHrid?: string; // FOLIO instance human-readable ID
 
   // Location information
