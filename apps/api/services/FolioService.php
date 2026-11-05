@@ -203,12 +203,29 @@ class FolioService
             }
 
             $data = $response->getData();
-            if (!isset($data['data']['holding']) || !is_array($data['data']['holding'])) {
+            if (!is_array($data) || !isset($data['data']) || !is_array($data['data'])) {
                 $results[$instanceId] = $this->availabilityFailure($instanceId, $status);
                 continue;
             }
 
-            $results[$instanceId] = FolioAvailabilityMapper::copiesFromHoldings($data['data']['holding']);
+            $availabilityData = $data['data'];
+            if ((isset($availabilityData['code']) && (int)$availabilityData['code'] >= 400)
+                || array_key_exists('error', $availabilityData)
+            ) {
+                $results[$instanceId] = $this->availabilityFailure($instanceId, $status);
+                continue;
+            }
+
+            if (!array_key_exists('holding', $availabilityData)) {
+                $results[$instanceId] = [];
+                continue;
+            }
+            if (!is_array($availabilityData['holding'])) {
+                $results[$instanceId] = $this->availabilityFailure($instanceId, $status);
+                continue;
+            }
+
+            $results[$instanceId] = FolioAvailabilityMapper::copiesFromHoldings($availabilityData['holding']);
         }
 
         return $results;

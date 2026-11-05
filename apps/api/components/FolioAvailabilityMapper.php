@@ -11,6 +11,10 @@ class FolioAvailabilityMapper
      */
     public static function copiesFromHoldings(array $holdings)
     {
+        if ($holdings && array_keys($holdings) !== range(0, count($holdings) - 1)) {
+            $holdings = [$holdings];
+        }
+
         $copies = [];
         foreach ($holdings as $holding) {
             if (isset($holding['suppressFromDiscovery']) && $holding['suppressFromDiscovery'] === 'true') {
