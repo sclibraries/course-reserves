@@ -160,6 +160,181 @@ class FolioServiceTest extends \Codeception\Test\Unit
         $this->assertSame([8, 8], array_column(array_column($transport->requests, 'options'), 'timeout'));
     }
 
+    public function testFetchAvailabilityMapsTwoRealRtacHoldingEntries()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $id = '00000000-0000-4000-8000-000000000881';
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [[
+            'status' => 200,
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => [
+                    'instanceId' => $id,
+                    'holding' => [
+                        [
+                            'id' => 'synthetic-item-1',
+                            'callNumber' => 'QA 100 .T47',
+                            'location' => 'Smith College Neilson Stacks',
+                            'status' => 'Available',
+                            'permanentLoanType' => 'Standard Loan',
+                            'suppressFromDiscovery' => 'false',
+                            'library' => ['name' => 'SC Neilson Library', 'code' => 'SCNLS'],
+                            'notes' => [],
+                        ],
+                        [
+                            'id' => 'synthetic-item-2',
+                            'callNumber' => 'M 200 .D42',
+                            'location' => 'Mount Holyoke College Main Stacks',
+                            'status' => 'Checked out',
+                            'permanentLoanType' => 'Limited',
+                            'suppressFromDiscovery' => 'false',
+                            'library' => ['name' => 'Mount Holyoke College Library', 'code' => 'MHLIB'],
+                            'notes' => [],
+                        ],
+                    ],
+                ],
+            ],
+        ]];
+        $service = new TestableFolioService($transport);
+
+        $this->assertSame([
+            $id => [
+                [
+                    'library' => 'SC Neilson Library',
+                    'location' => 'Smith College Neilson Stacks',
+                    'callNumber' => 'QA 100 .T47',
+                    'status' => 'Available',
+                    'loanType' => 'Standard Loan',
+                ],
+                [
+                    'library' => 'Mount Holyoke College Library',
+                    'location' => 'Mount Holyoke College Main Stacks',
+                    'callNumber' => 'M 200 .D42',
+                    'status' => 'Checked out',
+                    'loanType' => 'Limited',
+                ],
+            ],
+        ], $service->fetchAvailability([$id]));
+    }
+
+    public function testFetchAvailabilityMapsSingleRealRtacHoldingObjectToOneCopy()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $id = '00000000-0000-4000-8000-000000000882';
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [[
+            'status' => 200,
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => [
+                    'instanceId' => $id,
+                    'holding' => [
+                        'id' => 'synthetic-single-item',
+                        'callNumber' => 'PN 100 .S53',
+                        'location' => 'Smith College Neilson Stacks',
+                        'status' => 'Available',
+                        'permanentLoanType' => 'Non-circulating',
+                        'suppressFromDiscovery' => 'false',
+                        'library' => ['name' => 'SC Neilson Library', 'code' => 'SCNLS'],
+                        'notes' => [],
+                    ],
+                ],
+            ],
+        ]];
+        $service = new TestableFolioService($transport);
+
+        $this->assertSame([
+            $id => [[
+                'library' => 'SC Neilson Library',
+                'location' => 'Smith College Neilson Stacks',
+                'callNumber' => 'PN 100 .S53',
+                'status' => 'Available',
+                'loanType' => 'Non-circulating',
+            ]],
+        ], $service->fetchAvailability([$id]));
+    }
+
+    public function testFetchAvailabilityReturnsNoCopiesForAnEmptyHoldingArray()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $id = '00000000-0000-4000-8000-000000000883';
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [[
+            'status' => 200,
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => ['instanceId' => $id, 'holding' => []],
+            ],
+        ]];
+        $service = new TestableFolioService($transport);
+
+        $this->assertSame([$id => []], $service->fetchAvailability([$id]));
+    }
+
+    public function testFetchAvailabilityReturnsNoCopiesWhenHoldingIsMissingFromSuccessfulRtacResponse()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $id = '00000000-0000-4000-8000-000000000884';
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [[
+            'status' => 200,
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => ['instanceId' => $id],
+            ],
+        ]];
+        $service = new TestableFolioService($transport);
+
+        $this->assertSame([$id => []], $service->fetchAvailability([$id]));
+    }
+
+    public function testFetchAvailabilityTreatsMiddlewareErrorEnvelopeAsFailureAtHttp200()
+    {
+        Yii::$app->params['folio'] = [
+            'searchBaseUrl' => 'https://folio.example.test/api/search',
+            'timeoutSeconds' => 5,
+        ];
+        $id = '00000000-0000-4000-8000-000000000885';
+        $transport = new RecordingFolioTransport();
+        $transport->responses = [[
+            'status' => 200,
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => [
+                    'code' => '400',
+                    'error' => 'synthetic invalid search request',
+                    'holding' => [],
+                ],
+            ],
+        ]];
+        $service = new TestableFolioService($transport);
+
+        $result = $service->fetchAvailability([$id]);
+
+        $this->assertArrayHasKey('error', $result[$id]);
+        $this->assertTrue($result[$id]['error']);
+        $this->assertNotEmpty($result[$id]['reference']);
+        $this->assertCount(2, $result[$id]);
+    }
+
     public function testFetchAvailabilityDropsSuppressedCopiesAndMapsOnlyPublicFields()
     {
         Yii::$app->params['folio'] = [
@@ -170,43 +345,47 @@ class FolioServiceTest extends \Codeception\Test\Unit
         $transport = new RecordingFolioTransport();
         $transport->responses = [[
             'status' => 200,
-            'data' => ['data' => [
-                'instanceId' => $id,
-                'holding' => [
-                    [
-                        'id' => 'synthetic-item-1',
-                        'barcode' => 'SYNTHETIC-BARCODE-1',
-                        'location' => 'Smith College Neilson Stacks',
-                        'locationId' => 'synthetic-location-id',
-                        'status' => 'Available',
-                        'permanentLoanType' => 'Standard Loan',
-                        'suppressFromDiscovery' => 'false',
-                        'library' => ['name' => 'SC Neilson Library'],
-                        'callNumber' => 'QA 100 .T47',
-                        'totalHoldRequests' => '0',
-                    ],
-                    [
-                        'id' => 'synthetic-hidden-item',
-                        'barcode' => 'SYNTHETIC-HIDDEN-BARCODE',
-                        'location' => 'Hidden synthetic location',
-                        'status' => 'Available',
-                        'permanentLoanType' => 'Standard Loan',
-                        'suppressFromDiscovery' => 'true',
-                        'library' => ['name' => 'SC Neilson Library'],
-                        'callNumber' => 'QA 101 .T47',
-                    ],
-                    [
-                        'id' => 'synthetic-item-2',
-                        'barcode' => 'SYNTHETIC-BARCODE-2',
-                        'location' => 'Mount Holyoke College Main Stacks',
-                        'status' => 'Checked out',
-                        'permanentLoanType' => 'Library Use Only',
-                        'suppressFromDiscovery' => 'false',
-                        'library' => ['name' => 'Mount Holyoke College Library'],
-                        'callNumber' => 'QA 102 .T47',
+            'data' => [
+                'message' => 'success',
+                'code' => 200,
+                'data' => [
+                    'instanceId' => $id,
+                    'holding' => [
+                        [
+                            'id' => 'synthetic-item-1',
+                            'barcode' => 'SYNTHETIC-BARCODE-1',
+                            'location' => 'Smith College Neilson Stacks',
+                            'locationId' => 'synthetic-location-id',
+                            'status' => 'Available',
+                            'permanentLoanType' => 'Standard Loan',
+                            'suppressFromDiscovery' => 'false',
+                            'library' => ['name' => 'SC Neilson Library'],
+                            'callNumber' => 'QA 100 .T47',
+                            'totalHoldRequests' => '0',
+                        ],
+                        [
+                            'id' => 'synthetic-hidden-item',
+                            'barcode' => 'SYNTHETIC-HIDDEN-BARCODE',
+                            'location' => 'Hidden synthetic location',
+                            'status' => 'Available',
+                            'permanentLoanType' => 'Standard Loan',
+                            'suppressFromDiscovery' => 'true',
+                            'library' => ['name' => 'SC Neilson Library'],
+                            'callNumber' => 'QA 101 .T47',
+                        ],
+                        [
+                            'id' => 'synthetic-item-2',
+                            'barcode' => 'SYNTHETIC-BARCODE-2',
+                            'location' => 'Mount Holyoke College Main Stacks',
+                            'status' => 'Checked out',
+                            'permanentLoanType' => 'Library Use Only',
+                            'suppressFromDiscovery' => 'false',
+                            'library' => ['name' => 'Mount Holyoke College Library'],
+                            'callNumber' => 'QA 102 .T47',
+                        ],
                     ],
                 ],
-            ]],
+            ],
         ]];
         $service = new TestableFolioService($transport);
 
