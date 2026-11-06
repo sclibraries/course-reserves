@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ArrowLeft } from 'lucide-react';
-import { Modal, ModalHeader, ModalBody, Alert } from 'reactstrap';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { notify } from '../../../services/notify';
 
@@ -15,12 +15,19 @@ import { ResourceFormType } from './constants/formTypes';
 import ResourceSearchPicker from './search/ResourceSearchPicker';
 
 // Services
-import { adminCourseService } from '../../../services/admin/adminCourseService';
-import { adminResourceService } from '../../../services/admin/adminResourceService';
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
-import { adjustProxy, LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
 import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
+import { useResourceFormSubmit } from '../../../hooks/admin/useResourceFormSubmit';
+
+const RESOURCE_FORM_TITLES = {
+  [ResourceFormType.NEW]: 'Add resource',
+  [ResourceFormType.EDIT]: 'Edit resource',
+  [ResourceFormType.EDS]: 'Add from EDS',
+  [ResourceFormType.HITCHCOCK]: 'Add from Hitchcock',
+  [ResourceFormType.REUSE]: 'Reuse resource',
+  [ResourceFormType.CROSSLINK]: 'Cross-link to another course',
+};
 
 /**
  * ResourceFormManager - Unified component for managing all resource forms
@@ -39,6 +46,7 @@ import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
  * @param {string} props.formType - Type of form to display (from ResourceFormType)
  * @param {Object} props.initialData - Initial data for the form
  * @param {Object} props.course - Current course data
+ * @param {'course'|'none'} props.mode - Save context for the resource form
  * @param {string} props.title - Modal title override
  */
 export const ResourceFormManager = ({ 
@@ -48,6 +56,7 @@ export const ResourceFormManager = ({
   formType, 
   initialData = {}, 
   course,
+  mode = 'course',
   title: customTitle,
   refreshLinkedCourses,
   ...additionalProps 
@@ -61,12 +70,8 @@ export const ResourceFormManager = ({
   const resourceSearch = useResourceSearch(formType);
   const { reset: resetResourceSearch } = resourceSearch;
 
-  // Reuse keeps its current search UI until AW-087B.
-  const [reuseSearchTerm, setReuseSearchTerm] = useState('');
-  const [reuseSearchResults, setReuseSearchResults] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
-
 
   /**
    * Reset all state when modal closes or form type changes
@@ -75,8 +80,6 @@ export const ResourceFormManager = ({
     setLoading(false);
     setError(null);
     resetResourceSearch();
-    setReuseSearchTerm('');
-    setReuseSearchResults([]);
     setSelectedRecord(null);
     setShowEditForm(false);
   }, [resetResourceSearch]);
@@ -89,46 +92,6 @@ export const ResourceFormManager = ({
       resetState();
     }
   }, [isOpen, formType, resetState]);
-
-  /**
-   * Get modal configuration based on form type
-   */
-  const getModalConfig = () => {
-    const configs = {
-      [ResourceFormType.NEW]: {
-        title: 'Add New Resource',
-        size: 'xl',
-        fullscreen: true
-      },
-      [ResourceFormType.EDIT]: {
-        title: 'Edit Resource',
-        size: 'xl',
-        fullscreen: true
-      },
-      [ResourceFormType.EDS]: {
-        title: 'Create Resource from EDS',
-        size: 'xl',
-        fullscreen: true
-      },
-      [ResourceFormType.HITCHCOCK]: {
-        title: 'Create Resource from Hitchcock',
-        size: 'xl',
-        fullscreen: true
-      },
-      [ResourceFormType.REUSE]: {
-        title: 'Reuse Existing Resource',
-        size: 'xl',
-        fullscreen: true
-      },
-      [ResourceFormType.CROSSLINK]: {
-        title: 'Cross-link to Another Course',
-        size: 'xl',
-        fullscreen: true
-      }
-    };
-    
-    return configs[formType] || configs[ResourceFormType.NEW];
-  };
 
   /**
    * Transform resource metadata from array to object format
@@ -147,87 +110,6 @@ export const ResourceFormManager = ({
       }
       return acc;
     }, {});
-  };
-
-  /**
-   * Handle base form submission (for new/edit/selected records)
-   */
-  const handleBaseFormSubmit = async (formData) => {
-    try {
-      setLoading(true);
-      
-      // Apply proxy settings
-      adjustProxy(formData);
-      
-      // Apply proxy to additional links
-      if (formData.links && formData.links.length > 0) {
-        formData.links = formData.links.map(link => {
-          if (link.use_proxy) {
-            return { 
-              ...link, 
-              url: link.url.includes('proxy') ? link.url : `${LIBPROXY_PREFIX}${link.url}`
-            };
-          }
-          return link;
-        });
-      }
-
-      let result;
-      if (formType === ResourceFormType.EDIT) {
-        // Update existing resource
-        const { resource_id, ...updateData } = formData;
-        result = await additionalProps.onUpdate?.(formData) || 
-                await adminResourceService.updateResource(resource_id, updateData);
-      } else {
-        // Create new resource
-        result = await adminCourseService.createResource(
-          course.offering_id, 
-          course.course_id, 
-          formData, 
-          folioCourseData
-        );
-      }
-
-      if (result !== false) {
-        notify.success(formType === ResourceFormType.EDIT ? 'Resource updated' : 'Resource added');
-        onSubmit?.(formData);
-        onClose();
-      }
-      
-      return result;
-    } catch (err) {
-      console.error('Error submitting resource:', err);
-      setError("Couldn't save the resource");
-      notify.fromError(err, "Couldn't save the resource");
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReuseSearch = async (searchQuery = reuseSearchTerm) => {
-    if (!searchQuery.trim()) {
-      setError('Please enter a search term');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const data = await adminCourseService.searchResources(searchQuery);
-      const results = data?.resources || [];
-      setReuseSearchResults(results);
-      if (results.length === 0) {
-        setError('No results found for your search term');
-      }
-    } catch (err) {
-      console.error('Search error:', err);
-      setError(err.message || 'Search failed');
-      setReuseSearchResults([]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   /**
@@ -271,6 +153,17 @@ export const ResourceFormManager = ({
       setLoading(false);
     }
   };
+
+  const handleBaseFormSubmit = useResourceFormSubmit({
+    formType,
+    course,
+    folioCourseData,
+    onUpdate: additionalProps.onUpdate,
+    onSubmit,
+    onClose,
+    setLoading,
+    setError,
+  });
 
   /**
    * Convert string/number proxy values to boolean
@@ -364,14 +257,11 @@ export const ResourceFormManager = ({
             </Button>
           )}
           <BaseResourceForm
+            formId="resource-form"
             course={folioCourseData}
+            mode={mode}
             initialData={getFormInitialData()}
             onSubmit={handleBaseFormSubmit}
-            title={getModalConfig().title}
-            submitButtonText={formType === ResourceFormType.EDIT ? 'Save Changes' : 'Create Resource'}
-            onCancel={showEditForm ? () => setShowEditForm(false) : onClose}
-            showCancel={!showEditForm && formType !== ResourceFormType.EDIT}
-            loading={loading}
           />
         </>
       );
@@ -382,10 +272,6 @@ export const ResourceFormManager = ({
         return (
           <AdminReuseForm
             error={error}
-            searchTerm={reuseSearchTerm}
-            searchResults={reuseSearchResults}
-            onSearchTermChange={setReuseSearchTerm}
-            onSearch={handleReuseSearch}
             onReuse={handleReuseResource}
             isLoading={loading}
           />
@@ -426,27 +312,39 @@ export const ResourceFormManager = ({
         );
 
       default:
-        return <Alert color="warning" fade={false}>Unknown form type: {formType}</Alert>;
+        return (
+          <div role="alert" className="tw-rounded-md tw-border tw-border-destructive tw-p-3 tw-text-destructive">
+            Unknown form type: {formType}
+          </div>
+        );
     }
   };
 
-  const modalConfig = getModalConfig();
+  const modalTitle = customTitle || RESOURCE_FORM_TITLES[formType] || RESOURCE_FORM_TITLES[ResourceFormType.NEW];
+  const showResourceForm = [ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType) || showEditForm;
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      toggle={onClose}
-      size={modalConfig.size}
-      fullscreen={modalConfig.fullscreen}
-      onClosed={resetState}
-    >
-      <ModalHeader toggle={onClose}>
-        {customTitle || modalConfig.title}
-      </ModalHeader>
-      <ModalBody>
-        {renderFormContent()}
-      </ModalBody>
-    </Modal>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="tw-flex tw-h-[calc(100dvh-2rem)] tw-max-h-[calc(100dvh-2rem)] tw-w-[calc(100vw-2rem)] tw-max-w-7xl tw-flex-col tw-overflow-hidden"
+      >
+        <DialogHeader className="tw-shrink-0">
+          <DialogTitle>{modalTitle}</DialogTitle>
+        </DialogHeader>
+        <div data-testid="resource-form-content" className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-overscroll-contain">
+          {renderFormContent()}
+        </div>
+        {showResourceForm && (
+          <DialogFooter className="tw-shrink-0 tw-border-t tw-pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" form="resource-form" disabled={loading}>Save</Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -457,13 +355,10 @@ ResourceFormManager.propTypes = {
   formType: PropTypes.oneOf(Object.values(ResourceFormType)).isRequired,
   initialData: PropTypes.object,
   course: PropTypes.object,
+  mode: PropTypes.oneOf(['course', 'none']),
   title: PropTypes.string,
   refreshLinkedCourses: PropTypes.func,
   // Additional props for specific form types
-  searchTerm: PropTypes.string,
-  searchResults: PropTypes.array,
-  onSearchTermChange: PropTypes.func,
-  onSearch: PropTypes.func,
   onReuse: PropTypes.func,
   onUpdate: PropTypes.func,
   resourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

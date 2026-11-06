@@ -9,20 +9,25 @@ const mocks = vi.hoisted(() => ({
   deleteResource: vi.fn(),
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
+  resourceFormManagerProps: vi.fn(),
 }));
 
 vi.mock('../../admin/forms/ResourceFormManager', () => ({
-  default: ({ isOpen, onSubmit, initialData }) => isOpen
-    ? <button onClick={async () => {
-      const link = initialData.use_proxy === 1 || initialData.use_proxy === '1' || initialData.use_proxy === true
-        ? `${LIBPROXY_PREFIX}${initialData.item_url.replace(LIBPROXY_PREFIX, '')}`
-        : initialData.item_url.replace(LIBPROXY_PREFIX, '');
-      await mocks.updateResource(initialData.resource_id, { link, use_proxy: initialData.use_proxy });
-      onSubmit();
-    }}>
-      Save resource
-    </button>
-    : null,
+  default: (props) => {
+    mocks.resourceFormManagerProps(props);
+    const { isOpen, onSubmit, initialData } = props;
+    return isOpen ? (
+      <button onClick={async () => {
+        const link = initialData.use_proxy === 1 || initialData.use_proxy === '1' || initialData.use_proxy === true
+          ? `${LIBPROXY_PREFIX}${initialData.item_url.replace(LIBPROXY_PREFIX, '')}`
+          : initialData.item_url.replace(LIBPROXY_PREFIX, '');
+        await mocks.updateResource(initialData.resource_id, { link, use_proxy: initialData.use_proxy });
+        onSubmit();
+      }}>
+        Save resource
+      </button>
+    ) : null;
+  },
 }));
 
 vi.mock('../../../services/admin/adminResourceService', () => ({
@@ -95,6 +100,13 @@ afterEach(() => {
 });
 
 describe('ResourceListTable proxy handling', () => {
+  it('opens the resource form in no-course mode', async () => {
+    await mountTable();
+    await act(async () => container.querySelector('[aria-label="Edit Example resource"]').click());
+
+    expect(mocks.resourceFormManagerProps.mock.lastCall[0].mode).toBe('none');
+  });
+
   it.each([1, '1', true])('adds the proxy prefix for enabled flag %s', async (use_proxy) => {
     await render(use_proxy, 'https://example.test/item');
 

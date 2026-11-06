@@ -522,6 +522,7 @@ function AdminElectronicResources() {
         course={course}
         refreshLinkedCourses={refreshLinkedCourses}
         {...resourceFormModal.additionalProps}
+        mode="course"
       />
     </Container>
   );

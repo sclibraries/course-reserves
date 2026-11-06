@@ -1,7 +1,8 @@
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import PropTypes from 'prop-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, getByRole, getByText, queryByRole } from '@testing-library/dom';
+import { fireEvent, getByRole, getByText, queryByRole, waitFor } from '@testing-library/dom';
 
 const mocks = vi.hoisted(() => ({
   searchEDS: vi.fn(),
@@ -9,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   searchResources: vi.fn(),
   searchHitchcock: vi.fn(),
   mapEdsRecordToResource: vi.fn(),
+  createResource: vi.fn(),
   updateResource: vi.fn(),
+  fetch: vi.fn(),
   onReuse: vi.fn(),
   notifyFromError: vi.fn(),
   notifySuccess: vi.fn(),
@@ -62,6 +65,7 @@ vi.mock('../../../services/admin/adminCourseService', () => ({
     searchEDS: mocks.searchEDS,
     searchEDSPage: mocks.searchEDSPage,
     searchResources: mocks.searchResources,
+    createResource: mocks.createResource,
   },
 }));
 vi.mock('../../../services/admin/course/resourceApi', () => ({
@@ -73,12 +77,21 @@ vi.mock('../../../services/admin/adminResourceService', () => ({
 vi.mock('../../../services/admin/hitchcockService', () => ({
   hitchcockService: { searchResources: mocks.searchHitchcock },
 }));
-vi.mock('../../../store/adminCourseStore', () => ({ useAdminCourseStore: () => ({ folioCourseData: null }) }));
+vi.mock('../../../store/adminCourseStore', () => ({
+  useAdminCourseStore: () => ({
+    folioCourseData: {
+      offering_id: 'stale-offering',
+      course_id: 'stale-course',
+      courseListingObject: { termObject: { startDate: '2026-01-01', endDate: '2026-05-01' } },
+    },
+  }),
+}));
 vi.mock('../../../util/proxyUtil', () => ({ adjustProxy: (value) => value, LIBPROXY_PREFIX: '' }));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));
 vi.mock('./common/BaseResourceForm', () => ({
-  default: ({ initialData, onSubmit }) => <>
+  default: ({ initialData, onSubmit, mode }) => <>
     <p>{initialData?.title}</p>
+    <p data-mode={mode} />
     <button onClick={async () => {
       try {
         await onSubmit({ resource_id: 'test-resource', title: 'Updated item' });
@@ -109,6 +122,24 @@ import { ResourceFormType } from './constants/formTypes';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+function ControlledManager({ formType, onClose }) {
+  const [isOpen, setIsOpen] = useState(true);
+  return <ResourceFormManager
+    isOpen={isOpen}
+    onClose={() => {
+      onClose();
+      setIsOpen(false);
+    }}
+    formType={formType}
+    mode="course"
+  />;
+}
+
+ControlledManager.propTypes = {
+  formType: PropTypes.oneOf(Object.values(ResourceFormType)).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
 describe('ResourceFormManager EDS search failures', () => {
   let container;
   let root;
@@ -116,6 +147,8 @@ describe('ResourceFormManager EDS search failures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.fetch.mockImplementation(() => { throw new Error('Unexpected application HTTP request'); });
+    vi.stubGlobal('fetch', mocks.fetch);
     mocks.updateResource.mockResolvedValue({ resource_id: 'test-resource' });
     mocks.onReuse.mockResolvedValue(undefined);
     container = document.createElement('div');
@@ -124,7 +157,9 @@ describe('ResourceFormManager EDS search failures', () => {
   });
 
   afterEach(() => {
+    expect(mocks.fetch).not.toHaveBeenCalled();
     act(() => root.unmount());
+    vi.unstubAllGlobals();
     container.remove();
     vi.restoreAllMocks();
   });
@@ -143,13 +178,13 @@ describe('ResourceFormManager EDS search failures', () => {
       }));
     });
 
-    const input = getByRole(container, 'textbox', { name: 'Search EDS' });
+    const input = getByRole(document.body, 'textbox', { name: 'Search EDS' });
     await act(async () => fireEvent.change(input, { target: { value: 'climate change' } }));
-    await act(async () => getByRole(container, 'button', { name: 'Search' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Search' }).click());
 
     expect(mocks.searchEDS).toHaveBeenCalledWith('climate change');
     expect(mocks.notifyFromError).toHaveBeenCalledWith(error, "Couldn't search resources");
-    expect(queryByRole(container, 'alert')).toBeNull();
+    expect(queryByRole(document.body, 'alert')).toBeNull();
   });
 
   it('returns to the same EDS results after filling the form through the mapper', async () => {
@@ -173,19 +208,34 @@ describe('ResourceFormManager EDS search failures', () => {
       isOpen: true,
       onClose: vi.fn(),
       formType: ResourceFormType.EDS,
+      mode: 'course',
     })));
-    const input = getByRole(container, 'textbox', { name: 'Search EDS' });
+    const input = getByRole(document.body, 'textbox', { name: 'Search EDS' });
     await act(async () => fireEvent.change(input, { target: { value: 'climate change' } }));
-    await act(async () => getByRole(container, 'button', { name: 'Search' }).click());
-    await act(async () => getByRole(container, 'button', { name: 'Edit & Add' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Search' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Edit & Add' }).click());
 
     expect(mocks.mapEdsRecordToResource).toHaveBeenCalledWith(record);
-    expect(getByText(container, 'Mapped synthetic title')).toBeTruthy();
-    await act(async () => getByRole(container, 'button', { name: 'Back to results' }).click());
+    expect(getByText(document.body, 'Mapped synthetic title')).toBeTruthy();
+    expect(document.body.querySelector('[data-mode="course"]')).toBeTruthy();
+    await act(async () => getByRole(document.body, 'button', { name: 'Back to results' }).click());
 
-    expect(getByRole(container, 'textbox', { name: 'Search EDS' }).value).toBe('climate change');
-    expect(getByRole(container, 'heading', { name: 'Synthetic EDS title' })).toBeTruthy();
+    expect(getByRole(document.body, 'textbox', { name: 'Search EDS' }).value).toBe('climate change');
+    expect(getByRole(document.body, 'heading', { name: 'Synthetic EDS title' })).toBeTruthy();
     expect(mocks.searchEDS).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards no-course mode even when course data is stale in the store', async () => {
+    await act(async () => root.render(createElement(ResourceFormManager, {
+      isOpen: true,
+      onClose: vi.fn(),
+      formType: ResourceFormType.EDIT,
+      initialData: { resource_id: 'test-resource' },
+      mode: 'none',
+    })));
+
+    expect(document.body.querySelector('[data-mode="none"]')).toBeTruthy();
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it('uses the shared picker to search Hitchcock and render its results', async () => {
@@ -197,13 +247,43 @@ describe('ResourceFormManager EDS search failures', () => {
       onClose: vi.fn(),
       formType: ResourceFormType.HITCHCOCK,
     })));
-    const input = getByRole(container, 'textbox', { name: 'Search Hitchcock' });
+    const input = getByRole(document.body, 'textbox', { name: 'Search Hitchcock' });
     await act(async () => fireEvent.change(input, { target: { value: 'documentary' } }));
-    await act(async () => getByRole(container, 'button', { name: 'Search' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Search' }).click());
 
     expect(mocks.searchHitchcock).toHaveBeenCalledWith('documentary');
-    expect(getByRole(container, 'heading', { name: record.title })).toBeTruthy();
-    expect(getByRole(container, 'button', { name: 'Edit & Add' })).toBeTruthy();
+    expect(getByRole(document.body, 'heading', { name: record.title })).toBeTruthy();
+    expect(getByRole(document.body, 'button', { name: 'Edit & Add' })).toBeTruthy();
+  });
+
+  it.each([
+    [ResourceFormType.EDS, 'Search EDS', mocks.searchEDS, {
+      status: 'success',
+      code: 200,
+      data: { records: [{ An: 'SYNTH-CANCEL-EDS', Items: { Ti: [{ CleanData: 'Synthetic EDS result' }] } }] },
+    }],
+    [ResourceFormType.HITCHCOCK, 'Search Hitchcock', mocks.searchHitchcock, {
+      ok: true,
+      json: async () => [{ id: 'SYNTH-CANCEL-HITCHCOCK', title: 'Synthetic Hitchcock result' }],
+    }],
+  ])('%s closes after a pick when Cancel is pressed, without saving', async (formType, searchName, search, results) => {
+    const onClose = vi.fn();
+    search.mockResolvedValueOnce(results);
+    mocks.mapEdsRecordToResource.mockResolvedValue({ title: 'Synthetic mapped result' });
+
+    await act(async () => root.render(createElement(ControlledManager, { formType, onClose })));
+    const input = getByRole(document.body, 'textbox', { name: searchName });
+    await act(async () => fireEvent.change(input, { target: { value: 'synthetic query' } }));
+    await act(async () => getByRole(document.body, 'button', { name: 'Search' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Edit & Add' }).click());
+
+    expect(getByRole(document.body, 'button', { name: 'Cancel' })).toBeTruthy();
+    await act(async () => fireEvent.click(getByRole(document.body, 'button', { name: 'Cancel' })));
+
+    await waitFor(() => expect(queryByRole(document.body, 'dialog')).toBeNull());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(mocks.createResource).not.toHaveBeenCalled();
+    expect(mocks.updateResource).not.toHaveBeenCalled();
   });
 
   it('saves an edited resource once and owns one success toast', async () => {
@@ -217,7 +297,7 @@ describe('ResourceFormManager EDS search failures', () => {
       initialData: { resource_id: 'test-resource' },
     })));
 
-    await act(async () => getByRole(container, 'button', { name: 'Save resource' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Save resource' }).click());
 
     expect(mocks.updateResource).toHaveBeenCalledTimes(1);
     expect(mocks.notifySuccess).toHaveBeenCalledTimes(1);
@@ -237,7 +317,7 @@ describe('ResourceFormManager EDS search failures', () => {
       initialData: { resource_id: 'test-resource' },
     })));
 
-    await act(async () => getByRole(container, 'button', { name: 'Save resource' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Save resource' }).click());
 
     expect(mocks.updateResource).toHaveBeenCalledTimes(1);
     expect(mocks.notifyFromError).toHaveBeenCalledTimes(1);
@@ -257,7 +337,7 @@ describe('ResourceFormManager EDS search failures', () => {
       formType: ResourceFormType.REUSE,
     })));
 
-    await act(async () => getByRole(container, 'button', { name: 'Reuse resource' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Reuse resource' }).click());
 
     expect(mocks.onReuse).toHaveBeenCalledTimes(1);
     expect(mocks.onReuse).toHaveBeenCalledWith('test-resource');
@@ -280,9 +360,9 @@ describe('ResourceFormManager EDS search failures', () => {
       formType: ResourceFormType.REUSE,
     })));
 
-    await act(async () => getByRole(container, 'button', { name: 'Reuse resource' }).click());
+    await act(async () => getByRole(document.body, 'button', { name: 'Reuse resource' }).click());
 
-    expect(getByRole(container, 'alert').textContent).toBe("Couldn't add the resource to the course");
+    expect(getByRole(document.body, 'alert').textContent).toBe("Couldn't add the resource to the course");
     expect(mocks.onReuse).toHaveBeenCalledTimes(1);
     expect(onSubmit).not.toHaveBeenCalled();
     expect(mocks.notifyFromError).toHaveBeenCalledTimes(1);

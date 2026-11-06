@@ -7,7 +7,6 @@ import {
   Col,
   Card,
   CardBody,
-  CardHeader,
   Alert
 } from 'reactstrap';
 import { FaInfoCircle, FaLink, FaFolder } from 'react-icons/fa';
@@ -15,7 +14,6 @@ import { FaInfoCircle, FaLink, FaFolder } from 'react-icons/fa';
 import ResourceBasicFields from './ResourceBasicFields';
 import ResourceTypeSelector from './ResourceTypeSelector';
 import FormSection from './FormSection';
-import FormActions from './FormActions';
 import FolderSelector from './FolderSelector';
 import UnifiedVisibilityControl from './UnifiedVisibilityControl';
 import FormNavigationAnchor from './FormNavigationAnchor';
@@ -43,7 +41,6 @@ import '../../../../css/AdminForms.css';
  * - Integrated folder selection with creation capability
  * - Additional links management
  * - Form validation and error handling
- * - Loading states and user feedback
  * - Responsive design with consistent styling
  * 
  * **Form Sections**:
@@ -76,19 +73,12 @@ import '../../../../css/AdminForms.css';
  * <BaseResourceForm
  *   initialData={resource}
  *   onSubmit={handleSave}
- *   title="Edit Resource"
- *   submitButtonText="Save Changes"
- *   onCancel={handleCancel}
- *   showCancel={true}
  * />
  */
 export const BaseResourceForm = ({ 
   initialData = {}, 
   onSubmit,
-  title = 'Resource Form',
-  submitButtonText = 'Save Resource',
-  onCancel,
-  showCancel = true,
+  formId,
   course // Add course prop for term dates
 }) => {
   // Get course data from store to access semester dates
@@ -235,13 +225,12 @@ export const BaseResourceForm = ({
   // State for links - filter out primary link (order = 0) since it's handled separately
   const [links, setLinks] = useState(() => {
     const existingLinks = (initialData.links || []).filter(link => link.order !== 0 && link.order !== '0');
-    return existingLinks;
+    return existingLinks.map(link => ({ ...link }));
   });
   
   // State for additional data
   const [materialTypes, setMaterialTypes] = useState([]);
   const [materialTypeFields, setMaterialTypeFields] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
   // Fetch material types on component mount
@@ -397,7 +386,6 @@ export const BaseResourceForm = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage(null);
-    setIsLoading(true);
     
     try {
       // Validate required fields
@@ -440,8 +428,6 @@ export const BaseResourceForm = ({
     } catch (error) {
       console.error('Error saving resource:', error);
       setErrorMessage("Couldn't save the resource");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -449,9 +435,6 @@ export const BaseResourceForm = ({
   return (
     <Container fluid className="py-4">
       <Card className="shadow-sm">
-        <CardHeader className="bg-white">
-          <h3 className="mb-0">{title}</h3>
-        </CardHeader>
         <CardBody>
           {errorMessage && (
             <div className="alert alert-danger" role="alert">
@@ -459,7 +442,7 @@ export const BaseResourceForm = ({
             </div>
           )}
           
-          <Form onSubmit={handleSubmit}>
+          <Form id={formId} onSubmit={handleSubmit}>
             {/* Hitchcock Video Automatic Visibility Alert */}
             {formData.link && 
              isHitchcockVideoUrl(formData.link) &&
@@ -574,13 +557,6 @@ export const BaseResourceForm = ({
               />
             </div>
             
-            {/* Form Actions */}
-            <FormActions 
-              isSubmitting={isLoading}
-              onCancel={onCancel}
-              submitText={submitButtonText}
-              showCancel={showCancel}
-            />
           </Form>
         </CardBody>
       </Card>
@@ -599,10 +575,8 @@ BaseResourceForm.propTypes = {
   }),
   initialData: PropTypes.object,
   onSubmit: PropTypes.func.isRequired,
-  title: PropTypes.string,
-  submitButtonText: PropTypes.string,
-  onCancel: PropTypes.func,
-  showCancel: PropTypes.bool
+  formId: PropTypes.string,
+  mode: PropTypes.oneOf(['course', 'none'])
 };
 
 export default BaseResourceForm;

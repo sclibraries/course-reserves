@@ -274,6 +274,7 @@ const ResourceListTable = ({ resources, refreshResources }) => {
         formType={ResourceFormType.EDIT}
         initialData={editResourceModal.initialData}
         {...editResourceModal.additionalProps}
+        mode="none"
       />
 
       {/* Delete Confirmation Modal */}
