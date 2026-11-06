@@ -2,6 +2,8 @@
 
 // Generic Yii REST routes follow the explicit route files.
 return [
+    'GET resource/<id:\d+>/usage' => 'resource/usage',
+    'OPTIONS resource/<id:\d+>/usage' => 'resource/options',
     'GET tracking/top-courses' => 'tracking/top-courses',
     'OPTIONS tracking/top-courses' => 'tracking/options',
     'GET tracking/analytics' => 'tracking/analytics',

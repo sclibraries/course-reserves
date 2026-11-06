@@ -12,12 +12,14 @@ use yii\rest\ActiveController;
 use app\models\ResourceLinks;
 use app\components\Roles;
 use app\services\PublicResourceFields;
+use app\services\ResourceUsageService;
 use yii\filters\auth\HttpBearerAuth;
 use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 
 class ResourceController extends ActiveController
 {
-    private const RESOURCE_WRITE_ACTIONS = ['create', 'update', 'delete', 'add-link', 'delete-link'];
+    private const RESOURCE_STAFF_ACTIONS = ['create', 'update', 'delete', 'add-link', 'delete-link', 'usage'];
 
     public $modelClass = 'app\models\Resources';
 
@@ -126,6 +128,16 @@ class ResourceController extends ActiveController
     public function actionDeleteLink($id)
     {
         return Yii::$container->get(\app\services\ResourceMutationService::class)->deleteLink($id);
+    }
+
+    public function actionUsage($id)
+    {
+        $usage = Yii::$container->get(ResourceUsageService::class)->forResource($id);
+        if ($usage === null) {
+            throw new NotFoundHttpException('Resource not found.');
+        }
+
+        return $usage;
     }
 
 
@@ -319,7 +331,7 @@ class ResourceController extends ActiveController
 
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'only' => array_merge(['index', 'view', 'search'], self::RESOURCE_WRITE_ACTIONS),
+            'only' => array_merge(['index', 'view', 'search'], self::RESOURCE_STAFF_ACTIONS),
             'optional' => ['index', 'view', 'search'],
         ];
 
@@ -343,17 +355,17 @@ class ResourceController extends ActiveController
             return false;
         }
 
-        if (in_array($action->id, self::RESOURCE_WRITE_ACTIONS, true)) {
-            $this->assertResourceWriteAccess(Yii::$app->user->identity);
+        if (in_array($action->id, self::RESOURCE_STAFF_ACTIONS, true)) {
+            $this->assertResourceStaffAccess(Yii::$app->user->identity);
         }
 
         return true;
     }
 
-    private function assertResourceWriteAccess($identity): void
+    private function assertResourceStaffAccess($identity): void
     {
         if (!Roles::isStaff($identity->role ?? null)) {
-            throw new ForbiddenHttpException('Resource writes require a staff or admin role.');
+            throw new ForbiddenHttpException('Resource access requires a staff or admin role.');
         }
     }
 }
