@@ -3,7 +3,7 @@
  * @description Modal for sending messages to faculty (always faculty_visible)
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Loader2, Mail, Send } from 'lucide-react';
 import { Button } from '../../ui/button';
@@ -26,7 +26,6 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const openerRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -81,14 +80,7 @@ const FacultyMessageModal = ({ isOpen, toggle, item, onMessageSent }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) toggle(); }}>
-      <DialogContent
-        className="tw-w-[calc(100vw-2rem)] tw-max-h-[90vh] tw-overflow-y-auto [&>button]:tw-absolute [&>button]:tw-right-4 [&>button]:tw-top-4 [&>button]:tw-flex [&>button]:tw-size-10 [&>button]:tw-items-center [&>button]:tw-justify-center [&>button]:tw-rounded-md [&>button]:tw-border [&>button]:tw-border-transparent [&>button]:tw-bg-background [&>button]:tw-text-foreground [&>button]:tw-transition-opacity [&>button]:tw-opacity-70 [&>button]:hover:tw-opacity-100 [&>button]:focus-visible:tw-outline-none [&>button]:focus-visible:tw-ring-2 [&>button]:focus-visible:tw-ring-ring [&>button]:focus-visible:tw-ring-offset-2 [&>button>span]:tw-sr-only [&>button>svg]:tw-size-4"
-        onOpenAutoFocus={() => { openerRef.current = document.activeElement; }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          openerRef.current?.focus();
-        }}
-      >
+      <DialogContent className="tw-w-[calc(100vw-2rem)] tw-max-h-[90vh] tw-overflow-y-auto">
         <DialogHeader className="tw-pr-10 tw-text-left">
           <DialogTitle className="tw-flex tw-items-center tw-gap-2 tw-break-words">
             <Mail aria-hidden="true" className="tw-size-5 tw-shrink-0" />
