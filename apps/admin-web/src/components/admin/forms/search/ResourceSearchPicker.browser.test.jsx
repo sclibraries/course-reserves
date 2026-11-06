@@ -20,6 +20,13 @@ const record = {
   },
 };
 
+const reuseRecord = {
+  resource_id: 9,
+  name: `${'Synthetic reusable title with many words '.repeat(18)}${'x'.repeat(80)}`,
+  material_type_name: 'Book',
+  item_url: `https://example.test/${'long-resource-path-'.repeat(14)}`,
+};
+
 let container;
 let root;
 
@@ -46,6 +53,29 @@ async function renderPicker() {
   ));
 }
 
+async function renderReusePicker() {
+  await page.viewport(1280, 900);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root.render(
+    <ResourceSearchPicker
+      formType={ResourceFormType.REUSE}
+      searchTerm="long title"
+      onSearchTermChange={vi.fn()}
+      onSearch={vi.fn()}
+      searchResults={[reuseRecord]}
+      hasSearched
+      loading={false}
+      totalHits={0}
+      searchTime={0}
+      hasMore={false}
+      onLoadMore={vi.fn()}
+      onSelectRecord={vi.fn()}
+    />,
+  ));
+}
+
 afterEach(() => {
   if (root) act(() => root.unmount());
   container?.remove();
@@ -58,6 +88,17 @@ describe('ResourceSearchPicker in Chromium', () => {
     await renderPicker();
 
     const title = getByRole(container, 'heading', { name: /Synthetic long title/ });
+    await expectNoHorizontalOverflow([320, 768, 1280]);
+    await page.viewport(320, 900);
+    expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);
+    await expectNoAxeViolations(container);
+  });
+
+  it('reflows reuse results without page overflow and has no axe violations', async () => {
+    await renderReusePicker();
+
+    const title = getByRole(container, 'heading', { name: /Synthetic reusable title/ });
+    expect(getByRole(container, 'button', { name: 'Add to Course' })).toBeTruthy();
     await expectNoHorizontalOverflow([320, 768, 1280]);
     await page.viewport(320, 900);
     expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);

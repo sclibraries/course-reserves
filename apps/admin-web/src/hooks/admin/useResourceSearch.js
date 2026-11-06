@@ -39,6 +39,9 @@ export function useResourceSearch(formType) {
         setSearchTime(data.data?.statistics?.TotalSearchTime || 0);
         setEbscoQueryString(data.data?.request?.QueryString || '');
         setCurrentPage(1);
+      } else if (formType === ResourceFormType.REUSE) {
+        const data = await adminCourseService.searchResources(query);
+        results = data.resources || [];
       } else {
         const response = await hitchcockService.searchResources(query);
         if (!response.ok) {

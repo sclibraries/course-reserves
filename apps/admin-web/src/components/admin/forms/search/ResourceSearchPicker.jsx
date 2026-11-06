@@ -20,9 +20,14 @@ export default function ResourceSearchPicker({
   hasMore,
   onLoadMore,
   onSelectRecord,
+  selectionDisabled = false,
 }) {
   const searchId = useId();
-  const source = formType === ResourceFormType.EDS ? 'EDS' : 'Hitchcock';
+  const source = {
+    [ResourceFormType.EDS]: 'EDS',
+    [ResourceFormType.HITCHCOCK]: 'Hitchcock',
+    [ResourceFormType.REUSE]: 'resources',
+  }[formType];
 
   return (
     <div className="tw-min-w-0 tw-space-y-4">
@@ -69,6 +74,7 @@ export default function ResourceSearchPicker({
             formType={formType}
             results={searchResults}
             onSelectRecord={onSelectRecord}
+            selectionDisabled={selectionDisabled}
           />
           {hasMore && (
             <Button type="button" variant="outline" onClick={onLoadMore} disabled={loading}>
@@ -83,7 +89,7 @@ export default function ResourceSearchPicker({
 }
 
 ResourceSearchPicker.propTypes = {
-  formType: PropTypes.oneOf([ResourceFormType.EDS, ResourceFormType.HITCHCOCK]).isRequired,
+  formType: PropTypes.oneOf([ResourceFormType.EDS, ResourceFormType.HITCHCOCK, ResourceFormType.REUSE]).isRequired,
   searchTerm: PropTypes.string.isRequired,
   onSearchTermChange: PropTypes.func.isRequired,
   onSearch: PropTypes.func.isRequired,
@@ -95,4 +101,5 @@ ResourceSearchPicker.propTypes = {
   hasMore: PropTypes.bool.isRequired,
   onLoadMore: PropTypes.func.isRequired,
   onSelectRecord: PropTypes.func.isRequired,
+  selectionDisabled: PropTypes.bool,
 };

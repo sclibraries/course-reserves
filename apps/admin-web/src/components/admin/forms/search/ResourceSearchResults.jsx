@@ -92,23 +92,44 @@ function HitchcockDetails({ record }) {
 
 HitchcockDetails.propTypes = { record: PropTypes.object.isRequired };
 
-export default function ResourceSearchResults({ formType, results, onSelectRecord }) {
+function ReuseDetails({ record }) {
+  return (
+    <div className="tw-min-w-0 tw-space-y-2 tw-text-sm">
+      <p className="tw-break-words">
+        <span className="tw-font-medium">Type: </span>{record.material_type_name || 'N/A'}
+      </p>
+      <p className="tw-break-all">
+        <span className="tw-font-medium">URL: </span>
+        {record.item_url ? (
+          <a className="tw-text-primary tw-underline" href={record.item_url} target="_blank" rel="noopener noreferrer">
+            {record.item_url} <ExternalLink aria-hidden="true" className="tw-inline tw-size-4" />
+          </a>
+        ) : 'No URL available'}
+      </p>
+    </div>
+  );
+}
+
+ReuseDetails.propTypes = { record: PropTypes.object.isRequired };
+
+export default function ResourceSearchResults({ formType, results, onSelectRecord, selectionDisabled }) {
   const isEds = formType === ResourceFormType.EDS;
+  const isReuse = formType === ResourceFormType.REUSE;
 
   return (
     <div className="tw-grid tw-min-w-0 tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-2">
       {results.map((record) => {
-        const title = isEds ? getEdsTitle(record) : (record.title || 'N/A');
-        const key = record.An || record.id || record.PLink || title;
+        const title = isEds ? getEdsTitle(record) : (isReuse ? record.name : record.title) || 'N/A';
+        const key = record.resource_id || record.An || record.id || record.PLink || title;
         return (
           <Card key={key} className="tw-min-w-0">
             <CardHeader className="tw-p-4">
               <CardTitle className="tw-min-w-0 tw-break-words tw-text-lg tw-leading-snug">{title}</CardTitle>
             </CardHeader>
             <CardContent className="tw-min-w-0 tw-space-y-4 tw-p-4 tw-pt-0">
-              {isEds ? <EDSDetails record={record} /> : <HitchcockDetails record={record} />}
-              <Button type="button" size="sm" onClick={() => onSelectRecord(record)}>
-                Edit &amp; Add
+              {isEds ? <EDSDetails record={record} /> : isReuse ? <ReuseDetails record={record} /> : <HitchcockDetails record={record} />}
+              <Button type="button" size="sm" onClick={() => onSelectRecord(record)} disabled={selectionDisabled}>
+                {isReuse ? 'Add to Course' : 'Edit & Add'}
               </Button>
             </CardContent>
           </Card>
@@ -119,7 +140,8 @@ export default function ResourceSearchResults({ formType, results, onSelectRecor
 }
 
 ResourceSearchResults.propTypes = {
-  formType: PropTypes.oneOf([ResourceFormType.EDS, ResourceFormType.HITCHCOCK]).isRequired,
+  formType: PropTypes.oneOf([ResourceFormType.EDS, ResourceFormType.HITCHCOCK, ResourceFormType.REUSE]).isRequired,
   results: PropTypes.arrayOf(PropTypes.object).isRequired,
   onSelectRecord: PropTypes.func.isRequired,
+  selectionDisabled: PropTypes.bool,
 };
