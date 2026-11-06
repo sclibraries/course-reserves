@@ -158,6 +158,119 @@ class CreateResourceOfferingCest extends BaseFunctionalCest
         $this->assertNoResourceNamed($name);
     }
 
+    public function createAndEditResourceVisibilityAndLinkSettings(FunctionalTester $I)
+    {
+        $name = $this->resourceName('visibility');
+        $payload = $this->payload($this->sectionThreeOfferingId, $this->sectionThreeFolioCourseId, $name);
+        $payload['start_visibility'] = '2027-01-01';
+        $payload['end_visibility'] = '2027-12-31';
+        $payload['primary_link_start_visibility'] = '2027-02-01';
+        $payload['primary_link_end_visibility'] = '2027-11-30';
+        $payload['use_resource_visibility'] = 1;
+        $payload['use_primary_link_visibility'] = 1;
+        $payload['links'] = [[
+            'url' => 'https://links.example.test/api127b-create',
+            'use_link_visibility' => 1,
+            'start_visibility' => '2027-03-01',
+            'end_visibility' => '2027-10-31',
+        ]];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonPost('course/create-resource', $payload);
+        $I->seeResponseCodeIs(200);
+
+        $resourceId = (int)$this->db->createCommand(
+            'SELECT resource_id FROM resources WHERE name = :name', [':name' => $name]
+        )->queryScalar();
+        $resource = $this->db->createCommand(
+            'SELECT start_visibility, end_visibility FROM resources WHERE resource_id = :id', [':id' => $resourceId]
+        )->queryOne();
+        $link = $this->db->createCommand(
+            'SELECT use_link_visibility, start_visibility, end_visibility FROM resource_links WHERE resource_id = :id',
+            [':id' => $resourceId]
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertSame('2027-01-01', $resource['start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-12-31', $resource['end_visibility']);
+        \PHPUnit\Framework\Assert::assertSame(1, (int)$link['use_link_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-03-01', $link['start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-10-31', $link['end_visibility']);
+
+        $I->sendJsonRequest('PUT', 'resource/update', [
+            'start_visibility' => null,
+            'primary_link_start_visibility' => '',
+            'use_resource_visibility' => null,
+            'links' => [[
+                'url' => 'https://links.example.test/api127b-create',
+                'use_link_visibility' => '0',
+                'start_visibility' => '2027-04-01',
+                'end_visibility' => '2027-09-30',
+            ]],
+        ], ['id' => $resourceId]);
+        $I->seeResponseCodeIs(200);
+
+        $association = $this->db->createCommand(
+            'SELECT start_visibility, end_visibility, use_resource_visibility, '
+            . 'primary_link_start_visibility, primary_link_end_visibility, use_primary_link_visibility '
+            . 'FROM course_resources WHERE resource_id = :id',
+            [':id' => $resourceId]
+        )->queryOne();
+        $link = $this->db->createCommand(
+            'SELECT use_link_visibility, start_visibility, end_visibility FROM resource_links WHERE resource_id = :id',
+            [':id' => $resourceId]
+        )->queryOne();
+        $resource = $this->db->createCommand(
+            'SELECT start_visibility, end_visibility FROM resources WHERE resource_id = :id', [':id' => $resourceId]
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertNull($association['start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-12-31', $association['end_visibility']);
+        \PHPUnit\Framework\Assert::assertSame(1, (int)$association['use_resource_visibility']);
+        \PHPUnit\Framework\Assert::assertNull($association['primary_link_start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-11-30', $association['primary_link_end_visibility']);
+        \PHPUnit\Framework\Assert::assertSame(1, (int)$association['use_primary_link_visibility']);
+        \PHPUnit\Framework\Assert::assertSame(0, (int)$link['use_link_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-04-01', $link['start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-09-30', $link['end_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-01-01', $resource['start_visibility']);
+        \PHPUnit\Framework\Assert::assertSame('2027-12-31', $resource['end_visibility']);
+
+        $I->sendJsonRequest('PUT', 'resource/update', [
+            'end_visibility' => '',
+            'use_resource_visibility' => 0,
+        ], ['id' => $resourceId]);
+        $I->seeResponseCodeIs(200);
+        $association = $this->db->createCommand(
+            'SELECT end_visibility, use_resource_visibility FROM course_resources WHERE resource_id = :id',
+            [':id' => $resourceId]
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertNull($association['end_visibility']);
+        \PHPUnit\Framework\Assert::assertSame(0, (int)$association['use_resource_visibility']);
+    }
+
+    public function invalidLaterAdditionalLinkRollsBackResourceCreation(FunctionalTester $I)
+    {
+        $name = $this->resourceName('invalid-link');
+        $payload = $this->payload($this->sectionThreeOfferingId, $this->sectionThreeFolioCourseId, $name);
+        $payload['links'] = [
+            ['url' => 'https://links.example.test/api127b-valid'],
+            'invalid link object',
+        ];
+
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonPost('course/create-resource', $payload);
+        $I->seeResponseCodeIs(400);
+
+        $counts = $this->db->createCommand(
+            'SELECT COUNT(DISTINCT r.resource_id) AS resources, COUNT(DISTINCT rl.link_id) AS links, '
+            . 'COUNT(DISTINCT cr.course_resource_id) AS associations FROM resources r '
+            . 'LEFT JOIN resource_links rl ON rl.resource_id = r.resource_id '
+            . 'LEFT JOIN course_resources cr ON cr.resource_id = r.resource_id WHERE r.name = :name',
+            [':name' => $name]
+        )->queryOne();
+        \PHPUnit\Framework\Assert::assertSame(0, (int)$counts['resources']);
+        \PHPUnit\Framework\Assert::assertSame(0, (int)$counts['links']);
+        \PHPUnit\Framework\Assert::assertSame(0, (int)$counts['associations']);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function payload($offeringId, $folioCourseId, $title)

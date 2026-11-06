@@ -125,8 +125,8 @@ class ResourceMutationService
     {
         $visibility = [];
         foreach (['start_visibility', 'end_visibility', 'primary_link_start_visibility', 'primary_link_end_visibility'] as $field) {
-            if (isset($data[$field])) {
-                $visibility[$field] = $data[$field];
+            if (array_key_exists($field, $data)) {
+                $visibility[$field] = $data[$field] === '' ? null : $data[$field];
             }
         }
         foreach (['use_resource_visibility', 'use_primary_link_visibility'] as $field) {
@@ -184,7 +184,7 @@ class ResourceMutationService
         }
     }
 
-    private function replaceLinks($resourceId, array $links)
+    public function replaceLinks($resourceId, array $links)
     {
         $desired = [];
         foreach ($links as $index => $data) {

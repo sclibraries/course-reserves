@@ -1619,26 +1619,9 @@ class CourseController extends ActiveController
                     throw new ServerErrorHttpException('Failed to create resource: ' . json_encode($resource->getErrors()));
                 }
 
-                // Process and save additional links
                 if (!empty($additionalLinks) && is_array($additionalLinks)) {
-                    foreach ($additionalLinks as $index => $linkData) {
-                        // Skip empty URLs
-                        if (empty($linkData['url'])) {
-                            continue;
-                        }
-
-                        $resourceLink = new ResourceLinks();
-                        $resourceLink->resource_id = $resource->resource_id;
-                        $resourceLink->url = $linkData['url'];
-                        $resourceLink->title = $linkData['title'] ?? null;
-                        $resourceLink->description = $linkData['description'] ?? null;
-                        $resourceLink->use_proxy = isset($linkData['use_proxy']) && $linkData['use_proxy'] ? 1 : 0;
-                        $resourceLink->order = $index + 1;
-
-                        if (!$resourceLink->save()) {
-                            throw new ServerErrorHttpException('Failed to save link: ' . json_encode($resourceLink->getErrors()));
-                        }
-                    }
+                    Yii::$container->get(\app\services\ResourceMutationService::class)
+                        ->replaceLinks($resource->resource_id, $additionalLinks);
                 }
 
                 // Process and save metadata if provided
