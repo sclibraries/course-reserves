@@ -148,6 +148,10 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'OPTIONS physical-resource/update-resource-order' => 'cors-preflight/options',
             'OPTIONS <path:.*>' => 'cors-preflight/options',
         ];
+        $resourceUsageRules = [
+            'GET resource/<id:\\d+>/usage' => 'resource/usage',
+            'OPTIONS resource/<id:\\d+>/usage' => 'resource/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
@@ -158,6 +162,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $expectedStaffEnteredRules = array_intersect_key($mergedRules, $staffEnteredRules);
         $expectedPublicationRules = array_intersect_key($mergedRules, $publicationRules);
         $expectedCorsRules = array_intersect_key($mergedRules, $corsRules);
+        $expectedResourceUsageRules = array_intersect_key($mergedRules, $resourceUsageRules);
         $declaredRules = array_merge(
             $claimRules,
             $groupRules,
@@ -168,10 +173,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $staffEnteredRules,
             $publicationRules,
             $navPinRules,
-            $corsRules
+            $corsRules,
+            $resourceUsageRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(264, $mergedRules);
+        $this->assertCount(266, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -182,6 +188,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $this->assertSame($staffEnteredRules, $expectedStaffEnteredRules);
         $this->assertSame($publicationRules, $expectedPublicationRules);
         $this->assertSame($corsRules, $expectedCorsRules);
+        $this->assertSame($resourceUsageRules, $expectedResourceUsageRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -358,6 +365,8 @@ class UrlRulesTest extends \Codeception\Test\Unit
                 'course/course/public-view', ['uuid' => $uuid],
             ]],
             ['GET', 'resource/999007206', ['resource/view', ['id' => '999007206']]],
+            ['GET', 'resource/5/usage', ['resource/usage', ['id' => '5']]],
+            ['OPTIONS', 'resource/5/usage', ['resource/options', ['id' => '5']]],
             ['GET', 'faculty-proxy/staff/grants', ['faculty-proxy/staff-grants', []]],
             ['OPTIONS', 'faculty-proxy/staff/grants', ['faculty-proxy/options', []]],
             ['GET', 'course-assignments/instructor-courses', ['course-assignments/instructor-courses', []]],
