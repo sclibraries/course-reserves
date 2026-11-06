@@ -10,10 +10,12 @@ use app\models\CourseOfferings;
 use app\models\Courses;
 use app\models\CourseResources;
 use yii\filters\Cors;
+use yii\filters\VerbFilter;
 use yii\filters\auth\HttpBearerAuth;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 use app\services\PublicResourceFields;
+use app\services\ResourceReuseService;
 
 class OfferingLinkController extends ActiveController
 {
@@ -49,10 +51,15 @@ class OfferingLinkController extends ActiveController
                 'update' => Roles::STAFF,
                 'delete' => Roles::STAFF,
                 'link-existing-resources' => Roles::STAFF,
+                'reuse-existing-resources' => Roles::STAFF,
                 'update-resource-order' => Roles::STAFF,
                 'find-links' => Roles::STAFF,
                 'find-linked-resources' => Roles::STAFF,
             ],
+        ];
+        $behaviors['verbs'] = [
+            'class' => VerbFilter::class,
+            'actions' => ['reuse-existing-resources' => ['POST']],
         ];
 
         return \app\components\CorsOriginPolicy::corsFirst($behaviors);
@@ -191,6 +198,13 @@ class OfferingLinkController extends ActiveController
             $transaction->rollBack();
             throw new BadRequestHttpException($e->getMessage());
         }
+    }
+
+    public function actionReuseExistingResources()
+    {
+        $result = (new ResourceReuseService())->create(Yii::$app->request->post());
+        Yii::$app->response->setStatusCode($result['status']);
+        return $result['body'];
     }
 
     /**

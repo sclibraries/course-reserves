@@ -4,6 +4,8 @@
 return [
     'GET resource/<id:\d+>/usage' => 'resource/usage',
     'OPTIONS resource/<id:\d+>/usage' => 'resource/options',
+    'POST offering-link/link-existing-resources' => 'offering-link/reuse-existing-resources',
+    'PUT offering-link/link-existing-resources' => 'offering-link/reuse-existing-resources',
     'GET tracking/top-courses' => 'tracking/top-courses',
     'OPTIONS tracking/top-courses' => 'tracking/options',
     'GET tracking/analytics' => 'tracking/analytics',
