@@ -49,7 +49,7 @@ export interface DraftItemPayload {
   
   // Basic item info
   title: string;
-  materialType: 'book' | 'article' | 'chapter' | 'video' | 'website' | 'other';
+  materialType: 'book' | 'ebook' | 'article' | 'chapter' | 'video' | 'website' | 'other';
   status: 'draft' | 'pending' | 'in-progress' | 'complete' | 'needs-review';
   
   // Bibliographic data
@@ -59,6 +59,7 @@ export interface DraftItemPayload {
   publicationYear?: string | null;
   edition?: string | null;
   pages?: string | null;
+  assignedPages?: string | null;
   chapterTitle?: string | null;
   journalTitle?: string | null;
   volume?: string | null;

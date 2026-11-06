@@ -102,6 +102,7 @@ export const createSubmissionHandlers = (
                 display_start_date: resource.resource_data.displayStartDate || null,
                 display_end_date: resource.resource_data.displayEndDate || null,
                 faculty_notes: resource.faculty_notes,
+                assignedPages: resource.assignedPages,
                 call_number: resource.source_call_number,
                 barcode: resource.source_barcode,
               };

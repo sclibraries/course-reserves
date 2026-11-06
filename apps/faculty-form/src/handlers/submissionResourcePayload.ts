@@ -12,6 +12,7 @@ export const transformItemForBackend = (item: CourseItem, displayOrder: number, 
     display_order: displayOrder,
     folder_name: folderName || null,
     faculty_notes: item.notes || null,
+    assignedPages: item.assignedPages || null,
     priority: item.status === 'needs-review' ? 'high' : 'medium',
     resource_data: {
       id: item.id,

@@ -110,6 +110,7 @@ const mapMaterial = (
     status: mapMaterialStatus(material.status),
     barcode: material.barcode,
     callNumber: material.call_number,
+    assignedPages: resourceRow?.assignedPages ?? undefined,
     doi: resourceData.doi,
     issn: resourceData.issn,
     journalTitle,

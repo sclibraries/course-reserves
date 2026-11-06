@@ -89,6 +89,7 @@ export const ItemDrawer = ({ open, onOpenChange, onSave, initialData }: ItemDraw
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="book">Book</SelectItem>
+                <SelectItem value="ebook">Ebook</SelectItem>
                 <SelectItem value="chapter">Chapter</SelectItem>
                 <SelectItem value="article">Article</SelectItem>
                 <SelectItem value="streaming-video">Streaming Video</SelectItem>

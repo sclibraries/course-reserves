@@ -61,7 +61,8 @@ function mapMaterialType(result: DiscoveryResultLike): CitationMaterialType {
   const type = result.publicationType.toLowerCase();
   if (type.includes('chapter') || type.includes('book section')) return 'chapter';
   if (['journal', 'article', 'periodical', 'magazine', 'academic'].some((term) => type.includes(term))) return 'article';
-  if (['book', 'ebook', 'monograph'].some((term) => type.includes(term))) return 'book';
+  if (type.includes('ebook') || type.includes('e-book')) return 'ebook';
+  if (['book', 'monograph'].some((term) => type.includes(term))) return 'book';
   if (['video', 'film', 'dvd', 'streaming'].some((term) => type.includes(term))) return 'video';
   if (type.includes('website') || type.includes('web') || result.fileDescription?.toLowerCase().includes('web')) return 'website';
   return 'other';

@@ -3,8 +3,9 @@ import type { ItemData } from "@/components/ItemModal";
 /**
  * Material type mappings between store and UI formats
  */
-export const MATERIAL_TYPE_TO_STORE: Record<string, 'book' | 'article' | 'chapter' | 'video' | 'website' | 'other'> = {
+export const MATERIAL_TYPE_TO_STORE: Record<string, 'book' | 'ebook' | 'article' | 'chapter' | 'video' | 'website' | 'other'> = {
   'Book': 'book',
+  'Ebook': 'ebook',
   'Article': 'article',
   'Journal Article': 'article',
   'Book Chapter': 'chapter',
@@ -15,6 +16,7 @@ export const MATERIAL_TYPE_TO_STORE: Record<string, 'book' | 'article' | 'chapte
 
 export const MATERIAL_TYPE_FROM_STORE: Record<string, string> = {
   'book': 'Book',
+  'ebook': 'Ebook',
   'article': 'Article',
   'chapter': 'Book Chapter',
   'video': 'Video',
@@ -35,6 +37,7 @@ export const transformItemForEditing = (courseItem: {
   isbn?: string;
   doi?: string;
   pages?: string;
+  assignedPages?: string;
   edition?: string;
   publisher?: string;
   publicationYear?: string;
@@ -66,6 +69,7 @@ export const transformItemForEditing = (courseItem: {
     isbn: courseItem.isbn,
     doi: courseItem.doi,
     pages: courseItem.pages,
+    assignedPages: courseItem.assignedPages,
     edition: courseItem.edition,
     publisher: courseItem.publisher,
     publicationYear: courseItem.publicationYear,
@@ -87,6 +91,7 @@ export const transformItemForSaving = (itemData: ItemData) => {
     publicationYear: itemData.publicationYear,
     edition: itemData.edition,
     pages: itemData.pages,
+    assignedPages: itemData.assignedPages,
     journalTitle: itemData.journal,
     volume: itemData.volume,
     issue: itemData.issue,

@@ -16,6 +16,7 @@ export interface ItemData {
   isbn?: string;
   doi?: string;
   pages?: string;
+  assignedPages?: string;
   edition?: string;
   publisher?: string;
   publicationYear?: string;
@@ -33,7 +34,7 @@ export function createEmptyItemData(): ItemData {
   return {
     materialType: '', title: '', author: '', citation: '', sourceLink: '',
     requestType: 'link-electronic', publicNote: '', hasAttachment: false,
-    isbn: '', doi: '', pages: '', edition: '', publisher: '', publicationYear: '',
+    isbn: '', doi: '', pages: '', assignedPages: '', edition: '', publisher: '', publicationYear: '',
     journal: '', volume: '', issue: '',
   };
 }

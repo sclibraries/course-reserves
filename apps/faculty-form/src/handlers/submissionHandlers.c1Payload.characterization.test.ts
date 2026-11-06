@@ -87,6 +87,7 @@ describe('C1 submission payload characterization', () => {
         display_order: 0,
         folder_name: null,
         faculty_notes: 'Use chapter 2',
+        assignedPages: null,
         priority: 'medium',
         resource_data: {
           id: 'c1-reuse-item', title: 'Synthetic Course Book', authors: 'Synthetic Author',

@@ -56,6 +56,7 @@ export interface CourseItem {
   publicationYear?: string;
   edition?: string;
   pages?: string;
+  assignedPages?: string;
   chapterTitle?: string;
   journalTitle?: string;
   volume?: string;
@@ -68,7 +69,7 @@ export interface CourseItem {
     plink: string;
   };
   url?: string;
-  materialType: 'book' | 'article' | 'chapter' | 'video' | 'website' | 'other';
+  materialType: 'book' | 'ebook' | 'article' | 'chapter' | 'video' | 'website' | 'other';
   status: 'draft' | 'pending' | 'in-progress' | 'complete' | 'needs-review';
   notes?: string;
   libraryNotes?: string;

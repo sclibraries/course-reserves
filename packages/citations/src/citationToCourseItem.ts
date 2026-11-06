@@ -1,6 +1,6 @@
 const MAX_TITLE_LENGTH = 200;
 
-export type CitationMaterialType = 'book' | 'article' | 'chapter' | 'video' | 'website' | 'other';
+export type CitationMaterialType = 'book' | 'ebook' | 'article' | 'chapter' | 'video' | 'website' | 'other';
 
 export interface CitationCourseItem {
   title: string;

@@ -29,6 +29,7 @@ export default function ItemForm({ formData, setFormData }: ItemFormProps) {
               <SelectTrigger id="materialType"><SelectValue placeholder="Select material type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Book">Book</SelectItem>
+                <SelectItem value="Ebook">Ebook</SelectItem>
                 <SelectItem value="Book Chapter">Book Chapter</SelectItem>
                 <SelectItem value="Journal Article">Journal Article</SelectItem>
                 <SelectItem value="Article">Article</SelectItem>
@@ -52,6 +53,12 @@ export default function ItemForm({ formData, setFormData }: ItemFormProps) {
             <Input id="author" value={formData.author} onChange={(event) => update({ author: event.target.value })} placeholder="Enter author or creator name" />
           </div>
           {FieldsComponent && <FieldsComponent formData={formData} setFormData={setFormData} />}
+          {['Ebook', 'Book', 'Book Chapter'].includes(formData.materialType) && (
+            <div className="space-y-2">
+              <Label htmlFor="assignedPages">Pages to read</Label>
+              <Input id="assignedPages" value={formData.assignedPages || ''} onChange={(event) => update({ assignedPages: event.target.value })} />
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">

@@ -2,6 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { discoveryResultToCourseItem } from './discoveryResultToCourseItem';
 
 describe('discoveryResultToCourseItem', () => {
+  it.each([
+    ['eBook', 'ebook'],
+    ['E-Book', 'ebook'],
+    ['eBook; Electronic Resource', 'ebook'],
+    ['Book', 'book'],
+    ['monograph', 'book'],
+    ['eBook Book Chapter', 'chapter'],
+  ])('maps publication type "%s" to %s', (publicationType, materialType) => {
+    expect(discoveryResultToCourseItem({
+      id: 'synthetic-an',
+      dbId: 'synthetic-database',
+      title: 'Synthetic reading',
+      authors: [],
+      publicationType,
+      pLink: 'https://example.test/record/synthetic',
+    }).materialType).toBe(materialType);
+  });
+
   it('maps a plain structural EDS result into faculty item fields', () => {
     const item = discoveryResultToCourseItem({
       id: 'synthetic-an',

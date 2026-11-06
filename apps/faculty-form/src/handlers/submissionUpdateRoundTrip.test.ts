@@ -469,6 +469,36 @@ describe('submitted item load and payload round-trip', () => {
     expect(secondSave.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.journal).toBe('Edited Journal');
   });
 
+  it('round-trips Ebook pages through the index and sends a clear as null', async () => {
+    const submission = backendSubmission('submitted');
+    const ebook = submission.folders?.flatMap((folder) => folder.items || []).find((item) => item.id === 601);
+    const resource = submission.newResources?.find((row) => row.id === 601);
+    if (!ebook || !resource) throw new Error('Missing synthetic Ebook fixture');
+    ebook.material_type = 'ebook';
+    resource.assignedPages = '12-16';
+
+    const loaded = mapSubmissionIndexItem(submission);
+    const ebookItem = loaded.items.find((item) => item.id === 'material-601');
+    expect(ebookItem).toMatchObject({ materialType: 'ebook', assignedPages: '12-16' });
+
+    const submissionPayload = buildSubmissionPayload(loaded, false);
+    expect(submissionPayload.resources.find((row) => row.resource_data.id === 'material-601')?.assignedPages).toBe('12-16');
+
+    const firstUpdate = await submitUpdate(loaded);
+    expect(firstUpdate.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.assignedPages).toBe('12-16');
+
+    const reloaded = mapSubmissionIndexItem(submission);
+    const secondUpdate = await submitUpdate(reloaded);
+    expect(secondUpdate.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.assignedPages).toBe('12-16');
+
+    const cleared: CourseReserve = {
+      ...reloaded,
+      items: reloaded.items.map((item) => item.id === 'material-601' ? { ...item, assignedPages: '' } : item),
+    };
+    const clearUpdate = await submitUpdate(cleared);
+    expect(clearUpdate.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.assignedPages).toBeNull();
+  });
+
   it('keeps an explicit journal clear through save, reload, and a second save', async () => {
     const submission = backendSubmission('submitted');
     const loaded = mapSubmissionDetailItem(submission);
@@ -528,6 +558,7 @@ describe('submitted item load and payload round-trip', () => {
     };
     const emptyResource = newResourceRow(emptySpec);
     emptyResource.faculty_notes = '';
+    emptyResource.assignedPages = null;
     const reserve = mapSubmissionDetailItem({
       ...submission,
       folders: [],
@@ -559,6 +590,7 @@ describe('submitted item load and payload round-trip', () => {
       display_start_date: null,
       display_end_date: null,
       faculty_notes: null,
+      assignedPages: null,
       call_number: null,
       barcode: null,
     }]);
@@ -591,6 +623,7 @@ function expectedUpdateItem(
     display_start_date: data.displayStartDate || null,
     display_end_date: data.displayEndDate || null,
     faculty_notes: `Faculty note ${spec.id}`,
+    assignedPages: '17-20',
     call_number: callNumber,
     barcode,
   };
