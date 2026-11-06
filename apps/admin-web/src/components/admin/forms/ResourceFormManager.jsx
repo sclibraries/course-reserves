@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Modal, ModalHeader, ModalBody, Container, Row, Col, Card, CardBody, Table, Spinner, Alert, Button, ListGroup, ListGroupItem } from 'reactstrap';
+import { ArrowLeft } from 'lucide-react';
+import { Modal, ModalHeader, ModalBody, Alert } from 'reactstrap';
+import { Button } from '../../ui/button';
 import { notify } from '../../../services/notify';
 
 // Form components
@@ -10,15 +12,15 @@ import { CrossLinkForm } from './specialized/CrosslinkForm';
 
 // Constants
 import { ResourceFormType } from './constants/formTypes';
+import ResourceSearchPicker from './search/ResourceSearchPicker';
 
 // Services
 import { adminCourseService } from '../../../services/admin/adminCourseService';
-import { getEdsSearchErrorMessage } from '../../../services/admin/course/resourceApi';
 import { adminResourceService } from '../../../services/admin/adminResourceService';
-import { hitchcockService } from '../../../services/admin/hitchcockService';
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
 import { adjustProxy, LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
+import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
 
 /**
  * ResourceFormManager - Unified component for managing all resource forms
@@ -56,39 +58,28 @@ export const ResourceFormManager = ({
   // Common state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Search-specific state (for EDS, Hitchcock, Reuse)
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const resourceSearch = useResourceSearch(formType);
+  const { reset: resetResourceSearch } = resourceSearch;
+
+  // Reuse keeps its current search UI until AW-087B.
+  const [reuseSearchTerm, setReuseSearchTerm] = useState('');
+  const [reuseSearchResults, setReuseSearchResults] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
-  
-  // Additional state for API data display
-  const [copiedField, setCopiedField] = useState(null);
-  
-  // Pagination state for EDS search
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalHits, setTotalHits] = useState(0);
-  const [searchTime, setSearchTime] = useState(0);
-  const [ebscoQueryString, setEbscoQueryString] = useState('');
 
 
   /**
    * Reset all state when modal closes or form type changes
    */
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setLoading(false);
     setError(null);
-    setSearchTerm('');
-    setSearchResults([]);
+    resetResourceSearch();
+    setReuseSearchTerm('');
+    setReuseSearchResults([]);
     setSelectedRecord(null);
     setShowEditForm(false);
-    setCopiedField(null);
-    setCurrentPage(1);
-    setTotalHits(0);
-    setSearchTime(0);
-    setEbscoQueryString('');
-  };
+  }, [resetResourceSearch]);
 
   /**
    * Effect to reset state when modal opens/closes or form type changes
@@ -97,7 +88,7 @@ export const ResourceFormManager = ({
     if (!isOpen) {
       resetState();
     }
-  }, [isOpen, formType]);
+  }, [isOpen, formType, resetState]);
 
   /**
    * Get modal configuration based on form type
@@ -214,11 +205,8 @@ export const ResourceFormManager = ({
     }
   };
 
-  /**
-   * Handle search operations (EDS, Hitchcock)
-   */
-  const handleSearch = async (searchQuery = searchTerm, page = 1) => {
-    if (!searchQuery.trim() && page === 1) {
+  const handleReuseSearch = async (searchQuery = reuseSearchTerm) => {
+    if (!searchQuery.trim()) {
       setError('Please enter a search term');
       return;
     }
@@ -227,53 +215,16 @@ export const ResourceFormManager = ({
     setError(null);
     
     try {
-      let results = [];
-      
-      if (formType === ResourceFormType.EDS) {
-        const data = await adminCourseService.searchEDS(searchQuery);
-        
-        // Handle new backend response structure
-        if (data.status !== 'success' || data.code !== 200) {
-          throw new Error(getEdsSearchErrorMessage());
-        }
-        
-        results = data.data?.records || [];
-        
-        // Update pagination state
-        setTotalHits(data.data?.statistics?.TotalHits || 0);
-        setSearchTime(data.data?.statistics?.TotalSearchTime || 0);
-        setEbscoQueryString(data.data?.request?.QueryString || '');
-        setCurrentPage(page);
-        
-        if (page === 1) {
-          setSearchResults(results);
-        } else {
-          setSearchResults(prev => [...prev, ...results]);
-        }
-      } else if (formType === ResourceFormType.HITCHCOCK) {
-        const response = await hitchcockService.searchResources(searchQuery);
-
-        if (!response.ok) {
-          throw new Error(`Search failed with status ${response.status}`);
-        }
-
-        results = await response.json();
-        setSearchResults(results);
-      } else if (formType === ResourceFormType.REUSE) {
-        const data = await adminCourseService.searchResources(searchQuery);
-        results = data?.resources || [];
-        setSearchResults(results);
-      }
-      
-      if (results.length === 0 && page === 1) {
+      const data = await adminCourseService.searchResources(searchQuery);
+      const results = data?.resources || [];
+      setReuseSearchResults(results);
+      if (results.length === 0) {
         setError('No results found for your search term');
       }
     } catch (err) {
       console.error('Search error:', err);
       setError(err.message || 'Search failed');
-      if (page === 1) {
-        setSearchResults([]);
-      }
+      setReuseSearchResults([]);
     } finally {
       setLoading(false);
     }
@@ -319,94 +270,6 @@ export const ResourceFormManager = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCopyToClipboard = async (value, fieldName) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(fieldName);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-      notify.fromError(err, "Couldn't copy the text");
-    }
-  };
-
-  /**
-   * Build verification URL for EDS records
-   */
-  const buildVerificationUrl = (record) => {
-    // Use new field names from robust backend
-    const accession = record.An;
-    const dbId = record.DbId;
-    if (!accession) return record.PLink || '#';
-    return `https://openurl.ebsco.com/c/4e4lys/openurl?sid=ebsco:plink&id=ebsco:${encodeURIComponent(dbId)}:${encodeURIComponent(accession)}`;
-  };
-  
-  /**
-   * Decode HTML entities in text
-   */
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-  
-  /**
-   * Load more EDS search results (pagination)
-   */
-  const handleLoadMore = async () => {
-    if (loading || !ebscoQueryString) return;
-    
-    const nextPage = currentPage + 1;
-    setLoading(true);
-    
-    try {
-      const data = await adminCourseService.searchEDSPage(ebscoQueryString, nextPage);
-      
-      if (data.status !== 'success' || data.code !== 200) {
-        throw new Error(getEdsSearchErrorMessage());
-      }
-      
-      const newResults = data.data?.records || [];
-      setSearchResults(prev => [...prev, ...newResults]);
-      setCurrentPage(nextPage);
-    } catch (err) {
-      console.error('Error loading more results:', err);
-      notify.fromError(err, "Couldn't load more library results");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  /**
-   * Extract title from new EDS record structure
-   */
-  const extractTitle = (record) => {
-    const titleData = record.Items?.Ti?.[0]?.CleanData;
-    const title = (typeof titleData === 'string' ? titleData : titleData?.[0]) ||
-                  record.RecordInfo?.BibEntity?.Titles?.[0]?.TitleFull ||
-                  '(No Title)';
-    return decodeHtmlEntities(title);
-  };
-  
-  /**
-   * Extract authors from new EDS record structure
-   */
-  const extractAuthors = (record) => {
-    const authorData = record.Items?.Au?.[0]?.CleanData;
-    const authors = Array.isArray(authorData) ? authorData :
-                   (typeof authorData === 'string' ? [authorData] : []);
-    const authorString = authors.join('; ') || '';
-    return decodeHtmlEntities(authorString);
-  };
-  
-  /**
-   * Extract publication type from new EDS record structure
-   */
-  const extractPubType = (record) => {
-    return record.pubType || 'Unknown';
   };
 
   /**
@@ -486,35 +349,46 @@ export const ResourceFormManager = ({
    * Render the appropriate form content based on form type
    */
   const renderFormContent = () => {
-    // Show BaseResourceForm for direct form types or when editing a selected record
     if ([ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType) || showEditForm) {
       return (
-        <BaseResourceForm
-          course={folioCourseData}
-          initialData={getFormInitialData()}
-          onSubmit={handleBaseFormSubmit}
-          title={getModalConfig().title}
-          submitButtonText={formType === ResourceFormType.EDIT ? 'Save Changes' : 'Create Resource'}
-          onCancel={showEditForm ? () => setShowEditForm(false) : onClose}
-          showCancel={showEditForm || formType !== ResourceFormType.EDIT}
-          loading={loading}
-        />
+        <>
+          {showEditForm && (
+            <Button
+              type="button"
+              variant="outline"
+              className="tw-mb-3"
+              onClick={() => setShowEditForm(false)}
+            >
+              <ArrowLeft aria-hidden="true" />
+              Back to results
+            </Button>
+          )}
+          <BaseResourceForm
+            course={folioCourseData}
+            initialData={getFormInitialData()}
+            onSubmit={handleBaseFormSubmit}
+            title={getModalConfig().title}
+            submitButtonText={formType === ResourceFormType.EDIT ? 'Save Changes' : 'Create Resource'}
+            onCancel={showEditForm ? () => setShowEditForm(false) : onClose}
+            showCancel={!showEditForm && formType !== ResourceFormType.EDIT}
+            loading={loading}
+          />
+        </>
       );
     }
 
-    // Handle specialized forms
     switch (formType) {
       case ResourceFormType.REUSE:
         return (
-            <AdminReuseForm
-              error={error}
-              searchTerm={searchTerm}
-              searchResults={searchResults}
-              onSearchTermChange={setSearchTerm}
-              onSearch={handleSearch}
-              onReuse={handleReuseResource}
-              isLoading={loading}
-            />
+          <AdminReuseForm
+            error={error}
+            searchTerm={reuseSearchTerm}
+            searchResults={reuseSearchResults}
+            onSearchTermChange={setReuseSearchTerm}
+            onSearch={handleReuseSearch}
+            onReuse={handleReuseResource}
+            isLoading={loading}
+          />
         );
 
       case ResourceFormType.CROSSLINK:
@@ -522,8 +396,7 @@ export const ResourceFormManager = ({
           <CrossLinkForm
             onSuccess={() => {
               onSubmit?.();
-              // Don't call onClose() - keep modal open for multiple operations
-              // Refresh linked courses in parent component
+              // Keep the modal open for multiple operations and refresh the parent list.
               if (refreshLinkedCourses) {
                 refreshLinkedCourses();
               }
@@ -535,262 +408,27 @@ export const ResourceFormManager = ({
 
       case ResourceFormType.EDS:
       case ResourceFormType.HITCHCOCK:
-        return renderSearchInterface();
+        return (
+          <ResourceSearchPicker
+            formType={formType}
+            searchTerm={resourceSearch.searchTerm}
+            onSearchTermChange={resourceSearch.setSearchTerm}
+            onSearch={resourceSearch.search}
+            searchResults={resourceSearch.searchResults}
+            hasSearched={resourceSearch.hasSearched}
+            loading={resourceSearch.loading}
+            totalHits={resourceSearch.totalHits}
+            searchTime={resourceSearch.searchTime}
+            hasMore={resourceSearch.hasMore}
+            onLoadMore={resourceSearch.loadMore}
+            onSelectRecord={handleSelectRecord}
+          />
+        );
 
       default:
         return <Alert color="warning" fade={false}>Unknown form type: {formType}</Alert>;
     }
   };
-
-  /**
-   * Render search interface for EDS and Hitchcock
-   */
-  const renderSearchInterface = () => (
-    <Container fluid className="p-0">
-      {error && (
-        <Alert color="danger" className="mb-3" fade={false} style={{ whiteSpace: 'pre-line' }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Search Form */}
-      <Card className="mb-4">
-        <CardBody>
-          <h5>Search {formType === ResourceFormType.EDS ? 'EDS' : 'Hitchcock'}</h5>
-          <div className="d-flex gap-2">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter search term..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              disabled={loading}
-            />
-            <Button
-              color="primary"
-              onClick={() => handleSearch()}
-              disabled={loading || !searchTerm.trim()}
-            >
-              {loading ? <Spinner size="sm" /> : 'Search'}
-            </Button>
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Search Stats */}
-      {formType === ResourceFormType.EDS && totalHits > 0 && (
-        <Alert color="info" className="mb-3" fade={false}>
-          <div className="d-flex justify-content-between align-items-center">
-            <span>
-              Found <strong>{totalHits.toLocaleString()}</strong> results in {searchTime}ms
-              {searchResults.length < totalHits && (
-                <span className="text-muted ms-2">
-                  • Showing {searchResults.length} of {totalHits.toLocaleString()}
-                </span>
-              )}
-            </span>
-            <span className="text-muted small">EBSCO Discovery</span>
-          </div>
-        </Alert>
-      )}
-
-      {/* Search Results */}
-      {searchResults.length > 0 && (
-        <Card>
-          <CardBody>
-            <h5>Search Results</h5>
-            <Table responsive striped>
-              <thead>
-                <tr>
-                  {formType === ResourceFormType.EDS ? (
-                    <>
-                      <th>Accession #</th>
-                      <th>Title</th>
-                      <th>Author</th>
-                      <th>Type</th>
-                      <th>Database</th>
-                      <th>Verification</th>
-                      <th>Action</th>
-                    </>
-                  ) : (
-                    <>
-                      <th>Title</th>
-                      <th>Link</th>
-                      <th>Notes</th>
-                      <th>Action</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {searchResults.map((record) => {
-                  const key = formType === ResourceFormType.EDS ? record.An : record.id || Math.random();
-                  return (
-                  <tr key={key}>
-                    {formType === ResourceFormType.EDS ? (
-                      <>
-                        <td style={{ wordBreak: 'break-all', fontSize: '0.85rem' }}>
-                          {record.An || 'N/A'}
-                        </td>
-                        <td>{extractTitle(record)}</td>
-                        <td>{extractAuthors(record)}</td>
-                        <td>
-                          <span className="badge bg-secondary">
-                            {extractPubType(record)}
-                          </span>
-                        </td>
-                        <td className="text-muted small">{record.DbLabel || 'EBSCO'}</td>
-                        <td>
-                          <a 
-                            href={buildVerificationUrl(record)} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="btn btn-sm btn-outline-secondary"
-                          >
-                            Verify
-                          </a>
-                        </td>
-                        <td>
-                          <Button color="primary" size="sm" onClick={() => handleSelectRecord(record)}>
-                            Edit & Add
-                          </Button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{record.title || 'N/A'}</td>
-                        <td>
-                          {record.link ? (
-                            <a href={record.link} target="_blank" rel="noopener noreferrer">
-                              {record.link}
-                            </a>
-                          ) : 'N/A'}
-                        </td>
-                        <td>{record.notes || record.description || 'N/A'}</td>
-                        <td>
-                          <Button color="primary" size="sm" onClick={() => handleSelectRecord(record)}>
-                            Edit & Add
-                          </Button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-            
-            {/* Load More Button for EDS */}
-            {formType === ResourceFormType.EDS && searchResults.length < totalHits && (
-              <div className="text-center mt-3">
-                <Button 
-                  color="secondary" 
-                  onClick={handleLoadMore}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Spinner size="sm" className="me-2" />
-                      Loading...
-                    </>
-                  ) : (
-                    `Load More Results (${searchResults.length} of ${totalHits.toLocaleString()})`
-                  )}
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Show API data for selected record */}
-      {selectedRecord && formType === ResourceFormType.EDS && selectedRecord.Items && (
-        <Row className="mt-4">
-          <Col md={8}>
-            {/* Form will be rendered here when showEditForm is true */}
-          </Col>
-          <Col md={4}>
-            <Card>
-              <CardBody>
-                <h5>Available Metadata</h5>
-                <p className="text-muted small">Click &quot;Copy&quot; to copy field values</p>
-                <ListGroup className="small">
-                  {/* Display cleaned data from new structure */}
-                  {Object.entries(selectedRecord.Items).map(([key, items]) => {
-                    if (!items || !items[0]) return null;
-                    const item = items[0];
-                    const rawValue = typeof item.CleanData === 'string' ? 
-                                 item.CleanData : 
-                                 (Array.isArray(item.CleanData) ? item.CleanData.join('; ') : item.Data);
-                    
-                    if (!rawValue) return null;
-                    
-                    const value = decodeHtmlEntities(rawValue);
-                    
-                    return (
-                      <ListGroupItem key={key} className="d-flex justify-content-between align-items-center py-2">
-                        <div className="flex-grow-1 me-2">
-                          <strong>{item.Label || key}:</strong>{' '}
-                          <span style={{ wordBreak: 'break-all' }}>
-                            {value}
-                          </span>
-                        </div>
-                        <Button
-                          size="sm"
-                          color={copiedField === key ? "success" : "outline-primary"}
-                          onClick={() => handleCopyToClipboard(value, key)}
-                          style={{ minWidth: '70px' }}
-                        >
-                          {copiedField === key ? "✓ Copied" : "Copy"}
-                        </Button>
-                      </ListGroupItem>
-                    );
-                  })}
-                  
-                  {/* Additional metadata */}
-                  {selectedRecord.An && (
-                    <ListGroupItem className="d-flex justify-content-between align-items-center py-2">
-                      <div className="flex-grow-1 me-2">
-                        <strong>Accession:</strong> {selectedRecord.An}
-                      </div>
-                      <Button
-                        size="sm"
-                        color={copiedField === 'An' ? "success" : "outline-primary"}
-                        onClick={() => handleCopyToClipboard(selectedRecord.An, 'An')}
-                        style={{ minWidth: '70px' }}
-                      >
-                        {copiedField === 'An' ? "✓ Copied" : "Copy"}
-                      </Button>
-                    </ListGroupItem>
-                  )}
-                  
-                  {selectedRecord.PLink && (
-                    <ListGroupItem className="d-flex justify-content-between align-items-center py-2">
-                      <div className="flex-grow-1 me-2">
-                        <strong>Permalink:</strong>{' '}
-                        <a href={selectedRecord.PLink} target="_blank" rel="noopener noreferrer" className="text-truncate d-inline-block" style={{ maxWidth: '200px' }}>
-                          {selectedRecord.PLink}
-                        </a>
-                      </div>
-                      <Button
-                        size="sm"
-                        color={copiedField === 'PLink' ? "success" : "outline-primary"}
-                        onClick={() => handleCopyToClipboard(selectedRecord.PLink, 'PLink')}
-                        style={{ minWidth: '70px' }}
-                      >
-                        {copiedField === 'PLink' ? "✓ Copied" : "Copy"}
-                      </Button>
-                    </ListGroupItem>
-                  )}
-                </ListGroup>
-              </CardBody>
-            </Card>
-          </Col>
-        </Row>
-      )}
-    </Container>
-  );
 
   const modalConfig = getModalConfig();
 
