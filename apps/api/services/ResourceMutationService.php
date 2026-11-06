@@ -9,6 +9,7 @@ use app\models\ResourceMetadata;
 use app\models\Resources;
 use yii\web\BadRequestHttpException;
 use yii\web\NotFoundHttpException;
+use yii\web\UnprocessableEntityHttpException;
 
 /** Applies resource and child-row edits atomically, then invalidates dependent drafts once. */
 class ResourceMutationService
@@ -171,6 +172,15 @@ class ResourceMutationService
     private function saveMetadata($resourceId, array $metadata)
     {
         foreach ($metadata as $field => $value) {
+            if ($value === null || $value === '') {
+                ResourceMetadata::deleteAll(['resource_id' => $resourceId, 'field_name' => $field]);
+                continue;
+            }
+            if (!is_string($value)) {
+                throw new UnprocessableEntityHttpException(
+                    'Invalid value for metadata field "' . $field . '".'
+                );
+            }
             $meta = ResourceMetadata::find()->where(['resource_id' => $resourceId, 'field_name' => $field])->one();
             if (!$meta) {
                 $meta = new ResourceMetadata();
