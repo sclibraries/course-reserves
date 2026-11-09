@@ -77,6 +77,7 @@ async function renderForm() {
   root = createRoot(container);
   await act(async () => root.render(<BrowserHarness />));
   const opener = getByRole(container, 'button', { name: 'Open resource form' });
+  opener.focus();
   await act(async () => fireEvent.click(opener));
   return opener;
 }
