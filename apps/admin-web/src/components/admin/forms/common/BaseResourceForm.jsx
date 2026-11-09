@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   Form,
@@ -19,10 +19,10 @@ import UnifiedVisibilityControl from './UnifiedVisibilityControl';
 import FormNavigationAnchor from './FormNavigationAnchor';
 import { TypeSpecificFields } from '../fields/TypeSpecificFields';
 import ResourceLinks from '../fields/ResourceLinks';
+import { useResourceFormState } from '../../../../hooks/admin/useResourceFormState';
 
 // Import services
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
-import { useAdminCourseStore } from '../../../../store/adminCourseStore';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import '../../../../css/AdminForms.css';
 
@@ -81,157 +81,23 @@ export const BaseResourceForm = ({
   formId,
   course // Add course prop for term dates
 }) => {
-  // Get course data from store to access semester dates
-  const { folioCourseData, termStart, termEnd } = useAdminCourseStore();
-
-  
-  // Get default visibility dates from term dates
-  const getDefaultVisibilityDates = () => {
-    // First try course prop for term dates
-    if (course?.courseListingObject?.termObject) {
-      const termObj = course.courseListingObject.termObject;
-      const dates = {
-        startDate: new Date(termObj.startDate).toISOString().split('T')[0],
-        endDate: new Date(termObj.endDate).toISOString().split('T')[0]
-      };
-      return dates;
-    }
-
-    
-    // Then try termStart/termEnd from the store
-    if (termStart && termEnd) {
-      const dates = {
-        startDate: new Date(termStart).toISOString().split('T')[0],
-        endDate: new Date(termEnd).toISOString().split('T')[0]
-      };
-      return dates;
-    }
-    
-    
-    // Fallback to extracting from folioCourseData if termStart/termEnd aren't available
-    if (folioCourseData?.courseListingObject?.termObject) {
-      const termObj = folioCourseData.courseListingObject.termObject;
-      const dates = {
-        startDate: new Date(termObj.startDate).toISOString().split('T')[0],
-        endDate: new Date(termObj.endDate).toISOString().split('T')[0]
-      };
-      return dates;
-    }
-    
-    return { startDate: '', endDate: '' };
-  };
-
-  
-  const defaultDates = getDefaultVisibilityDates();
-  
-  /**
-   * Convert string/number proxy values to boolean
-   */
-  const normalizeProxyValue = (value) => {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      return value === '1' || value === 'true' || value === 'TRUE';
-    }
-    if (typeof value === 'number') {
-      return value === 1;
-    }
-    return false;
-  };
-
-  /**
-   * Convert string/number boolean values to boolean (same logic as proxy)
-   */
-  const normalizeBooleanValue = (value) => {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      return value === '1' || value === 'true' || value === 'TRUE';
-    }
-    if (typeof value === 'number') {
-      return value === 1;
-    }
-    return false;
-  };
-  
-  // State for form data
-  const [formData, setFormData] = useState(() => {
-    // Check if primary link visibility is enabled directly from the resource
-    // Use the normalize function for consistency
-    const hasPrimaryLinkControl = normalizeBooleanValue(initialData.use_primary_link_visibility);
-    
-    // Check if URL matches Hitchcock video pattern
-    const primaryUrl = initialData.link || initialData.item_url || '';
-    const isHitchcockVideo = isHitchcockVideoUrl(primaryUrl);
-    
-    return {
-      title: initialData.title || initialData.name || '',
-      link: initialData.link || initialData.item_url || '',
-      use_proxy: normalizeProxyValue(initialData.use_proxy),
-      notes: initialData.notes || initialData.description || '',
-      internal_note: initialData.internal_note || '',
-      external_note: initialData.external_note || '',
-      folder: initialData.folder || initialData.folder_id || '',
-      start_visibility: initialData.start_visibility || defaultDates.startDate,
-      end_visibility: initialData.end_visibility || defaultDates.endDate,
-      material_type_id: initialData.material_type_id || initialData.material_type || '',
-      metadata: initialData.metadata || {},
-      // Primary link visibility fields - auto-enable for NEW Hitchcock videos only
-      use_primary_link_visibility: hasPrimaryLinkControl || (isHitchcockVideo && !initialData.resource_id),
-      primary_link_start_visibility: initialData.primary_link_start_visibility || ((isHitchcockVideo && !initialData.resource_id) ? defaultDates.startDate : ''),
-      primary_link_end_visibility: initialData.primary_link_end_visibility || ((isHitchcockVideo && !initialData.resource_id) ? defaultDates.endDate : ''),
-      // Keep any existing data that might be needed later
-      ...(initialData.resource_id && { resource_id: initialData.resource_id }),
-      ...(initialData.order && { order: initialData.order }),
-      ...(initialData.course_count && { course_count: initialData.course_count })
-    };
-  });
-
-  // State for visibility dates toggle
-  const [useVisibilityDates, setUseVisibilityDates] = useState(
-    // Only enable by default if dates were previously set (not for new video types)
-    !!(initialData.start_visibility || initialData.end_visibility)
-  );
-
-  // State for cascade visibility settings
-  const [cascadeVisibilityToLinks, setCascadeVisibilityToLinks] = useState(false);
-
-  // Update visibility dates if they're not set and term dates are available
-  useEffect(() => {
-    // First try course prop
-    if (course?.courseListingObject?.termObject) {
-      const termObj = course.courseListingObject.termObject;
-      setFormData(prev => ({
-        ...prev,
-        start_visibility: prev.start_visibility || new Date(termObj.startDate).toISOString().split('T')[0],
-        end_visibility: prev.end_visibility || new Date(termObj.endDate).toISOString().split('T')[0]
-      }));
-    } else if (termStart && termEnd) {
-      // Then try termStart/termEnd from store
-      setFormData(prev => ({
-        ...prev,
-        start_visibility: prev.start_visibility || new Date(termStart).toISOString().split('T')[0],
-        end_visibility: prev.end_visibility || new Date(termEnd).toISOString().split('T')[0]
-      }));
-    } else if (folioCourseData?.courseListingObject?.termObject) {
-      // Fallback to folioCourseData
-      const termObj = folioCourseData.courseListingObject.termObject;
-      setFormData(prev => ({
-        ...prev,
-        start_visibility: prev.start_visibility || new Date(termObj.startDate).toISOString().split('T')[0],
-        end_visibility: prev.end_visibility || new Date(termObj.endDate).toISOString().split('T')[0]
-      }));
-    }
-  }, [course, termStart, termEnd, folioCourseData]);
-
-  // State for links - filter out primary link (order = 0) since it's handled separately
-  const [links, setLinks] = useState(() => {
-    const existingLinks = (initialData.links || []).filter(link => link.order !== 0 && link.order !== '0');
-    return existingLinks.map(link => ({ ...link }));
-  });
-  
-  // State for additional data
-  const [materialTypes, setMaterialTypes] = useState([]);
-  const [materialTypeFields, setMaterialTypeFields] = useState([]);
-  const [errorMessage, setErrorMessage] = useState(null);
+  const {
+    defaultDates,
+    formData,
+    setFormData,
+    useVisibilityDates,
+    setUseVisibilityDates,
+    cascadeVisibilityToLinks,
+    setCascadeVisibilityToLinks,
+    links,
+    setLinks,
+    materialTypes,
+    setMaterialTypes,
+    materialTypeFields,
+    setMaterialTypeFields,
+    errorMessage,
+    setErrorMessage,
+  } = useResourceFormState({ initialData, course });
 
   // Fetch material types on component mount
   useEffect(() => {
