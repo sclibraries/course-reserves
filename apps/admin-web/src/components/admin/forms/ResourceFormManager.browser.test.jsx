@@ -76,7 +76,9 @@ async function renderForm() {
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => root.render(<BrowserHarness />));
-  await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Open resource form' })));
+  const opener = getByRole(container, 'button', { name: 'Open resource form' });
+  await act(async () => fireEvent.click(opener));
+  return opener;
 }
 
 afterEach(() => {
@@ -96,14 +98,13 @@ describe('ResourceFormManager in Chromium', () => {
     mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
     mocks.createResource.mockResolvedValue({ resource_id: 'created-17' });
     mocks.updateResource.mockResolvedValue({ resource_id: 'resource-17' });
-    await renderForm();
+    const opener = await renderForm();
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
     await expectNoHorizontalOverflow([320, 768, 1280]);
     await expectNoAxeViolations(document.body);
     expect(mocks.fetch).not.toHaveBeenCalled();
 
-    const opener = getByRole(container, 'button', { name: 'Open resource form' });
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
     await waitFor(() => expect(document.activeElement).toBe(opener));
   });
