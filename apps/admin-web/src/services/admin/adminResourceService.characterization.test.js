@@ -48,6 +48,24 @@ const requestCases = [
     expected: result,
   },
   {
+    name: 'getUsage',
+    invoke: () => adminResourceService.getUsage(18),
+    url: `${courseApi}/resource/18/usage`,
+    init: { headers: { Authorization: token } },
+    expected: {
+      course_count: 2,
+      offering_count: 3,
+      terms: [{ term_id: 7, term_name: 'Fall 2026' }],
+      linked_page_count: 1,
+    },
+    response: {
+      course_count: 2,
+      offering_count: 3,
+      terms: [{ term_id: 7, term_name: 'Fall 2026' }],
+      linked_page_count: 1,
+    },
+  },
+  {
     name: 'createResource',
     invoke: () => adminResourceService.createResource({ name: 'Synthetic title' }),
     url: `${courseApi}/resource`,
@@ -118,7 +136,7 @@ describe('adminResourceService characterization', () => {
   it.each(requestCases)('$name preserves its request and response', async (testCase) => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue(result),
+      json: vi.fn().mockResolvedValue(testCase.response || result),
       headers: {
         get: (name) => name === 'X-Pagination' ? '{"totalCount":1}' : null,
       },
@@ -149,5 +167,17 @@ describe('adminResourceService characterization', () => {
       `${courseApi}/resource/18`,
       { headers: { Authorization: token } },
     ]]);
+  });
+
+  it('keeps the usage error reference for the failure toast', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: vi.fn().mockResolvedValue({ message: 'Synthetic usage failure', reference: 'SYNTH-USAGE-404' }),
+    });
+
+    await expect(adminResourceService.getUsage(404)).rejects.toMatchObject({
+      message: 'Synthetic usage failure',
+      reference: 'SYNTH-USAGE-404',
+    });
   });
 });

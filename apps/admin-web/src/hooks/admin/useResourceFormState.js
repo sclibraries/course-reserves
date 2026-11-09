@@ -78,7 +78,6 @@ export const useResourceFormState = ({ initialData = {}, course }) => {
       primary_link_end_visibility: initialData.primary_link_end_visibility || ((isHitchcockVideo && !initialData.resource_id) ? defaultDates.endDate : ''),
       ...(initialData.resource_id && { resource_id: initialData.resource_id }),
       ...(initialData.order && { order: initialData.order }),
-      ...(initialData.course_count && { course_count: initialData.course_count }),
     };
   });
 

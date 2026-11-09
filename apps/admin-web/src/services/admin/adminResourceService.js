@@ -72,6 +72,22 @@ export const adminResourceService = {
     }
   },
 
+  async getUsage(resourceId) {
+    try {
+      const response = await authFetch(`${API_BASE}/resource/${resourceId}/usage`, { headers: {} });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const error = new Error(data.message || 'Failed to fetch resource usage');
+        error.reference = data.reference || data.reference_id;
+        throw error;
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Fetch resource usage failed:', error);
+      throw error;
+    }
+  },
+
   async createResource(resourceData) {
     try {
       const response = await authFetch(`${API_BASE}/resource`, {

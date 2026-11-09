@@ -11,6 +11,7 @@ import { ResourceFormType } from './constants/formTypes';
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
   updateResource: vi.fn(),
+  getUsage: vi.fn(),
   getMaterialTypes: vi.fn(),
   getMaterialTypeFields: vi.fn(),
   fetch: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock('../../../services/admin/adminCourseService', () => ({
   adminCourseService: { createResource: mocks.createResource },
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
-  adminResourceService: { updateResource: mocks.updateResource },
+  adminResourceService: { getUsage: mocks.getUsage, updateResource: mocks.updateResource },
 }));
 vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
   adminMaterialTypeService: {
@@ -58,14 +59,14 @@ const course = { offering_id: 'offering-17', course_id: 'course-17' };
 let container;
 let root;
 
-function BrowserHarness({ initialData = {} }) {
+function BrowserHarness({ initialData = {}, formType = ResourceFormType.NEW }) {
   const [isOpen, setIsOpen] = useState(false);
   return <>
     <button type="button" onClick={() => setIsOpen(true)}>Open resource form</button>
     <ResourceFormManager
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
-      formType={ResourceFormType.NEW}
+      formType={formType}
       initialData={initialData}
       course={course}
       mode="course"
@@ -73,14 +74,17 @@ function BrowserHarness({ initialData = {} }) {
   </>;
 }
 
-BrowserHarness.propTypes = { initialData: PropTypes.object };
+BrowserHarness.propTypes = {
+  initialData: PropTypes.object,
+  formType: PropTypes.oneOf(Object.values(ResourceFormType)),
+};
 
-async function renderForm(initialData) {
+async function renderForm(initialData, formType) {
   await page.viewport(1280, 900);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root.render(<BrowserHarness initialData={initialData} />));
+  await act(async () => root.render(<BrowserHarness initialData={initialData} formType={formType} />));
   const opener = getByRole(container, 'button', { name: 'Open resource form' });
   opener.focus();
   await act(async () => fireEvent.click(opener));
@@ -181,6 +185,59 @@ describe('ResourceFormManager in Chromium', () => {
       expect(bounds.bottom, diagnosticMessage).toBeLessThanOrEqual(window.innerHeight);
       expect(bounds.top).toBe(actionTops[index]);
     });
+
+    fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('shows the edit usage warning and required-name summary at supported widths', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue({ data: [] });
+    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+    mocks.getUsage.mockResolvedValue({
+      course_count: 2,
+      offering_count: 3,
+      terms: [{ term_id: 7, term_name: 'Fall 2026' }, { term_id: 8, term_name: 'Spring 2027' }],
+      linked_page_count: 3,
+    });
+    const opener = await renderForm({ resource_id: 'resource-17', name: '' }, ResourceFormType.EDIT);
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    await waitFor(() => expect(getByRole(dialog, 'status').textContent).toContain(
+      'Used in 2 courses (Fall 2026, Spring 2027) - changes apply to all, and up to 3 linked pages',
+    ));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    const summary = getByRole(dialog, 'alert', { name: 'Please correct the following:' });
+    const warning = getByRole(dialog, 'status');
+    const nameField = getByRole(dialog, 'textbox', { name: 'Resource Name' });
+    expect(nameField.getAttribute('aria-describedby')).toBe('title-error');
+    await act(async () => fireEvent.click(getByRole(summary, 'link', { name: 'Resource name is required' })));
+    expect(document.activeElement).toBe(nameField);
+
+    const content = dialog.querySelector('[data-testid="resource-form-content"]');
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      for (const element of [warning, summary]) {
+        element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        const bounds = element.getBoundingClientRect();
+        const contentBounds = content.getBoundingClientRect();
+        expect(bounds.width).toBeGreaterThan(0);
+        expect(bounds.height).toBeGreaterThan(0);
+        expect(bounds.left).toBeGreaterThanOrEqual(contentBounds.left);
+        expect(bounds.right).toBeLessThanOrEqual(contentBounds.right);
+        expect(bounds.top).toBeGreaterThanOrEqual(contentBounds.top);
+        expect(bounds.bottom).toBeLessThanOrEqual(contentBounds.bottom);
+      }
+      expect(summary.textContent).toContain('Resource name is required');
+      expect(warning.textContent).toContain('Used in 2 courses');
+    }
+    await expectNoHorizontalOverflow([320, 768, 1280]);
+    await expectNoAxeViolations(document.body);
+    expect(mocks.updateResource).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
 
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
     await waitFor(() => expect(document.activeElement).toBe(opener));

@@ -4,20 +4,26 @@ import { Info } from 'lucide-react';
 import { Alert } from '../../../ui/alert';
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
 import { useResourceFormState } from '../../../../hooks/admin/useResourceFormState';
+import { useResourceFormValidation } from '../../../../hooks/admin/useResourceFormValidation';
+import { useResourceUsage } from '../../../../hooks/admin/useResourceUsage';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
+import { ErrorSummary } from './ErrorSummary';
+import { SharedEditWarning } from './SharedEditWarning';
 import { StaffSection } from './StaffSection';
 import { StudentSection } from './StudentSection';
 import { WhatBasics } from './WhatBasics';
 import WhereSection from './WhereSection';
 import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
 
-export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, source }) => {
+export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, source, usageResourceId }) => {
   const {
     defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
     cascadeVisibilityToLinks, setCascadeVisibilityToLinks, links, setLinks,
     materialTypes, setMaterialTypes, materialTypeFields, setMaterialTypeFields,
     errorMessage, setErrorMessage,
   } = useResourceFormState({ initialData, course });
+  const { errors: validationErrors, validate, clearNameError } = useResourceFormValidation();
+  const resourceUsage = useResourceUsage(usageResourceId);
 
   useEffect(() => {
     adminMaterialTypeService.getMaterialTypes().then(({ data }) => setMaterialTypes(data)).catch((error) => {
@@ -43,6 +49,7 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
 
   const handleFieldChange = (event) => {
     const { name, value, type, checked } = event.target;
+    if (name === 'title') clearNameError();
     if (type === 'checkbox') {
       setFormData((current) => ({ ...current, [name]: checked }));
     } else if (name in formData) {
@@ -97,8 +104,8 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage(null);
+    if (!validate(formData)) return;
     try {
-      if (!formData.title) throw new Error('Resource name is required');
       const processedLinks = links
         .filter((link) => link.url && link.url.trim() !== '')
         .map((link) => ({
@@ -121,10 +128,17 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
     }
   };
 
+  const handleInvalid = (event) => {
+    if (event.target.name === 'title') {
+      event.preventDefault();
+      validate(formData);
+    }
+  };
+
   return (
     <>
       {errorMessage && <Alert variant="destructive" className="tw-mb-4">{errorMessage}</Alert>}
-      <form id={formId} onSubmit={handleSubmit} className="tw-space-y-4">
+      <form id={formId} onInvalidCapture={handleInvalid} onSubmit={handleSubmit} className="tw-space-y-4">
         {formData.link && isHitchcockVideoUrl(formData.link) && formData.use_primary_link_visibility && (
           <Alert className="tw-flex tw-items-start tw-gap-2">
             <Info aria-hidden="true" className="tw-size-4 tw-shrink-0" />
@@ -137,6 +151,7 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
           materialTypes={materialTypes}
           onTypeChange={handleMaterialTypeChange}
           materialTypeFields={materialTypeFields}
+          titleError={validationErrors.title}
         />
         <WhereSection
           formData={formData}
@@ -151,6 +166,9 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
           handleFieldChange={handleFieldChange}
           handleFolderChange={handleFieldChange}
           setFormData={setFormData}
+          sharedEditWarning={usageResourceId ? (
+            <SharedEditWarning {...resourceUsage} />
+          ) : null}
         />
         <div id="visibility-settings">
           <UnifiedVisibilityControl
@@ -177,6 +195,7 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
           />
         </div>
         <StaffSection formData={formData} handleFieldChange={handleFieldChange} />
+        <ErrorSummary errors={validationErrors} />
       </form>
     </>
   );
@@ -189,6 +208,7 @@ ResourceForm.propTypes = {
   course: PropTypes.object,
   mode: PropTypes.oneOf(['course', 'none']),
   source: PropTypes.string.isRequired,
+  usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 export default ResourceForm;

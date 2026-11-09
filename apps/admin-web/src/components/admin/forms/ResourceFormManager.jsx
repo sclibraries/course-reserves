@@ -206,7 +206,6 @@ export const ResourceFormManager = ({
         order: initialData.order || null,
         created_at: initialData.created_at || '',
         material_type_name: initialData.material_type_name || '',
-        course_count: initialData.course_count || 0,
         metadata: transformMetadata(initialData.metadata),
         links: initialData.links || [],
         use_primary_link_visibility: normalizeProxyValue(initialData.use_primary_link_visibility),
@@ -270,6 +269,7 @@ export const ResourceFormManager = ({
             initialData={getFormInitialData()}
             onSubmit={handleBaseFormSubmit}
             source={RESOURCE_SOURCES[formType] || 'Not recorded'}
+            usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
           />
         </>
       );
