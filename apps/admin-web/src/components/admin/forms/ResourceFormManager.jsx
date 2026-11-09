@@ -329,7 +329,7 @@ export const ResourceFormManager = ({
     }}>
       <DialogContent
         aria-describedby={undefined}
-        className="tw-flex tw-h-[calc(100dvh-2rem)] tw-max-h-[calc(100dvh-2rem)] tw-w-[calc(100vw-2rem)] tw-max-w-7xl tw-flex-col tw-overflow-hidden"
+        className="tw-flex tw-h-[90vh] tw-max-h-[90vh] tw-w-[calc(100vw-2rem)] tw-max-w-7xl tw-flex-col tw-overflow-hidden"
       >
         <DialogHeader className="tw-shrink-0">
           <DialogTitle>{modalTitle}</DialogTitle>
