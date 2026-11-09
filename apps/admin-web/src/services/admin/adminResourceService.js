@@ -78,7 +78,7 @@ export const adminResourceService = {
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         const error = new Error(data.message || 'Failed to fetch resource usage');
-        error.reference = data.reference || data.reference_id;
+        error.reference = data.reference;
         throw error;
       }
       return response.json();

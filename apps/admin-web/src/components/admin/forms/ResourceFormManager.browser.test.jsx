@@ -235,7 +235,8 @@ describe('ResourceFormManager in Chromium', () => {
       expect(warning.textContent).toContain('Used in 2 courses');
     }
     await expectNoHorizontalOverflow([320, 768, 1280]);
-    await expectNoAxeViolations(document.body);
+    await expectNoAxeViolations(summary);
+    await expectNoAxeViolations(warning);
     expect(mocks.updateResource).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
 

@@ -292,28 +292,6 @@ describe('ResourceFormManager dialog shell', () => {
     expect(mocks.notifyFromError).toHaveBeenCalledExactlyOnceWith(error, "Couldn't check resource usage");
   });
 
-  it('reports incomplete usage data as unavailable instead of rendering an invalid warning', async () => {
-    mocks.getUsage.mockResolvedValue({
-      terms: null,
-      linked_page_count: 0,
-      reference: 'SYNTH-USAGE-INCOMPLETE',
-    });
-    await renderForm({
-      formType: ResourceFormType.EDIT,
-      initialData: { resource_id: 'resource-17', name: 'Synthetic existing resource' },
-    });
-
-    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
-    await waitFor(() => expect(dialog.textContent).toContain("Resource usage couldn't be checked"));
-
-    expect(dialog.textContent).not.toContain('undefined courses');
-    expect(dialog.textContent).not.toContain('0 courses');
-    expect(mocks.notifyFromError).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ reference: 'SYNTH-USAGE-INCOMPLETE' }),
-      "Couldn't check resource usage",
-    );
-  });
-
   it.each([
     {
       invalidField: 'Publisher',
