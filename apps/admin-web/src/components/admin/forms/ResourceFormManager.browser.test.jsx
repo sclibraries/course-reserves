@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from '@vitest/browser/context';
 import { fireEvent, getByRole, waitFor } from '@testing-library/dom';
-import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../../test/browser';
+import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test/browser';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
 
