@@ -1,9 +1,16 @@
 // src/hooks/useFolderManagement.js
 import { useState, useEffect } from 'react';
 import { config } from '../config';
+import { notify } from '../services/notify';
 
 const API_BASE = config.api.urls.courseReserves;
 const getAuthToken = config.api.getAuthToken;
+
+const folderError = async (response, message) => {
+  const error = new Error(message);
+  error.payload = await response.json().catch(() => null);
+  return error;
+};
 
 export const useFolderManagement = () => {
   const [folders, setFolders] = useState([]);
@@ -23,12 +30,13 @@ export const useFolderManagement = () => {
         },
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch folders');
+        throw await folderError(response, 'Failed to fetch folders');
       }
       const data = await response.json();
       setFolders(data);
     } catch (err) {
       setError(err.message);
+      notify.fromError(err, "Couldn't load folders");
     } finally {
       setLoading(false);
     }
@@ -53,7 +61,7 @@ export const useFolderManagement = () => {
         body: JSON.stringify(folderData),
       });
       if (!response.ok) {
-        throw new Error('Failed to create folder');
+        throw await folderError(response, 'Failed to create folder');
       }
       const newFolder = await response.json();
       // Refresh folder list
@@ -61,6 +69,7 @@ export const useFolderManagement = () => {
       return newFolder;
     } catch (err) {
       setError(err.message);
+      notify.fromError(err, "Couldn't create folder");
       throw err;
     } finally {
       setLoading(false);

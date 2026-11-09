@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getMaterialTypes: vi.fn(),
   getMaterialTypeFields: vi.fn(),
   fetch: vi.fn(),
+  folderManagementState: { folders: [], loading: false, error: null, createFolder: vi.fn() },
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
   courseStoreState: {
@@ -41,7 +42,7 @@ vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
   },
 }));
 vi.mock('../../../hooks/useFolderManagement', () => ({
-  useFolderManagement: () => ({ folders: [], loading: false, error: null, createFolder: vi.fn() }),
+  useFolderManagement: () => mocks.folderManagementState,
 }));
 vi.mock('../../../store/adminCourseStore', () => ({
   useAdminCourseStore: () => mocks.courseStoreState,
@@ -103,8 +104,33 @@ describe('ResourceFormManager in Chromium', () => {
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
     await expectNoHorizontalOverflow([320, 768, 1280]);
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      for (const heading of ['What is it?', 'What do students see?', 'Staff only']) {
+        expect(getByRole(dialog, 'heading', { name: heading })).toBeTruthy();
+      }
+    }
     await expectNoAxeViolations(document.body);
     expect(mocks.fetch).not.toHaveBeenCalled();
+
+    await page.viewport(320, 480);
+    const content = dialog.querySelector('[data-testid="resource-form-content"]');
+    expect(content.scrollHeight).toBeGreaterThan(content.clientHeight);
+    const actionButtons = ['Save', 'Cancel'].map(name => getByRole(dialog, 'button', { name }));
+    const actionTops = actionButtons.map(button => button.getBoundingClientRect().top);
+    expect(actionButtons.every(button => !content.contains(button))).toBe(true);
+    content.scrollTop = content.scrollHeight;
+    const lastSection = dialog.querySelector('#staff-only');
+    const contentBounds = content.getBoundingClientRect();
+    const lastSectionBounds = lastSection.getBoundingClientRect();
+    expect(lastSectionBounds.top).toBeGreaterThanOrEqual(contentBounds.top);
+    expect(lastSectionBounds.bottom).toBeLessThanOrEqual(contentBounds.bottom);
+    actionButtons.forEach((button, index) => {
+      const bounds = button.getBoundingClientRect();
+      expect(bounds.top).toBeGreaterThanOrEqual(0);
+      expect(bounds.bottom).toBeLessThanOrEqual(window.innerHeight);
+      expect(bounds.top).toBe(actionTops[index]);
+    });
 
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
     await waitFor(() => expect(document.activeElement).toBe(opener));

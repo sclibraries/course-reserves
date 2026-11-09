@@ -1,85 +1,25 @@
 import { useEffect } from 'react';
 import PropTypes from 'prop-types';
-import {
-  Form,
-  Container,
-  Row,
-  Col,
-  Card,
-  CardBody,
-  Alert
-} from 'reactstrap';
-import { FaInfoCircle, FaLink, FaFolder } from 'react-icons/fa';
-// Import shared components
-import ResourceBasicFields from './ResourceBasicFields';
-import ResourceTypeSelector from './ResourceTypeSelector';
+import { Info } from 'lucide-react';
+import { FaInfoCircle, FaLink } from 'react-icons/fa';
+import { Alert } from '../../../ui/alert';
 import FormSection from './FormSection';
-import FolderSelector from './FolderSelector';
 import UnifiedVisibilityControl from './UnifiedVisibilityControl';
-import FormNavigationAnchor from './FormNavigationAnchor';
 import { TypeSpecificFields } from '../fields/TypeSpecificFields';
 import ResourceLinks from '../fields/ResourceLinks';
+import { WhatBasics } from '../resource-form/WhatBasics';
+import { StudentSection } from '../resource-form/StudentSection';
+import { StaffSection } from '../resource-form/StaffSection';
 import { useResourceFormState } from '../../../../hooks/admin/useResourceFormState';
 
-// Import services
 import { adminMaterialTypeService } from '../../../../services/admin/adminMaterialTypeService';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import '../../../../css/AdminForms.css';
-
-/**
- * BaseResourceForm - Core Resource Form Component
- * ===============================================
- * 
- * **Purpose**: Provides the complete, unified form interface for creating and editing
- * course resources. This is the foundation component that combines all field types
- * and form sections into a cohesive user experience.
- * 
- * **Key Features**:
- * - Complete resource form with all field types
- * - Material type-specific field rendering
- * - Automatic visibility date handling for video content
- * - Integrated folder selection with creation capability
- * - Additional links management
- * - Form validation and error handling
- * - Responsive design with consistent styling
- * 
- * **Form Sections**:
- * 1. **Basic Fields**: Name, URL, description, notes, proxy settings
- * 2. **Material Type**: Dropdown with dynamic field loading
- * 3. **Folder Selection**: With inline folder creation
- * 4. **Type-Specific Fields**: Dynamic based on material type
- * 5. **Additional Links**: Multiple related URLs
- * 6. **Visibility Settings**: Start/end dates with smart defaults
- * 
- * **Smart Defaults**:
- * - Visibility dates auto-populate from course term dates
- * - Video material types automatically enable visibility controls
- * - Proxy settings inherit from primary URL
- * 
- * **Data Flow**:
- * 1. Receives initialData and transforms to internal format
- * 2. Loads material types and field definitions from API
- * 3. Handles real-time form state and validation
- * 4. Processes submission data and calls onSubmit callback
- * 5. Provides success/error feedback to user
- * 
- * **Usage Context**:
- * - Used directly by ResourceFormManager for NEW/EDIT operations
- * - Used by EDS/Hitchcock forms in modal contexts
- * - Can be used standalone for custom implementations
- * 
- * @component
- * @example
- * <BaseResourceForm
- *   initialData={resource}
- *   onSubmit={handleSave}
- * />
- */
-export const BaseResourceForm = ({ 
-  initialData = {}, 
+export const BaseResourceForm = ({
+  initialData = {},
   onSubmit,
   formId,
-  course // Add course prop for term dates
+  course,
 }) => {
   const {
     defaultDates,
@@ -298,136 +238,86 @@ export const BaseResourceForm = ({
   };
 
 
-  return (
-    <Container fluid className="py-4">
-      <Card className="shadow-sm">
-        <CardBody>
-          {errorMessage && (
-            <div className="alert alert-danger" role="alert">
-              {errorMessage}
-            </div>
-          )}
-          
-          <Form id={formId} onSubmit={handleSubmit}>
-            {/* Hitchcock Video Automatic Visibility Alert */}
-            {formData.link && 
-             isHitchcockVideoUrl(formData.link) &&
-             formData.use_primary_link_visibility && (
-              <Alert color="warning" className="mb-4">
-                <FaInfoCircle className="me-2" />
-                <strong>Automatic Link Visibility Applied:</strong> The primary link to this Hitchcock video can only be displayed during the current term. 
-                Link visibility dates have been automatically set to ensure compliance.
-              </Alert>
-            )}
-            
-            {/* Form Navigation */}
-            <FormNavigationAnchor
-              hasMaterialTypeFields={!!formData.material_type_id && materialTypeFields.length > 0}
-              hasAdditionalLinks={links.length > 0}
+  return <>
+    {errorMessage && <Alert variant="destructive" className="tw-mb-4">{errorMessage}</Alert>}
+    <form id={formId} onSubmit={handleSubmit} className="tw-space-y-4">
+      {formData.link && isHitchcockVideoUrl(formData.link) && formData.use_primary_link_visibility && (
+        <Alert className="tw-mb-4">
+          <Info aria-hidden="true" />
+          <strong>Automatic Link Visibility Applied:</strong> The primary link to this Hitchcock video can only be displayed during the current term.
+          Link visibility dates have been automatically set to ensure compliance.
+        </Alert>
+      )}
+
+      <WhatBasics
+        formData={formData}
+        handleFieldChange={handleFieldChange}
+        materialTypes={materialTypes}
+        onTypeChange={handleMaterialTypeChange}
+      />
+
+      {formData.material_type_id && (
+        <div id="type-specific-details">
+          <FormSection title="Type-Specific Details" icon={FaInfoCircle}>
+            <TypeSpecificFields
+              formData={formData}
+              metadata={formData.metadata}
+              handleFieldChange={handleFieldChange}
+              materialTypeFields={materialTypeFields}
             />
-            
-            {/* Basic Resource Information */}
-            <div id="basic-information">
-              <FormSection title="Basic Information" icon={FaInfoCircle}>
-                <ResourceBasicFields 
-                  formData={formData}
-                  handleFieldChange={handleFieldChange}
-                />
-              </FormSection>
-            </div>
-            
-            {/* Material Type and Folder - Side by Side */}
-            <div id="classification-organization">
-              <FormSection title="Classification & Organization" icon={FaFolder}>
-                <Row>
-                  <Col md={6}>
-                    <ResourceTypeSelector 
-                      materialTypes={materialTypes}
-                      selectedTypeId={formData.material_type_id}
-                      onTypeChange={handleMaterialTypeChange}
-                    />
-                  </Col>
-                  
-                  <Col md={6}>
-                    <FolderSelector 
-                      selectedFolder={formData.folder}
-                      handleFolderChange={handleFieldChange}
-                      setFormData={setFormData}
-                    />
-                  </Col>
-                </Row>
-              </FormSection>
-            </div>
-            
-            {/* Type-Specific Fields */}
-            {formData.material_type_id && (
-              <div id="type-specific-details">
-                <FormSection title="Type-Specific Details" icon={FaInfoCircle}>
-                  <TypeSpecificFields
-                    formData={formData}
-                    metadata={formData.metadata}
-                    handleFieldChange={handleFieldChange}
-                    materialTypeFields={materialTypeFields}
-                  />
-                </FormSection>
-              </div>
-            )}
-            
-            {/* Additional Links */}
-            <div id="additional-links">
-              <FormSection title="Additional Links" icon={FaLink}>
-                <ResourceLinks 
-                  links={links}
-                  setLinks={setLinks}
-                  materialTypeId={formData.material_type_id}
-                  resourceVisibilityDates={{
-                    startDate: formData.start_visibility,
-                    endDate: formData.end_visibility
-                  }}
-                />
-              </FormSection>
-            </div>
-            
-            {/* Unified Visibility Settings */}
-            <div id="visibility-settings">
-              <UnifiedVisibilityControl
-                // Resource-level visibility
-                resourceStartDate={formData.start_visibility}
-                resourceEndDate={formData.end_visibility}
-                useResourceVisibility={useVisibilityDates}
-                onResourceVisibilityToggle={handleVisibilityToggle}
-                onResourceDateChange={handleFieldChange}
-                
-                // Primary link visibility
-                primaryLinkStartDate={formData.primary_link_start_visibility}
-                primaryLinkEndDate={formData.primary_link_end_visibility}
-                usePrimaryLinkVisibility={formData.use_primary_link_visibility}
-                onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
-                onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
-                hasPrimaryLink={!!(formData.link && formData.link.trim())}
-                primaryUrl={formData.link}
-                
-                // Additional links visibility
-                links={links}
-                onLinkVisibilityChange={handleLinkVisibilityChange}
-                onLinkDateChange={handleLinkDateChange}
-                
-                // General settings
-                materialTypeId={formData.material_type_id}
-                cascadeVisibilityToLinks={cascadeVisibilityToLinks}
-                onCascadeToggle={handleCascadeToggle}
-                
-                // Term dates for defaults
-                termStartDate={defaultDates.startDate}
-                termEndDate={defaultDates.endDate}
-              />
-            </div>
-            
-          </Form>
-        </CardBody>
-      </Card>
-    </Container>
-  );
+          </FormSection>
+        </div>
+      )}
+
+      <div id="additional-links">
+        <FormSection title="Additional Links" icon={FaLink}>
+          <ResourceLinks
+            links={links}
+            setLinks={setLinks}
+            materialTypeId={formData.material_type_id}
+            resourceVisibilityDates={{
+              startDate: formData.start_visibility,
+              endDate: formData.end_visibility,
+            }}
+          />
+        </FormSection>
+      </div>
+
+      <StudentSection
+        formData={formData}
+        handleFieldChange={handleFieldChange}
+        handleFolderChange={handleFieldChange}
+        setFormData={setFormData}
+      />
+
+      <div id="visibility-settings">
+        <UnifiedVisibilityControl
+          resourceStartDate={formData.start_visibility}
+          resourceEndDate={formData.end_visibility}
+          useResourceVisibility={useVisibilityDates}
+          onResourceVisibilityToggle={handleVisibilityToggle}
+          onResourceDateChange={handleFieldChange}
+          primaryLinkStartDate={formData.primary_link_start_visibility}
+          primaryLinkEndDate={formData.primary_link_end_visibility}
+          usePrimaryLinkVisibility={formData.use_primary_link_visibility}
+          onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
+          onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
+          hasPrimaryLink={!!(formData.link && formData.link.trim())}
+          primaryUrl={formData.link}
+          links={links}
+          onLinkVisibilityChange={handleLinkVisibilityChange}
+          onLinkDateChange={handleLinkDateChange}
+          materialTypeId={formData.material_type_id}
+          cascadeVisibilityToLinks={cascadeVisibilityToLinks}
+          onCascadeToggle={handleCascadeToggle}
+          termStartDate={defaultDates.startDate}
+          termEndDate={defaultDates.endDate}
+        />
+      </div>
+
+      <StaffSection formData={formData} handleFieldChange={handleFieldChange} />
+    </form>
+  </>;
 };
 
 BaseResourceForm.propTypes = {

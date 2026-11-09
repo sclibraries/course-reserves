@@ -1,120 +1,110 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { FormGroup, Label, Input, Button, InputGroup, Spinner } from 'reactstrap';
-import { FaFolder } from 'react-icons/fa';
+import { Folder } from 'lucide-react';
+import { Alert } from '../../../ui/alert';
+import { Button } from '../../../ui/button';
+import { Input } from '../../../ui/input';
+import { Label } from '../../../ui/label';
+import NativeSelect from '../../../ui/native-select';
 import { useFolderManagement } from '../../../../hooks/useFolderManagement';
 
-/**
- * FolderSelector - Component for selecting or creating folders
- */
 export const FolderSelector = ({ selectedFolder, handleFolderChange, setFormData }) => {
   const { folders, loading, error, createFolder } = useFolderManagement();
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const fieldError = createError || error;
+  const fieldId = showNewFolderInput ? 'new-folder-name' : 'folder';
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
-    
+
     setCreatingFolder(true);
+    setCreateError(null);
     try {
       const newFolder = await createFolder({ name: newFolderName.trim() });
-      
-      // Set the folder field in the form data to the newly created folder's id
       if (setFormData) {
         setFormData(prev => ({ ...prev, folder: newFolder.folder_id }));
-      } else if (handleFolderChange) {
-        // Create a synthetic event for the custom handler
-        handleFolderChange({
-          target: {
-            name: 'folder',
-            value: newFolder.folder_id
-          }
-        });
+      } else {
+        handleFolderChange({ target: { name: 'folder', value: newFolder.folder_id } });
       }
-      
       setNewFolderName('');
       setShowNewFolderInput(false);
     } catch (err) {
-      console.error('Error creating folder:', err);
+      setCreateError(err.message);
     } finally {
       setCreatingFolder(false);
     }
   };
 
-  const handleFolderDropdownChange = (e) => {
-    const {  value } = e.target;
-    
-    // Handle special case for folder dropdown
-    if (value === '__new__') {
+  const handleFolderDropdownChange = (event) => {
+    if (event.target.value === '__new__') {
+      setCreateError(null);
       setShowNewFolderInput(true);
       return;
     }
-    
-    // Otherwise use the normal handler
-    handleFolderChange(e);
+    handleFolderChange(event);
   };
 
   return (
-    <FormGroup>
-      <Label for="folder">
-        <FaFolder className="me-1" /> Folder
+    <div className="tw-space-y-2">
+      <Label htmlFor={fieldId} className="tw-flex tw-items-center tw-gap-2">
+        <Folder aria-hidden="true" className="tw-size-4" />
+        {showNewFolderInput ? 'New folder name' : 'Folder'}
       </Label>
       {!showNewFolderInput ? (
-        <Input
+        <NativeSelect
           id="folder"
           name="folder"
-          type="select"
           value={selectedFolder || ''}
           onChange={handleFolderDropdownChange}
           disabled={loading}
+          aria-describedby={fieldError ? 'folder-error' : undefined}
         >
           <option value="">-- Select Folder --</option>
           {folders.map(folder => (
-            <option key={folder.folder_id} value={folder.folder_id}>
-              {folder.name}
-            </option>
+            <option key={folder.folder_id} value={folder.folder_id}>{folder.name}</option>
           ))}
           <option value="__new__">+ Create new folder</option>
-        </Input>
+        </NativeSelect>
       ) : (
-        <InputGroup>
+        <div className="tw-flex tw-flex-wrap tw-gap-2">
           <Input
+            id="new-folder-name"
             value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
+            onChange={event => setNewFolderName(event.target.value)}
             placeholder="Enter new folder name"
+            disabled={creatingFolder}
+            aria-describedby={fieldError ? 'folder-error' : undefined}
           />
-          <Button 
-            color="primary" 
-            onClick={handleCreateFolder}
-            disabled={!newFolderName.trim() || creatingFolder}
-          >
+          <Button type="button" onClick={handleCreateFolder} disabled={!newFolderName.trim() || creatingFolder}>
             {creatingFolder ? 'Adding...' : 'Add'}
           </Button>
-          <Button 
-            color="secondary" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => {
               setShowNewFolderInput(false);
               setNewFolderName('');
+              setCreateError(null);
             }}
+            disabled={creatingFolder}
           >
             Cancel
           </Button>
-        </InputGroup>
+        </div>
       )}
-      {loading && <div className="text-muted mt-1"><Spinner size="sm" /> Loading folders...</div>}
-      {error && <div className="text-danger mt-1">Error: {error}</div>}
-    </FormGroup>
+      {loading && <p role="status" className="tw-text-sm tw-text-muted-foreground">Loading folders...</p>}
+      {fieldError && <Alert id="folder-error" variant="destructive" className="tw-p-2 tw-text-sm">{fieldError}</Alert>}
+    </div>
   );
 };
 
 FolderSelector.propTypes = {
-  selectedFolder: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.number
-  ]),
+  selectedFolder: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   handleFolderChange: PropTypes.func.isRequired,
-  setFormData: PropTypes.func
+  setFormData: PropTypes.func,
 };
 
 export default FolderSelector;

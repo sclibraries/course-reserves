@@ -1,49 +1,38 @@
 import PropTypes from 'prop-types';
-import { FormGroup, Label, Input } from 'reactstrap';
+import { Label } from '../../../ui/label';
+import NativeSelect from '../../../ui/native-select';
 
-/**
- * ResourceTypeSelector - Component for selecting resource material type
- */
-export const ResourceTypeSelector = ({ 
-  materialTypes = [], 
+export const ResourceTypeSelector = ({
+  materialTypes = [],
   selectedTypeId = '',
   onTypeChange,
-  isLoading = false 
-}) => {
-  return (
-    <FormGroup>
-      <Label for="material_type_id">Material Type</Label>
-      <Input
-        id="material_type_id"
-        name="material_type_id"
-        type="select"
-        value={selectedTypeId}
-        onChange={onTypeChange}
-        disabled={isLoading}
-      >
-        <option value="">-- Select Material Type --</option>
-        {materialTypes.map(type => (
-          <option 
-            key={type.material_type_id} 
-            value={type.material_type_id}
-          >
-            {type.description || type.name}
-          </option>
-        ))}
-      </Input>
-      {isLoading && <small className="text-muted">Loading material types...</small>}
-    </FormGroup>
-  );
-};
+  isLoading = false,
+}) => (
+  <div className="tw-space-y-2">
+    <Label htmlFor="material_type_id">Material Type</Label>
+    <NativeSelect
+      id="material_type_id"
+      name="material_type_id"
+      value={selectedTypeId}
+      onChange={onTypeChange}
+      disabled={isLoading}
+    >
+      <option value="">-- Select Material Type --</option>
+      {materialTypes.map(type => (
+        <option key={type.material_type_id} value={type.material_type_id}>
+          {type.description || type.name}
+        </option>
+      ))}
+    </NativeSelect>
+    {isLoading && <p role="status" className="tw-text-sm tw-text-muted-foreground">Loading material types...</p>}
+  </div>
+);
 
 ResourceTypeSelector.propTypes = {
   materialTypes: PropTypes.array,
-  selectedTypeId: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.number
-  ]),
+  selectedTypeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onTypeChange: PropTypes.func.isRequired,
-  isLoading: PropTypes.bool
+  isLoading: PropTypes.bool,
 };
 
 export default ResourceTypeSelector;

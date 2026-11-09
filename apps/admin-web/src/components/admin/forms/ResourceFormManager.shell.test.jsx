@@ -17,6 +17,12 @@ const mocks = vi.hoisted(() => ({
   getMaterialTypes: vi.fn(),
   getMaterialTypeFields: vi.fn(),
   fetch: vi.fn(),
+  folderManagementState: {
+    folders: [{ folder_id: 'folder-17', name: 'Synthetic folder' }],
+    loading: false,
+    error: null,
+    createFolder: vi.fn(),
+  },
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
   courseStoreState: {
@@ -45,7 +51,7 @@ vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
   },
 }));
 vi.mock('../../../hooks/useFolderManagement', () => ({
-  useFolderManagement: () => ({ folders: [], loading: false, error: null, createFolder: vi.fn() }),
+  useFolderManagement: () => mocks.folderManagementState,
 }));
 vi.mock('../../../store/adminCourseStore', () => ({
   useAdminCourseStore: () => mocks.courseStoreState,
@@ -115,16 +121,33 @@ describe('ResourceFormManager dialog shell', () => {
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
     expect(getAllByRole(dialog, 'heading', { name: 'Add resource' })).toHaveLength(1);
     const headings = getAllByRole(dialog, 'heading').map((heading) => heading.textContent.trim());
-    expect(headings.indexOf('Basic Information')).toBeLessThan(headings.indexOf('Classification & Organization'));
-    expect(headings.indexOf('Classification & Organization')).toBeLessThan(headings.indexOf('Additional Links'));
+    expect(headings).toContain('What is it?');
+    expect(headings).toContain('What do students see?');
+    expect(headings).toContain('Staff only');
+    expect(headings.indexOf('What is it?')).toBeLessThan(headings.indexOf('What do students see?'));
+    expect(headings.indexOf('What do students see?')).toBeLessThan(headings.indexOf('Staff only'));
+    expect(getByRole(dialog, 'combobox', { name: 'Material Type' })).toBeTruthy();
+    expect(getByRole(dialog, 'textbox', { name: 'Resource Name' })).toBeTruthy();
+    expect(getByRole(dialog, 'textbox', { name: 'Description' })).toBeTruthy();
+    expect(getByRole(dialog, 'textbox', { name: 'Note for students' })).toBeTruthy();
+    expect(getByRole(dialog, 'combobox', { name: 'Folder' })).toBeTruthy();
+    expect(getByRole(dialog, 'textbox', { name: 'Internal note' })).toBeTruthy();
     expect(getByRole(dialog, 'button', { name: 'Save' })).toBeTruthy();
     expect(getByRole(dialog, 'button', { name: 'Cancel' })).toBeTruthy();
+    for (const id of ['what-is-it', 'what-students-see', 'staff-only']) {
+      expect(await axe(dialog.querySelector(`#${id}`), {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
+      })).toHaveNoViolations();
+    }
     expect(await axe(document.body, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
     })).toHaveNoViolations();
 
     fireEvent.change(getByRole(dialog, 'textbox', { name: 'Resource Name' }), {
       target: { value: 'Synthetic manual resource' },
+    });
+    fireEvent.change(getByRole(dialog, 'combobox', { name: 'Folder' }), {
+      target: { value: 'folder-17' },
     });
     await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
 
@@ -138,7 +161,7 @@ describe('ResourceFormManager dialog shell', () => {
         notes: '',
         internal_note: '',
         external_note: '',
-        folder: '',
+        folder: 'folder-17',
         start_visibility: '2026-09-01',
         end_visibility: '2026-12-20',
         material_type_id: '',
