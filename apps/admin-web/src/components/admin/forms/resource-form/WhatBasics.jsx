@@ -3,8 +3,9 @@ import { BookOpen } from 'lucide-react';
 import ResourceBasicFields from '../common/ResourceBasicFields';
 import ResourceTypeSelector from '../common/ResourceTypeSelector';
 import { ResourceFormSection } from './ResourceFormSection';
+import TypeFieldsSection from './TypeFieldsSection';
 
-export const WhatBasics = ({ formData, handleFieldChange, materialTypes, onTypeChange }) => (
+export const WhatBasics = ({ formData, handleFieldChange, materialTypes, onTypeChange, materialTypeFields }) => (
   <ResourceFormSection id="what-is-it" title="What is it?" icon={BookOpen}>
     <ResourceTypeSelector
       materialTypes={materialTypes}
@@ -12,6 +13,13 @@ export const WhatBasics = ({ formData, handleFieldChange, materialTypes, onTypeC
       onTypeChange={onTypeChange}
     />
     <ResourceBasicFields formData={formData} handleFieldChange={handleFieldChange} />
+    {formData.material_type_id && (
+      <TypeFieldsSection
+        materialTypeFields={materialTypeFields}
+        metadata={formData.metadata}
+        handleFieldChange={handleFieldChange}
+      />
+    )}
   </ResourceFormSection>
 );
 
@@ -20,4 +28,5 @@ WhatBasics.propTypes = {
   handleFieldChange: PropTypes.func.isRequired,
   materialTypes: PropTypes.array.isRequired,
   onTypeChange: PropTypes.func.isRequired,
+  materialTypeFields: PropTypes.array,
 };

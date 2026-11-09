@@ -6,7 +6,7 @@ import { Button } from '../../ui/button';
 import { notify } from '../../../services/notify';
 
 // Form components
-import BaseResourceForm from './common/BaseResourceForm';
+import ResourceForm from './resource-form/ResourceForm';
 import { AdminReuseForm } from './specialized/AdminReuseForm';
 import { CrossLinkForm } from './specialized/CrosslinkForm';
 
@@ -27,6 +27,13 @@ const RESOURCE_FORM_TITLES = {
   [ResourceFormType.HITCHCOCK]: 'Add from Hitchcock',
   [ResourceFormType.REUSE]: 'Reuse resource',
   [ResourceFormType.CROSSLINK]: 'Cross-link to another course',
+};
+
+const RESOURCE_SOURCES = {
+  [ResourceFormType.NEW]: 'Manual',
+  [ResourceFormType.EDIT]: 'Not recorded',
+  [ResourceFormType.EDS]: 'EBSCO Discovery',
+  [ResourceFormType.HITCHCOCK]: 'Hitchcock',
 };
 
 /**
@@ -180,7 +187,7 @@ export const ResourceFormManager = ({
   };
 
   /**
-   * Prepare initial data for BaseResourceForm based on form type and context
+   * Prepare initial data for ResourceForm based on form type and context
    */
   const getFormInitialData = () => {
     if (formType === ResourceFormType.EDIT && initialData) {
@@ -256,12 +263,13 @@ export const ResourceFormManager = ({
               Back to results
             </Button>
           )}
-          <BaseResourceForm
+          <ResourceForm
             formId="resource-form"
             course={folioCourseData}
             mode={mode}
             initialData={getFormInitialData()}
             onSubmit={handleBaseFormSubmit}
+            source={RESOURCE_SOURCES[formType] || 'Not recorded'}
           />
         </>
       );

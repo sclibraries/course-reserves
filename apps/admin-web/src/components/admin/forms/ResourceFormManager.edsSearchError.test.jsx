@@ -89,7 +89,7 @@ vi.mock('../../../store/adminCourseStore', () => ({
 }));
 vi.mock('../../../util/proxyUtil', () => ({ adjustProxy: (value) => value, LIBPROXY_PREFIX: '' }));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));
-vi.mock('./common/BaseResourceForm', () => ({
+vi.mock('./resource-form/ResourceForm', () => ({
   default: ({ initialData, onSubmit, mode }) => <>
     <p>{initialData?.title}</p>
     <p data-mode={mode} />

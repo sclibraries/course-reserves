@@ -1,5 +1,6 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from '@vitest/browser/context';
 import { fireEvent, getByRole, waitFor } from '@testing-library/dom';
@@ -57,7 +58,7 @@ const course = { offering_id: 'offering-17', course_id: 'course-17' };
 let container;
 let root;
 
-function BrowserHarness() {
+function BrowserHarness({ initialData = {} }) {
   const [isOpen, setIsOpen] = useState(false);
   return <>
     <button type="button" onClick={() => setIsOpen(true)}>Open resource form</button>
@@ -65,18 +66,21 @@ function BrowserHarness() {
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
       formType={ResourceFormType.NEW}
+      initialData={initialData}
       course={course}
       mode="course"
     />
   </>;
 }
 
-async function renderForm() {
+BrowserHarness.propTypes = { initialData: PropTypes.object };
+
+async function renderForm(initialData) {
   await page.viewport(1280, 900);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root.render(<BrowserHarness />));
+  await act(async () => root.render(<BrowserHarness initialData={initialData} />));
   const opener = getByRole(container, 'button', { name: 'Open resource form' });
   opener.focus();
   await act(async () => fireEvent.click(opener));
@@ -92,6 +96,32 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager in Chromium', () => {
+  it('reflows three long additional links across supported widths', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue({ data: [] });
+    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+    const links = [1, 2, 3].map((number) => ({
+      url: `https://example.test/${'long-path-segment-'.repeat(18)}${number}`,
+      title: `Synthetic additional link ${number}`,
+      description: '',
+      use_proxy: false,
+    }));
+    await renderForm({ links });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      for (const number of [1, 2, 3]) {
+        expect(getByRole(dialog, 'textbox', { name: `URL for link ${number}` }).value).toBe(links[number - 1].url);
+      }
+    }
+    await expectNoHorizontalOverflow([320, 768, 1280]);
+    await expectNoAxeViolations(document.body);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
   it('keeps the long form accessible across supported widths', async () => {
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');

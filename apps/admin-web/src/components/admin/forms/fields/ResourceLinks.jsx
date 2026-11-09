@@ -1,214 +1,120 @@
 import PropTypes from 'prop-types';
-import {
-  Card,
-  CardBody,
-  FormGroup,
-  Label,
-  Input,
-  Button,
-  Alert,
-  Row,
-  Col
-} from 'reactstrap';
-import { FaPlus, FaTrash, FaLink, FaTags, FaFileAlt, FaInfoCircle } from 'react-icons/fa';
-import '../../../../css/AdminForms.css';
+import { FileText, Link2, Plus, Tags, Trash2 } from 'lucide-react';
+import { Alert } from '../../../ui/alert';
+import { Button } from '../../../ui/button';
+import { Card, CardContent, CardHeader } from '../../../ui/card';
+import { Input } from '../../../ui/input';
+import { Label } from '../../../ui/label';
+import { Textarea } from '../../../ui/textarea';
+import ProxyToggle from '../common/ProxyToggle';
 
-/**
- * ResourceLinks Component
- * =======================
- * 
- * **Purpose**: Manages additional URL links for resources, allowing multiple
- * related links beyond the primary resource URL.
- * 
- * **Key Features**:
- * - Dynamic addition/removal of link entries
- * - Individual proxy settings per link
- * - Structured data with URL, title, and description
- * - Responsive card-based layout
- * - Validation for required fields
- * - Empty state with helpful messaging
- * - Clean, focused interface (visibility controls handled elsewhere)
- * 
- * **Use Cases**:
- * - Related articles or resources
- * - Alternative access points (e.g., different databases)
- * - Supplementary materials
- * - Help or instruction pages
- * 
- * **Data Structure**:
- * Each link object contains:
- * - `url` (required): The link URL
- * - `title` (optional): Display name for the link
- * - `description` (optional): Brief description
- * - `use_proxy` (boolean): Whether to apply proxy for off-campus access
- * 
- * **Note**: Visibility settings are now handled by the UnifiedVisibilityControl component
- * 
- * @component
- * @example
- * <ResourceLinks
- *   links={formData.links}
- *   setLinks={updateLinks}
- * />
- */
-const ResourceLinks = ({ 
-  links, 
-  setLinks, 
-  resourceVisibilityDates = { startDate: '', endDate: '' }
-}) => {
-  // Function to add a new empty link
-  const addLink = () => {
-    // Default to resource visibility dates if they exist
-    const defaultStartDate = resourceVisibilityDates.startDate || '';
-    const defaultEndDate = resourceVisibilityDates.endDate || '';
-    
-    setLinks([...links, { 
-      url: '', 
-      title: '', 
-      description: '', 
-      use_proxy: false,
-      start_visibility: defaultStartDate,
-      end_visibility: defaultEndDate,
-      use_link_visibility: false // Never auto-enable, let user choose
-    }]);
-  };
+const ResourceLinks = ({ links, setLinks, resourceVisibilityDates = { startDate: '', endDate: '' } }) => {
+  const addLink = () => setLinks((current) => [...current, {
+    url: '',
+    title: '',
+    description: '',
+    use_proxy: false,
+    start_visibility: resourceVisibilityDates.startDate || '',
+    end_visibility: resourceVisibilityDates.endDate || '',
+    use_link_visibility: false,
+  }]);
 
-  // Function to remove a link at a specific index
-  const removeLink = (indexToRemove) => {
-    setLinks(links.filter((_, index) => index !== indexToRemove));
-  };
-
-  // Function to update a specific link's property
-  const updateLink = (index, field, value) => {
-    const newLinks = [...links];
-    newLinks[index][field] = value;
-    setLinks(newLinks);
-  };
+  const removeLink = (indexToRemove) => setLinks((current) => current.filter((_, index) => index !== indexToRemove));
+  const updateLink = (index, field, value) => setLinks((current) => current.map((link, linkIndex) => (
+    linkIndex === index ? { ...link, [field]: value } : link
+  )));
 
   return (
-    <div className="resource-links">
-      <div className="mb-3 d-flex justify-content-between align-items-center">
-        <h5 className="mb-0 text-primary">
-          <FaLink className="me-2" />
-          Additional Resource Links
-        </h5>
-        <Button 
-          color="primary" 
-          size="sm" 
-          className="add-link-button"
-          onClick={addLink}
-        >
-          <FaPlus className="me-1" /> Add Link
+    <div className="tw-min-w-0 tw-space-y-4">
+      <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
+        <h4 className="tw-flex tw-items-center tw-gap-2 tw-font-medium">
+          <Link2 aria-hidden="true" className="tw-size-4" /> Additional links
+        </h4>
+        <Button type="button" size="sm" variant="outline" onClick={addLink}>
+          <Plus aria-hidden="true" /> Add link
         </Button>
       </div>
 
       {links.length === 0 ? (
-        <Alert color="light" className="text-center p-4 border" fade={false}>
-          <FaInfoCircle className="mb-2" size={24} />
-          <p className="mb-0">No additional links added. Click &quot;Add Link&quot; to include related resources.</p>
+        <Alert className="tw-text-center">
+          <p>No additional links added.</p>
         </Alert>
       ) : (
-        <div className="links-container">
-          {links.map((link, index) => (
-            <Card key={index} className="link-card mb-3">
-              <CardBody>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className="card-title mb-0">
-                    Link #{index + 1}
-                  </h6>
+        <div className="tw-min-w-0 tw-space-y-3">
+          {links.map((link, index) => {
+            const linkName = link.title?.trim() || link.url?.trim() || 'untitled link';
+            return (
+              <Card key={index} className="tw-min-w-0">
+                <CardHeader className="tw-flex tw-flex-row tw-items-center tw-justify-between tw-gap-2 tw-p-4">
+                  <h5 className="tw-min-w-0 tw-break-words tw-font-medium">Link {index + 1}: {linkName}</h5>
                   <Button
-                    color="link"
-                    className="text-danger p-0"
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Remove link ${index + 1}: ${linkName}`}
                     onClick={() => removeLink(index)}
                   >
-                    <FaTrash /> Remove
+                    <Trash2 aria-hidden="true" /> Remove
                   </Button>
-                </div>
-                
-                <Row>
-                  <Col md={12}>
-                    <FormGroup>
-                      <Label for={`url-${index}`}>
-                        <FaLink className="me-1" /> URL <span className="text-danger">*</span>
-                      </Label>
-                      <Input
-                        id={`url-${index}`}
-                        type="url"
-                        placeholder="https://example.com"
-                        value={link.url}
-                        onChange={(e) => updateLink(index, 'url', e.target.value)}
-                        required={index === 0}
-                        className="link-url-input"
-                      />
-                    </FormGroup>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label for={`title-${index}`}>
-                        <FaTags className="me-1" /> Title
-                      </Label>
-                      <Input
-                        id={`title-${index}`}
-                        type="text"
-                        placeholder="Link title"
-                        value={link.title}
-                        onChange={(e) => updateLink(index, 'title', e.target.value)}
-                      />
-                    </FormGroup>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label for={`use-proxy-${index}`}>Proxy Settings</Label>
-                      <div className="mt-2">
-                        <div className="form-check form-switch">
-                          <input
-                            id={`use-proxy-${index}`}
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={link.use_proxy}
-                            onChange={(e) => updateLink(index, 'use_proxy', e.target.checked)}
-                          />
-                          <label className="form-check-label" htmlFor={`use-proxy-${index}`}>
-                            Use proxy for this link
-                          </label>
-                        </div>
-                      </div>
-                    </FormGroup>
-                  </Col>
-                  
-                  <Col md={12}>
-                    <FormGroup>
-                      <Label for={`description-${index}`}>
-                        <FaFileAlt className="me-1" /> Description
-                      </Label>
-                      <Input
-                        id={`description-${index}`}
-                        type="textarea"
-                        rows="2"
-                        placeholder="Link description"
-                        value={link.description}
-                        onChange={(e) => updateLink(index, 'description', e.target.value)}
-                      />
-                    </FormGroup>
-                  </Col>
-                </Row>
-              </CardBody>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent className="tw-grid tw-min-w-0 tw-grid-cols-1 tw-gap-4 tw-p-4 tw-pt-0 md:tw-grid-cols-2">
+                  <div className="tw-min-w-0 tw-space-y-2 md:tw-col-span-2">
+                    <Label htmlFor={`resource-link-url-${index}`}>
+                      <Link2 aria-hidden="true" className="tw-mr-1 tw-inline tw-size-4" /> URL for link {index + 1}
+                      {index === 0 && <span aria-hidden="true" className="tw-text-destructive"> *</span>}
+                    </Label>
+                    <Input
+                      id={`resource-link-url-${index}`}
+                      type="url"
+                      value={link.url}
+                      onChange={(event) => updateLink(index, 'url', event.target.value)}
+                      placeholder="https://example.com"
+                      required={index === 0}
+                      className="tw-min-w-0"
+                    />
+                  </div>
+                  <div className="tw-min-w-0 tw-space-y-2">
+                    <Label htmlFor={`resource-link-title-${index}`}>
+                      <Tags aria-hidden="true" className="tw-mr-1 tw-inline tw-size-4" /> Title for link {index + 1}
+                    </Label>
+                    <Input
+                      id={`resource-link-title-${index}`}
+                      value={link.title || ''}
+                      onChange={(event) => updateLink(index, 'title', event.target.value)}
+                      placeholder="Link title"
+                    />
+                  </div>
+                  <div className="tw-flex tw-items-end">
+                    <ProxyToggle
+                      name={`resource-link-proxy-${index}`}
+                      checked={link.use_proxy || false}
+                      onChange={(event) => updateLink(index, 'use_proxy', event.target.checked)}
+                      label={`Use proxy for link ${index + 1}`}
+                    />
+                  </div>
+                  <div className="tw-min-w-0 tw-space-y-2 md:tw-col-span-2">
+                    <Label htmlFor={`resource-link-description-${index}`}>
+                      <FileText aria-hidden="true" className="tw-mr-1 tw-inline tw-size-4" /> Description for link {index + 1}
+                    </Label>
+                    <Textarea
+                      id={`resource-link-description-${index}`}
+                      rows={2}
+                      value={link.description || ''}
+                      onChange={(event) => updateLink(index, 'description', event.target.value)}
+                      placeholder="Link description"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
       {links.length > 0 && (
-        <div className="text-center mt-3">
-          <Button
-            color="light"
-            outline
-            className="add-more-button"
-            onClick={addLink}
-          >
-            <FaPlus className="me-1" /> Add Another Link
+        <div className="tw-flex tw-justify-center">
+          <Button type="button" variant="outline" onClick={addLink}>
+            <Plus aria-hidden="true" /> Add another link
           </Button>
         </div>
       )}
@@ -217,22 +123,20 @@ const ResourceLinks = ({
 };
 
 ResourceLinks.propTypes = {
-  links: PropTypes.arrayOf(
-    PropTypes.shape({
-      url: PropTypes.string.isRequired,
-      title: PropTypes.string,
-      description: PropTypes.string,
-      use_proxy: PropTypes.bool,
-      start_visibility: PropTypes.string,
-      end_visibility: PropTypes.string,
-      use_link_visibility: PropTypes.bool
-    })
-  ).isRequired,
+  links: PropTypes.arrayOf(PropTypes.shape({
+    url: PropTypes.string.isRequired,
+    title: PropTypes.string,
+    description: PropTypes.string,
+    use_proxy: PropTypes.bool,
+    start_visibility: PropTypes.string,
+    end_visibility: PropTypes.string,
+    use_link_visibility: PropTypes.bool,
+  })).isRequired,
   setLinks: PropTypes.func.isRequired,
   resourceVisibilityDates: PropTypes.shape({
     startDate: PropTypes.string,
-    endDate: PropTypes.string
-  })
+    endDate: PropTypes.string,
+  }),
 };
 
 export default ResourceLinks;
