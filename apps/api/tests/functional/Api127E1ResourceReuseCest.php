@@ -21,6 +21,9 @@ class Api127E1ResourceReuseCest extends BaseFunctionalCest
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->courseIds = [];
+        $this->offeringIds = [];
+        $this->resourceIds = [];
         $this->db = \Yii::$app->db;
         $this->loadProductionRouter();
         $this->sourceOfferingId = $this->createOffering('source');
@@ -80,7 +83,9 @@ class Api127E1ResourceReuseCest extends BaseFunctionalCest
 
         $this->request($I, 'POST', $path, $payload, $this->staffToken);
         Assert::assertSame(409, $this->status, 'An existing association must be rejected.');
-        Assert::assertSame('Already on this course', $I->grabJsonResponse()['message']);
+        $duplicate = $I->grabJsonResponse();
+        Assert::assertSame('Already on this course', $duplicate['message']);
+        Assert::assertNotEmpty($duplicate['reference']);
 
         $defaultPayload = [
             'offering_id' => $this->targetOfferingId,
@@ -144,6 +149,8 @@ class Api127E1ResourceReuseCest extends BaseFunctionalCest
             Assert::assertSame($case[1], $this->status);
             if ($case[1] === 422) {
                 Assert::assertNotEmpty($I->grabJsonResponse()['errors']);
+            } elseif ($case[1] === 404) {
+                Assert::assertNotEmpty($I->grabJsonResponse()['reference']);
             }
         }
 
@@ -171,6 +178,89 @@ class Api127E1ResourceReuseCest extends BaseFunctionalCest
             [':offering_id' => $this->targetOfferingId]
         )->queryScalar(), 'Rejected requests must not insert associations.');
         $this->assertSaveFailureIsNotReportedAsSuccess($I, $path);
+    }
+
+    public function validationFailureHasFeedbackEnvelope(FunctionalTester $I)
+    {
+        $this->request($I, 'POST', 'offering-link/link-existing-resources', [
+            'offering_id' => $this->targetOfferingId,
+            'resource_id' => $this->resourceIds[0],
+            'settings' => ['unexpected' => 'value'],
+        ], $this->staffToken);
+
+        Assert::assertSame(422, $this->status);
+        $body = $I->grabJsonResponse();
+        $keys = array_keys($body);
+        sort($keys);
+        Assert::assertSame(['errors', 'message', 'reference'], $keys);
+        Assert::assertNotEmpty($body['message']);
+        Assert::assertNotEmpty($body['reference']);
+        Assert::assertNotEmpty($body['errors']['settings']);
+        Assert::assertIsArray($body['errors']['settings']);
+    }
+
+    public function duplicateRaceReturnsConflictAfterRollback(FunctionalTester $I)
+    {
+        $payload = [
+            'offering_id' => $this->targetOfferingId,
+            'resource_id' => $this->resourceIds[0],
+        ];
+        $handler = function () use ($payload) {
+            $this->db->createCommand()->insert('course_resources', $payload)->execute();
+        };
+        Event::on(\app\models\CourseResources::class, ActiveRecord::EVENT_BEFORE_INSERT, $handler);
+        try {
+            $this->request($I, 'POST', 'offering-link/link-existing-resources', $payload, $this->staffToken);
+        } finally {
+            Event::off(\app\models\CourseResources::class, ActiveRecord::EVENT_BEFORE_INSERT, $handler);
+        }
+
+        Assert::assertSame(409, $this->status);
+        $body = $I->grabJsonResponse();
+        $keys = array_keys($body);
+        sort($keys);
+        Assert::assertSame(['message', 'reference'], $keys);
+        Assert::assertSame('Already on this course', $body['message']);
+        Assert::assertNotEmpty($body['reference']);
+        Assert::assertSame(0, (int)$this->db->createCommand(
+            'SELECT COUNT(*) FROM course_resources WHERE offering_id = :offering_id AND resource_id = :resource_id',
+            [':offering_id' => $payload['offering_id'], ':resource_id' => $payload['resource_id']]
+        )->queryScalar(), 'The failed transaction must roll back the association.');
+    }
+
+    public function foreignKeyFailureReturnsSafeLoggedReference(FunctionalTester $I)
+    {
+        $originalLogger = \Yii::getLogger();
+        $logger = new \yii\log\Logger();
+        $logger->flushInterval = 0;
+        \Yii::setLogger($logger);
+        $handler = function ($event) {
+            $event->sender->resource_id = 2147483647;
+        };
+        Event::on(\app\models\CourseResources::class, ActiveRecord::EVENT_BEFORE_INSERT, $handler);
+        try {
+            $this->request($I, 'POST', 'offering-link/link-existing-resources', [
+                'offering_id' => $this->targetOfferingId,
+                'resource_id' => $this->resourceIds[0],
+            ], $this->staffToken);
+            $body = $I->grabJsonResponse();
+            $messages = $logger->messages;
+        } finally {
+            Event::off(\app\models\CourseResources::class, ActiveRecord::EVENT_BEFORE_INSERT, $handler);
+            \Yii::setLogger($originalLogger);
+        }
+
+        Assert::assertSame(500, $this->status);
+        $keys = array_keys($body);
+        sort($keys);
+        Assert::assertSame(['message', 'reference'], $keys);
+        Assert::assertSame('Unable to reuse this resource. Contact library staff.', $body['message']);
+        Assert::assertNotEmpty($body['reference']);
+        Assert::assertStringNotContainsString('FOREIGN KEY', json_encode($body));
+        $matchingLogs = array_filter($messages, function ($message) use ($body) {
+            return strpos($message[0], $body['reference']) !== false;
+        });
+        Assert::assertNotEmpty($matchingLogs, 'The response reference must match a backend log entry.');
     }
 
     private function assertSaveFailureIsNotReportedAsSuccess(FunctionalTester $I, $path)

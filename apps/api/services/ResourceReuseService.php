@@ -6,7 +6,7 @@ use app\models\CourseOfferings;
 use app\models\CourseResources;
 use app\models\Resources;
 use Yii;
-use yii\web\ConflictHttpException;
+use yii\db\IntegrityException;
 use yii\web\NotFoundHttpException;
 use yii\web\ServerErrorHttpException;
 
@@ -55,7 +55,7 @@ class ResourceReuseService
             }
         }
         if ($errors) {
-            return ['status' => 422, 'body' => ['errors' => $errors]];
+            return $this->errorResult(422, 'Please correct the highlighted fields.', $errors);
         }
 
         if (!CourseOfferings::findOne($offeringId)) {
@@ -81,26 +81,36 @@ class ResourceReuseService
             'offering_id' => $offeringId,
             'resource_id' => $resourceId,
         ])->exists()) {
-            throw new ConflictHttpException('Already on this course');
+            return $this->errorResult(409, 'Already on this course');
         }
 
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
+        return Transactional::run(function ($transaction) use ($model) {
             if (!$model->save()) {
                 if ($model->hasErrors()) {
                     $transaction->rollBack();
-                    return ['status' => 422, 'body' => ['errors' => $model->errors]];
+                    return $this->errorResult(422, 'Please correct the highlighted fields.', $model->errors);
                 }
                 throw new ServerErrorHttpException('Failed to save resource association.');
             }
-            $transaction->commit();
             return ['status' => 201, 'body' => $model];
-        } catch (\Throwable $error) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
+        }, function (IntegrityException $exception) {
+            if (PublicationDestinationDuplicateKey::name($exception, ['course_id']) !== null) {
+                return $this->errorResult(409, 'Already on this course');
             }
-            throw $error;
+            throw $exception;
+        });
+    }
+
+    private function errorResult($status, $message, array $errors = null)
+    {
+        $body = [
+            'message' => $message,
+            'reference' => Yii::$app->security->generateRandomString(12),
+        ];
+        if ($errors !== null) {
+            $body['errors'] = $errors;
         }
+        return ['status' => $status, 'body' => $body];
     }
 
     private function positiveId($value)

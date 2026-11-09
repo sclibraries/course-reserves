@@ -202,9 +202,28 @@ class OfferingLinkController extends ActiveController
 
     public function actionReuseExistingResources()
     {
-        $result = (new ResourceReuseService())->create(Yii::$app->request->post());
-        Yii::$app->response->setStatusCode($result['status']);
-        return $result['body'];
+        try {
+            $result = Yii::$container->get(ResourceReuseService::class)->create(Yii::$app->request->post());
+            Yii::$app->response->setStatusCode($result['status']);
+            return $result['body'];
+        } catch (NotFoundHttpException $exception) {
+            return $this->resourceReuseFailure(404, $exception->getMessage(), $exception);
+        } catch (\Throwable $exception) {
+            return $this->resourceReuseFailure(
+                500,
+                'Unable to reuse this resource. Contact library staff.',
+                $exception
+            );
+        }
+    }
+
+    private function resourceReuseFailure($status, $message, \Throwable $exception)
+    {
+        $reference = Yii::$app->security->generateRandomString(12);
+        $detail = str_replace(["\r", "\n"], ' ', $exception->getMessage());
+        Yii::error('Resource reuse failed. reference=' . $reference . ' detail=' . $detail, __METHOD__);
+        Yii::$app->response->setStatusCode($status);
+        return ['message' => $message, 'reference' => $reference];
     }
 
     /**
