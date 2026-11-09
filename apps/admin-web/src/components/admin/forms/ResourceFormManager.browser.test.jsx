@@ -125,10 +125,30 @@ describe('ResourceFormManager in Chromium', () => {
     const lastSectionBounds = lastSection.getBoundingClientRect();
     expect(lastSectionBounds.top).toBeGreaterThanOrEqual(contentBounds.top);
     expect(lastSectionBounds.bottom).toBeLessThanOrEqual(contentBounds.bottom);
+    const footer = actionButtons[0].closest('footer') || actionButtons[0].parentElement;
+    const form = content.querySelector('form');
+    const diagnostic = Object.fromEntries(Object.entries({ dialog, content, footer, form }).map(([name, element]) => {
+      const { top, bottom, height } = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return [name, {
+        className: element.className,
+        rect: { top, bottom, height },
+        style: {
+          display: style.display,
+          height: style.height,
+          maxHeight: style.maxHeight,
+          overflowY: style.overflowY,
+          position: style.position,
+        },
+      }];
+    }));
+    diagnostic.windowInnerHeight = window.innerHeight;
+    diagnostic.documentClientHeight = document.documentElement.clientHeight;
+    const diagnosticMessage = JSON.stringify(diagnostic);
     actionButtons.forEach((button, index) => {
       const bounds = button.getBoundingClientRect();
       expect(bounds.top).toBeGreaterThanOrEqual(0);
-      expect(bounds.bottom).toBeLessThanOrEqual(window.innerHeight);
+      expect(bounds.bottom, diagnosticMessage).toBeLessThanOrEqual(window.innerHeight);
       expect(bounds.top).toBe(actionTops[index]);
     });
 
