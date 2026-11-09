@@ -16,6 +16,13 @@ const mocks = vi.hoisted(() => ({
   onReuse: vi.fn(),
   notifyFromError: vi.fn(),
   notifySuccess: vi.fn(),
+  courseStoreState: {
+    folioCourseData: {
+      offering_id: 'stale-offering',
+      course_id: 'stale-course',
+      courseListingObject: { termObject: { startDate: '2026-01-01', endDate: '2026-05-01' } },
+    },
+  },
 }));
 
 vi.mock('reactstrap', async () => {
@@ -78,13 +85,7 @@ vi.mock('../../../services/admin/hitchcockService', () => ({
   hitchcockService: { searchResources: mocks.searchHitchcock },
 }));
 vi.mock('../../../store/adminCourseStore', () => ({
-  useAdminCourseStore: () => ({
-    folioCourseData: {
-      offering_id: 'stale-offering',
-      course_id: 'stale-course',
-      courseListingObject: { termObject: { startDate: '2026-01-01', endDate: '2026-05-01' } },
-    },
-  }),
+  useAdminCourseStore: () => mocks.courseStoreState,
 }));
 vi.mock('../../../util/proxyUtil', () => ({ adjustProxy: (value) => value, LIBPROXY_PREFIX: '' }));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));

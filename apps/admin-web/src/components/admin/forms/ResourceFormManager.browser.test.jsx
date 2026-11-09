@@ -15,6 +15,17 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
+  courseStoreState: {
+    folioCourseData: {
+      offering_id: 'folio-offering-17',
+      course_id: 'folio-course-17',
+      courseListingObject: {
+        termObject: { startDate: '2026-09-01T00:00:00Z', endDate: '2026-12-20T00:00:00Z' },
+      },
+    },
+    termStart: null,
+    termEnd: null,
+  },
 }));
 
 vi.mock('../../../services/admin/adminCourseService', () => ({
@@ -33,17 +44,7 @@ vi.mock('../../../hooks/useFolderManagement', () => ({
   useFolderManagement: () => ({ folders: [], loading: false, error: null, createFolder: vi.fn() }),
 }));
 vi.mock('../../../store/adminCourseStore', () => ({
-  useAdminCourseStore: () => ({
-    folioCourseData: {
-      offering_id: 'folio-offering-17',
-      course_id: 'folio-course-17',
-      courseListingObject: {
-        termObject: { startDate: '2026-09-01T00:00:00Z', endDate: '2026-12-20T00:00:00Z' },
-      },
-    },
-    termStart: null,
-    termEnd: null,
-  }),
+  useAdminCourseStore: () => mocks.courseStoreState,
 }));
 vi.mock('../../../services/notify', () => ({
   notify: { success: mocks.notifySuccess, fromError: mocks.notifyFromError },
