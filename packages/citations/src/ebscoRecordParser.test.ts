@@ -35,13 +35,18 @@ const record: EBSCORecord = {
       Identifiers: [
         { Type: 'DOI', Value: '10.1000/synthetic' },
         { Type: 'ISBN', Value: '9780000000001' },
+        { Type: 'ISBN-13', Value: '9780000000002' },
       ],
+      PhysicalDescription: { StartPage: '10', Pagination: '5' },
     },
     BibRelationships: {
       HasContributorRelationships: [{ NameFull: 'Contributor Name' }],
       IsPartOfRelationships: {
         date: [{ Y: '2024', M: '6', D: '18', Type: 'publication' }],
-        Identifiers: [{ Type: 'ISSN', Value: '1234-5678' }],
+        Identifiers: [
+          { Type: 'ISSN', Value: '1234-5678' },
+          { Type: 'ISBN', Value: '9780000000003' },
+        ],
         Titles: [{ TitleFull: 'Synthetic Journal', Type: 'journal' }],
         numbering: [
           { Type: 'volume', Value: '12' },
@@ -68,6 +73,7 @@ describe('parseEBSCORecord', () => {
       subjects: ['Synthetic subject'],
       abstract: 'Synthetic abstract',
       isbn: '9780000000001',
+      isbns: ['9780000000001', '9780000000002', '9780000000003'],
       issn: '1234-5678',
       doi: '10.1000/synthetic',
       url: 'https://example.test/full',
@@ -92,9 +98,18 @@ describe('parseEBSCORecord', () => {
       edition: '2nd edition',
       publisher: 'Test Press',
       fileDescription: 'PDF full text',
+      pages: '10-14',
       additionalUrls: ['https://example.test/related'],
       hasFullText: true,
     });
+
+    expect(parseEBSCORecord({
+      ...record,
+      RecordInfo: {
+        ...record.RecordInfo,
+        BibEntity: { ...record.RecordInfo?.BibEntity, PhysicalDescription: { StartPage: '10' } },
+      },
+    }).pages).toBe('10');
   });
 
   it('uses bib title and contributors when CleanData title and authors are absent', () => {

@@ -43,7 +43,10 @@ export interface EBSCORecord {
       Languages?: Array<{ Code: string; Text: string }>;
       Subjects?: Array<{ SubjectFull: string; Type: string }>;
       Identifiers?: Array<{ Type: string; Value: string }>;
-      PhysicalDescription?: unknown;
+      PhysicalDescription?: {
+        Pagination?: string | number;
+        StartPage?: string | number;
+      };
     };
     BibRelationships?: {
       HasContributorRelationships?: Array<{ NameFull: string }>;
@@ -71,6 +74,7 @@ export interface DiscoverySearchResult extends CitationSearchResult {
   subjects?: string[];
   abstract?: string;
   isbn?: string;
+  isbns?: string[];
   issn?: string;
   doi?: string;
   url?: string;
@@ -88,6 +92,7 @@ export interface DiscoverySearchResult extends CitationSearchResult {
   edition?: string;
   publisher?: string;
   fileDescription?: string;
+  pages?: string;
   additionalUrls?: string[];
   fullTextLinks?: EBSCOFullTextLink[];
   hasFullText: boolean;
@@ -102,6 +107,14 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
   const bib = record.RecordInfo?.BibEntity;
   const partOf = record.RecordInfo?.BibRelationships?.IsPartOfRelationships;
   const identifiers = [...(bib?.Identifiers || []), ...(partOf?.Identifiers || [])];
+  const isbns = identifiers.filter((identifier) => identifier.Type.toLowerCase().includes('isbn')).map((identifier) => identifier.Value);
+  const startPage = bib?.PhysicalDescription?.StartPage;
+  const pagination = bib?.PhysicalDescription?.Pagination;
+  const pages = startPage === undefined || startPage === ''
+    ? undefined
+    : pagination !== undefined && pagination !== '' && Number.isFinite(Number(startPage)) && Number.isFinite(Number(pagination))
+      ? `${startPage}-${Number(startPage) + Number(pagination) - 1}`
+      : String(startPage);
   const date = partOf?.date?.[0];
   const links = [...(record.FullTextCustomLinks || []), ...(record.CustomLinks || [])];
   const authors = cleanValues(record.Items?.Au?.[0]?.CleanData);
@@ -125,7 +138,8 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
     publicationInfo,
     subjects: subjectList,
     abstract: abstracts[0],
-    isbn: identifierValue(identifiers, 'isbn'),
+    isbn: isbns[0],
+    isbns,
     issn: identifierValue(identifiers, 'issn'),
     doi: identifierValue(identifiers, 'doi'),
     url,
@@ -144,6 +158,7 @@ export function parseEBSCORecord(record: EBSCORecord): DiscoverySearchResult {
     edition: firstGroupValue(itemGroups, /edition/i),
     publisher: firstGroupValue(itemGroups, /publisher|publishing/i) || firstGroupValue(itemGroups, /^pub$/i),
     fileDescription: findGroup(record.Items?.SrcInfo, /file description/i),
+    pages,
     additionalUrls: typeof relationUrls === 'string' ? [relationUrls] : relationUrls,
     hasFullText: Boolean(record.FullText || record.PDF || record.HTML || links.some((link) => Boolean(link.Url))),
   };
