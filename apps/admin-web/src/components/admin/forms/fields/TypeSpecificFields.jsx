@@ -6,6 +6,7 @@ import { Input } from '../../../ui/input';
 import { Label } from '../../../ui/label';
 import NativeSelect from '../../../ui/native-select';
 import { Textarea } from '../../../ui/textarea';
+import { metadataBoolean } from '../../../../util/metadataBoolean';
 import { FieldMarker } from '../resource-form/FieldMarker';
 
 export const TypeSpecificFields = ({ materialTypeFields = [], metadata = {}, handleFieldChange }) => {
@@ -36,7 +37,7 @@ export const TypeSpecificFields = ({ materialTypeFields = [], metadata = {}, han
             id={name}
             name={name}
             type="checkbox"
-            checked={!!value}
+            checked={metadataBoolean(value)}
             onChange={handleFieldChange}
             required={required}
             className="tw-size-6 tw-rounded tw-border-input tw-accent-primary focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring focus-visible:tw-ring-offset-2"

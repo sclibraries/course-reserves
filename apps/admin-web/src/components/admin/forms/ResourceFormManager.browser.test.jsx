@@ -8,6 +8,7 @@ import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
 import { Toaster } from '../../ui/sonner';
+import { LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
@@ -70,6 +71,20 @@ const mocks = vi.hoisted(() => ({
     { field_name: 'publisher', field_type: 'text', label: 'Publisher' },
   ],
   materialTypeFieldsResult: { data: [] },
+  usageResult: {
+    course_count: 1,
+    offering_count: 1,
+    terms: [],
+    linked_page_count: 0,
+  },
+  detailedUsageResult: {
+    course_count: 2,
+    offering_count: 3,
+    terms: [{ term_id: 7, term_name: 'Fall 2026' }, { term_id: 8, term_name: 'Spring 2027' }],
+    linked_page_count: 3,
+  },
+  createdResourceResult: { resource_id: 'created-17' },
+  savedResourceResult: { resource_id: 'resource-17' },
   courseStoreState: {
     folioCourseData: {
       offering_id: 'folio-offering-17',
@@ -157,25 +172,30 @@ describe('ResourceFormManager in Chromium', () => {
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');
     }));
-    mocks.getMaterialTypes.mockResolvedValue({ data: [] });
-    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    const prefix = LIBPROXY_PREFIX;
     const links = [1, 2, 3].map((number) => ({
-      url: `https://example.test/${'long-path-segment-'.repeat(18)}${number}`,
+      url: `${number === 1 ? prefix : ''}https://example.test/${'long-path-segment-'.repeat(18)}${number}`,
       title: `Synthetic additional link ${number}`,
       description: '',
-      use_proxy: false,
+      use_proxy: number === 1 ? 0 : false,
     }));
-    await renderForm({ links });
+    await renderForm({ link: `${prefix}https://example.test/primary`, use_proxy: 0, links });
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
+    const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
     for (const width of [320, 768, 1280]) {
       await page.viewport(width, 900);
+      expect(getByRole(linkSection, 'textbox', { name: 'Primary URL' }).value).toBe('https://example.test/primary');
+      expect(getByRole(linkSection, 'checkbox', { name: 'Use proxy for this resource' }).checked).toBe(true);
       for (const number of [1, 2, 3]) {
-        expect(getByRole(dialog, 'textbox', { name: `URL for link ${number}` }).value).toBe(links[number - 1].url);
+        const expectedUrl = number === 1 ? links[number - 1].url.slice(prefix.length) : links[number - 1].url;
+        expect(getByRole(linkSection, 'textbox', { name: `URL for link ${number}` }).value).toBe(expectedUrl);
       }
     }
     await expectNoHorizontalOverflow([320, 768, 1280]);
-    await expectNoAxeViolations(document.body);
+    await expectNoAxeViolations(linkSection);
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
@@ -183,10 +203,10 @@ describe('ResourceFormManager in Chromium', () => {
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');
     }));
-    mocks.getMaterialTypes.mockResolvedValue({ data: [] });
-    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
-    mocks.createResource.mockResolvedValue({ resource_id: 'created-17' });
-    mocks.updateResource.mockResolvedValue({ resource_id: 'resource-17' });
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    mocks.createResource.mockResolvedValue(mocks.createdResourceResult);
+    mocks.updateResource.mockResolvedValue(mocks.savedResourceResult);
     const opener = await renderForm();
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
@@ -248,14 +268,9 @@ describe('ResourceFormManager in Chromium', () => {
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');
     }));
-    mocks.getMaterialTypes.mockResolvedValue({ data: [] });
-    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
-    mocks.getUsage.mockResolvedValue({
-      course_count: 2,
-      offering_count: 3,
-      terms: [{ term_id: 7, term_name: 'Fall 2026' }, { term_id: 8, term_name: 'Spring 2027' }],
-      linked_page_count: 3,
-    });
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    mocks.getUsage.mockResolvedValue(mocks.detailedUsageResult);
     const opener = await renderForm({ resource_id: 'resource-17', name: '' }, ResourceFormType.EDIT);
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
@@ -373,16 +388,11 @@ describe('ResourceFormManager in Chromium', () => {
       throw new Error('Unexpected application HTTP request');
     }));
     mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
-    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
-    mocks.getUsage.mockResolvedValue({
-      course_count: 1,
-      offering_count: 1,
-      terms: [],
-      linked_page_count: 0,
-    });
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    mocks.getUsage.mockResolvedValue(mocks.usageResult);
     mocks.searchEDS.mockResolvedValue(mocks.edsSearchResult);
     mocks.mapEdsRecordToResource.mockResolvedValue(mocks.changedEdsRecord);
-    mocks.updateResource.mockResolvedValue({ resource_id: 'resource-17' });
+    mocks.updateResource.mockResolvedValue(mocks.savedResourceResult);
     mocks.updateResource.mockClear();
     const opener = await renderForm({
       resource_id: 'resource-17',

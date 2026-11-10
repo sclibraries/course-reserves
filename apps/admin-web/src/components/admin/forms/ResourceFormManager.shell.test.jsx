@@ -7,6 +7,7 @@ import { toHaveNoViolations } from 'vitest-axe/matchers';
 import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByRole, waitFor } from '@testing-library/dom';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
+import { LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 
 expect.extend({ toHaveNoViolations });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -27,6 +28,10 @@ const mocks = vi.hoisted(() => ({
   },
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
+  proxyFieldsResult: { data: [
+    { field_name: 'peer_reviewed', field_type: 'checkbox', label: 'Peer reviewed' },
+    { field_name: 'open_access', field_type: 'checkbox', label: 'Open access' },
+  ] },
   courseStoreState: {
     folioCourseData: {
       offering_id: 'folio-offering-17',
@@ -123,6 +128,61 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager dialog shell', () => {
+  it('saves checkbox metadata and preserves proxy URLs per link', async () => {
+    const prefix = LIBPROXY_PREFIX;
+    const links = [
+      { url: `${prefix}https://example.test/untouched`, title: 'Untouched', use_proxy: 0 },
+      { url: `${prefix}https://example.test/original`, title: 'Edited', use_proxy: 0 },
+      { url: `${prefix}https://example.test/disabled`, title: 'Disabled', use_proxy: 1 },
+      { url: 'https://proxy.example.test/item', title: 'Proxy host', use_proxy: 0 },
+    ];
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.proxyFieldsResult);
+
+    await renderForm({
+      formType: ResourceFormType.EDIT,
+      initialData: {
+        resource_id: 'resource-17',
+        name: 'Synthetic resource',
+        item_url: `${prefix}https://example.test/primary`,
+        use_proxy: 0,
+        material_type_id: '9',
+        metadata: [
+          { field_name: 'peer_reviewed', field_value: 'No' },
+          { field_name: 'open_access', field_value: 'Yes' },
+        ],
+        links,
+      },
+    });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
+    expect(getByRole(linkSection, 'textbox', { name: 'Primary URL' }).value).toBe('https://example.test/primary');
+    expect(getByRole(linkSection, 'checkbox', { name: 'Use proxy for this resource' }).checked).toBe(true);
+    expect(getByRole(linkSection, 'checkbox', { name: 'Use proxy for link 1' }).checked).toBe(true);
+    expect(getByRole(linkSection, 'checkbox', { name: 'Use proxy for link 4' }).checked).toBe(false);
+    expect(getByRole(dialog, 'checkbox', { name: 'Peer reviewed' }).checked).toBe(false);
+    expect(getByRole(dialog, 'checkbox', { name: 'Open access' }).checked).toBe(true);
+    expect(await axe(linkSection)).toHaveNoViolations();
+
+    await act(async () => fireEvent.change(getByRole(linkSection, 'textbox', { name: 'URL for link 2' }), {
+      target: { value: 'https://example.test/edited' },
+    }));
+    await act(async () => fireEvent.click(getByRole(linkSection, 'checkbox', { name: 'Use proxy for link 3' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'checkbox', { name: 'Peer reviewed' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'checkbox', { name: 'Open access' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    const payload = mocks.updateResource.mock.calls[0][1];
+    expect(payload.metadata).toMatchObject({ peer_reviewed: 'Yes', open_access: 'No' });
+    expect(payload.link).toBe(`${prefix}https://example.test/primary`);
+    expect(payload.links.map(({ url }) => url)).toEqual([
+      links[0].url,
+      `${prefix}https://example.test/edited`,
+      'https://example.test/disabled',
+      links[3].url,
+    ]);
+  });
+
   it('keeps ebook metadata and Description when the fields endpoint has no definitions', async () => {
     const record = {
       pubType: 'Ebook',

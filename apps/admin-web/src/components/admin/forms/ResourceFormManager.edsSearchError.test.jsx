@@ -87,7 +87,12 @@ vi.mock('../../../services/admin/hitchcockService', () => ({
 vi.mock('../../../store/adminCourseStore', () => ({
   useAdminCourseStore: () => mocks.courseStoreState,
 }));
-vi.mock('../../../util/proxyUtil', () => ({ adjustProxy: (value) => value, LIBPROXY_PREFIX: '' }));
+vi.mock('../../../util/proxyUtil', () => ({
+  LIBPROXY_PREFIX: '',
+  normalizeProxyFlag: (value) => (value === true || value === 1 || value === '1' ? true : false),
+  getProxyState: (rawUrl, savedFlag) => ({ rawUrl, url: rawUrl, useProxy: Boolean(savedFlag) }),
+  buildProxyUrl: ({ url }) => url,
+}));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));
 vi.mock('./resource-form/ResourceForm', () => ({
   default: ({ initialData, onSubmit, mode }) => <>

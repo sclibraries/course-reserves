@@ -8,6 +8,7 @@ import { useResourceFormValidation } from '../../../../hooks/admin/useResourceFo
 import { useResourceUsage } from '../../../../hooks/admin/useResourceUsage';
 import { useEdsProvenance } from '../../../../hooks/admin/useEdsProvenance';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
+import { getProxyState } from '../../../../util/proxyUtil';
 import { ErrorSummary } from './ErrorSummary';
 import { FieldMarker } from './FieldMarker';
 import { OtherDetails } from './OtherDetails';
@@ -42,7 +43,15 @@ export const ResourceForm = ({
     if (!changeRecord || handledRecord.current === changeRecord) return;
     handledRecord.current = changeRecord;
     const result = replaceRecord(formData, changeRecord, savedMetadataKeys.current);
-    setFormData(result.data);
+    const proxyState = getProxyState(result.data.link || '', result.data.use_proxy);
+    setFormData({
+      ...result.data,
+      link: proxyState.url,
+      raw_link: proxyState.rawUrl,
+      use_proxy: proxyState.useProxy,
+      original_link: proxyState.url,
+      original_use_proxy: proxyState.useProxy,
+    });
     setKeptFields(result.keptFields);
   }, [changeRecord, formData, replaceRecord, setFormData]);
   const markedMaterialTypes = materialTypes.map((type) => ({
@@ -82,7 +91,9 @@ export const ResourceForm = ({
     const { name, value, type, checked } = event.target;
     if (name === 'title') clearNameError();
     if (type === 'checkbox') {
-      setFormData((current) => ({ ...current, [name]: checked }));
+      setFormData((current) => (name in current
+        ? { ...current, [name]: checked }
+        : { ...current, metadata: { ...current.metadata, [name]: checked ? 'Yes' : 'No' } }));
     } else if (name in formData) {
       const next = { ...formData, [name]: value };
       if (name === 'link' && isHitchcockVideoUrl(value) && !next.use_primary_link_visibility) {

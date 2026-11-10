@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { notify } from '../../services/notify';
 import { adminCourseService } from '../../services/admin/adminCourseService';
 import { adminResourceService } from '../../services/admin/adminResourceService';
-import { adjustProxy, LIBPROXY_PREFIX } from '../../util/proxyUtil';
+import { buildProxyUrl } from '../../util/proxyUtil';
 import { ResourceFormType } from '../../components/admin/forms/constants/formTypes';
 
 export function useResourceFormSubmit({
@@ -18,37 +18,54 @@ export function useResourceFormSubmit({
   return useCallback(async (formData) => {
     try {
       setLoading(true);
-      adjustProxy(formData);
-
-      if (formData.links && formData.links.length > 0) {
-        formData.links = formData.links.map((link) => {
-          if (link.use_proxy) {
+      const { raw_link, original_link, original_use_proxy, links, ...resourceData } = formData;
+      const payload = {
+        ...resourceData,
+        link: buildProxyUrl({
+          url: formData.link,
+          use_proxy: formData.use_proxy,
+          raw_url: raw_link,
+          original_url: original_link,
+          original_use_proxy,
+        }),
+        ...(links && {
+          links: links.map((link) => {
+            const {
+              raw_url: rawUrl,
+              original_url: originalUrl,
+              original_use_proxy: originalUseProxy,
+              ...data
+            } = link;
             return {
-              ...link,
-              url: link.url.includes('proxy') ? link.url : `${LIBPROXY_PREFIX}${link.url}`,
+              ...data,
+              url: buildProxyUrl({
+                ...data,
+                raw_url: rawUrl,
+                original_url: originalUrl,
+                original_use_proxy: originalUseProxy,
+              }),
             };
-          }
-          return link;
-        });
-      }
+          }),
+        }),
+      };
 
       let result;
       if (formType === ResourceFormType.EDIT) {
-        const { resource_id, ...updateData } = formData;
-        result = await onUpdate?.(formData)
+        const { resource_id, ...updateData } = payload;
+        result = await onUpdate?.(payload)
           || await adminResourceService.updateResource(resource_id, updateData);
       } else {
         result = await adminCourseService.createResource(
           course.offering_id,
           course.course_id,
-          formData,
+          payload,
           folioCourseData,
         );
       }
 
       if (result !== false) {
         notify.success(formType === ResourceFormType.EDIT ? 'Resource updated' : 'Resource added');
-        onSubmit?.(formData);
+        onSubmit?.(payload);
         onClose();
       }
 
