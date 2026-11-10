@@ -12,7 +12,7 @@ const materialTypes = [
 const initialData = {
   title: 'Synthetic EDS title',
   link: 'https://example.test/record/17',
-  material_type: '1',
+  material_type_id: '1',
   metadata: {
     book_title: 'Synthetic EDS title',
     author_editor: 'Synthetic EDS author',
@@ -116,8 +116,8 @@ describe('useEdsProvenance', () => {
     const nextRecord = {
       title: 'New EDS title',
       link: 'https://example.test/new',
-      material_type: '2',
-      description: 'New EDS abstract',
+      material_type_id: '2',
+      notes: 'New EDS abstract',
       metadata: { accession_number: 'SYNTH-NEW-17' },
     };
 
@@ -146,7 +146,7 @@ describe('useEdsProvenance', () => {
       initialData: {
         title: 'Synthetic EDS title',
         link: 'https://example.test/record/17',
-        material_type: '1',
+        material_type_id: '1',
         metadata: { book_title: 'Synthetic EDS title' },
       },
       sourceType: 'eds',
@@ -163,7 +163,7 @@ describe('useEdsProvenance', () => {
       }, {
         title: 'Replacement EDS title',
         link: 'https://example.test/record/18',
-        material_type: '1',
+        material_type_id: '1',
         metadata: { book_title: 'Replacement EDS title' },
       });
     });
@@ -187,7 +187,7 @@ describe('useEdsProvenance', () => {
       result = hook.current.replaceRecord(currentData, {
         title: 'Synthetic replacement title',
         link: 'https://example.test/replacement',
-        material_type: '1',
+        material_type_id: '1',
         metadata: {
           book_title: 'Synthetic replacement title',
           author_editor: 'Synthetic replacement author',

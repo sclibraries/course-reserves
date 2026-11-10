@@ -20,7 +20,7 @@ import WhereSection from './WhereSection';
 import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
 
 export const ResourceForm = ({
-  initialData = {}, onSubmit, formId, course, sourceType, usageResourceId, onChangeRecord, changeRecord,
+  initialData = {}, onSubmit, formId, course, sourceType, usageResourceId, onChangeRecord, changeRecordButtonRef, changeRecord,
 }) => {
   const {
     defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
@@ -178,6 +178,7 @@ export const ResourceForm = ({
           source={provenance.source}
           canChangeRecord={canChangeRecord}
           onChangeRecord={onChangeRecord}
+          changeRecordButtonRef={changeRecordButtonRef}
           keptFields={keptFields}
         />
         {formData.link && isHitchcockVideoUrl(formData.link) && formData.use_primary_link_visibility && (
@@ -257,6 +258,7 @@ ResourceForm.propTypes = {
   sourceType: PropTypes.string.isRequired,
   usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onChangeRecord: PropTypes.func,
+  changeRecordButtonRef: PropTypes.object,
   changeRecord: PropTypes.object,
 };
 

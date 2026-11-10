@@ -73,7 +73,8 @@ export const ResourceFormManager = ({
   const { reset: resetResourceSearch } = resourceSearch;
   const recordChange = useChangeRecord({ formType, resetSearch: resetResourceSearch, setError });
   const resetRecordChange = recordChange.reset;
-  const contentRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const changeRecordButtonRef = useRef(null);
   const wasPickerOpen = useRef(false);
 
   /**
@@ -97,12 +98,12 @@ export const ResourceFormManager = ({
 
   useEffect(() => {
     if (recordChange.isPickerOpen) {
-      contentRef.current?.querySelector(':scope > div:not([hidden]) input')?.focus();
-    } else if (wasPickerOpen.current) {
-      contentRef.current?.querySelector('[aria-label="Change record"]')?.focus();
+      searchInputRef.current?.focus();
+    } else if (isOpen && wasPickerOpen.current) {
+      changeRecordButtonRef.current?.focus();
     }
     wasPickerOpen.current = recordChange.isPickerOpen;
-  }, [recordChange.isPickerOpen]);
+  }, [isOpen, recordChange.isPickerOpen]);
 
   /**
    * Transform resource metadata from array to object format
@@ -248,14 +249,16 @@ export const ResourceFormManager = ({
         sourceType={formType}
         usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
         onChangeRecord={recordChange.openPicker}
+        changeRecordButtonRef={changeRecordButtonRef}
         changeRecord={recordChange.record}
       />
     </>
   );
 
-  const renderSearchPicker = (pickerType) => (
+  const renderSearchPicker = (pickerType, inputRef = null) => (
     <ResourceSearchPicker
       formType={pickerType}
+      searchInputRef={inputRef}
       searchTerm={resourceSearch.searchTerm}
       onSearchTermChange={resourceSearch.setSearchTerm}
       onSearch={resourceSearch.search}
@@ -274,20 +277,22 @@ export const ResourceFormManager = ({
    * Render the appropriate form content based on form type
    */
   const renderFormContent = () => {
-    if (recordChange.isPickerOpen && showResourceForm) {
+    if (showResourceForm) {
       return (
         <>
-          <div hidden>{renderResourceForm()}</div>
-          <Button type="button" variant="outline" className="tw-mb-3" onClick={recordChange.closePicker}>
-            <ArrowLeft aria-hidden="true" />
-            Back to form
-          </Button>
-          {renderSearchPicker(ResourceFormType.EDS)}
+          <div hidden={recordChange.isPickerOpen}>{renderResourceForm()}</div>
+          {recordChange.isPickerOpen && (
+            <>
+              <Button type="button" variant="outline" className="tw-mb-3" onClick={recordChange.closePicker}>
+                <ArrowLeft aria-hidden="true" />
+                Back to form
+              </Button>
+              {renderSearchPicker(ResourceFormType.EDS, searchInputRef)}
+            </>
+          )}
         </>
       );
     }
-
-    if (showResourceForm) return renderResourceForm();
 
     switch (formType) {
       case ResourceFormType.REUSE:
@@ -340,7 +345,7 @@ export const ResourceFormManager = ({
         <DialogHeader className="tw-shrink-0">
           <DialogTitle>{modalTitle}</DialogTitle>
         </DialogHeader>
-        <div ref={contentRef} data-testid="resource-form-content" className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-overscroll-contain">
+        <div data-testid="resource-form-content" className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-overscroll-contain">
           {renderFormContent()}
         </div>
         {showResourceForm && !recordChange.isPickerOpen && (

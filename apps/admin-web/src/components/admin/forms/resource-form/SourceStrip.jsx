@@ -11,7 +11,7 @@ const FIELD_LABELS = {
 const labelForField = (field) => FIELD_LABELS[field]
   || field.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
 
-export const SourceStrip = ({ source, canChangeRecord = false, onChangeRecord, keptFields = [] }) => (
+export const SourceStrip = ({ source, canChangeRecord = false, onChangeRecord, changeRecordButtonRef, keptFields = [] }) => (
   <section
     aria-label="Resource source"
     className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-2 tw-rounded-md tw-border tw-bg-muted tw-px-3 tw-py-2 tw-text-sm"
@@ -31,7 +31,7 @@ export const SourceStrip = ({ source, canChangeRecord = false, onChangeRecord, k
         type="button"
         variant="outline"
         size="sm"
-        aria-label="Change record"
+        ref={changeRecordButtonRef}
         onClick={onChangeRecord}
       >
         Change record
@@ -52,6 +52,7 @@ SourceStrip.propTypes = {
   }).isRequired,
   canChangeRecord: PropTypes.bool,
   onChangeRecord: PropTypes.func,
+  changeRecordButtonRef: PropTypes.object,
   keptFields: PropTypes.arrayOf(PropTypes.string),
 };
 

@@ -20,6 +20,7 @@ export default function ResourceSearchPicker({
   hasMore,
   onLoadMore,
   onSelectRecord,
+  searchInputRef,
   selectionDisabled = false,
 }) {
   const searchId = useId();
@@ -43,6 +44,7 @@ export default function ResourceSearchPicker({
           <Input
             id={searchId}
             className="tw-mt-2"
+            ref={searchInputRef}
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
             disabled={loading}
@@ -101,5 +103,6 @@ ResourceSearchPicker.propTypes = {
   hasMore: PropTypes.bool.isRequired,
   onLoadMore: PropTypes.func.isRequired,
   onSelectRecord: PropTypes.func.isRequired,
+  searchInputRef: PropTypes.object,
   selectionDisabled: PropTypes.bool,
 };

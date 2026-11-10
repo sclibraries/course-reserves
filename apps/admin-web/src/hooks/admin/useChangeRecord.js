@@ -3,6 +3,14 @@ import { ResourceFormType } from '../../components/admin/forms/constants/formTyp
 import { notify } from '../../services/notify';
 import { mapEdsRecordToResource } from '../../util/mapEDSRecordToRespurce';
 
+const formRecord = ({ title, link, material_type: materialTypeId, description, metadata }) => ({
+  title,
+  link,
+  notes: description || '',
+  material_type_id: materialTypeId || '',
+  metadata: { ...(metadata || {}) },
+});
+
 export function useChangeRecord({ formType, resetSearch, setError }) {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -27,12 +35,12 @@ export function useChangeRecord({ formType, resetSearch, setError }) {
       if (formType === ResourceFormType.EDS || changing) {
         const mapped = await mapEdsRecordToResource(selected);
         if (changing) {
-          setRecord({ ...mapped, metadata: { ...mapped.metadata } });
+          setRecord(formRecord(mapped));
           setPickerOpen(false);
           notify.success('Resource details replaced from EDS');
           return;
         }
-        setSelectedRecord({ ...selected, parsedData: mapped });
+        setSelectedRecord({ ...selected, parsedData: formRecord(mapped) });
       } else {
         setSelectedRecord(selected);
       }
