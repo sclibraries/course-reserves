@@ -9,6 +9,22 @@ const bookMapping = {
   location: 'location',
 };
 
+export const OTHER_DETAILS = {
+  authors: 'author',
+  isbns: 'isbn',
+  issn: 'issn',
+  doi: 'doi',
+  publicationDate: 'publication_date',
+  journalTitle: 'journal_title',
+  volumeNumber: 'volume',
+  issueNumber: 'issue',
+  pages: 'pages',
+  publisher: 'publisher',
+  callNumber: 'call_number',
+  location: 'location',
+  database: 'database',
+};
+
 export const EDS_TO_DB_FIELD_MAPPING = {
   book: bookMapping,
   ebook: bookMapping,

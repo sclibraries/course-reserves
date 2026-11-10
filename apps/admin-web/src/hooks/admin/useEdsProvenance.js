@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { EDS_TO_DB_FIELD_MAPPING } from '../../constants/edsFieldMapping';
-import { OTHER_DETAILS } from '../../util/mapEDSRecordToRespurce';
+import { EDS_TO_DB_FIELD_MAPPING, OTHER_DETAILS } from '../../constants/edsFieldMapping';
 
 const owns = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const EMPTY_METADATA = Object.freeze({});

@@ -1,5 +1,5 @@
 import { parseEBSCORecord } from '@course-reserves/citations';
-import { EDS_TO_DB_FIELD_MAPPING } from '../constants/edsFieldMapping';
+import { EDS_TO_DB_FIELD_MAPPING, OTHER_DETAILS } from '../constants/edsFieldMapping';
 import { adminMaterialTypeService } from '../services/admin/adminMaterialTypeService';
 import { getEdsMaterialType } from './edsMaterialType';
 import { metadataBoolean } from './metadataBoolean';
@@ -38,22 +38,6 @@ const hasValue = (value) => value !== undefined && value !== null && value !== '
 const asText = (value) => Array.isArray(value)
   ? value.map(decodeHtmlEntities).filter(Boolean).join('; ')
   : decodeHtmlEntities(value);
-
-export const OTHER_DETAILS = {
-  authors: 'author',
-  isbns: 'isbn',
-  issn: 'issn',
-  doi: 'doi',
-  publicationDate: 'publication_date',
-  journalTitle: 'journal_title',
-  volumeNumber: 'volume',
-  issueNumber: 'issue',
-  pages: 'pages',
-  publisher: 'publisher',
-  callNumber: 'call_number',
-  location: 'location',
-  database: 'database',
-};
 
 export const mapEdsRecordToResource = async (record) => {
   try {
