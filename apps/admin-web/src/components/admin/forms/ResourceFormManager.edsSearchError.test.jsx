@@ -226,6 +226,33 @@ describe('ResourceFormManager EDS search failures', () => {
     expect(mocks.searchEDS).toHaveBeenCalledTimes(1);
   });
 
+  it('reports an EDS mapping failure through the shared error feedback', async () => {
+    const error = Object.assign(new Error('Synthetic mapper failure'), { reference: 'SYNTH-EDS-9' });
+    mocks.searchEDS.mockResolvedValueOnce({
+      status: 'success',
+      code: 200,
+      data: {
+        records: [{ An: 'SYNTH-AN-9', Items: { Ti: [{ CleanData: 'Synthetic EDS title' }] } }],
+        statistics: { TotalHits: 1 },
+        request: { QueryString: 'synthetic' },
+      },
+    });
+    mocks.mapEdsRecordToResource.mockRejectedValueOnce(error);
+
+    await act(async () => root.render(createElement(ResourceFormManager, {
+      isOpen: true,
+      onClose: vi.fn(),
+      formType: ResourceFormType.EDS,
+    })));
+    const input = getByRole(document.body, 'textbox', { name: 'Search EDS' });
+    await act(async () => fireEvent.change(input, { target: { value: 'synthetic' } }));
+    await act(async () => fireEvent.click(getByRole(document.body, 'button', { name: 'Search' })));
+    await act(async () => fireEvent.click(getByRole(document.body, 'button', { name: 'Edit & Add' })));
+
+    expect(mocks.notifyFromError).toHaveBeenCalledExactlyOnceWith(error, "Couldn't fill the resource from EDS");
+    expect(mocks.notifySuccess).not.toHaveBeenCalled();
+  });
+
   it('forwards no-course mode even when course data is stale in the store', async () => {
     await act(async () => root.render(createElement(ResourceFormManager, {
       isOpen: true,

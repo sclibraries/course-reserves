@@ -13,6 +13,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
+  searchEDS: vi.fn(),
   updateResource: vi.fn(),
   getUsage: vi.fn(),
   getMaterialTypes: vi.fn(),
@@ -40,7 +41,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/admin/adminCourseService', () => ({
-  adminCourseService: { createResource: mocks.createResource },
+  adminCourseService: { createResource: mocks.createResource, searchEDS: mocks.searchEDS },
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
   adminResourceService: { getUsage: mocks.getUsage, updateResource: mocks.updateResource },
@@ -122,6 +123,56 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager dialog shell', () => {
+  it('keeps ebook metadata and Description when the fields endpoint has no definitions', async () => {
+    const record = {
+      pubType: 'Ebook',
+      DbId: 'SYNTH-DB-9',
+      DbLabel: 'Synthetic ebook database',
+      An: 'SYNTH-AN-9',
+      PLink: 'https://example.test/ebook',
+      Items: {
+        Ti: [{ Label: 'Title', Group: 'Ti', Data: 'Synthetic ebook title', CleanData: ['Synthetic ebook title'] }],
+        Au: [{ Label: 'Author', Group: 'Au', Data: 'Author', CleanData: ['Synthetic ebook author'] }],
+        Ab: [{ Label: 'Abstract', Group: 'Ab', Data: 'Abstract', CleanData: ['Description from EDS'] }],
+      },
+      RecordInfo: {
+        BibEntity: { Identifiers: [{ Type: 'ISBN-13', Value: '9780000000009' }] },
+      },
+    };
+    mocks.searchEDS.mockResolvedValueOnce({
+      status: 'success',
+      code: 200,
+      data: { records: [record], statistics: { TotalHits: 1 }, request: { QueryString: 'ebook' } },
+    });
+    mocks.getMaterialTypes.mockResolvedValue({ data: [{ material_type_id: '9', name: 'ebook' }] });
+    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+
+    await renderForm({ formType: ResourceFormType.EDS });
+    const dialog = getByRole(document.body, 'dialog', { name: 'Add from EDS' });
+    await act(async () => fireEvent.change(getByRole(dialog, 'textbox', { name: 'Search EDS' }), {
+      target: { value: 'ebook' },
+    }));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Edit & Add' })));
+
+    await waitFor(() => expect(getByRole(dialog, 'textbox', { name: 'Description' }).value).toBe('Description from EDS'));
+    expect(getByRole(dialog, 'textbox', { name: 'Resource Name' }).value).toBe('Synthetic ebook title');
+    expect(mocks.getMaterialTypeFields).toHaveBeenCalledExactlyOnceWith(9);
+    expect(dialog.textContent).not.toContain('Failed to load material type fields');
+    expect(mocks.notifyFromError).not.toHaveBeenCalled();
+    expect(mocks.notifySuccess).toHaveBeenCalledExactlyOnceWith('Resource details filled from EDS');
+
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    const saved = mocks.createResource.mock.calls[0][2];
+    expect(saved.metadata).toMatchObject({
+      book_title: 'Synthetic ebook title',
+      author_editor: 'Synthetic ebook author',
+      isbn: '9780000000009',
+      is_ebook: true,
+    });
+  });
+
   it('creates a resource with the existing payload and exposes one accessible title, Save, Cancel, and an axe-clean form', async () => {
     await renderForm({ formType: ResourceFormType.NEW });
 

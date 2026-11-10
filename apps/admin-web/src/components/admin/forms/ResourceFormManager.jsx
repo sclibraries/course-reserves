@@ -133,9 +133,11 @@ export const ResourceFormManager = ({
       }
       
       setShowEditForm(true);
+      if (formType === ResourceFormType.EDS) notify.success('Resource details filled from EDS');
     } catch (err) {
       console.error('Error selecting record:', err);
       setError('Failed to process selected record');
+      if (formType === ResourceFormType.EDS) notify.fromError(err, "Couldn't fill the resource from EDS");
     }
   };
 

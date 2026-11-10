@@ -14,6 +14,7 @@ export const adminMaterialTypeService = {
     const response = await authFetch(
       `${config.api.urls.courseReserves}${config.api.endpoints.courseReserves.materialTypes.fields}?material_type_id=${encodeURIComponent(materialTypeId)}`
     );
+    if (response.status === 404) return { status: 'success', data: [] };
     if (!response.ok) throw new Error("Failed to fetch material type fields");
     return response.json();
   },

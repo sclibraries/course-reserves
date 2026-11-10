@@ -52,6 +52,15 @@ describe('adminMaterialTypeService', () => {
     );
   });
 
+  it('treats missing material type fields as an empty definition list', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 404 });
+
+    await expect(adminMaterialTypeService.getMaterialTypeFields(9)).resolves.toEqual({
+      status: 'success',
+      data: [],
+    });
+  });
+
   it('encodes material type IDs in the exact authenticated request URL', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue([]) });
 
