@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
@@ -16,9 +16,9 @@ import ResourceSearchPicker from './search/ResourceSearchPicker';
 
 // Services
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
-import { mapEdsRecordToResource } from '../../../util/mapEDSRecordToRespurce';
 import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
 import { useResourceFormSubmit } from '../../../hooks/admin/useResourceFormSubmit';
+import { useChangeRecord } from '../../../hooks/admin/useChangeRecord';
 
 const RESOURCE_FORM_TITLES = {
   [ResourceFormType.NEW]: 'Add resource',
@@ -67,11 +67,14 @@ export const ResourceFormManager = ({
   // Common state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const resourceSearch = useResourceSearch(formType);
+  const resourceSearch = useResourceSearch(
+    formType === ResourceFormType.EDIT ? ResourceFormType.EDS : formType,
+  );
   const { reset: resetResourceSearch } = resourceSearch;
-
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [showEditForm, setShowEditForm] = useState(false);
+  const recordChange = useChangeRecord({ formType, resetSearch: resetResourceSearch, setError });
+  const resetRecordChange = recordChange.reset;
+  const contentRef = useRef(null);
+  const wasPickerOpen = useRef(false);
 
   /**
    * Reset all state when modal closes or form type changes
@@ -80,9 +83,8 @@ export const ResourceFormManager = ({
     setLoading(false);
     setError(null);
     resetResourceSearch();
-    setSelectedRecord(null);
-    setShowEditForm(false);
-  }, [resetResourceSearch]);
+    resetRecordChange();
+  }, [resetRecordChange, resetResourceSearch]);
 
   /**
    * Effect to reset state when modal opens/closes or form type changes
@@ -92,6 +94,15 @@ export const ResourceFormManager = ({
       resetState();
     }
   }, [isOpen, formType, resetState]);
+
+  useEffect(() => {
+    if (recordChange.isPickerOpen) {
+      contentRef.current?.querySelector(':scope > div:not([hidden]) input')?.focus();
+    } else if (wasPickerOpen.current) {
+      contentRef.current?.querySelector('[aria-label="Change record"]')?.focus();
+    }
+    wasPickerOpen.current = recordChange.isPickerOpen;
+  }, [recordChange.isPickerOpen]);
 
   /**
    * Transform resource metadata from array to object format
@@ -110,28 +121,6 @@ export const ResourceFormManager = ({
       }
       return acc;
     }, {});
-  };
-
-  /**
-   * Handle record selection (EDS, Hitchcock)
-   */
-  const handleSelectRecord = async (record) => {
-    try {
-      setSelectedRecord(record);
-      
-      if (formType === ResourceFormType.EDS) {
-        // Use the same mapping utility as AdminEDSForm
-        const mapped = await mapEdsRecordToResource(record);
-        setSelectedRecord({ ...record, parsedData: mapped });
-      }
-      
-      setShowEditForm(true);
-      if (formType === ResourceFormType.EDS) notify.success('Resource details filled from EDS');
-    } catch (err) {
-      console.error('Error selecting record:', err);
-      setError('Failed to process selected record');
-      if (formType === ResourceFormType.EDS) notify.fromError(err, "Couldn't fill the resource from EDS");
-    }
   };
 
   const handleReuseResource = async (resourceId) => {
@@ -209,19 +198,19 @@ export const ResourceFormManager = ({
       };
     }
 
-    if (selectedRecord) {
+    if (recordChange.selectedRecord) {
       const baseData = {
-        title: selectedRecord.title || '',
-        link: selectedRecord.link || selectedRecord.item_url || '',
-        notes: selectedRecord.notes || selectedRecord.description || '',
+        title: recordChange.selectedRecord.title || '',
+        link: recordChange.selectedRecord.link || recordChange.selectedRecord.item_url || '',
+        notes: recordChange.selectedRecord.notes || recordChange.selectedRecord.description || '',
       };
 
       // Add form-specific transformations
-      if (formType === ResourceFormType.EDS && selectedRecord.parsedData) {
+      if (formType === ResourceFormType.EDS && recordChange.selectedRecord.parsedData) {
         return {
           ...baseData,
-          ...selectedRecord.parsedData,
-          metadata: selectedRecord.parsedData?.metadata || {}
+          ...recordChange.selectedRecord.parsedData,
+          metadata: recordChange.selectedRecord.parsedData?.metadata || {}
         };
       }
 
@@ -239,36 +228,66 @@ export const ResourceFormManager = ({
     return defaultData;
   };
 
+  const showResourceForm = [ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType)
+    || recordChange.showEditForm;
+
+  const renderResourceForm = () => (
+    <>
+      {recordChange.showEditForm && (
+        <Button type="button" variant="outline" className="tw-mb-3" onClick={() => recordChange.setShowEditForm(false)}>
+          <ArrowLeft aria-hidden="true" />
+          Back to results
+        </Button>
+      )}
+      <ResourceForm
+        formId="resource-form"
+        course={folioCourseData}
+        mode={mode}
+        initialData={getFormInitialData()}
+        onSubmit={handleBaseFormSubmit}
+        sourceType={formType}
+        usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
+        onChangeRecord={recordChange.openPicker}
+        changeRecord={recordChange.record}
+      />
+    </>
+  );
+
+  const renderSearchPicker = (pickerType) => (
+    <ResourceSearchPicker
+      formType={pickerType}
+      searchTerm={resourceSearch.searchTerm}
+      onSearchTermChange={resourceSearch.setSearchTerm}
+      onSearch={resourceSearch.search}
+      searchResults={resourceSearch.searchResults}
+      hasSearched={resourceSearch.hasSearched}
+      loading={resourceSearch.loading}
+      totalHits={resourceSearch.totalHits}
+      searchTime={resourceSearch.searchTime}
+      hasMore={resourceSearch.hasMore}
+      onLoadMore={resourceSearch.loadMore}
+      onSelectRecord={recordChange.handleSelectRecord}
+    />
+  );
+
   /**
    * Render the appropriate form content based on form type
    */
   const renderFormContent = () => {
-    if ([ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType) || showEditForm) {
+    if (recordChange.isPickerOpen && showResourceForm) {
       return (
         <>
-          {showEditForm && (
-            <Button
-              type="button"
-              variant="outline"
-              className="tw-mb-3"
-              onClick={() => setShowEditForm(false)}
-            >
-              <ArrowLeft aria-hidden="true" />
-              Back to results
-            </Button>
-          )}
-          <ResourceForm
-            formId="resource-form"
-            course={folioCourseData}
-            mode={mode}
-            initialData={getFormInitialData()}
-            onSubmit={handleBaseFormSubmit}
-            sourceType={formType}
-            usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
-          />
+          <div hidden>{renderResourceForm()}</div>
+          <Button type="button" variant="outline" className="tw-mb-3" onClick={recordChange.closePicker}>
+            <ArrowLeft aria-hidden="true" />
+            Back to form
+          </Button>
+          {renderSearchPicker(ResourceFormType.EDS)}
         </>
       );
     }
+
+    if (showResourceForm) return renderResourceForm();
 
     switch (formType) {
       case ResourceFormType.REUSE:
@@ -297,22 +316,7 @@ export const ResourceFormManager = ({
 
       case ResourceFormType.EDS:
       case ResourceFormType.HITCHCOCK:
-        return (
-          <ResourceSearchPicker
-            formType={formType}
-            searchTerm={resourceSearch.searchTerm}
-            onSearchTermChange={resourceSearch.setSearchTerm}
-            onSearch={resourceSearch.search}
-            searchResults={resourceSearch.searchResults}
-            hasSearched={resourceSearch.hasSearched}
-            loading={resourceSearch.loading}
-            totalHits={resourceSearch.totalHits}
-            searchTime={resourceSearch.searchTime}
-            hasMore={resourceSearch.hasMore}
-            onLoadMore={resourceSearch.loadMore}
-            onSelectRecord={handleSelectRecord}
-          />
-        );
+        return renderSearchPicker(formType);
 
       default:
         return (
@@ -324,7 +328,6 @@ export const ResourceFormManager = ({
   };
 
   const modalTitle = customTitle || RESOURCE_FORM_TITLES[formType] || RESOURCE_FORM_TITLES[ResourceFormType.NEW];
-  const showResourceForm = [ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType) || showEditForm;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -337,10 +340,10 @@ export const ResourceFormManager = ({
         <DialogHeader className="tw-shrink-0">
           <DialogTitle>{modalTitle}</DialogTitle>
         </DialogHeader>
-        <div data-testid="resource-form-content" className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-overscroll-contain">
+        <div ref={contentRef} data-testid="resource-form-content" className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-overscroll-contain">
           {renderFormContent()}
         </div>
-        {showResourceForm && (
+        {showResourceForm && !recordChange.isPickerOpen && (
           <DialogFooter className="tw-shrink-0 tw-border-t tw-pt-4">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" form="resource-form" disabled={loading}>Save</Button>

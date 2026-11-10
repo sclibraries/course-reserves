@@ -7,6 +7,7 @@ import { fireEvent, getByRole, getByText, queryByRole, waitFor } from '@testing-
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test/browser';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
+import { Toaster } from '../../ui/sonner';
 
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
@@ -18,8 +19,6 @@ const mocks = vi.hoisted(() => ({
   getMaterialTypeFields: vi.fn(),
   fetch: vi.fn(),
   folderManagementState: { folders: [], loading: false, error: null, createFolder: vi.fn() },
-  notifySuccess: vi.fn(),
-  notifyFromError: vi.fn(),
   edsSearchResult: {
     status: 'success',
     code: 200,
@@ -50,6 +49,16 @@ const mocks = vi.hoisted(() => ({
       accession_number: 'SYNTH-AN-22',
       is_ebook: false,
       doi: '10.5555/synthetic.22',
+    },
+  },
+  changedEdsRecord: {
+    title: 'Synthetic replacement title',
+    link: 'https://example.test/eds/synthetic-replacement',
+    material_type: '9',
+    description: 'Synthetic replacement abstract',
+    metadata: {
+      publisher: 'Synthetic replacement press',
+      accession_number: 'SYNTH-AN-23',
     },
   },
   materialTypesResult: { data: [
@@ -92,9 +101,6 @@ vi.mock('../../../hooks/useFolderManagement', () => ({
 vi.mock('../../../store/adminCourseStore', () => ({
   useAdminCourseStore: () => mocks.courseStoreState,
 }));
-vi.mock('../../../services/notify', () => ({
-  notify: { success: mocks.notifySuccess, fromError: mocks.notifyFromError },
-}));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({
   mapEdsRecordToResource: mocks.mapEdsRecordToResource,
 }));
@@ -109,6 +115,7 @@ function BrowserHarness({ initialData = {}, formType = ResourceFormType.NEW }) {
   const [isOpen, setIsOpen] = useState(false);
   return <>
     <button type="button" onClick={() => setIsOpen(true)}>Open resource form</button>
+    <Toaster />
     <ResourceFormManager
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
@@ -183,6 +190,7 @@ describe('ResourceFormManager in Chromium', () => {
     const opener = await renderForm();
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
+    expect(queryByRole(dialog, 'button', { name: 'Change record' })).toBeNull();
     await expectNoHorizontalOverflow([320, 768, 1280]);
     for (const width of [320, 768, 1280]) {
       await page.viewport(width, 900);
@@ -314,6 +322,7 @@ describe('ResourceFormManager in Chromium', () => {
     const source = getByRole(dialog, 'region', { name: 'Resource source' });
     const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
     const typeFields = getByRole(dialog, 'region', { name: 'Type-specific fields' });
+    expect(getByRole(source, 'button', { name: 'Change record' })).toBeTruthy();
     const mobileDetails = source.querySelector('details');
     const mobileSummary = source.querySelector('summary');
     const desktopText = source.querySelector('p.md\\:tw-block');
@@ -357,5 +366,69 @@ describe('ResourceFormManager in Chromium', () => {
     await expectNoHorizontalOverflow([320, 768, 1280]);
     await expectNoAxeViolations(source);
     expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it('changes a saved EDS record while keeping edits and clearing saved metadata', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+    mocks.getUsage.mockResolvedValue({
+      course_count: 1,
+      offering_count: 1,
+      terms: [],
+      linked_page_count: 0,
+    });
+    mocks.searchEDS.mockResolvedValue(mocks.edsSearchResult);
+    mocks.mapEdsRecordToResource.mockResolvedValue(mocks.changedEdsRecord);
+    mocks.updateResource.mockResolvedValue({ resource_id: 'resource-17' });
+    mocks.updateResource.mockClear();
+    const opener = await renderForm({
+      resource_id: 'resource-17',
+      name: 'Loaded synthetic title',
+      item_url: 'https://example.test/loaded-resource',
+      material_type_id: '9',
+      metadata: [
+        { field_name: 'database', field_value: 'Synthetic saved database' },
+        { field_name: 'publisher', field_value: 'Synthetic saved press' },
+        { field_name: 'accession_number', field_value: 'SYNTH-AN-OLD' },
+      ],
+    }, ResourceFormType.EDIT);
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    const title = getByRole(dialog, 'textbox', { name: 'Resource Name' });
+    await act(async () => fireEvent.change(title, { target: { value: 'Staff-edited title' } }));
+    const changeButton = getByRole(dialog, 'button', { name: 'Change record' });
+    changeButton.focus();
+    await act(async () => fireEvent.click(changeButton));
+
+    const search = getByRole(dialog, 'textbox', { name: 'Search EDS' });
+    await waitFor(() => expect(document.activeElement).toBe(search));
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      await expectNoHorizontalOverflow([width]);
+    }
+    await expectNoAxeViolations(document.body);
+
+    await act(async () => fireEvent.change(search, { target: { value: 'replacement record' } }));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+    await waitFor(() => expect(getByRole(dialog, 'button', { name: 'Edit & Add' })).toBeTruthy());
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Edit & Add' })));
+
+    const source = getByRole(dialog, 'region', { name: 'Resource source' });
+    await waitFor(() => expect(getByRole(source, 'status').textContent).toBe('Kept your edits: Title'));
+    await waitFor(() => expect(getByText(document.body, 'Resource details replaced from EDS')).toBeTruthy());
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+    await waitFor(() => expect(mocks.updateResource).toHaveBeenCalledOnce());
+
+    const [, payload] = mocks.updateResource.mock.calls.at(-1);
+    expect(payload.title).toBe('Staff-edited title');
+    expect(payload.metadata.database).toBeNull();
+    expect(payload.metadata.accession_number).toBe('SYNTH-AN-23');
+    expect(payload.metadata.publisher).toBe('Synthetic replacement press');
+    expect(payload.metadata).not.toHaveProperty('isbn');
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 });

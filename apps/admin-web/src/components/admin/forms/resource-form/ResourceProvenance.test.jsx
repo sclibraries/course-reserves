@@ -1,9 +1,9 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
-import { getAllByText, getByRole, getByText } from '@testing-library/dom';
+import { fireEvent, getAllByText, getByRole, getByText } from '@testing-library/dom';
 import { ResourceTypeSelector } from '../common/ResourceTypeSelector';
 import { TypeSpecificFields } from '../fields/TypeSpecificFields';
 import { FieldMarker } from './FieldMarker';
@@ -33,9 +33,15 @@ afterEach(() => {
 
 describe('resource provenance UI', () => {
   it('shows the source strip and accessible EDS field marker with no axe violations', async () => {
+    const onChangeRecord = vi.fn();
     await render(
       <>
-        <SourceStrip source={{ summary: 'From EDS', text: 'From EDS: Synthetic title · Synthetic database · AN SYNTH-AN-17' }} />
+        <SourceStrip
+          source={{ summary: 'From EDS', text: 'From EDS: Synthetic title · Synthetic database · AN SYNTH-AN-17' }}
+          canChangeRecord
+          onChangeRecord={onChangeRecord}
+          keptFields={['title']}
+        />
         <OtherDetails
           metadata={{ doi: '10.5555/synthetic.17', publisher: 'Synthetic Press' }}
           materialTypeFields={[{ field_name: 'publisher' }]}
@@ -60,6 +66,9 @@ describe('resource provenance UI', () => {
     const source = getByRole(container, 'region', { name: 'Resource source' });
     const details = getByRole(container, 'region', { name: 'Other details' });
     expect(getAllByText(source, 'From EDS: Synthetic title · Synthetic database · AN SYNTH-AN-17', { selector: 'p' })).toHaveLength(2);
+    fireEvent.click(getByRole(source, 'button', { name: 'Change record' }));
+    expect(onChangeRecord).toHaveBeenCalledOnce();
+    expect(getByRole(source, 'status').textContent).toBe('Kept your edits: Title');
     expect(getByText(details, '10.5555/synthetic.17')).toBeTruthy();
     expect(getByText(details, 'from EDS')).toBeTruthy();
     expect(getAllByText(container, 'guessed')).toHaveLength(2);

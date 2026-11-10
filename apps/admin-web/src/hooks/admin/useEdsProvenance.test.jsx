@@ -1,3 +1,4 @@
+import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { renderHook } from './testUtils/renderHook';
 import { useEdsProvenance } from './useEdsProvenance';
@@ -84,6 +85,123 @@ describe('useEdsProvenance', () => {
     expect(book.book_title).toBe('Synthetic EDS title');
     expect(book.author_editor).toBe('Synthetic EDS author');
     expect(book.article_title).toBeUndefined();
+  });
+
+  it('keeps edits, clears saved metadata missing from the new record, and omits unsaved metadata', async () => {
+    hook = await renderHook((props) => useEdsProvenance(props), {
+      initialData: {
+        resource_id: 'resource-17',
+        title: 'Loaded title',
+        link: 'https://example.test/loaded',
+        material_type_id: '1',
+        metadata: {
+          database: 'Synthetic old database',
+          accession_number: 'SYNTH-OLD-17',
+        },
+      },
+      sourceType: 'edit',
+      materialTypes,
+    });
+
+    const currentData = {
+      title: 'Staff-edited title',
+      link: 'https://example.test/loaded',
+      notes: '',
+      material_type_id: '1',
+      metadata: {
+        database: 'Synthetic old database',
+        accession_number: 'SYNTH-OLD-17',
+      },
+    };
+    const nextRecord = {
+      title: 'New EDS title',
+      link: 'https://example.test/new',
+      material_type: '2',
+      description: 'New EDS abstract',
+      metadata: { accession_number: 'SYNTH-NEW-17' },
+    };
+
+    expect(hook.current.replaceRecord).toBeTypeOf('function');
+    let result;
+    act(() => {
+      result = hook.current.replaceRecord(currentData, nextRecord, ['database', 'accession_number']);
+    });
+
+    expect(result.data).toMatchObject({
+      title: 'Staff-edited title',
+      link: 'https://example.test/new',
+      notes: 'New EDS abstract',
+      material_type_id: '2',
+      metadata: {
+        database: null,
+        accession_number: 'SYNTH-NEW-17',
+      },
+    });
+    expect(result.data.metadata).not.toHaveProperty('doi');
+    expect(result.keptFields).toEqual(['title']);
+  });
+
+  it('omits an empty mapped field when an unsaved EDS pick is changed', async () => {
+    hook = await renderHook((props) => useEdsProvenance(props), {
+      initialData: {
+        title: 'Synthetic EDS title',
+        link: 'https://example.test/record/17',
+        material_type: '1',
+        metadata: { book_title: 'Synthetic EDS title' },
+      },
+      sourceType: 'eds',
+      materialTypes,
+    });
+
+    let result;
+    act(() => {
+      result = hook.current.replaceRecord({
+        title: 'Synthetic EDS title',
+        link: 'https://example.test/record/17',
+        material_type_id: '1',
+        metadata: { book_title: 'Synthetic EDS title' },
+      }, {
+        title: 'Replacement EDS title',
+        link: 'https://example.test/record/18',
+        material_type: '1',
+        metadata: { book_title: 'Replacement EDS title' },
+      });
+    });
+
+    expect(result.data.metadata.isbn).toBeUndefined();
+  });
+
+  it('keeps a manual type and maps the replacement record to that type', async () => {
+    const state = await renderProvenance();
+    const metadata = state.remapMetadata('2', initialData.metadata, '1');
+    const currentData = {
+      title: initialData.title,
+      link: initialData.link,
+      notes: '',
+      material_type_id: '2',
+      metadata,
+    };
+
+    let result;
+    act(() => {
+      result = hook.current.replaceRecord(currentData, {
+        title: 'Synthetic replacement title',
+        link: 'https://example.test/replacement',
+        material_type: '1',
+        metadata: {
+          book_title: 'Synthetic replacement title',
+          author_editor: 'Synthetic replacement author',
+          publisher: 'Synthetic replacement press',
+          accession_number: 'SYNTH-AN-18',
+        },
+      });
+    });
+
+    expect(result.data.material_type_id).toBe('2');
+    expect(result.data.metadata.article_title).toBe('Synthetic replacement title');
+    expect(result.data.metadata.author).toBe('Synthetic replacement author');
+    expect(result.data.metadata.book_title).toBeUndefined();
+    expect(result.data.metadata.author_editor).toBeUndefined();
   });
 
   it.each([

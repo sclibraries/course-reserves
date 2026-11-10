@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Info } from 'lucide-react';
 import { Alert } from '../../../ui/alert';
@@ -19,7 +19,9 @@ import { WhatBasics } from './WhatBasics';
 import WhereSection from './WhereSection';
 import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
 
-export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourceType, usageResourceId }) => {
+export const ResourceForm = ({
+  initialData = {}, onSubmit, formId, course, sourceType, usageResourceId, onChangeRecord, changeRecord,
+}) => {
   const {
     defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
     cascadeVisibilityToLinks, setCascadeVisibilityToLinks, links, setLinks,
@@ -29,6 +31,20 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
   const { errors: validationErrors, validate, clearNameError } = useResourceFormValidation();
   const resourceUsage = useResourceUsage(usageResourceId);
   const provenance = useEdsProvenance({ initialData, sourceType, materialTypes, usage: resourceUsage.usage });
+  const replaceRecord = provenance.replaceRecord;
+  const [keptFields, setKeptFields] = useState([]);
+  const handledRecord = useRef(null);
+  const savedMetadataKeys = useRef(initialData.resource_id ? Object.keys(initialData.metadata || {}) : []);
+  const canChangeRecord = sourceType === 'eds'
+    || (sourceType === 'edit' && Boolean(initialData.metadata?.accession_number));
+
+  useEffect(() => {
+    if (!changeRecord || handledRecord.current === changeRecord) return;
+    handledRecord.current = changeRecord;
+    const result = replaceRecord(formData, changeRecord, savedMetadataKeys.current);
+    setFormData(result.data);
+    setKeptFields(result.keptFields);
+  }, [changeRecord, formData, replaceRecord, setFormData]);
   const markedMaterialTypes = materialTypes.map((type) => ({
     ...type,
     marker: String(type.material_type_id) === String(formData.material_type_id)
@@ -158,7 +174,12 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
     <>
       {errorMessage && <Alert variant="destructive" className="tw-mb-4">{errorMessage}</Alert>}
       <form id={formId} onInvalidCapture={handleInvalid} onSubmit={handleSubmit} className="tw-space-y-4">
-        <SourceStrip source={provenance.source} />
+        <SourceStrip
+          source={provenance.source}
+          canChangeRecord={canChangeRecord}
+          onChangeRecord={onChangeRecord}
+          keptFields={keptFields}
+        />
         {formData.link && isHitchcockVideoUrl(formData.link) && formData.use_primary_link_visibility && (
           <Alert className="tw-flex tw-items-start tw-gap-2">
             <Info aria-hidden="true" className="tw-size-4 tw-shrink-0" />
@@ -235,6 +256,8 @@ ResourceForm.propTypes = {
   mode: PropTypes.oneOf(['course', 'none']),
   sourceType: PropTypes.string.isRequired,
   usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChangeRecord: PropTypes.func,
+  changeRecord: PropTypes.object,
 };
 
 export default ResourceForm;
