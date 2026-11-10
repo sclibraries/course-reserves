@@ -5,6 +5,11 @@ import { adminResourceService } from '../../services/admin/adminResourceService'
 import { buildProxyUrl } from '../../util/proxyUtil';
 import { ResourceFormType } from '../../components/admin/forms/constants/formTypes';
 
+const RESOURCE_ASSOCIATION_FIELDS = [
+  'start_visibility', 'end_visibility', 'use_resource_visibility',
+  'primary_link_start_visibility', 'primary_link_end_visibility', 'use_primary_link_visibility',
+];
+
 const serializeProxyLink = (link, urlField) => {
   const { loaded, ...data } = link;
   return {
@@ -17,6 +22,8 @@ export function useResourceFormSubmit({
   formType,
   course,
   folioCourseData,
+  mode = 'course',
+  courseResourceId,
   onUpdate,
   onSubmit,
   onClose,
@@ -37,7 +44,18 @@ export function useResourceFormSubmit({
       let result;
       if (formType === ResourceFormType.EDIT) {
         const { resource_id, ...updateData } = payload;
-        result = await onUpdate?.(payload)
+        RESOURCE_ASSOCIATION_FIELDS.forEach((field) => {
+          if (updateData[field] === '') updateData[field] = null;
+        });
+        if (mode === 'none') {
+          RESOURCE_ASSOCIATION_FIELDS.forEach((field) => delete updateData[field]);
+          delete updateData.offering_id;
+          delete updateData.course_resource_id;
+        } else {
+          updateData.offering_id = course?.offering_id;
+          updateData.course_resource_id = courseResourceId;
+        }
+        result = await onUpdate?.({ resource_id, ...updateData })
           || await adminResourceService.updateResource(resource_id, updateData);
       } else {
         result = await adminCourseService.createResource(
@@ -58,10 +76,10 @@ export function useResourceFormSubmit({
     } catch (err) {
       console.error('Error submitting resource:', err);
       setError("Couldn't save the resource");
-      notify.fromError(err, "Couldn't save the resource");
+      notify.fromError(err, err.serverMessage || "Couldn't save the resource");
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [formType, course, folioCourseData, onUpdate, onSubmit, onClose, setLoading, setError]);
+  }, [formType, course, folioCourseData, mode, courseResourceId, onUpdate, onSubmit, onClose, setLoading, setError]);
 }

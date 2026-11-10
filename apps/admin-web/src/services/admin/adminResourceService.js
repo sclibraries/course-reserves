@@ -120,7 +120,13 @@ export const adminResourceService = {
         body: JSON.stringify(updateData)
       });
 
-      if (!response.ok) throw new Error(ADMIN_ERROR_MESSAGES.RESOURCE_UPDATE_FAILED);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const error = new Error(data?.message || ADMIN_ERROR_MESSAGES.RESOURCE_UPDATE_FAILED);
+        error.reference = data?.reference;
+        error.serverMessage = data?.message;
+        throw error;
+      }
       
       return response.json();
     } catch (error) {

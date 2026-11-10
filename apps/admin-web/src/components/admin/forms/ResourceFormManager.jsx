@@ -153,7 +153,7 @@ export const ResourceFormManager = ({
     onUpdate: additionalProps.onUpdate,
     onSubmit,
     onClose,
-    setLoading,
+    mode, courseResourceId: initialData.course_resource_id, setLoading,
     setError,
   });
 
