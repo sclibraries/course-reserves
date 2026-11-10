@@ -272,10 +272,11 @@ describe('ResourceFormManager in Chromium', () => {
         const contentBounds = content.getBoundingClientRect();
         expect(bounds.width).toBeGreaterThan(0);
         expect(bounds.height).toBeGreaterThan(0);
-        expect(bounds.left).toBeGreaterThanOrEqual(contentBounds.left);
-        expect(bounds.right).toBeLessThanOrEqual(contentBounds.right);
-        expect(bounds.top).toBeGreaterThanOrEqual(contentBounds.top);
-        expect(bounds.bottom).toBeLessThanOrEqual(contentBounds.bottom);
+        // Allow 1 px for sub-pixel rounding after scrollIntoView.
+        expect(bounds.left).toBeGreaterThanOrEqual(contentBounds.left - 1);
+        expect(bounds.right).toBeLessThanOrEqual(contentBounds.right + 1);
+        expect(bounds.top).toBeGreaterThanOrEqual(contentBounds.top - 1);
+        expect(bounds.bottom).toBeLessThanOrEqual(contentBounds.bottom + 1);
       }
       expect(summary.textContent).toContain('Resource name is required');
       expect(warning.textContent).toContain('Used in 2 courses');
