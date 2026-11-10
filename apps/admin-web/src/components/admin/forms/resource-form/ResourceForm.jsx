@@ -43,7 +43,7 @@ export const ResourceForm = ({
     if (!changeRecord || handledRecord.current === changeRecord) return;
     handledRecord.current = changeRecord;
     const result = replaceRecord(formData, changeRecord, savedMetadataKeys.current);
-    setFormData(loadProxyLink(result.data));
+    setFormData({ ...loadProxyLink(result.data), loaded: formData.loaded });
     setKeptFields(result.keptFields);
   }, [changeRecord, formData, replaceRecord, setFormData]);
   const markedMaterialTypes = materialTypes.map((type) => ({

@@ -183,6 +183,61 @@ describe('ResourceFormManager dialog shell', () => {
     ]);
   });
 
+  it('keeps proxy enabled when changing an EDS record and prefixes the replacement link on save', async () => {
+    mocks.getMaterialTypes.mockResolvedValue({ data: [{ material_type_id: '9', name: 'ebook' }] });
+    mocks.searchEDS.mockResolvedValue({
+      status: 'success',
+      code: 200,
+      data: {
+        records: [{
+          pubType: 'Academic Journal',
+          An: 'SYNTH-AN-18',
+          DbId: 'SYNTH-DB-18',
+          DbLabel: 'Synthetic database',
+          PLink: 'https://example.test/record',
+          FullTextCustomLinks: [{ Url: 'https://example.test/new-eds' }],
+          Items: {
+            Ti: [{ Label: 'Title', Group: 'Ti', Data: 'Synthetic replacement', CleanData: ['Synthetic replacement'] }],
+            Au: [],
+            Ab: [],
+          },
+          RecordInfo: { BibEntity: { Identifiers: [] } },
+        }],
+        statistics: { TotalHits: 1 },
+        request: { QueryString: 'replacement' },
+      },
+    });
+    await renderForm({
+      formType: ResourceFormType.EDIT,
+      initialData: {
+        resource_id: 'resource-18',
+        name: 'Loaded synthetic resource',
+        item_url: 'https://example.test/loaded',
+        use_proxy: 1,
+        material_type_id: '9',
+        metadata: [{ field_name: 'accession_number', field_value: 'SYNTH-AN-OLD' }],
+      },
+    });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    const changeRecordButton = getByRole(dialog, 'button', { name: 'Change record' });
+    changeRecordButton.focus();
+    await act(async () => fireEvent.click(changeRecordButton));
+
+    const search = getByRole(dialog, 'textbox', { name: 'Search EDS' });
+    await act(async () => fireEvent.change(search, { target: { value: 'replacement' } }));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Edit & Add' })));
+    await waitFor(() => expect(getByRole(dialog, 'textbox', { name: 'Primary URL' }).value)
+      .toBe('https://example.test/new-eds'));
+    expect(getByRole(dialog, 'checkbox', { name: 'Use proxy for this resource' }).checked).toBe(true);
+
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    expect(mocks.updateResource.mock.calls[0][1].link)
+      .toBe(`${LIBPROXY_PREFIX}https://example.test/new-eds`);
+  });
+
   it('keeps ebook metadata and Description when the fields endpoint has no definitions', async () => {
     const record = {
       pubType: 'Ebook',
