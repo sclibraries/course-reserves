@@ -5,6 +5,14 @@ import { adminResourceService } from '../../services/admin/adminResourceService'
 import { buildProxyUrl } from '../../util/proxyUtil';
 import { ResourceFormType } from '../../components/admin/forms/constants/formTypes';
 
+const serializeProxyLink = (link, urlField) => {
+  const { loaded, ...data } = link;
+  return {
+    ...data,
+    [urlField]: buildProxyUrl({ url: data[urlField], use_proxy: data.use_proxy }, loaded),
+  };
+};
+
 export function useResourceFormSubmit({
   formType,
   course,
@@ -18,34 +26,11 @@ export function useResourceFormSubmit({
   return useCallback(async (formData) => {
     try {
       setLoading(true);
-      const { raw_link, original_link, original_use_proxy, links, ...resourceData } = formData;
+      const { links, ...resourceData } = formData;
       const payload = {
-        ...resourceData,
-        link: buildProxyUrl({
-          url: formData.link,
-          use_proxy: formData.use_proxy,
-          raw_url: raw_link,
-          original_url: original_link,
-          original_use_proxy,
-        }),
+        ...serializeProxyLink(resourceData, 'link'),
         ...(links && {
-          links: links.map((link) => {
-            const {
-              raw_url: rawUrl,
-              original_url: originalUrl,
-              original_use_proxy: originalUseProxy,
-              ...data
-            } = link;
-            return {
-              ...data,
-              url: buildProxyUrl({
-                ...data,
-                raw_url: rawUrl,
-                original_url: originalUrl,
-                original_use_proxy: originalUseProxy,
-              }),
-            };
-          }),
+          links: links.map((link) => serializeProxyLink(link, 'url')),
         }),
       };
 

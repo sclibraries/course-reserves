@@ -90,7 +90,7 @@ vi.mock('../../../store/adminCourseStore', () => ({
 vi.mock('../../../util/proxyUtil', () => ({
   LIBPROXY_PREFIX: '',
   normalizeProxyFlag: (value) => (value === true || value === 1 || value === '1' ? true : false),
-  getProxyState: (rawUrl, savedFlag) => ({ rawUrl, url: rawUrl, useProxy: Boolean(savedFlag) }),
+  loadProxyLink: (link) => link,
   buildProxyUrl: ({ url }) => url,
 }));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAdminCourseStore } from '../../store/adminCourseStore';
 import { isHitchcockVideoUrl } from '../../util/externalLinks';
-import { getProxyState } from '../../util/proxyUtil';
+import { loadProxyLink } from '../../util/proxyUtil';
 
 export const useResourceFormState = ({ initialData = {}, course }) => {
   const { folioCourseData, termStart, termEnd } = useAdminCourseStore();
@@ -48,17 +48,18 @@ export const useResourceFormState = ({ initialData = {}, course }) => {
 
   const [formData, setFormData] = useState(() => {
     const hasPrimaryLinkControl = normalizeBooleanValue(initialData.use_primary_link_visibility);
-    const primaryLink = getProxyState(initialData.link || initialData.item_url || '', initialData.use_proxy);
-    const primaryUrl = primaryLink.url;
+    const primaryLink = loadProxyLink({
+      link: initialData.link || initialData.item_url || '',
+      use_proxy: initialData.use_proxy,
+    });
+    const primaryUrl = primaryLink.link;
     const isHitchcockVideo = isHitchcockVideoUrl(primaryUrl);
 
     return {
       title: initialData.title || initialData.name || '',
-      link: primaryLink.url,
-      raw_link: primaryLink.rawUrl,
-      original_link: primaryLink.url,
-      use_proxy: primaryLink.useProxy,
-      original_use_proxy: primaryLink.useProxy,
+      link: primaryLink.link,
+      use_proxy: primaryLink.use_proxy,
+      loaded: primaryLink.loaded,
       notes: initialData.notes || initialData.description || '',
       internal_note: initialData.internal_note || '',
       external_note: initialData.external_note || '',
@@ -106,17 +107,7 @@ export const useResourceFormState = ({ initialData = {}, course }) => {
 
   const [links, setLinks] = useState(() => {
     const existingLinks = (initialData.links || []).filter(link => link.order !== 0 && link.order !== '0');
-    return existingLinks.map((link) => {
-      const proxyState = getProxyState(link.url || '', link.use_proxy);
-      return {
-        ...link,
-        url: proxyState.url,
-        raw_url: proxyState.rawUrl,
-        original_url: proxyState.url,
-        use_proxy: proxyState.useProxy,
-        original_use_proxy: proxyState.useProxy,
-      };
-    });
+    return existingLinks.map(loadProxyLink);
   });
   const [materialTypes, setMaterialTypes] = useState([]);
   const [materialTypeFields, setMaterialTypeFields] = useState([]);

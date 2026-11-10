@@ -8,7 +8,7 @@ import { useResourceFormValidation } from '../../../../hooks/admin/useResourceFo
 import { useResourceUsage } from '../../../../hooks/admin/useResourceUsage';
 import { useEdsProvenance } from '../../../../hooks/admin/useEdsProvenance';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
-import { getProxyState } from '../../../../util/proxyUtil';
+import { loadProxyLink } from '../../../../util/proxyUtil';
 import { ErrorSummary } from './ErrorSummary';
 import { FieldMarker } from './FieldMarker';
 import { OtherDetails } from './OtherDetails';
@@ -43,15 +43,7 @@ export const ResourceForm = ({
     if (!changeRecord || handledRecord.current === changeRecord) return;
     handledRecord.current = changeRecord;
     const result = replaceRecord(formData, changeRecord, savedMetadataKeys.current);
-    const proxyState = getProxyState(result.data.link || '', result.data.use_proxy);
-    setFormData({
-      ...result.data,
-      link: proxyState.url,
-      raw_link: proxyState.rawUrl,
-      use_proxy: proxyState.useProxy,
-      original_link: proxyState.url,
-      original_use_proxy: proxyState.useProxy,
-    });
+    setFormData(loadProxyLink(result.data));
     setKeptFields(result.keptFields);
   }, [changeRecord, formData, replaceRecord, setFormData]);
   const markedMaterialTypes = materialTypes.map((type) => ({

@@ -15,27 +15,30 @@ export function normalizeProxyFlag(value) {
   return null;
 }
 
-export function getProxyState(rawUrl, savedFlag) {
+export function loadProxyLink(link) {
+  const urlField = Object.prototype.hasOwnProperty.call(link, 'url') ? 'url' : 'link';
+  const rawUrl = link[urlField] || '';
   const isPrefixed = rawUrl.startsWith(LIBPROXY_PREFIX);
   const url = isPrefixed
     ? rawUrl.slice(LIBPROXY_PREFIX.length)
     : rawUrl;
+  const useProxy = normalizeProxyFlag(link.use_proxy) === true || isPrefixed;
+  const loaded = { rawUrl, url, useProxy };
 
   return {
-    rawUrl,
-    url,
-    useProxy: normalizeProxyFlag(savedFlag) === true || isPrefixed,
+    ...link,
+    [urlField]: url,
+    use_proxy: useProxy,
+    loaded,
   };
 }
 
-export function buildProxyUrl({ url, use_proxy, raw_url, original_url, original_use_proxy }) {
+export function buildProxyUrl({ url, use_proxy }, loaded) {
   const proxyEnabled = normalizeProxyFlag(use_proxy) === true;
-  if (raw_url !== undefined
-    && url === original_url
-    && proxyEnabled === (normalizeProxyFlag(original_use_proxy) === true)) {
-    return raw_url;
+  if (loaded && url === loaded.url && proxyEnabled === loaded.useProxy) {
+    return loaded.rawUrl;
   }
 
-  const bareUrl = getProxyState(url, false).url;
+  const bareUrl = loadProxyLink({ url, use_proxy: false }).url;
   return proxyEnabled ? `${LIBPROXY_PREFIX}${bareUrl}` : bareUrl;
 }

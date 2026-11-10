@@ -195,7 +195,7 @@ describe('ResourceFormManager in Chromium', () => {
       }
     }
     await expectNoHorizontalOverflow([320, 768, 1280]);
-    await expectNoAxeViolations(linkSection);
+    await expectNoAxeViolations(document.body);
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
