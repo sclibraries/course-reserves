@@ -264,7 +264,6 @@ export const ResourceFormManager = ({
             initialData={getFormInitialData()}
             onSubmit={handleBaseFormSubmit}
             sourceType={formType}
-            sourceRecord={selectedRecord}
             usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
           />
         </>

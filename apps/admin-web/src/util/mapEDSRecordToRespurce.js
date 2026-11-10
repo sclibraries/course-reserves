@@ -39,7 +39,7 @@ const asText = (value) => Array.isArray(value)
   ? value.map(decodeHtmlEntities).filter(Boolean).join('; ')
   : decodeHtmlEntities(value);
 
-const OTHER_DETAILS = {
+export const OTHER_DETAILS = {
   authors: 'author',
   isbns: 'isbn',
   issn: 'issn',

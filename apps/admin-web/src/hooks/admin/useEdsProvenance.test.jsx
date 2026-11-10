@@ -5,6 +5,7 @@ import { useEdsProvenance } from './useEdsProvenance';
 const materialTypes = [
   { material_type_id: '1', name: 'book' },
   { material_type_id: '2', name: 'article' },
+  { material_type_id: '3', name: 'media' },
 ];
 
 const initialData = {
@@ -15,9 +16,11 @@ const initialData = {
     book_title: 'Synthetic EDS title',
     author_editor: 'Synthetic EDS author',
     publisher: 'Synthetic EDS press',
+    database: 'Synthetic database',
     is_ebook: false,
     journal_title: 'Synthetic journal',
     doi: '10.5555/synthetic.17',
+    accession_number: 'SYNTH-AN-17',
   },
 };
 
@@ -33,10 +36,6 @@ async function renderProvenance(data = initialData) {
     initialData: data,
     sourceType: 'eds',
     materialTypes,
-    sourceRecord: {
-      title: 'Synthetic EDS title',
-      metadata: { database: 'Synthetic database', accession_number: 'SYNTH-AN-17' },
-    },
   });
   return hook.current;
 }
@@ -72,6 +71,9 @@ describe('useEdsProvenance', () => {
     });
     expect(changed.book_title).toBeUndefined();
     expect(state.markerFor('article_title', changed.article_title, '2')).toBe('from EDS');
+
+    const media = state.remapMetadata('3', initialData.metadata, '1');
+    expect(media.library_database).toBe('Synthetic database');
   });
 
   it('re-maps the baseline again when the manually chosen type changes back', async () => {
@@ -98,5 +100,16 @@ describe('useEdsProvenance', () => {
     });
 
     expect(hook.current.source.text).toBe(expected);
+  });
+
+  it.each([['loading', undefined], ['failed', null]])('uses a plain reuse label when usage is %s', async (_state, usage) => {
+    hook = await renderHook((props) => useEdsProvenance(props), {
+      initialData: {},
+      sourceType: 'reuse',
+      materialTypes,
+      usage,
+    });
+
+    expect(hook.current.source.text).toBe('Reusing resource');
   });
 });

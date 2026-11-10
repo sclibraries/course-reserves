@@ -19,7 +19,7 @@ import { WhatBasics } from './WhatBasics';
 import WhereSection from './WhereSection';
 import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
 
-export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourceType, sourceRecord, usageResourceId }) => {
+export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourceType, usageResourceId }) => {
   const {
     defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
     cascadeVisibilityToLinks, setCascadeVisibilityToLinks, links, setLinks,
@@ -28,7 +28,7 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
   } = useResourceFormState({ initialData, course });
   const { errors: validationErrors, validate, clearNameError } = useResourceFormValidation();
   const resourceUsage = useResourceUsage(usageResourceId);
-  const provenance = useEdsProvenance({ initialData, sourceType, sourceRecord, materialTypes, usage: resourceUsage.usage });
+  const provenance = useEdsProvenance({ initialData, sourceType, materialTypes, usage: resourceUsage.usage });
   const markedMaterialTypes = materialTypes.map((type) => ({
     ...type,
     marker: String(type.material_type_id) === String(formData.material_type_id)
@@ -234,7 +234,6 @@ ResourceForm.propTypes = {
   course: PropTypes.object,
   mode: PropTypes.oneOf(['course', 'none']),
   sourceType: PropTypes.string.isRequired,
-  sourceRecord: PropTypes.object,
   usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 

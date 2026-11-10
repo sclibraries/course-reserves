@@ -314,6 +314,7 @@ describe('ResourceFormManager in Chromium', () => {
     const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
     const typeFields = getByRole(dialog, 'region', { name: 'Type-specific fields' });
     const mobileDetails = source.querySelector('details');
+    const mobileSummary = source.querySelector('summary');
     const desktopText = source.querySelector('p.md\\:tw-block');
     await waitFor(() => expect(mobileDetails).toBeTruthy());
     await waitFor(() => expect(getByRole(typeFields, 'textbox', { name: /Publisher.*from EDS/ })).toBeTruthy());
@@ -328,9 +329,9 @@ describe('ResourceFormManager in Chromium', () => {
       await expectNoHorizontalOverflow([width]);
       if (width === 320) {
         expect(mobileDetails.open).toBe(false);
-        expect(getByRole(source, 'button', { name: 'From EDS' })).toBeTruthy();
+        expect(mobileSummary).toBeTruthy();
         expect(getComputedStyle(desktopText).display).toBe('none');
-        await act(async () => fireEvent.click(getByRole(source, 'button', { name: 'From EDS' })));
+        await act(async () => fireEvent.click(mobileSummary));
         expect(mobileDetails.open).toBe(true);
         expect(mobileDetails.textContent).toContain('Synthetic EDS database');
       }
