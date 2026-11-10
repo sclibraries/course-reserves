@@ -29,13 +29,6 @@ const RESOURCE_FORM_TITLES = {
   [ResourceFormType.CROSSLINK]: 'Cross-link to another course',
 };
 
-const RESOURCE_SOURCES = {
-  [ResourceFormType.NEW]: 'Manual',
-  [ResourceFormType.EDIT]: 'Not recorded',
-  [ResourceFormType.EDS]: 'EBSCO Discovery',
-  [ResourceFormType.HITCHCOCK]: 'Hitchcock',
-};
-
 /**
  * ResourceFormManager - Unified component for managing all resource forms
  * 
@@ -270,7 +263,8 @@ export const ResourceFormManager = ({
             mode={mode}
             initialData={getFormInitialData()}
             onSubmit={handleBaseFormSubmit}
-            source={RESOURCE_SOURCES[formType] || 'Not recorded'}
+            sourceType={formType}
+            sourceRecord={selectedRecord}
             usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
           />
         </>

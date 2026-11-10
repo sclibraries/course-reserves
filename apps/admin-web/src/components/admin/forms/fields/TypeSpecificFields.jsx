@@ -6,6 +6,7 @@ import { Input } from '../../../ui/input';
 import { Label } from '../../../ui/label';
 import NativeSelect from '../../../ui/native-select';
 import { Textarea } from '../../../ui/textarea';
+import { FieldMarker } from '../resource-form/FieldMarker';
 
 export const TypeSpecificFields = ({ materialTypeFields = [], metadata = {}, handleFieldChange }) => {
   if (!materialTypeFields.length) {
@@ -40,7 +41,7 @@ export const TypeSpecificFields = ({ materialTypeFields = [], metadata = {}, han
             required={required}
             className="tw-size-6 tw-rounded tw-border-input tw-accent-primary focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-ring focus-visible:tw-ring-offset-2"
           />
-          <Label htmlFor={name}>{description || label}</Label>
+          <Label htmlFor={name}>{description || label}<FieldMarker marker={field.marker} /></Label>
         </div>
       );
     }
@@ -88,6 +89,7 @@ export const TypeSpecificFields = ({ materialTypeFields = [], metadata = {}, han
                 {field.field_type !== 'checkbox' && (
                   <Label htmlFor={field.field_name}>
                     {field.label || field.field_name}
+                    <FieldMarker marker={field.marker} />
                     {field.required && <span aria-hidden="true" className="tw-ml-1 tw-text-destructive">*</span>}
                   </Label>
                 )}
@@ -113,6 +115,7 @@ TypeSpecificFields.propTypes = {
     required: PropTypes.bool,
     options_json: PropTypes.string,
     category: PropTypes.string,
+    marker: PropTypes.oneOf(['from EDS', 'guessed']),
   })),
   metadata: PropTypes.object,
   handleFieldChange: PropTypes.func.isRequired,

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
-import { fireEvent, getByRole, getByText, queryByRole } from '@testing-library/dom';
+import { fireEvent, getByRole, queryByRole, queryByText } from '@testing-library/dom';
 import TypeFieldsSection from './TypeFieldsSection';
 import WhereSection from './WhereSection';
 
@@ -62,7 +62,6 @@ describe('resource form sections', () => {
           handleFieldChange={vi.fn()}
           links={links}
           setLinks={setLinks}
-          source="EBSCO Discovery"
         />
       );
     }
@@ -70,7 +69,7 @@ describe('resource form sections', () => {
     await render(<Harness />);
     const section = getByRole(container, 'region', { name: 'Where do students go?' });
     expect(getByRole(section, 'textbox', { name: 'Primary URL' }).value).toBe('https://example.test/primary');
-    expect(getByText(section, 'Source: EBSCO Discovery')).toBeTruthy();
+    expect(queryByText(section, /Source:/)).toBeNull();
     expect(getByRole(section, 'checkbox', { name: 'Use proxy for this resource' })).toBeTruthy();
     for (const number of [1, 2, 3]) {
       expect(getByRole(section, 'checkbox', { name: `Use proxy for link ${number}` })).toBeTruthy();

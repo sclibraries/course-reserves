@@ -6,10 +6,10 @@ import ProxyToggle from '../common/ProxyToggle';
 import ResourceLinks from '../fields/ResourceLinks';
 import { ResourceFormSection } from './ResourceFormSection';
 
-export const WhereSection = ({ formData, handleFieldChange, links, setLinks, source, resourceVisibilityDates }) => (
+export const WhereSection = ({ formData, handleFieldChange, links, setLinks, linkMarker, resourceVisibilityDates }) => (
   <ResourceFormSection id="where-do-students-go" title="Where do students go?" icon={Link2}>
     <div className="tw-min-w-0 tw-space-y-2">
-      <Label htmlFor="link">Primary URL</Label>
+      <Label htmlFor="link">Primary URL{linkMarker}</Label>
       <Input
         id="link"
         name="link"
@@ -17,9 +17,6 @@ export const WhereSection = ({ formData, handleFieldChange, links, setLinks, sou
         onChange={handleFieldChange}
         placeholder="https://example.com"
       />
-      <p className="tw-break-words tw-text-sm tw-text-muted-foreground">
-        Source: {source}
-      </p>
     </div>
     <ProxyToggle
       name="use_proxy"
@@ -40,7 +37,7 @@ WhereSection.propTypes = {
   handleFieldChange: PropTypes.func.isRequired,
   links: PropTypes.array.isRequired,
   setLinks: PropTypes.func.isRequired,
-  source: PropTypes.string.isRequired,
+  linkMarker: PropTypes.node,
   resourceVisibilityDates: PropTypes.shape({
     startDate: PropTypes.string,
     endDate: PropTypes.string,

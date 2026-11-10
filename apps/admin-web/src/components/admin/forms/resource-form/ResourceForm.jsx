@@ -6,16 +6,20 @@ import { adminMaterialTypeService } from '../../../../services/admin/adminMateri
 import { useResourceFormState } from '../../../../hooks/admin/useResourceFormState';
 import { useResourceFormValidation } from '../../../../hooks/admin/useResourceFormValidation';
 import { useResourceUsage } from '../../../../hooks/admin/useResourceUsage';
+import { useEdsProvenance } from '../../../../hooks/admin/useEdsProvenance';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import { ErrorSummary } from './ErrorSummary';
+import { FieldMarker } from './FieldMarker';
+import { OtherDetails } from './OtherDetails';
 import { SharedEditWarning } from './SharedEditWarning';
+import { SourceStrip } from './SourceStrip';
 import { StaffSection } from './StaffSection';
 import { StudentSection } from './StudentSection';
 import { WhatBasics } from './WhatBasics';
 import WhereSection from './WhereSection';
 import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
 
-export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, source, usageResourceId }) => {
+export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourceType, sourceRecord, usageResourceId }) => {
   const {
     defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
     cascadeVisibilityToLinks, setCascadeVisibilityToLinks, links, setLinks,
@@ -24,6 +28,17 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
   } = useResourceFormState({ initialData, course });
   const { errors: validationErrors, validate, clearNameError } = useResourceFormValidation();
   const resourceUsage = useResourceUsage(usageResourceId);
+  const provenance = useEdsProvenance({ initialData, sourceType, sourceRecord, materialTypes, usage: resourceUsage.usage });
+  const markedMaterialTypes = materialTypes.map((type) => ({
+    ...type,
+    marker: String(type.material_type_id) === String(formData.material_type_id)
+      ? provenance.markerFor('material_type_id', formData.material_type_id)
+      : null,
+  }));
+  const markedMaterialTypeFields = materialTypeFields.map((field) => ({
+    ...field,
+    marker: provenance.markerFor(field.field_name, formData.metadata[field.field_name] ?? '', formData.material_type_id),
+  }));
 
   useEffect(() => {
     adminMaterialTypeService.getMaterialTypes().then(({ data }) => setMaterialTypes(data)).catch((error) => {
@@ -67,7 +82,11 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
 
   const handleMaterialTypeChange = (event) => {
     const { value } = event.target;
-    setFormData((current) => ({ ...current, material_type_id: value, metadata: {} }));
+    setFormData((current) => ({
+      ...current,
+      material_type_id: value,
+      metadata: provenance.remapMetadata(value, current.metadata, current.material_type_id),
+    }));
     fetchMaterialTypeFields(value);
   };
 
@@ -139,6 +158,7 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
     <>
       {errorMessage && <Alert variant="destructive" className="tw-mb-4">{errorMessage}</Alert>}
       <form id={formId} onInvalidCapture={handleInvalid} onSubmit={handleSubmit} className="tw-space-y-4">
+        <SourceStrip source={provenance.source} />
         {formData.link && isHitchcockVideoUrl(formData.link) && formData.use_primary_link_visibility && (
           <Alert className="tw-flex tw-items-start tw-gap-2">
             <Info aria-hidden="true" className="tw-size-4 tw-shrink-0" />
@@ -148,9 +168,9 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
         <WhatBasics
           formData={formData}
           handleFieldChange={handleFieldChange}
-          materialTypes={materialTypes}
+          materialTypes={markedMaterialTypes}
           onTypeChange={handleMaterialTypeChange}
-          materialTypeFields={materialTypeFields}
+          materialTypeFields={markedMaterialTypeFields}
           titleError={validationErrors.title}
         />
         <WhereSection
@@ -158,8 +178,14 @@ export const ResourceForm = ({ initialData = {}, onSubmit, formId, course, sourc
           handleFieldChange={handleFieldChange}
           links={links}
           setLinks={setLinks}
-          source={source}
+          linkMarker={<FieldMarker marker={provenance.markerFor('link', formData.link)} />}
           resourceVisibilityDates={{ startDate: formData.start_visibility, endDate: formData.end_visibility }}
+        />
+        <OtherDetails
+          metadata={formData.metadata}
+          materialTypeFields={materialTypeFields}
+          markerFor={provenance.markerFor}
+          materialTypeId={formData.material_type_id}
         />
         <StudentSection
           formData={formData}
@@ -207,7 +233,8 @@ ResourceForm.propTypes = {
   formId: PropTypes.string,
   course: PropTypes.object,
   mode: PropTypes.oneOf(['course', 'none']),
-  source: PropTypes.string.isRequired,
+  sourceType: PropTypes.string.isRequired,
+  sourceRecord: PropTypes.object,
   usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 

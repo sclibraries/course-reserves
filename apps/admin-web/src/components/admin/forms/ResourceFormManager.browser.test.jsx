@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from '@vitest/browser/context';
-import { fireEvent, getByRole, waitFor } from '@testing-library/dom';
+import { fireEvent, getByRole, getByText, queryByRole, waitFor } from '@testing-library/dom';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test/browser';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
@@ -11,6 +11,8 @@ import { ResourceFormType } from './constants/formTypes';
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
   updateResource: vi.fn(),
+  searchEDS: vi.fn(),
+  mapEdsRecordToResource: vi.fn(),
   getUsage: vi.fn(),
   getMaterialTypes: vi.fn(),
   getMaterialTypeFields: vi.fn(),
@@ -18,6 +20,47 @@ const mocks = vi.hoisted(() => ({
   folderManagementState: { folders: [], loading: false, error: null, createFolder: vi.fn() },
   notifySuccess: vi.fn(),
   notifyFromError: vi.fn(),
+  edsSearchResult: {
+    status: 'success',
+    code: 200,
+    data: {
+      records: [{
+        title: 'Synthetic EDS source title',
+        pubType: 'E-Book',
+        DbId: 'SYNTH-DB-22',
+        DbLabel: 'Synthetic EDS database',
+        An: 'SYNTH-AN-22',
+        Items: {
+          Ti: [{ CleanData: ['Synthetic EDS source title'] }],
+          Au: [{ CleanData: ['Synthetic EDS author'] }],
+        },
+      }],
+      statistics: { TotalHits: 1 },
+      request: { QueryString: 'synthetic record' },
+    },
+  },
+  mappedEdsRecord: {
+    title: 'Synthetic EDS source title',
+    link: 'https://example.test/eds/synthetic-22',
+    material_type: '9',
+    metadata: {
+      book_title: 'Synthetic EDS source title',
+      publisher: 'Synthetic EDS press',
+      database: 'Synthetic EDS database',
+      accession_number: 'SYNTH-AN-22',
+      is_ebook: false,
+      doi: '10.5555/synthetic.22',
+    },
+  },
+  materialTypesResult: { data: [
+    { material_type_id: '9', name: 'ebook', description: 'E-book' },
+    { material_type_id: '10', name: 'article', description: 'Article' },
+  ] },
+  bookFields: [
+    { field_name: 'book_title', field_type: 'text', label: 'Book title' },
+    { field_name: 'publisher', field_type: 'text', label: 'Publisher' },
+  ],
+  materialTypeFieldsResult: { data: [] },
   courseStoreState: {
     folioCourseData: {
       offering_id: 'folio-offering-17',
@@ -32,7 +75,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/admin/adminCourseService', () => ({
-  adminCourseService: { createResource: mocks.createResource },
+  adminCourseService: { createResource: mocks.createResource, searchEDS: mocks.searchEDS },
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
   adminResourceService: { getUsage: mocks.getUsage, updateResource: mocks.updateResource },
@@ -51,6 +94,9 @@ vi.mock('../../../store/adminCourseStore', () => ({
 }));
 vi.mock('../../../services/notify', () => ({
   notify: { success: mocks.notifySuccess, fromError: mocks.notifyFromError },
+}));
+vi.mock('../../../util/mapEDSRecordToRespurce', () => ({
+  mapEdsRecordToResource: mocks.mapEdsRecordToResource,
 }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -242,5 +288,72 @@ describe('ResourceFormManager in Chromium', () => {
 
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
     await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('collapses the EDS source strip on phones and shows its full details on desktop', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockImplementation((typeId) => {
+      mocks.materialTypeFieldsResult.data = String(typeId) === '9' ? mocks.bookFields : [];
+      return Promise.resolve(mocks.materialTypeFieldsResult);
+    });
+    mocks.searchEDS.mockResolvedValue(mocks.edsSearchResult);
+    mocks.mapEdsRecordToResource.mockResolvedValue(mocks.mappedEdsRecord);
+    await renderForm({}, ResourceFormType.EDS);
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Add from EDS' });
+    await act(async () => fireEvent.change(getByRole(dialog, 'textbox', { name: 'Search EDS' }), {
+      target: { value: 'synthetic record' },
+    }));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Edit & Add' })));
+
+    const source = getByRole(dialog, 'region', { name: 'Resource source' });
+    const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
+    const typeFields = getByRole(dialog, 'region', { name: 'Type-specific fields' });
+    const mobileDetails = source.querySelector('details');
+    const desktopText = source.querySelector('p.md\\:tw-block');
+    await waitFor(() => expect(mobileDetails).toBeTruthy());
+    await waitFor(() => expect(getByRole(typeFields, 'textbox', { name: /Publisher.*from EDS/ })).toBeTruthy());
+    const guessedLink = getByRole(dialog, 'textbox', { name: /Primary URL.*guessed/ });
+    const guessedType = getByRole(dialog, 'combobox', { name: /Material Type.*guessed/ });
+    const publisher = getByRole(typeFields, 'textbox', { name: /Publisher.*from EDS/ });
+    expect(getByRole(dialog, 'region', { name: 'Other details' }).textContent).toContain('from EDS');
+    expect(getByRole(typeFields, 'textbox', { name: /Book title.*from EDS/ })).toBeTruthy();
+    await expectNoAxeViolations(typeFields);
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      await expectNoHorizontalOverflow([width]);
+      if (width === 320) {
+        expect(mobileDetails.open).toBe(false);
+        expect(getByRole(source, 'button', { name: 'From EDS' })).toBeTruthy();
+        expect(getComputedStyle(desktopText).display).toBe('none');
+        await act(async () => fireEvent.click(getByRole(source, 'button', { name: 'From EDS' })));
+        expect(mobileDetails.open).toBe(true);
+        expect(mobileDetails.textContent).toContain('Synthetic EDS database');
+      }
+      if (width === 1280) {
+        expect(getComputedStyle(mobileDetails).display).toBe('none');
+        expect(getComputedStyle(desktopText).display).not.toBe('none');
+        expect(desktopText.textContent).toBe('From EDS: Synthetic EDS source title · Synthetic EDS database · AN SYNTH-AN-22');
+      }
+    }
+    await expectNoAxeViolations(linkSection);
+    await act(async () => fireEvent.change(publisher, { target: { value: 'Manually edited press' } }));
+    await waitFor(() => expect(queryByRole(typeFields, 'textbox', { name: /Publisher.*from EDS/ })).toBeNull());
+    await act(async () => fireEvent.change(guessedType, { target: { value: '10' } }));
+    await waitFor(() => expect(queryByRole(dialog, 'combobox', { name: /Material Type.*guessed/ })).toBeNull());
+    expect(guessedType.value).toBe('10');
+    const otherDetails = getByRole(dialog, 'region', { name: 'Other details' });
+    await waitFor(() => expect(otherDetails.textContent).toContain('Manually edited press'));
+    expect(getByText(otherDetails, 'article title')).toBeTruthy();
+    expect(getByText(otherDetails, 'Synthetic EDS source title')).toBeTruthy();
+    await act(async () => fireEvent.change(guessedLink, { target: { value: 'https://example.test/edited-link' } }));
+    await waitFor(() => expect(queryByRole(dialog, 'textbox', { name: /Primary URL.*guessed/ })).toBeNull());
+    await expectNoHorizontalOverflow([320, 768, 1280]);
+    await expectNoAxeViolations(source);
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
