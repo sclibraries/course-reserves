@@ -18,17 +18,19 @@ import { StaffSection } from './StaffSection';
 import { StudentSection } from './StudentSection';
 import { WhatBasics } from './WhatBasics';
 import WhereSection from './WhereSection';
-import UnifiedVisibilityControl from '../common/UnifiedVisibilityControl';
+import { VisibilitySection } from './visibility/VisibilitySection';
 
 export const ResourceForm = ({
-  initialData = {}, onSubmit, formId, course, sourceType, usageResourceId, onChangeRecord, changeRecordButtonRef, changeRecord,
+  initialData = {}, onSubmit, formId, course, mode = 'course', sourceType, usageResourceId,
+  onChangeRecord, changeRecordButtonRef, changeRecord,
 }) => {
   const {
-    defaultDates, formData, setFormData, useVisibilityDates, setUseVisibilityDates,
-    cascadeVisibilityToLinks, setCascadeVisibilityToLinks, links, setLinks,
+    formData, setFormData, useVisibilityDates, handleResourceVisibilityToggle, handleItemDateChange,
+    handlePrimaryLinkVisibilityToggle, handlePrimaryLinkDateChange, handleLinkVisibilityChange,
+    handleLinkDateChange, links, setLinks,
     materialTypes, setMaterialTypes, materialTypeFields, setMaterialTypeFields,
     errorMessage, setErrorMessage,
-  } = useResourceFormState({ initialData, course });
+  } = useResourceFormState({ initialData, course, sourceType });
   const { errors: validationErrors, validate, clearNameError } = useResourceFormValidation();
   const resourceUsage = useResourceUsage(usageResourceId);
   const provenance = useEdsProvenance({ initialData, sourceType, materialTypes, usage: resourceUsage.usage });
@@ -87,13 +89,7 @@ export const ResourceForm = ({
         ? { ...current, [name]: checked }
         : { ...current, metadata: { ...current.metadata, [name]: checked ? 'Yes' : 'No' } }));
     } else if (name in formData) {
-      const next = { ...formData, [name]: value };
-      if (name === 'link' && isHitchcockVideoUrl(value) && !next.use_primary_link_visibility) {
-        next.use_primary_link_visibility = true;
-        next.primary_link_start_visibility ||= defaultDates.startDate;
-        next.primary_link_end_visibility ||= defaultDates.endDate;
-      }
-      setFormData((current) => ({ ...current, ...next }));
+      setFormData((current) => ({ ...current, [name]: value }));
     } else {
       setFormData((current) => ({ ...current, metadata: { ...current.metadata, [name]: value } }));
     }
@@ -109,36 +105,6 @@ export const ResourceForm = ({
     fetchMaterialTypeFields(value);
   };
 
-  const handleVisibilityToggle = (enabled) => {
-    setUseVisibilityDates(enabled);
-    setFormData((current) => ({
-      ...current,
-      start_visibility: enabled ? current.start_visibility || defaultDates.startDate : '',
-      end_visibility: enabled ? current.end_visibility || defaultDates.endDate : '',
-    }));
-  };
-
-  const handlePrimaryLinkVisibilityToggle = (enabled) => setFormData((current) => ({
-    ...current,
-    use_primary_link_visibility: enabled,
-    ...(enabled ? {} : { primary_link_start_visibility: '', primary_link_end_visibility: '' }),
-  }));
-
-  const handlePrimaryLinkDateChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
-    const dateField = name === 'primary_link_start_visibility' ? 'start_visibility' : 'end_visibility';
-    if (name === 'primary_link_start_visibility' || name === 'primary_link_end_visibility') {
-      setLinks((current) => current.map((link) => (
-        link.use_link_visibility ? { ...link, [dateField]: value } : link
-      )));
-    }
-  };
-
-  const updateLinkField = (index, field, value) => setLinks((current) => current.map((link, linkIndex) => (
-    linkIndex === index ? { ...link, [field]: value } : link
-  )));
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -151,14 +117,13 @@ export const ResourceForm = ({
           use_link_visibility: link.use_link_visibility ? 1 : 0,
           use_proxy: link.use_proxy ? 1 : 0,
         }));
-      const isVideoType = formData.material_type_id === '3' || formData.material_type_id === 3;
       await onSubmit({
         ...formData,
         use_proxy: formData.use_proxy ? 1 : 0,
         use_primary_link_visibility: formData.use_primary_link_visibility ? 1 : 0,
         links: processedLinks,
-        start_visibility: useVisibilityDates || isVideoType ? formData.start_visibility : '',
-        end_visibility: useVisibilityDates || isVideoType ? formData.end_visibility : '',
+        start_visibility: formData.start_visibility,
+        end_visibility: formData.end_visibility,
       });
     } catch (error) {
       console.error('Error saving resource:', error);
@@ -204,7 +169,6 @@ export const ResourceForm = ({
           links={links}
           setLinks={setLinks}
           linkMarker={<FieldMarker marker={provenance.markerFor('link', formData.link)} />}
-          resourceVisibilityDates={{ startDate: formData.start_visibility, endDate: formData.end_visibility }}
         />
         <OtherDetails
           metadata={formData.metadata}
@@ -221,30 +185,18 @@ export const ResourceForm = ({
             <SharedEditWarning {...resourceUsage} />
           ) : null}
         />
-        <div id="visibility-settings">
-          <UnifiedVisibilityControl
-            resourceStartDate={formData.start_visibility}
-            resourceEndDate={formData.end_visibility}
-            useResourceVisibility={useVisibilityDates}
-            onResourceVisibilityToggle={handleVisibilityToggle}
-            onResourceDateChange={handleFieldChange}
-            primaryLinkStartDate={formData.primary_link_start_visibility}
-            primaryLinkEndDate={formData.primary_link_end_visibility}
-            usePrimaryLinkVisibility={formData.use_primary_link_visibility}
-            onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
-            onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
-            hasPrimaryLink={!!(formData.link && formData.link.trim())}
-            primaryUrl={formData.link}
-            links={links}
-            onLinkVisibilityChange={updateLinkField}
-            onLinkDateChange={updateLinkField}
-            materialTypeId={formData.material_type_id}
-            cascadeVisibilityToLinks={cascadeVisibilityToLinks}
-            onCascadeToggle={setCascadeVisibilityToLinks}
-            termStartDate={defaultDates.startDate}
-            termEndDate={defaultDates.endDate}
-          />
-        </div>
+        <VisibilitySection
+          formData={formData}
+          mode={mode}
+          useVisibilityDates={useVisibilityDates}
+          onResourceVisibilityToggle={handleResourceVisibilityToggle}
+          onItemDateChange={handleItemDateChange}
+          onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
+          onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
+          links={links}
+          onLinkVisibilityChange={handleLinkVisibilityChange}
+          onLinkDateChange={handleLinkDateChange}
+        />
         <StaffSection formData={formData} handleFieldChange={handleFieldChange} />
         <ErrorSummary errors={validationErrors} />
       </form>

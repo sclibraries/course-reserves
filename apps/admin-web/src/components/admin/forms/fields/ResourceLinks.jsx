@@ -8,14 +8,14 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import ProxyToggle from '../common/ProxyToggle';
 
-const ResourceLinks = ({ links, setLinks, resourceVisibilityDates = { startDate: '', endDate: '' } }) => {
+const ResourceLinks = ({ links, setLinks }) => {
   const addLink = () => setLinks((current) => [...current, {
     url: '',
     title: '',
     description: '',
     use_proxy: false,
-    start_visibility: resourceVisibilityDates.startDate || '',
-    end_visibility: resourceVisibilityDates.endDate || '',
+    start_visibility: '',
+    end_visibility: '',
     use_link_visibility: false,
   }]);
 
@@ -133,10 +133,6 @@ ResourceLinks.propTypes = {
     use_link_visibility: PropTypes.bool,
   })).isRequired,
   setLinks: PropTypes.func.isRequired,
-  resourceVisibilityDates: PropTypes.shape({
-    startDate: PropTypes.string,
-    endDate: PropTypes.string,
-  }),
 };
 
 export default ResourceLinks;

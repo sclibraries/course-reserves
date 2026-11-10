@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import PropTypes from 'prop-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from '@vitest/browser/context';
-import { fireEvent, getByRole, getByText, queryByRole, waitFor } from '@testing-library/dom';
+import { fireEvent, getByLabelText, getByRole, getByText, queryByRole, waitFor } from '@testing-library/dom';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../../../test/browser';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
@@ -168,6 +168,48 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager in Chromium', () => {
+  it('reflows the visibility section with three dated links and has no full-page axe violations', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    const links = [1, 2, 3].map((number) => ({
+      url: `https://example.test/${'long-visibility-path-'.repeat(14)}${number}`,
+      title: `Synthetic visibility link ${number}`,
+      description: '',
+      use_proxy: 0,
+      start_visibility: '2026-09-01',
+      end_visibility: '2026-12-20',
+      use_link_visibility: 1,
+    }));
+    await renderForm({
+      link: 'https://example.test/primary',
+      start_visibility: '2026-09-01',
+      end_visibility: '2026-12-20',
+      use_resource_visibility: 1,
+      use_primary_link_visibility: 1,
+      primary_link_start_visibility: '2026-09-01',
+      primary_link_end_visibility: '2026-12-20',
+      links,
+    }, ResourceFormType.NEW);
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
+    const visibility = getByRole(dialog, 'region', { name: 'When can students see it?' });
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      expect(getByLabelText(visibility, 'Item start date').value).toBe('2026-09-01');
+      expect(getByLabelText(visibility, 'Primary link start date').value).toBe('2026-09-01');
+      for (const number of [1, 2, 3]) {
+        expect(getByLabelText(visibility, `Link ${number} start date`).value).toBe('2026-09-01');
+        expect(getByLabelText(visibility, `Link ${number} end date`).value).toBe('2026-12-20');
+      }
+      await expectNoHorizontalOverflow([width]);
+    }
+    await expectNoAxeViolations(document.body);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
   it('reflows three long additional links across supported widths', async () => {
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');
@@ -305,8 +347,8 @@ describe('ResourceFormManager in Chromium', () => {
       expect(warning.textContent).toContain('Used in 2 courses');
     }
     await expectNoHorizontalOverflow([320, 768, 1280]);
-    await expectNoAxeViolations(summary);
-    await expectNoAxeViolations(warning);
+    await expectNoAxeViolations(document.body);
+    await expectNoAxeViolations(document.body);
     expect(mocks.updateResource).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
 

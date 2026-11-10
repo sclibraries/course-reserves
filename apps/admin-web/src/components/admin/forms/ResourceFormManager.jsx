@@ -187,6 +187,7 @@ export const ResourceFormManager = ({
         external_note: initialData.external_note || '',
         start_visibility: initialData.start_visibility || null,
         end_visibility: initialData.end_visibility || null,
+        use_resource_visibility: initialData.use_resource_visibility,
         material_type_id: initialData.material_type_id || null,
         order: initialData.order || null,
         created_at: initialData.created_at || '',

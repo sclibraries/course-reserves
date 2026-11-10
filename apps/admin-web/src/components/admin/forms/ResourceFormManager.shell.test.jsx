@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
-import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByRole, waitFor } from '@testing-library/dom';
+import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByLabelText, queryByRole, waitFor } from '@testing-library/dom';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
 import { LIBPROXY_PREFIX } from '../../../util/proxyUtil';
@@ -128,6 +128,132 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager dialog shell', () => {
+  it.each([
+    {
+      name: 'flag 0 with item dates',
+      material_type_id: '1',
+      fields: {
+        start_visibility: '2026-09-01', end_visibility: '2026-12-20', use_resource_visibility: 0,
+        primary_link_start_visibility: null, primary_link_end_visibility: null, use_primary_link_visibility: 0,
+      },
+      links: [{
+        url: 'https://example.test/dormant-item', title: 'Synthetic additional link', description: '', use_proxy: 0,
+        start_visibility: '2026-09-03', end_visibility: '2026-12-18', use_link_visibility: 0,
+      }],
+    },
+    {
+      name: 'flag 1 with undated item and primary link',
+      material_type_id: '1',
+      fields: {
+        start_visibility: null, end_visibility: null, use_resource_visibility: 1,
+        primary_link_start_visibility: null, primary_link_end_visibility: null, use_primary_link_visibility: 1,
+      },
+      links: [],
+    },
+    {
+      name: 'one-sided item, primary, and additional-link windows',
+      material_type_id: '1',
+      fields: {
+        start_visibility: '2026-09-01', end_visibility: null, use_resource_visibility: 1,
+        primary_link_start_visibility: null, primary_link_end_visibility: '2026-12-18', use_primary_link_visibility: 1,
+      },
+      links: [{
+        url: 'https://example.test/one-sided', title: 'Synthetic one-sided link', description: '', use_proxy: 0,
+        start_visibility: '2026-09-03', end_visibility: null, use_link_visibility: 1,
+      }],
+    },
+    {
+      name: 'an undated video',
+      material_type_id: '3',
+      fields: {
+        start_visibility: null, end_visibility: null, use_resource_visibility: 0,
+        primary_link_start_visibility: null, primary_link_end_visibility: null, use_primary_link_visibility: 0,
+      },
+      links: [],
+    },
+    {
+      name: 'dormant primary and additional-link dates',
+      material_type_id: '1',
+      fields: {
+        start_visibility: null, end_visibility: null, use_resource_visibility: 0,
+        primary_link_start_visibility: '2026-09-02', primary_link_end_visibility: '2026-12-19', use_primary_link_visibility: 0,
+      },
+      links: [{
+        url: 'https://example.test/dormant-link', title: 'Synthetic dormant link', description: '', use_proxy: 0,
+        start_visibility: '2026-09-04', end_visibility: '2026-12-17', use_link_visibility: 0,
+      }],
+    },
+  ])('preserves all loaded visibility fields after a name-only edit with $name', async ({ material_type_id, fields, links }) => {
+    await renderForm({
+      formType: ResourceFormType.EDIT,
+      initialData: {
+        resource_id: 'resource-17', name: 'Loaded synthetic resource', item_url: 'https://example.test/primary',
+        material_type_id, links, ...fields,
+      },
+    });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    fireEvent.change(getByRole(dialog, 'textbox', { name: 'Resource Name' }), {
+      target: { value: 'Renamed synthetic resource' },
+    });
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+    await waitFor(() => expect(mocks.updateResource).toHaveBeenCalledOnce());
+
+    const payload = mocks.updateResource.mock.calls[0][1];
+    expect(Object.fromEntries(Object.keys(fields).map((field) => [field, payload[field]]))).toEqual(fields);
+    expect(payload.links).toEqual(links);
+  });
+
+  it('shows only shared additional-link dates in no-course mode and keeps the section axe-clean', async () => {
+    await renderForm({
+      formType: ResourceFormType.EDIT,
+      mode: 'none',
+      initialData: {
+        resource_id: 'resource-17', name: 'Synthetic resource', item_url: 'https://example.test/primary',
+        start_visibility: '2026-09-01', end_visibility: '2026-12-20', use_resource_visibility: 1,
+        use_primary_link_visibility: 1, primary_link_start_visibility: '2026-09-02',
+        primary_link_end_visibility: '2026-12-19',
+        links: [{
+          url: 'https://example.test/shared', title: 'Synthetic shared link', description: '', use_proxy: 0,
+          start_visibility: '2026-09-03', end_visibility: '2026-12-18', use_link_visibility: 1,
+        }],
+      },
+    });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    const visibility = getByRole(dialog, 'region', { name: 'When can students see it?' });
+    expect(queryByRole(visibility, 'checkbox', { name: 'Show this item between' })).toBeNull();
+    expect(queryByRole(visibility, 'checkbox', { name: 'Primary link only between' })).toBeNull();
+    expect(queryByLabelText(visibility, /item start date/i)).toBeNull();
+    expect(queryByLabelText(visibility, /primary link start date/i)).toBeNull();
+    expect(getByLabelText(visibility, /link 1 start date/i).value).toBe('2026-09-03');
+    expect(visibility.textContent).toContain('Applies in every course using this resource.');
+    expect(await axe(visibility)).toHaveNoViolations();
+  });
+
+  it('does not change additional-link dates when a primary-link date changes', async () => {
+    await renderForm({
+      formType: ResourceFormType.EDIT,
+      initialData: {
+        resource_id: 'resource-17', name: 'Synthetic resource', item_url: 'https://example.test/primary',
+        use_primary_link_visibility: 1, primary_link_start_visibility: '2026-09-01',
+        links: [{
+          url: 'https://example.test/additional', title: 'Synthetic additional link', description: '', use_proxy: 0,
+          start_visibility: '2026-09-05', end_visibility: '2026-12-05', use_link_visibility: 1,
+        }],
+      },
+    });
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
+    fireEvent.change(getByLabelText(dialog, /primary link start date/i), { target: { value: '2026-10-01' } });
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+    await waitFor(() => expect(mocks.updateResource).toHaveBeenCalledOnce());
+
+    expect(mocks.updateResource.mock.calls[0][1].links[0]).toMatchObject({
+      start_visibility: '2026-09-05', end_visibility: '2026-12-05',
+    });
+  });
+
   it('saves checkbox metadata and preserves proxy URLs per link', async () => {
     const prefix = LIBPROXY_PREFIX;
     const links = [
@@ -307,7 +433,7 @@ describe('ResourceFormManager dialog shell', () => {
     expect(getByRole(dialog, 'textbox', { name: 'Internal note' })).toBeTruthy();
     expect(getByRole(dialog, 'button', { name: 'Save' })).toBeTruthy();
     expect(getByRole(dialog, 'button', { name: 'Cancel' })).toBeTruthy();
-    for (const id of ['what-is-it', 'what-students-see', 'staff-only']) {
+    for (const id of ['what-is-it', 'what-students-see', 'when-can-students-see-it', 'staff-only']) {
       expect(await axe(dialog.querySelector(`#${id}`), {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
       })).toHaveNoViolations();
@@ -337,6 +463,7 @@ describe('ResourceFormManager dialog shell', () => {
         folder: 'folder-17',
         start_visibility: '2026-09-01',
         end_visibility: '2026-12-20',
+        use_resource_visibility: 1,
         material_type_id: '',
         metadata: {},
         use_primary_link_visibility: 0,
@@ -370,11 +497,12 @@ describe('ResourceFormManager dialog shell', () => {
     expect(getByRole(dialog, 'button', { name: 'Save' })).toBeTruthy();
     const cancel = getByRole(dialog, 'button', { name: 'Cancel' });
     const linkUrl = getByLabelText(dialog, /^URL/);
-    const [startDate, endDate] = dialog.querySelectorAll('input[type="date"]');
+    const startDate = getByLabelText(dialog, 'Link 1 start date');
+    const endDate = getByLabelText(dialog, 'Link 1 end date');
     fireEvent.change(linkUrl, { target: { value: 'https://example.test/unsaved' } });
     fireEvent.change(startDate, { target: { value: '2026-10-01' } });
     fireEvent.change(endDate, { target: { value: '2026-11-01' } });
-    fireEvent.click(getByRole(dialog, 'checkbox', { name: 'Set separate visibility dates for this link' }));
+    fireEvent.click(getByRole(dialog, 'checkbox', { name: 'Link 1 only between' }));
     fireEvent.click(cancel);
 
     await waitFor(() => expect(queryByRole(document.body, 'dialog')).toBeNull());
@@ -384,10 +512,9 @@ describe('ResourceFormManager dialog shell', () => {
 
     dialog = getByRole(document.body, 'dialog', { name: 'Edit resource' });
     expect(getByLabelText(dialog, /^URL/).value).toBe('https://example.test/original');
-    const reopenedDates = dialog.querySelectorAll('input[type="date"]');
-    expect(reopenedDates[0].value).toBe('2026-09-05');
-    expect(reopenedDates[1].value).toBe('2026-12-05');
-    expect(getByRole(dialog, 'checkbox', { name: 'Set separate visibility dates for this link' }).checked).toBe(true);
+    expect(getByLabelText(dialog, 'Link 1 start date').value).toBe('2026-09-05');
+    expect(getByLabelText(dialog, 'Link 1 end date').value).toBe('2026-12-05');
+    expect(getByRole(dialog, 'checkbox', { name: 'Link 1 only between' }).checked).toBe(true);
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
