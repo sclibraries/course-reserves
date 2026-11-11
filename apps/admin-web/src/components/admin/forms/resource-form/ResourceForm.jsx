@@ -9,6 +9,7 @@ import { useResourceUsage } from '../../../../hooks/admin/useResourceUsage';
 import { useEdsProvenance } from '../../../../hooks/admin/useEdsProvenance';
 import { isHitchcockVideoUrl } from '../../../../util/externalLinks';
 import { loadProxyLink } from '../../../../util/proxyUtil';
+import { getVisibilitySummary } from '../../../../util/visibilitySummary';
 import { ErrorSummary } from './ErrorSummary';
 import { FieldMarker } from './FieldMarker';
 import { OtherDetails } from './OtherDetails';
@@ -40,6 +41,12 @@ export const ResourceForm = ({
   const savedMetadataKeys = useRef(initialData.resource_id ? Object.keys(initialData.metadata || {}) : []);
   const canChangeRecord = sourceType === 'eds'
     || (sourceType === 'edit' && Boolean(initialData.metadata?.accession_number));
+  const visibilitySummary = getVisibilitySummary({ ...formData, links }, {
+    mode,
+    sourceType,
+    course,
+    courseResourceId: initialData.course_resource_id,
+  });
 
   useEffect(() => {
     if (!changeRecord || handledRecord.current === changeRecord) return;
@@ -193,6 +200,7 @@ export const ResourceForm = ({
           onItemDateChange={handleItemDateChange}
           onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
           onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
+          summary={visibilitySummary}
           links={links}
           onLinkVisibilityChange={handleLinkVisibilityChange}
           onLinkDateChange={handleLinkDateChange}

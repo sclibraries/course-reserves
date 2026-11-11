@@ -2,21 +2,8 @@ import { useCallback } from 'react';
 import { notify } from '../../services/notify';
 import { adminCourseService } from '../../services/admin/adminCourseService';
 import { adminResourceService } from '../../services/admin/adminResourceService';
-import { buildProxyUrl } from '../../util/proxyUtil';
+import { serializeResourcePayload } from '../../util/resourcePayload';
 import { ResourceFormType } from '../../components/admin/forms/constants/formTypes';
-
-const RESOURCE_ASSOCIATION_FIELDS = [
-  'start_visibility', 'end_visibility', 'use_resource_visibility',
-  'primary_link_start_visibility', 'primary_link_end_visibility', 'use_primary_link_visibility',
-];
-
-const serializeProxyLink = (link, urlField) => {
-  const { loaded, ...data } = link;
-  return {
-    ...data,
-    [urlField]: buildProxyUrl({ url: data[urlField], use_proxy: data.use_proxy }, loaded),
-  };
-};
 
 export function useResourceFormSubmit({
   formType,
@@ -33,28 +20,16 @@ export function useResourceFormSubmit({
   return useCallback(async (formData) => {
     try {
       setLoading(true);
-      const { links, ...resourceData } = formData;
-      const payload = {
-        ...serializeProxyLink(resourceData, 'link'),
-        ...(links && {
-          links: links.map((link) => serializeProxyLink(link, 'url')),
-        }),
-      };
+      const payload = serializeResourcePayload(formData, {
+        isEdit: formType === ResourceFormType.EDIT,
+        mode,
+        course,
+        courseResourceId,
+      });
 
       let result;
       if (formType === ResourceFormType.EDIT) {
         const { resource_id, ...updateData } = payload;
-        RESOURCE_ASSOCIATION_FIELDS.forEach((field) => {
-          if (updateData[field] === '') updateData[field] = null;
-        });
-        if (mode === 'none') {
-          RESOURCE_ASSOCIATION_FIELDS.forEach((field) => delete updateData[field]);
-          delete updateData.offering_id;
-          delete updateData.course_resource_id;
-        } else {
-          updateData.offering_id = course?.offering_id;
-          updateData.course_resource_id = courseResourceId;
-        }
         result = await onUpdate?.({ resource_id, ...updateData })
           || await adminResourceService.updateResource(resource_id, updateData);
       } else {

@@ -164,11 +164,14 @@ afterEach(() => {
   container?.remove();
   root = null;
   container = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe('ResourceFormManager in Chromium', () => {
   it('reflows the visibility section with three dated links and has no full-page axe violations', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 22, 12, 0, 0));
     vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
       throw new Error('Unexpected application HTTP request');
     }));
@@ -196,14 +199,23 @@ describe('ResourceFormManager in Chromium', () => {
 
     const dialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
     const visibility = getByRole(dialog, 'region', { name: 'When can students see it?' });
+    const summary = getByRole(visibility, 'region', { name: 'Visibility summary' });
     for (const width of [320, 768, 1280]) {
       await page.viewport(width, 900);
+      summary.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       expect(getByLabelText(visibility, 'Item start date').value).toBe('2026-09-01');
       expect(getByLabelText(visibility, 'Primary link start date').value).toBe('2026-09-01');
       for (const number of [1, 2, 3]) {
         expect(getByLabelText(visibility, `Link ${number} start date`).value).toBe('2026-09-01');
         expect(getByLabelText(visibility, `Link ${number} end date`).value).toBe('2026-12-20');
       }
+      const bounds = summary.getBoundingClientRect();
+      const contentBounds = dialog.querySelector('[data-testid="resource-form-content"]').getBoundingClientRect();
+      expect(summary.textContent).toContain("Cross-linked pages use this resource's shared dates");
+      expect(bounds.width).toBeGreaterThan(0);
+      expect(bounds.height).toBeGreaterThan(0);
+      expect(bounds.left).toBeGreaterThanOrEqual(contentBounds.left - 1);
+      expect(bounds.right).toBeLessThanOrEqual(contentBounds.right + 1);
       await expectNoHorizontalOverflow([width]);
     }
     await expectNoAxeViolations(document.body);

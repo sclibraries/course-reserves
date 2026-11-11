@@ -5,6 +5,7 @@ import { Label } from '../../../../ui/label';
 import { normalizeVisibilityFlag } from '../../../../../hooks/admin/useVisibilityFormState';
 import { ResourceFormSection } from '../ResourceFormSection';
 import { DatePairControl } from './DatePairControl';
+import { VisibilitySummary } from './VisibilitySummary';
 
 export const VisibilitySection = ({
   formData,
@@ -14,6 +15,7 @@ export const VisibilitySection = ({
   onItemDateChange,
   onPrimaryLinkVisibilityToggle,
   onPrimaryLinkDateChange,
+  summary,
   links,
   onLinkVisibilityChange,
   onLinkDateChange,
@@ -106,6 +108,7 @@ export const VisibilitySection = ({
         )}
       </div>
     ))}
+    <VisibilitySummary summary={summary} />
   </ResourceFormSection>
 );
 
@@ -117,6 +120,12 @@ VisibilitySection.propTypes = {
   onItemDateChange: PropTypes.func.isRequired,
   onPrimaryLinkVisibilityToggle: PropTypes.func.isRequired,
   onPrimaryLinkDateChange: PropTypes.func.isRequired,
+  summary: PropTypes.shape({
+    citation: PropTypes.string,
+    primaryLink: PropTypes.string,
+    links: PropTypes.arrayOf(PropTypes.object).isRequired,
+    sharedDatesMessage: PropTypes.string,
+  }).isRequired,
   links: PropTypes.arrayOf(PropTypes.object).isRequired,
   onLinkVisibilityChange: PropTypes.func.isRequired,
   onLinkDateChange: PropTypes.func.isRequired,
