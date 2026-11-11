@@ -246,12 +246,11 @@ describe('AddMaterialsPage', () => {
     }));
   });
 
-  it('renders independently scrollable, keyboard-focusable panes on desktop', async () => {
+  it('renders a keyboard-focusable full record region beside search results on desktop', async () => {
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
     const results = view.querySelector('[aria-label="Search results"]') as HTMLElement;
     expect(results).not.toBeNull();
     expect(view.querySelector('[aria-label="Full record"]')).toBeNull();
-    expect(results.className).not.toContain('md:overflow-y-auto');
     expect(results.parentElement?.className).not.toContain('md:grid-cols-');
     expect(view.querySelector('[aria-label="Search the library"]')?.getAttribute('style')).toBeNull();
 
@@ -260,16 +259,13 @@ describe('AddMaterialsPage', () => {
     const record = view.querySelector('[aria-label="Full record"]') as HTMLElement;
 
     expect(record).not.toBeNull();
-    expect(results.tabIndex).toBe(0);
     expect(record.tabIndex).toBe(0);
     expect(results.parentElement?.className).toContain('md:grid-cols-');
-    expect(results.className).toContain('md:overflow-y-auto');
+    expect(record.getAttribute('role')).toBe('region');
+    expect(record.className).toContain('md:sticky');
     expect(record.className).toContain('md:overflow-y-auto');
-    expect(results.className).toContain('md:min-h-0');
-    expect(record.className).toContain('md:min-h-0');
-    expect(results.className).not.toContain('overscroll-contain');
-    expect(record.className).not.toContain('overscroll-contain');
-    expect(view.querySelector('[aria-label="Search the library"]')?.className).toContain('md:flex');
+    expect(view.querySelector('[aria-label="Search results"]')?.className).not.toContain('md:overflow-y-auto');
+    expect(view.querySelector('[aria-label="Search the library"]')?.className).not.toContain('md:flex');
   });
 
   it('keeps an empty search in normal page flow without a record rail', async () => {
@@ -353,7 +349,7 @@ describe('AddMaterialsPage', () => {
     await act(async () => { resolveRecord(fullRecord); await Promise.resolve(); });
   });
 
-  it('uses the results pane as the infinite-scroll root', async () => {
+  it('keeps infinite scroll on the page while the record is open', async () => {
     const instances: Array<{ options: IntersectionObserverInit; callback: IntersectionObserverCallback }> = [];
     class TestIntersectionObserver {
       readonly root: Element | Document | null;
@@ -372,13 +368,11 @@ describe('AddMaterialsPage', () => {
       appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
     }));
     const view = await renderAt('/submission/reserve-test/edit/add?tab=search&q=climate%20change');
-    const results = view.querySelector('[aria-label="Search results"]');
-
     expect(instances.length).toBeGreaterThan(0);
     expect(instances[0].options.root).toBeNull();
     const openRecord = Array.from(view.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
     await act(async () => { openRecord.click(); await Promise.resolve(); });
-    expect(instances[instances.length - 1].options.root).toBe(results);
+    expect(instances[instances.length - 1].options.root).toBeNull();
     await act(async () => {
       instances[instances.length - 1].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
       await Promise.resolve();
@@ -649,14 +643,27 @@ Melanie Newton, “The Race Leapt at Sauteurs: Genocide, Narrative and Indigenou
     expect(citationCard.textContent).not.toContain('Hide other matches');
   });
 
-  it('adds from the full-record panel and closes it', async () => {
+  it('resets the paste full-record pane for each selection and closes after adding', async () => {
+    vi.mocked(searchDiscovery).mockResolvedValue({
+      results: [searchResult, secondSearchResult], totalHits: 2, searchTime: 5,
+      queryString: 'citation search', appliedLimiters: [], facets: { sourceTypes: [], publicationYears: [] },
+    });
     const context = createContext({ reserve: { ...reserve, items: [] } });
     const view = await renderAt('/submission/reserve-test/edit/add?tab=paste', context);
     await enterCitation(view, validCitation);
     await findPasteMatches(view);
     const card = view.querySelector('[data-citation-id="citation-1"]') as HTMLElement;
-    const openRecord = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'View full record') as HTMLButtonElement;
+    const showOthers = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.includes('Show')) as HTMLButtonElement;
+    await act(async () => showOthers.click());
+    const openRecord = card.querySelector('[aria-label="View full record for Synthetic Article"]') as HTMLButtonElement;
     await act(async () => { openRecord.click(); await Promise.resolve(); });
+    const recordPane = view.querySelector('[aria-label="Full record"]') as HTMLElement;
+    recordPane.scrollTop = 280;
+    await act(async () => {
+      (card.querySelector('[aria-label="View full record for Second Synthetic Article"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(recordPane.scrollTop).toBe(0);
     const useMatch = Array.from(view.querySelectorAll('[aria-label="Full record"] button')).find((button) => button.textContent?.includes('Use this match')) as HTMLButtonElement;
 
     expect(useMatch).toBeTruthy();

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DiscoveryFilterBar from '@/components/discovery/DiscoveryFilterBar';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
+import StickyRecordPane from '@/components/discovery/StickyRecordPane';
 import DiscoveryResultCard from '@/components/discovery/DiscoveryResultCard';
 import { useDiscoverySearch } from '@/hooks/useDiscoverySearch';
 import { useCatalogAvailability } from '@/hooks/useCatalogAvailability';
@@ -30,9 +31,6 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
   const search = useDiscoverySearch({ enabled: !showRecordRoute });
   const { record, selectedId, loading, error, loadRecord, clearSelection } = useSelection();
   const [draftQuery, setDraftQuery] = useState(search.query);
-  const [sectionHeight, setSectionHeight] = useState<number>();
-  const sectionRef = useRef<HTMLElement>(null);
-  const resultsPaneRef = useRef<HTMLDivElement>(null);
   const recordPaneRef = useRef<HTMLDivElement>(null);
   const returnToList = searchParams.get('returnTo') === 'list';
   const isSplitView = !showRecordRoute && Boolean(selectedId) && search.results.length > 0;
@@ -59,49 +57,9 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
 
   useOnEscape(isSplitView && window.innerWidth >= 768, clearSelection);
 
-  useLayoutEffect(() => {
-    if (!isSplitView) {
-      setSectionHeight(undefined);
-      return undefined;
-    }
-
-    const section = sectionRef.current;
-    if (!section) return undefined;
-    const tray = (section.closest('main') || document).querySelector<HTMLElement>('aside[aria-label="Added materials"]');
-    const stickyTop = document.querySelector<HTMLElement>('[data-testid="page-sticky-top"]');
-    let frame = 0;
-    const measure = () => {
-      window.cancelAnimationFrame(frame);
-      if (window.innerWidth < 768) {
-        setSectionHeight(undefined);
-        return;
-      }
-      frame = window.requestAnimationFrame(() => {
-        const sectionTop = section.getBoundingClientRect().top;
-        const trayTop = tray?.getBoundingClientRect().top ?? window.innerHeight;
-        const availableBottom = Math.min(window.innerHeight, trayTop);
-        setSectionHeight(Math.max(0, availableBottom - sectionTop));
-      });
-    };
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    observer?.observe(section);
-    if (tray) observer?.observe(tray);
-    if (stickyTop) observer?.observe(stickyTop);
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    measure();
-    return () => {
-      observer?.disconnect();
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-    };
-  }, [isSplitView]);
-
   const sentinelRef = useInfiniteScroll(
     search.loadMore,
     search.hasMore && !search.loading && !search.loadingMore,
-    isSplitView ? resultsPaneRef : undefined,
   );
   const searchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -119,13 +77,20 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
     params.set('tab', 'search');
     navigate(`/submission/${id}/edit/add?${params.toString()}`);
   };
+  const fullRecordPanel = (
+    <DiscoveryRecordPanel
+      record={record}
+      availability={availability.get(record?.id || '')}
+      loading={loading}
+      error={error}
+      isRoute={showRecordRoute}
+      onBack={showRecordRoute ? backToSearch : clearSelection}
+      backLabel={returnToList ? 'Back to my list' : undefined}
+      onAdd={record && !returnToList && !isDuplicate(record) ? addFullRecord : undefined}
+    />
+  );
   return (
-    <section
-      ref={sectionRef}
-      className={isSplitView ? 'space-y-4 md:flex md:min-h-0 md:flex-col' : 'space-y-4'}
-      aria-label="Search the library"
-      style={sectionHeight === undefined ? undefined : { height: `${sectionHeight}px` }}
-    >
+    <section className="space-y-4" aria-label="Search the library">
       {!showRecordRoute && (
         <>
           <form onSubmit={searchSubmit} className="flex gap-2">
@@ -136,14 +101,12 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
         </>
       )}
 
-      <div className={showRecordRoute ? 'block' : isSplitView ? 'grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)] md:grid-rows-[minmax(0,1fr)]' : 'space-y-3'}>
+      <div className={showRecordRoute ? 'block' : isSplitView ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(20rem,38%)]' : 'space-y-3'}>
         {!showRecordRoute && (
           <div
-            ref={resultsPaneRef}
-            className={`min-w-0 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSplitView ? 'md:min-h-0 md:overflow-y-auto' : ''}`}
+            className="min-w-0 space-y-3"
             role="region"
             aria-label="Search results"
-            tabIndex={isSplitView && window.innerWidth >= 768 ? 0 : undefined}
           >
             {search.query && <p className="text-sm text-muted-foreground">Found {search.totalHits.toLocaleString()} results{search.results.length > 0 ? ` · showing ${search.results.length}` : ''}{search.searchTime ? ` · ${search.searchTime}ms` : ''}</p>}
             {search.error && <div role="alert" className="whitespace-pre-line rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{search.error}</div>}
@@ -167,26 +130,19 @@ export default function SearchTab({ isRecordRoute = false, dbId, an }: SearchTab
             {search.hasMore && <div className="text-center"><Button variant="outline" onClick={() => void search.loadMore()} disabled={search.loadingMore}>Load more</Button></div>}
           </div>
         )}
-        {(showRecordRoute || (isSplitView && window.innerWidth >= 768)) && (
+        {showRecordRoute ? (
           <div
-            ref={recordPaneRef}
             className="md:min-h-0 md:overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             role="region"
             aria-label="Full record"
-            tabIndex={isSplitView && window.innerWidth >= 768 ? 0 : undefined}
           >
-            <DiscoveryRecordPanel
-              record={record}
-              availability={availability.get(record?.id || '')}
-              loading={loading}
-              error={error}
-              isRoute={showRecordRoute}
-              onBack={showRecordRoute ? backToSearch : clearSelection}
-              backLabel={returnToList ? 'Back to my list' : undefined}
-              onAdd={record && !returnToList && !isDuplicate(record) ? addFullRecord : undefined}
-            />
+            {fullRecordPanel}
           </div>
-        )}
+        ) : isSplitView && window.innerWidth >= 768 ? (
+          <StickyRecordPane ref={recordPaneRef} tabIndex={0}>
+            {fullRecordPanel}
+          </StickyRecordPane>
+        ) : null}
       </div>
     </section>
   );

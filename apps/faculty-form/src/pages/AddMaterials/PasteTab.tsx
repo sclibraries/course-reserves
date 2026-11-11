@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import DiscoveryRecordPanel from '@/components/discovery/DiscoveryRecordPanel';
+import StickyRecordPane from '@/components/discovery/StickyRecordPane';
 import { useOpenDiscoveryRecord, type OpenDiscoveryRecordOptions } from '@/hooks/useOpenDiscoveryRecord';
 import { useSelection } from '@/hooks/useSelection';
 import { useCatalogAvailability } from '@/hooks/useCatalogAvailability';
@@ -38,8 +39,10 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
   const { id, addedItemsByCitation, isWrittenDuplicate, isResultDuplicate, addAsWritten, addMatch, undoAddedMaterial } =
     usePasteCitationActions(workspace, setWorkspace, keepUnheadedAtRoot);
   const { record, loading, error: recordError, loadRecord, clearSelection } = useSelection();
+  const recordPaneRef = useRef<HTMLDivElement>(null);
   const selectRecord = useCallback((selectedRecord: { dbId: string; an: string }, options: OpenDiscoveryRecordOptions) => {
     if (!options.citationId) return;
+    if (recordPaneRef.current) recordPaneRef.current.scrollTop = 0;
     setActiveCitationId(options.citationId);
     void loadRecord(selectedRecord.dbId, selectedRecord.an);
   }, [loadRecord]);
@@ -254,15 +257,17 @@ export default function PasteTab({ isRecordRoute = false, dbId, an }: PasteTabPr
               ))}
             </div>
             {hasRecordPanel && (
-              <DiscoveryRecordPanel
-                record={record}
-                availability={availability.get(record?.id || '')}
-                loading={loading}
-                error={recordError}
-                onBack={closeRecordPanel}
-                onAdd={record && selectedCitationId && !addedItemsByCitation.has(selectedCitationId) && !isResultDuplicate(record) ? useFullRecord : undefined}
-                addLabel="Use this match"
-              />
+              <StickyRecordPane ref={recordPaneRef} tabIndex={0}>
+                <DiscoveryRecordPanel
+                  record={record}
+                  availability={availability.get(record?.id || '')}
+                  loading={loading}
+                  error={recordError}
+                  onBack={closeRecordPanel}
+                  onAdd={record && selectedCitationId && !addedItemsByCitation.has(selectedCitationId) && !isResultDuplicate(record) ? useFullRecord : undefined}
+                  addLabel="Use this match"
+                />
+              </StickyRecordPane>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 border-t pt-4">
