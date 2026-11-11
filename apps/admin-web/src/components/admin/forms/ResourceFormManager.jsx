@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Button } from '../../ui/button';
-import { notify } from '../../../services/notify';
 
 // Form components
 import ResourceForm from './resource-form/ResourceForm';
@@ -17,6 +16,7 @@ import ResourceSearchPicker from './search/ResourceSearchPicker';
 // Services
 import { useAdminCourseStore } from '../../../store/adminCourseStore';
 import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
+import { useResourceReuse } from '../../../hooks/admin/useResourceReuse';
 import { useResourceFormSubmit } from '../../../hooks/admin/useResourceFormSubmit';
 import { useChangeRecord } from '../../../hooks/admin/useChangeRecord';
 
@@ -70,6 +70,7 @@ export const ResourceFormManager = ({
   const resourceSearch = useResourceSearch(
     formType === ResourceFormType.EDIT ? ResourceFormType.EDS : formType,
   );
+  const { resource: reusedResource, loading: reuseLoading, selectResource, reset: resetReuse } = useResourceReuse();
   const { reset: resetResourceSearch } = resourceSearch;
   const recordChange = useChangeRecord({ formType, resetSearch: resetResourceSearch, setError });
   const resetRecordChange = recordChange.reset;
@@ -85,7 +86,8 @@ export const ResourceFormManager = ({
     setError(null);
     resetResourceSearch();
     resetRecordChange();
-  }, [resetRecordChange, resetResourceSearch]);
+    resetReuse();
+  }, [resetRecordChange, resetResourceSearch, resetReuse]);
 
   /**
    * Effect to reset state when modal opens/closes or form type changes
@@ -124,28 +126,6 @@ export const ResourceFormManager = ({
     }, {});
   };
 
-  const handleReuseResource = async (resourceId) => {
-    setError(null);
-    setLoading(true);
-    try {
-      await additionalProps.onReuse?.(resourceId);
-      try {
-        await onSubmit?.();
-      } catch {
-        setError('Resource linked, but the list could not be refreshed.');
-        return;
-      }
-      notify.success('Resource linked');
-      onClose();
-    } catch (err) {
-      console.error('Error reusing resource:', err);
-      setError("Couldn't add the resource to the course");
-      notify.fromError(err, "Couldn't link the resource");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleBaseFormSubmit = useResourceFormSubmit({
     formType,
     course,
@@ -175,6 +155,8 @@ export const ResourceFormManager = ({
    * Prepare initial data for ResourceForm based on form type and context
    */
   const getFormInitialData = () => {
+    if (formType === ResourceFormType.REUSE && reusedResource) return reusedResource;
+
     if (formType === ResourceFormType.EDIT && initialData) {
       return {
         resource_id: initialData.resource_id || null,
@@ -231,7 +213,8 @@ export const ResourceFormManager = ({
   };
 
   const showResourceForm = [ResourceFormType.NEW, ResourceFormType.EDIT].includes(formType)
-    || recordChange.showEditForm;
+    || recordChange.showEditForm
+    || (formType === ResourceFormType.REUSE && Boolean(reusedResource));
 
   const renderResourceForm = () => (
     <>
@@ -248,7 +231,8 @@ export const ResourceFormManager = ({
         initialData={getFormInitialData()}
         onSubmit={handleBaseFormSubmit}
         sourceType={formType}
-        usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : null}
+        readOnly={formType === ResourceFormType.REUSE}
+        usageResourceId={formType === ResourceFormType.EDIT ? initialData.resource_id : reusedResource?.resource_id}
         onChangeRecord={recordChange.openPicker}
         changeRecordButtonRef={changeRecordButtonRef}
         changeRecord={recordChange.record}
@@ -300,8 +284,9 @@ export const ResourceFormManager = ({
         return (
           <AdminReuseForm
             error={error}
-            onReuse={handleReuseResource}
-            isLoading={loading}
+            onSearchTermChange={resourceSearch.setSearchTerm}
+            onReuse={selectResource}
+            isLoading={reuseLoading}
           />
         );
 
@@ -371,7 +356,6 @@ ResourceFormManager.propTypes = {
   title: PropTypes.string,
   refreshLinkedCourses: PropTypes.func,
   // Additional props for specific form types
-  onReuse: PropTypes.func,
   onUpdate: PropTypes.func,
   resourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };

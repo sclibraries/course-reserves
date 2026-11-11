@@ -41,12 +41,19 @@ export const offeringLinkApi = {
     return response.json();
   },
 
-  async linkExistingResources(offeringId, resourceId) {
-    const response = await authFetch(
-      `${COURSE_API}${config.api.endpoints.offeringLink.linkExisting}?offering_id=${offeringId}&resource_id=${resourceId}`,
-      { headers: {} }
-    );
-    if (!response.ok) throw new Error('Failed to link resources');
+  async reuseResource(offeringId, resourceId, settings) {
+    const response = await authFetch(`${COURSE_API}${config.api.endpoints.offeringLink.linkExisting}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offering_id: offeringId, resource_id: resourceId, settings }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const error = new Error(data.message || 'Failed to link resources');
+      error.reference = data.reference;
+      error.serverMessage = data.message;
+      throw error;
+    }
     return response.json();
   },
 

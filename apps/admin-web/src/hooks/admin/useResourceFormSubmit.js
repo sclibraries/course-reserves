@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { notify } from '../../services/notify';
 import { adminCourseService } from '../../services/admin/adminCourseService';
 import { adminResourceService } from '../../services/admin/adminResourceService';
+import { offeringLinkApi } from '../../services/admin/course/offeringLinkApi';
 import { serializeResourcePayload } from '../../util/resourcePayload';
 import { ResourceFormType } from '../../components/admin/forms/constants/formTypes';
 
@@ -32,6 +33,15 @@ export function useResourceFormSubmit({
         const { resource_id, ...updateData } = payload;
         result = await onUpdate?.({ resource_id, ...updateData })
           || await adminResourceService.updateResource(resource_id, updateData);
+      } else if (formType === ResourceFormType.REUSE) {
+        result = await offeringLinkApi.reuseResource(course.offering_id, payload.resource_id, {
+          start_visibility: payload.start_visibility || null,
+          end_visibility: payload.end_visibility || null,
+          use_resource_visibility: payload.use_resource_visibility,
+          primary_link_start_visibility: payload.primary_link_start_visibility || null,
+          primary_link_end_visibility: payload.primary_link_end_visibility || null,
+          use_primary_link_visibility: payload.use_primary_link_visibility,
+        });
       } else {
         result = await adminCourseService.createResource(
           course.offering_id,
@@ -42,7 +52,11 @@ export function useResourceFormSubmit({
       }
 
       if (result !== false) {
-        notify.success(formType === ResourceFormType.EDIT ? 'Resource updated' : 'Resource added');
+        const message = {
+          [ResourceFormType.EDIT]: 'Resource updated',
+          [ResourceFormType.REUSE]: `Added ${payload.title} to this course`,
+        }[formType] || 'Resource added';
+        notify.success(message);
         onSubmit?.(payload);
         onClose();
       }

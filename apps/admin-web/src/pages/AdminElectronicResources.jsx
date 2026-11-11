@@ -50,8 +50,6 @@ function AdminElectronicResources() {
   // Local state (only for UI-specific concerns)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
   const [showReusePrompt, setShowReusePrompt] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
   const [processingComplete, setProcessingComplete] = useState(false);
@@ -304,27 +302,6 @@ function AdminElectronicResources() {
     }
   };
 
-  // Resource action handlers
-  const handleSearchResources = async (searchTerm) => {
-    try {
-      setSearchResults([]);  
-      const { resources } = await adminCourseService.searchResources(searchTerm);
-      setSearchResults(resources);
-    } catch (err) {
-      console.error(err);
-      notify.fromError(err, "Couldn't search resources");
-    }
-  };
-
-  const handleReuseResource = async (resourceId) => {
-    try {
-      await adminCourseService.linkExistingResources(course.offering_id, resourceId);
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
-  };
-
   const handleUpdateResources = async () => {
     // Don't attempt to fetch resources if course isn't loaded yet
     if (!course?.offering_id) {
@@ -496,13 +473,7 @@ function AdminElectronicResources() {
             toggleNewResourceModal={resourceFormModal.openNewResourceForm}
             toggleEDSResourceModal={resourceFormModal.openEDSForm}
             toggleHitchcockModal={resourceFormModal.openHitchcockForm}
-            toggleReuseModal={() => resourceFormModal.openReuseForm({
-              searchTerm,
-              searchResults,
-              onSearchTermChange: setSearchTerm,
-              onSearch: handleSearchResources,
-              onReuse: handleReuseResource
-            })}
+            toggleReuseModal={() => resourceFormModal.openReuseForm()}
             toggleCrossLinkModal={resourceFormModal.openCrosslinkForm}
             buildFolioCourseUrl={() => buildFolioCourseUrl(folioCourseData?.id)}
             navigate={navigate}

@@ -24,6 +24,7 @@ export const VisibilitySection = ({
   onApplyItemDates,
   onLinkVisibilityChange,
   onLinkDateChange,
+  readOnly = false,
 }) => (
   <ResourceFormSection id="when-can-students-see-it" title="When can students see it?" icon={CalendarClock}>
     {mode !== 'none' && (
@@ -84,35 +85,42 @@ export const VisibilitySection = ({
         )}
       </>
     )}
-    {links.length > 0 && <h4 className="tw-font-medium">All courses</h4>}
-    {links.map((link, index) => (
-      <div key={index} className="tw-min-w-0 tw-space-y-3 tw-border-t tw-pt-4">
-        <div className="tw-flex tw-min-h-6 tw-items-center tw-gap-2">
-          <Input
-            id={`link-visibility-enabled-${index}`}
-            type="checkbox"
-            checked={normalizeVisibilityFlag(link.use_link_visibility)}
-            onChange={(event) => onLinkVisibilityChange(index, event.target.checked)}
-            className="tw-size-6 tw-shrink-0 tw-p-0"
-          />
-          <Label htmlFor={`link-visibility-enabled-${index}`}>Link {index + 1} only between</Label>
-        </div>
-        <p className="tw-text-sm tw-text-muted-foreground">Applies in every course using this resource.</p>
-        {normalizeVisibilityFlag(link.use_link_visibility) && (
-          <DatePairControl
-            id={`link-${index}-visibility`}
-            startLabel={`Link ${index + 1} start date`}
-            endLabel={`Link ${index + 1} end date`}
-            startName="start_visibility"
-            endName="end_visibility"
-            startValue={link.start_visibility}
-            endValue={link.end_visibility}
-            onStartChange={(event) => onLinkDateChange(index, 'start_visibility', event.target.value)}
-            onEndChange={(event) => onLinkDateChange(index, 'end_visibility', event.target.value)}
-          />
-        )}
-      </div>
-    ))}
+    {links.length > 0 && (
+      <>
+        <h4 className="tw-font-medium">All courses</h4>
+        <fieldset disabled={readOnly} className="tw-m-0 tw-min-w-0 tw-space-y-3 tw-border-0 tw-p-0">
+          <legend className="tw-sr-only">Additional link visibility windows</legend>
+          {links.map((link, index) => (
+            <div key={index} className="tw-min-w-0 tw-space-y-3 tw-border-t tw-pt-4">
+              <div className="tw-flex tw-min-h-6 tw-items-center tw-gap-2">
+                <Input
+                  id={`link-visibility-enabled-${index}`}
+                  type="checkbox"
+                  checked={normalizeVisibilityFlag(link.use_link_visibility)}
+                  onChange={(event) => onLinkVisibilityChange(index, event.target.checked)}
+                  className="tw-size-6 tw-shrink-0 tw-p-0"
+                />
+                <Label htmlFor={`link-visibility-enabled-${index}`}>Link {index + 1} only between</Label>
+              </div>
+              <p className="tw-text-sm tw-text-muted-foreground">Applies in every course using this resource.</p>
+              {normalizeVisibilityFlag(link.use_link_visibility) && (
+                <DatePairControl
+                  id={`link-${index}-visibility`}
+                  startLabel={`Link ${index + 1} start date`}
+                  endLabel={`Link ${index + 1} end date`}
+                  startName="start_visibility"
+                  endName="end_visibility"
+                  startValue={link.start_visibility}
+                  endValue={link.end_visibility}
+                  onStartChange={(event) => onLinkDateChange(index, 'start_visibility', event.target.value)}
+                  onEndChange={(event) => onLinkDateChange(index, 'end_visibility', event.target.value)}
+                />
+              )}
+            </div>
+          ))}
+        </fieldset>
+      </>
+    )}
     {(links.length > 0 || sourceType === 'reuse') && (
       <ApplyItemDatesButton
         sourceType={sourceType}
@@ -147,6 +155,7 @@ VisibilitySection.propTypes = {
   onApplyItemDates: PropTypes.func.isRequired,
   onLinkVisibilityChange: PropTypes.func.isRequired,
   onLinkDateChange: PropTypes.func.isRequired,
+  readOnly: PropTypes.bool,
 };
 
 export default VisibilitySection;

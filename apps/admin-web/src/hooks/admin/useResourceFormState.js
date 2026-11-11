@@ -35,7 +35,7 @@ export const useResourceFormState = ({ initialData = {}, course, sourceType = 'n
     };
   });
   const [links, setLinks] = useState(() => (
-    (sourceType === 'reuse' ? [] : initialData.links || [])
+    (initialData.links || [])
       .filter((link) => link.order !== 0 && link.order !== '0')
       .map((link) => ({
         ...loadProxyLink(link),

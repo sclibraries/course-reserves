@@ -22,7 +22,7 @@ import WhereSection from './WhereSection';
 import { VisibilitySection } from './visibility/VisibilitySection';
 
 export const ResourceForm = ({
-  initialData = {}, onSubmit, formId, course, mode = 'course', sourceType, usageResourceId,
+  initialData = {}, onSubmit, formId, course, mode = 'course', sourceType, readOnly = false, usageResourceId,
   onChangeRecord, changeRecordButtonRef, changeRecord,
 }) => {
   const {
@@ -170,6 +170,7 @@ export const ResourceForm = ({
           onTypeChange={handleMaterialTypeChange}
           materialTypeFields={markedMaterialTypeFields}
           titleError={validationErrors.title}
+          readOnly={readOnly}
         />
         <WhereSection
           formData={formData}
@@ -177,6 +178,7 @@ export const ResourceForm = ({
           links={links}
           setLinks={setLinks}
           linkMarker={<FieldMarker marker={provenance.markerFor('link', formData.link)} />}
+          readOnly={readOnly}
         />
         <OtherDetails
           metadata={formData.metadata}
@@ -192,6 +194,7 @@ export const ResourceForm = ({
           sharedEditWarning={usageResourceId ? (
             <SharedEditWarning {...resourceUsage} />
           ) : null}
+          readOnly={readOnly}
         />
         <VisibilitySection
           formData={formData}
@@ -209,8 +212,9 @@ export const ResourceForm = ({
           onApplyItemDates={handleApplyItemDates}
           onLinkVisibilityChange={handleLinkVisibilityChange}
           onLinkDateChange={handleLinkDateChange}
+          readOnly={readOnly}
         />
-        <StaffSection formData={formData} handleFieldChange={handleFieldChange} />
+        <StaffSection formData={formData} handleFieldChange={handleFieldChange} readOnly={readOnly} />
         <ErrorSummary errors={validationErrors} />
       </form>
     </>
@@ -224,6 +228,7 @@ ResourceForm.propTypes = {
   course: PropTypes.object,
   mode: PropTypes.oneOf(['course', 'none']),
   sourceType: PropTypes.string.isRequired,
+  readOnly: PropTypes.bool,
   usageResourceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onChangeRecord: PropTypes.func,
   changeRecordButtonRef: PropTypes.object,

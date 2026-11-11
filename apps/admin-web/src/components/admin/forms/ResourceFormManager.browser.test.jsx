@@ -13,6 +13,8 @@ import { LIBPROXY_PREFIX } from '../../../util/proxyUtil';
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
   updateResource: vi.fn(),
+  searchResources: vi.fn(),
+  getResourceById: vi.fn(),
   searchEDS: vi.fn(),
   mapEdsRecordToResource: vi.fn(),
   getUsage: vi.fn(),
@@ -83,6 +85,41 @@ const mocks = vi.hoisted(() => ({
     terms: [{ term_id: 7, term_name: 'Fall 2026' }, { term_id: 8, term_name: 'Spring 2027' }],
     linked_page_count: 3,
   },
+  reuseSearchResult: {
+    resources: [{
+      resource_id: 'resource-73',
+      name: 'Shared reusable record',
+      material_type_name: 'Book',
+      item_url: 'https://example.test/shared-primary',
+    }],
+  },
+  reuseResource: {
+    resource_id: 'resource-73',
+    name: 'Shared reusable record',
+    item_url: 'https://example.test/shared-primary',
+    description: 'Shared description',
+    external_note: 'Shared student note',
+    internal_note: 'Shared staff note',
+    folder_id: null,
+    material_type_id: '9',
+    metadata: [{ field_name: 'citation_note', field_value: 'Full-only metadata' }],
+    start_visibility: '2026-08-01',
+    end_visibility: '2026-12-31',
+    use_resource_visibility: 1,
+    primary_link_start_visibility: '2026-08-02',
+    primary_link_end_visibility: '2026-12-30',
+    use_primary_link_visibility: 1,
+    links: [{
+      url: `https://example.test/${'long-shared-link-path-'.repeat(16)}`,
+      title: 'Shared additional link',
+      description: 'Shared link description',
+      use_proxy: 0,
+      start_visibility: '2026-08-03',
+      end_visibility: '2026-12-29',
+      use_link_visibility: 1,
+      order: 1,
+    }],
+  },
   createdResourceResult: { resource_id: 'created-17' },
   savedResourceResult: { resource_id: 'resource-17' },
   courseStoreState: {
@@ -99,10 +136,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/admin/adminCourseService', () => ({
-  adminCourseService: { createResource: mocks.createResource, searchEDS: mocks.searchEDS },
+  adminCourseService: {
+    createResource: mocks.createResource,
+    searchEDS: mocks.searchEDS,
+    searchResources: mocks.searchResources,
+  },
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
-  adminResourceService: { getUsage: mocks.getUsage, updateResource: mocks.updateResource },
+  adminResourceService: {
+    getResourceById: mocks.getResourceById,
+    getUsage: mocks.getUsage,
+    updateResource: mocks.updateResource,
+  },
 }));
 vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
   adminMaterialTypeService: {
@@ -366,6 +411,49 @@ describe('ResourceFormManager in Chromium', () => {
 
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' });
     await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('reflows the reuse form with read-only shared fields and no axe violations', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    mocks.getUsage.mockResolvedValue(mocks.detailedUsageResult);
+    mocks.searchResources.mockResolvedValue(mocks.reuseSearchResult);
+    mocks.getResourceById.mockResolvedValue(mocks.reuseResource);
+    await renderForm({}, ResourceFormType.REUSE);
+
+    const dialog = getByRole(document.body, 'dialog', { name: 'Reuse resource' });
+    await act(async () => fireEvent.change(getByRole(dialog, 'textbox', { name: 'Search resources' }), {
+      target: { value: 'synthetic reuse' },
+    }));
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+    const selectButton = await waitFor(() => getByRole(dialog, 'button', { name: 'Add to Course' }));
+    selectButton.focus();
+    await act(async () => fireEvent.click(selectButton));
+    await waitFor(() => getByRole(dialog, 'button', { name: 'Save' }));
+    await waitFor(() => expect(getByRole(dialog, 'status').textContent).toContain('Used in 2 courses'));
+
+    const linkSection = getByRole(dialog, 'region', { name: 'Where do students go?' });
+    const sharedLink = getByRole(linkSection, 'textbox', { name: 'URL for link 1' });
+    expect(sharedLink.matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'checkbox', { name: 'Show this item between' }).checked).toBe(false);
+    expect(getByRole(dialog, 'checkbox', { name: 'Primary link only between' }).checked).toBe(false);
+    expect(dialog.querySelectorAll('form#resource-form')).toHaveLength(1);
+
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      sharedLink.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const bounds = sharedLink.getBoundingClientRect();
+      const contentBounds = dialog.querySelector('[data-testid="resource-form-content"]').getBoundingClientRect();
+      expect(bounds.width).toBeGreaterThan(0);
+      expect(bounds.left).toBeGreaterThanOrEqual(contentBounds.left - 1);
+      expect(bounds.right).toBeLessThanOrEqual(contentBounds.right + 1);
+      await expectNoHorizontalOverflow([width]);
+    }
+    await expectNoAxeViolations(document.body);
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it('collapses the EDS source strip on phones and shows its full details on desktop', async () => {

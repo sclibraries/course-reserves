@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { toHaveNoViolations } from 'vitest-axe/matchers';
-import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByLabelText, queryByRole, waitFor } from '@testing-library/dom';
+import { fireEvent, getAllByRole, getByLabelText, getByRole, getByText, queryByLabelText, queryByRole, waitFor } from '@testing-library/dom';
 import ResourceFormManager from './ResourceFormManager';
 import { ResourceFormType } from './constants/formTypes';
 import { LIBPROXY_PREFIX } from '../../../util/proxyUtil';
@@ -15,7 +15,9 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const mocks = vi.hoisted(() => ({
   createResource: vi.fn(),
   searchEDS: vi.fn(),
+  searchResources: vi.fn(),
   updateResource: vi.fn(),
+  getResourceById: vi.fn(),
   getUsage: vi.fn(),
   getMaterialTypes: vi.fn(),
   getMaterialTypeFields: vi.fn(),
@@ -32,6 +34,44 @@ const mocks = vi.hoisted(() => ({
     { field_name: 'peer_reviewed', field_type: 'checkbox', label: 'Peer reviewed' },
     { field_name: 'open_access', field_type: 'checkbox', label: 'Open access' },
   ] },
+  reuseSearchResult: {
+    resources: [{
+      resource_id: 73,
+      name: 'Shared reusable record',
+      material_type_name: 'Book',
+      item_url: 'https://example.test/shared-primary',
+    }],
+  },
+  reuseResource: {
+    resource_id: 73,
+    name: 'Shared reusable record',
+    item_url: 'https://example.test/shared-primary',
+    description: 'Shared description',
+    external_note: 'Shared student note',
+    internal_note: 'Shared staff note',
+    folder_id: 'folder-17',
+    material_type_id: '1',
+    metadata: [
+      { field_name: 'citation_note', field_value: 'Full-only metadata' },
+      { field_name: 'publisher', field_value: 'Full-only publisher' },
+    ],
+    start_visibility: '2026-08-01',
+    end_visibility: '2026-12-31',
+    use_resource_visibility: 1,
+    primary_link_start_visibility: '2026-08-02',
+    primary_link_end_visibility: '2026-12-30',
+    use_primary_link_visibility: 1,
+    links: [{
+      url: 'https://example.test/shared-additional',
+      title: 'Shared additional link',
+      description: 'Shared link description',
+      use_proxy: 0,
+      start_visibility: '2026-08-03',
+      end_visibility: '2026-12-29',
+      use_link_visibility: 1,
+      order: 1,
+    }],
+  },
   courseStoreState: {
     folioCourseData: {
       offering_id: 'folio-offering-17',
@@ -46,10 +86,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/admin/adminCourseService', () => ({
-  adminCourseService: { createResource: mocks.createResource, searchEDS: mocks.searchEDS },
+  adminCourseService: {
+    createResource: mocks.createResource,
+    searchEDS: mocks.searchEDS,
+    searchResources: mocks.searchResources,
+  },
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
-  adminResourceService: { getUsage: mocks.getUsage, updateResource: mocks.updateResource },
+  adminResourceService: {
+    getResourceById: mocks.getResourceById,
+    getUsage: mocks.getUsage,
+    updateResource: mocks.updateResource,
+  },
 }));
 vi.mock('../../../services/admin/adminMaterialTypeService', () => ({
   adminMaterialTypeService: {
@@ -103,6 +151,19 @@ async function renderForm(props) {
   await act(async () => root.render(createElement(FormHarness, props)));
 }
 
+async function selectReuseResource() {
+  await renderForm({ formType: ResourceFormType.REUSE, initialData: {} });
+  const dialog = getByRole(document.body, 'dialog', { name: 'Reuse resource' });
+  await act(async () => fireEvent.change(getByRole(dialog, 'textbox', { name: 'Search resources' }), {
+    target: { value: 'synthetic' },
+  }));
+  await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Search' })));
+  const selectButton = await waitFor(() => getByRole(dialog, 'button', { name: 'Add to Course' }));
+  await act(async () => fireEvent.click(selectButton));
+  await waitFor(() => getByRole(dialog, 'button', { name: 'Save' }));
+  return dialog;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.createResource.mockResolvedValue({ resource_id: 'created-17' });
@@ -115,6 +176,8 @@ beforeEach(() => {
   });
   mocks.getMaterialTypes.mockResolvedValue({ data: [] });
   mocks.getMaterialTypeFields.mockResolvedValue({ data: [] });
+  mocks.searchResources.mockResolvedValue(mocks.reuseSearchResult);
+  mocks.getResourceById.mockResolvedValue(mocks.reuseResource);
   mocks.fetch.mockImplementation(() => { throw new Error('Unexpected application HTTP request'); });
   vi.stubGlobal('fetch', mocks.fetch);
 });
@@ -128,6 +191,98 @@ afterEach(() => {
 });
 
 describe('ResourceFormManager dialog shell', () => {
+  it('opens the read-only shared record with editable, empty destination dates', async () => {
+    mocks.getMaterialTypes.mockResolvedValue({
+      data: [{ material_type_id: '1', name: 'Book', description: 'Book' }],
+    });
+    mocks.getMaterialTypeFields.mockResolvedValue({
+      data: [{ field_name: 'publisher', field_type: 'text', label: 'Publisher' }],
+    });
+    const dialog = await selectReuseResource();
+    await waitFor(() => getByRole(dialog, 'textbox', { name: 'Publisher' }));
+
+    expect(mocks.getResourceById).toHaveBeenCalledWith(73);
+    expect(getByRole(dialog, 'textbox', { name: 'Resource Name' }).value).toBe('Shared reusable record');
+    expect(getByRole(dialog, 'textbox', { name: 'Resource Name' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'combobox', { name: 'Material Type' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'Publisher' }).value).toBe('Full-only publisher');
+    expect(getByRole(dialog, 'textbox', { name: 'Publisher' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'Primary URL' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'checkbox', { name: 'Use proxy for this resource' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'Description' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'Note for students' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'Internal note' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'textbox', { name: 'URL for link 1' }).value)
+      .toBe('https://example.test/shared-additional');
+    expect(getByRole(dialog, 'textbox', { name: 'URL for link 1' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'button', { name: 'Add link' }).matches(':disabled')).toBe(true);
+    expect(getByRole(dialog, 'combobox', { name: 'Folder' }).matches(':disabled')).toBe(true);
+    expect(getByText(dialog, 'Full-only metadata')).toBeTruthy();
+    await waitFor(() => expect(getByRole(dialog, 'status').textContent).toContain('Used in 2 courses'));
+
+    const itemDates = getByRole(dialog, 'checkbox', { name: 'Show this item between' });
+    const primaryDates = getByRole(dialog, 'checkbox', { name: 'Primary link only between' });
+    expect(itemDates.checked).toBe(false);
+    expect(primaryDates.checked).toBe(false);
+    expect(itemDates.disabled).toBe(false);
+    expect(primaryDates.disabled).toBe(false);
+    await act(async () => fireEvent.click(itemDates));
+    await act(async () => fireEvent.click(primaryDates));
+    expect(getByLabelText(dialog, 'Item start date').matches(':disabled')).toBe(false);
+    expect(getByLabelText(dialog, 'Primary link start date').matches(':disabled')).toBe(false);
+    expect(getByRole(dialog, 'checkbox', { name: 'Link 1 only between' }).matches(':disabled')).toBe(true);
+    expect(await axe(document.body)).toHaveNoViolations();
+  });
+
+  it('posts reuse settings from the form and never creates a resource', async () => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ course_resource_id: 81 }),
+    });
+    const dialog = await selectReuseResource();
+
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    const [url, request] = mocks.fetch.mock.calls[0];
+    expect(url).toContain('/offering-link/link-existing-resources');
+    expect(request.method).toBe('POST');
+    expect(JSON.parse(request.body)).toEqual({
+      offering_id: 'offering-17',
+      resource_id: 73,
+      settings: {
+        start_visibility: null,
+        end_visibility: null,
+        use_resource_visibility: 0,
+        primary_link_start_visibility: null,
+        primary_link_end_visibility: null,
+        use_primary_link_visibility: 0,
+      },
+    });
+    expect(mocks.createResource).not.toHaveBeenCalled();
+    expect(mocks.notifySuccess).toHaveBeenCalledWith('Added Shared reusable record to this course');
+  });
+
+  it.each([
+    { status: 409, message: 'Already on this course', reference: 'SYNTH-REUSE-409' },
+    { status: 422, message: 'Please correct the highlighted fields.', reference: 'SYNTH-REUSE-422' },
+  ])('shows the server reuse error and reference for $status', async ({ status, message, reference }) => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: false,
+      status,
+      json: vi.fn().mockResolvedValue({ message, reference }),
+    });
+    const dialog = await selectReuseResource();
+
+    await act(async () => fireEvent.click(getByRole(dialog, 'button', { name: 'Save' })));
+
+    await waitFor(() => expect(mocks.notifyFromError).toHaveBeenCalledWith(
+      expect.objectContaining({ message, reference }), message,
+    ));
+    expect(mocks.createResource).not.toHaveBeenCalled();
+    expect(getByRole(dialog, 'button', { name: 'Save' })).toBeTruthy();
+  });
+
   it.each([
     {
       name: 'flag 0 with item dates',

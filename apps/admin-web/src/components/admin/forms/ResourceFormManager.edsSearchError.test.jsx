@@ -12,8 +12,9 @@ const mocks = vi.hoisted(() => ({
   mapEdsRecordToResource: vi.fn(),
   createResource: vi.fn(),
   updateResource: vi.fn(),
+  getResourceById: vi.fn(),
+  reuseResource: vi.fn(),
   fetch: vi.fn(),
-  onReuse: vi.fn(),
   notifyFromError: vi.fn(),
   notifySuccess: vi.fn(),
   courseStoreState: {
@@ -79,7 +80,13 @@ vi.mock('../../../services/admin/course/resourceApi', () => ({
   getEdsSearchErrorMessage: () => 'Unable to search the library right now. Please try again.',
 }));
 vi.mock('../../../services/admin/adminResourceService', () => ({
-  adminResourceService: { updateResource: mocks.updateResource },
+  adminResourceService: {
+    getResourceById: mocks.getResourceById,
+    updateResource: mocks.updateResource,
+  },
+}));
+vi.mock('../../../services/admin/course/offeringLinkApi', () => ({
+  offeringLinkApi: { reuseResource: mocks.reuseResource },
 }));
 vi.mock('../../../services/admin/hitchcockService', () => ({
   hitchcockService: { searchResources: mocks.searchHitchcock },
@@ -95,12 +102,21 @@ vi.mock('../../../util/proxyUtil', () => ({
 }));
 vi.mock('../../../util/mapEDSRecordToRespurce', () => ({ mapEdsRecordToResource: mocks.mapEdsRecordToResource }));
 vi.mock('./resource-form/ResourceForm', () => ({
-  default: ({ initialData, onSubmit, mode }) => <>
+  default: ({ initialData, onSubmit, mode, sourceType }) => <>
     <p>{initialData?.title}</p>
     <p data-mode={mode} />
     <button onClick={async () => {
       try {
-        await onSubmit({ resource_id: 'test-resource', title: 'Updated item' });
+        await onSubmit(sourceType === 'reuse' ? {
+          ...initialData,
+          start_visibility: '',
+          end_visibility: '',
+          use_resource_visibility: 0,
+          primary_link_start_visibility: '',
+          primary_link_end_visibility: '',
+          use_primary_link_visibility: 0,
+          links: [],
+        } : { resource_id: 'test-resource', title: 'Updated item' });
       } catch {
         // The real form keeps the inline error visible after submission rejects.
       }
@@ -156,7 +172,12 @@ describe('ResourceFormManager EDS search failures', () => {
     mocks.fetch.mockImplementation(() => { throw new Error('Unexpected application HTTP request'); });
     vi.stubGlobal('fetch', mocks.fetch);
     mocks.updateResource.mockResolvedValue({ resource_id: 'test-resource' });
-    mocks.onReuse.mockResolvedValue(undefined);
+    mocks.getResourceById.mockResolvedValue({
+      resource_id: 'test-resource',
+      name: 'Loaded synthetic reusable resource',
+      item_url: 'https://example.test/reuse',
+    });
+    mocks.reuseResource.mockResolvedValue({ course_resource_id: 'course-resource-17' });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -359,48 +380,65 @@ describe('ResourceFormManager EDS search failures', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('shows a reuse success once after the resource list refreshes', async () => {
+  it('opens the loaded resource form and posts only after Save', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
     await act(async () => root.render(createElement(ResourceFormManager, {
       isOpen: true,
       onClose,
       onSubmit,
-      onReuse: mocks.onReuse,
       formType: ResourceFormType.REUSE,
+      course: { offering_id: 'offering-17' },
     })));
 
     await act(async () => getByRole(document.body, 'button', { name: 'Reuse resource' }).click());
 
-    expect(mocks.onReuse).toHaveBeenCalledTimes(1);
-    expect(mocks.onReuse).toHaveBeenCalledWith('test-resource');
+    await waitFor(() => expect(getByText(document.body, 'Loaded synthetic reusable resource')).toBeTruthy());
+    expect(mocks.getResourceById).toHaveBeenCalledWith('test-resource');
+    expect(mocks.reuseResource).not.toHaveBeenCalled();
+    expect(mocks.createResource).not.toHaveBeenCalled();
+
+    await act(async () => getByRole(document.body, 'button', { name: 'Save resource' }).click());
+
+    expect(mocks.reuseResource).toHaveBeenCalledWith('offering-17', 'test-resource', {
+      start_visibility: null,
+      end_visibility: null,
+      use_resource_visibility: 0,
+      primary_link_start_visibility: null,
+      primary_link_end_visibility: null,
+      use_primary_link_visibility: 0,
+    });
+    expect(mocks.createResource).not.toHaveBeenCalled();
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(mocks.notifySuccess).toHaveBeenCalledTimes(1);
-    expect(mocks.notifySuccess).toHaveBeenCalledWith('Resource linked');
+    expect(mocks.notifySuccess).toHaveBeenCalledWith('Added Loaded synthetic reusable resource to this course');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a failed reuse open with an inline alert and one failure toast', async () => {
-    const error = Object.assign(new Error('Synthetic provider detail'), { reference: 'SYNTH-REUSE-1' });
+  it('keeps a failed reuse open and shows the server message and reference', async () => {
+    const error = Object.assign(new Error('Already on this course'), {
+      reference: 'SYNTH-REUSE-1',
+      serverMessage: 'Already on this course',
+    });
     const onSubmit = vi.fn();
     const onClose = vi.fn();
-    mocks.onReuse.mockRejectedValueOnce(error);
+    mocks.reuseResource.mockRejectedValueOnce(error);
     await act(async () => root.render(createElement(ResourceFormManager, {
       isOpen: true,
       onClose,
       onSubmit,
-      onReuse: mocks.onReuse,
       formType: ResourceFormType.REUSE,
+      course: { offering_id: 'offering-17' },
     })));
 
     await act(async () => getByRole(document.body, 'button', { name: 'Reuse resource' }).click());
+    await waitFor(() => expect(getByRole(document.body, 'button', { name: 'Save resource' })).toBeTruthy());
+    await act(async () => getByRole(document.body, 'button', { name: 'Save resource' }).click());
 
-    expect(getByRole(document.body, 'alert').textContent).toBe("Couldn't add the resource to the course");
-    expect(mocks.onReuse).toHaveBeenCalledTimes(1);
-    expect(onSubmit).not.toHaveBeenCalled();
     expect(mocks.notifyFromError).toHaveBeenCalledTimes(1);
-    expect(mocks.notifyFromError).toHaveBeenCalledWith(error, "Couldn't link the resource");
+    expect(mocks.notifyFromError).toHaveBeenCalledWith(error, 'Already on this course');
     expect(mocks.notifySuccess).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 });
