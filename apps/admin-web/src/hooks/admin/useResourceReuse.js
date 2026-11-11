@@ -1,20 +1,7 @@
 import { useCallback, useState } from 'react';
 import { adminResourceService } from '../../services/admin/adminResourceService';
 import { notify } from '../../services/notify';
-
-const toFormRecord = (resource) => ({
-  ...resource,
-  title: resource.name || '',
-  link: resource.item_url || '',
-  notes: resource.description || '',
-  folder: resource.folder_id || '',
-  metadata: Array.isArray(resource.metadata)
-    ? resource.metadata.reduce((values, item) => {
-      if (item?.field_name) values[item.field_name] = item.field_value;
-      return values;
-    }, {})
-    : (resource.metadata || {}),
-});
+import { resourceToFormData } from '../../util/resourceFormData';
 
 export const useResourceReuse = () => {
   const [resource, setResource] = useState(null);
@@ -23,7 +10,7 @@ export const useResourceReuse = () => {
   const selectResource = useCallback(async (resourceId) => {
     setLoading(true);
     try {
-      setResource(toFormRecord(await adminResourceService.getResourceById(resourceId)));
+      setResource(resourceToFormData(await adminResourceService.getResourceById(resourceId)));
     } catch (error) {
       notify.fromError(error, "Couldn't load the resource");
     } finally {

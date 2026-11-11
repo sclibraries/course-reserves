@@ -5,6 +5,13 @@ const RESOURCE_ASSOCIATION_FIELDS = [
   'primary_link_start_visibility', 'primary_link_end_visibility', 'use_primary_link_visibility',
 ];
 
+export const associationSettings = (payload) => Object.fromEntries(
+  RESOURCE_ASSOCIATION_FIELDS.map((field) => [
+    field,
+    payload[field] === '' ? null : payload[field],
+  ]),
+);
+
 const serializeProxyLink = (link, urlField) => {
   const { loaded, ...data } = link;
   return {
@@ -25,9 +32,7 @@ export const serializeResourcePayload = (
   if (!isEdit) return payload;
 
   const { resource_id, ...updateData } = payload;
-  RESOURCE_ASSOCIATION_FIELDS.forEach((field) => {
-    if (updateData[field] === '') updateData[field] = null;
-  });
+  Object.assign(updateData, associationSettings(updateData));
   if (mode === 'none') {
     RESOURCE_ASSOCIATION_FIELDS.forEach((field) => delete updateData[field]);
     delete updateData.offering_id;

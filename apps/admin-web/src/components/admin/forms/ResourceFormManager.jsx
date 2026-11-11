@@ -19,6 +19,7 @@ import { useResourceSearch } from '../../../hooks/admin/useResourceSearch';
 import { useResourceReuse } from '../../../hooks/admin/useResourceReuse';
 import { useResourceFormSubmit } from '../../../hooks/admin/useResourceFormSubmit';
 import { useChangeRecord } from '../../../hooks/admin/useChangeRecord';
+import { resourceToFormData } from '../../../util/resourceFormData';
 
 const RESOURCE_FORM_TITLES = {
   [ResourceFormType.NEW]: 'Add resource',
@@ -107,25 +108,6 @@ export const ResourceFormManager = ({
     wasPickerOpen.current = recordChange.isPickerOpen;
   }, [isOpen, recordChange.isPickerOpen]);
 
-  /**
-   * Transform resource metadata from array to object format
-   */
-  const transformMetadata = (metadata) => {
-    if (!metadata) {
-      return {};
-    }
-    if (!Array.isArray(metadata)) {
-      console.warn('Expected metadata to be an array but received:', metadata);
-      return metadata || {};
-    }
-    return metadata.reduce((acc, item) => {
-      if (item && item.field_name) {
-        acc[item.field_name] = item.field_value;
-      }
-      return acc;
-    }, {});
-  };
-
   const handleBaseFormSubmit = useResourceFormSubmit({
     formType,
     course,
@@ -138,48 +120,13 @@ export const ResourceFormManager = ({
   });
 
   /**
-   * Convert string/number proxy values to boolean
-   */
-  const normalizeProxyValue = (value) => {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      return value === '1' || value === 'true' || value === 'TRUE';
-    }
-    if (typeof value === 'number') {
-      return value === 1;
-    }
-    return false;
-  };
-
-  /**
    * Prepare initial data for ResourceForm based on form type and context
    */
   const getFormInitialData = () => {
     if (formType === ResourceFormType.REUSE && reusedResource) return reusedResource;
 
     if (formType === ResourceFormType.EDIT && initialData) {
-      return {
-        resource_id: initialData.resource_id || null,
-        title: initialData.name || '',
-        link: initialData.item_url || '',
-        use_proxy: normalizeProxyValue(initialData.use_proxy),
-        folder: initialData.folder_id || null,
-        notes: initialData.description || '',
-        internal_note: initialData.internal_note || '',
-        external_note: initialData.external_note || '',
-        start_visibility: initialData.start_visibility || null,
-        end_visibility: initialData.end_visibility || null,
-        use_resource_visibility: initialData.use_resource_visibility,
-        material_type_id: initialData.material_type_id || null,
-        order: initialData.order || null,
-        created_at: initialData.created_at || '',
-        material_type_name: initialData.material_type_name || '',
-        metadata: transformMetadata(initialData.metadata),
-        links: initialData.links || [],
-        use_primary_link_visibility: normalizeProxyValue(initialData.use_primary_link_visibility),
-        primary_link_start_visibility: initialData.primary_link_start_visibility || null,
-        primary_link_end_visibility: initialData.primary_link_end_visibility || null,
-      };
+      return resourceToFormData(initialData);
     }
 
     if (recordChange.selectedRecord) {
