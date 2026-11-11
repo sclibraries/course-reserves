@@ -26,7 +26,8 @@ export const ResourceForm = ({
   onChangeRecord, changeRecordButtonRef, changeRecord,
 }) => {
   const {
-    formData, setFormData, useVisibilityDates, handleResourceVisibilityToggle, handleItemDateChange,
+    formData, setFormData, useVisibilityDates, hasItemDates, customWindowCount, handleApplyItemDates,
+    handleResourceVisibilityToggle, handleItemDateChange,
     handlePrimaryLinkVisibilityToggle, handlePrimaryLinkDateChange, handleLinkVisibilityChange,
     handleLinkDateChange, links, setLinks,
     materialTypes, setMaterialTypes, materialTypeFields, setMaterialTypeFields,
@@ -195,13 +196,17 @@ export const ResourceForm = ({
         <VisibilitySection
           formData={formData}
           mode={mode}
+          sourceType={sourceType}
           useVisibilityDates={useVisibilityDates}
+          hasItemDates={hasItemDates}
           onResourceVisibilityToggle={handleResourceVisibilityToggle}
           onItemDateChange={handleItemDateChange}
           onPrimaryLinkVisibilityToggle={handlePrimaryLinkVisibilityToggle}
           onPrimaryLinkDateChange={handlePrimaryLinkDateChange}
           summary={visibilitySummary}
           links={links}
+          customWindowCount={customWindowCount}
+          onApplyItemDates={handleApplyItemDates}
           onLinkVisibilityChange={handleLinkVisibilityChange}
           onLinkDateChange={handleLinkDateChange}
         />

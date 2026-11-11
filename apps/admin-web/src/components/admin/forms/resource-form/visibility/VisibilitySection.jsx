@@ -4,19 +4,24 @@ import { Input } from '../../../../ui/input';
 import { Label } from '../../../../ui/label';
 import { normalizeVisibilityFlag } from '../../../../../hooks/admin/useVisibilityFormState';
 import { ResourceFormSection } from '../ResourceFormSection';
+import { ApplyItemDatesButton } from './ApplyItemDatesButton';
 import { DatePairControl } from './DatePairControl';
 import { VisibilitySummary } from './VisibilitySummary';
 
 export const VisibilitySection = ({
   formData,
   mode = 'course',
+  sourceType,
   useVisibilityDates,
+  hasItemDates,
   onResourceVisibilityToggle,
   onItemDateChange,
   onPrimaryLinkVisibilityToggle,
   onPrimaryLinkDateChange,
   summary,
   links,
+  customWindowCount,
+  onApplyItemDates,
   onLinkVisibilityChange,
   onLinkDateChange,
 }) => (
@@ -108,6 +113,15 @@ export const VisibilitySection = ({
         )}
       </div>
     ))}
+    {(links.length > 0 || sourceType === 'reuse') && (
+      <ApplyItemDatesButton
+        sourceType={sourceType}
+        hasItemDates={hasItemDates}
+        customWindowCount={customWindowCount}
+        linkCount={links.length}
+        onApply={onApplyItemDates}
+      />
+    )}
     <VisibilitySummary summary={summary} />
   </ResourceFormSection>
 );
@@ -115,7 +129,9 @@ export const VisibilitySection = ({
 VisibilitySection.propTypes = {
   formData: PropTypes.object.isRequired,
   mode: PropTypes.oneOf(['course', 'none']),
+  sourceType: PropTypes.string.isRequired,
   useVisibilityDates: PropTypes.bool.isRequired,
+  hasItemDates: PropTypes.bool.isRequired,
   onResourceVisibilityToggle: PropTypes.func.isRequired,
   onItemDateChange: PropTypes.func.isRequired,
   onPrimaryLinkVisibilityToggle: PropTypes.func.isRequired,
@@ -127,6 +143,8 @@ VisibilitySection.propTypes = {
     sharedDatesMessage: PropTypes.string,
   }).isRequired,
   links: PropTypes.arrayOf(PropTypes.object).isRequired,
+  customWindowCount: PropTypes.number.isRequired,
+  onApplyItemDates: PropTypes.func.isRequired,
   onLinkVisibilityChange: PropTypes.func.isRequired,
   onLinkDateChange: PropTypes.func.isRequired,
 };

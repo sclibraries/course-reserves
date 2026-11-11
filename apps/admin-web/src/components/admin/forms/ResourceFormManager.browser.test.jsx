@@ -495,4 +495,56 @@ describe('ResourceFormManager in Chromium', () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(opener));
   });
+
+  it('keeps the apply-date confirmation accessible across supported widths', async () => {
+    vi.stubGlobal('fetch', mocks.fetch.mockImplementation(() => {
+      throw new Error('Unexpected application HTTP request');
+    }));
+    mocks.getMaterialTypes.mockResolvedValue(mocks.materialTypesResult);
+    mocks.getMaterialTypeFields.mockResolvedValue(mocks.materialTypeFieldsResult);
+    await renderForm({
+      link: 'https://example.test/primary',
+      use_resource_visibility: 1,
+      start_visibility: '2026-09-01',
+      end_visibility: '',
+      links: [
+        {
+          url: 'https://example.test/custom',
+          title: 'Synthetic custom link',
+          use_link_visibility: 0,
+          start_visibility: '2026-10-01',
+          end_visibility: '2027-01-01',
+        },
+        {
+          url: 'https://example.test/ordinary',
+          title: 'Synthetic ordinary link',
+          use_link_visibility: 0,
+          start_visibility: '2026-09-01',
+          end_visibility: '',
+        },
+      ],
+    }, ResourceFormType.NEW);
+
+    const resourceDialog = getByRole(document.body, 'dialog', { name: 'Add resource' });
+    const visibility = getByRole(resourceDialog, 'region', { name: 'When can students see it?' });
+    const applyButton = getByRole(visibility, 'button', { name: 'Apply item dates to additional links' });
+    applyButton.focus();
+    await act(async () => fireEvent.click(applyButton));
+
+    const confirmation = getByRole(document.body, 'dialog', { name: 'Apply item dates to additional links?' });
+    expect(confirmation.textContent).toContain('1 custom date window');
+    for (const width of [320, 768, 1280]) {
+      await page.viewport(width, 900);
+      const bounds = confirmation.getBoundingClientRect();
+      expect(bounds.width).toBeGreaterThan(0);
+      expect(bounds.left).toBeGreaterThanOrEqual(-1);
+      expect(bounds.right).toBeLessThanOrEqual(window.innerWidth + 1);
+      await expectNoHorizontalOverflow([width]);
+    }
+    await expectNoAxeViolations(document.body);
+
+    await act(async () => fireEvent.keyDown(confirmation, { key: 'Escape', code: 'Escape' }));
+    await waitFor(() => expect(document.activeElement).toBe(applyButton));
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
 });

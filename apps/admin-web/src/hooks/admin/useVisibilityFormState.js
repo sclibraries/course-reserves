@@ -66,11 +66,17 @@ export const getVisibilityFormDefaults = ({ initialData = {}, sourceType = 'new'
 };
 
 export const useVisibilityFormState = ({
-  defaultDates, initialData, sourceType, formData, setFormData, setLinks,
+  defaultDates, initialData, sourceType, formData, setFormData, links, setLinks,
 }) => {
   const isEdit = sourceType === 'edit' || Boolean(initialData.resource_id);
   const isReuse = sourceType === 'reuse';
   const useVisibilityDates = normalizeVisibilityFlag(formData.use_resource_visibility);
+  const hasItemDates = Boolean(formData.start_visibility || formData.end_visibility);
+  const customWindowCount = links.filter((link) => (
+    normalizeVisibilityFlag(link.use_link_visibility)
+    || (link.start_visibility || '') !== (formData.start_visibility || '')
+    || (link.end_visibility || '') !== (formData.end_visibility || '')
+  )).length;
 
   useEffect(() => {
     const isVideoType = isVideoMaterialType(formData.material_type_id);
@@ -159,13 +165,25 @@ export const useVisibilityFormState = ({
     )));
   }, [setLinks]);
 
+  const handleApplyItemDates = useCallback(() => {
+    setLinks((current) => current.map((link) => ({
+      ...link,
+      use_link_visibility: true,
+      start_visibility: formData.start_visibility || '',
+      end_visibility: formData.end_visibility || '',
+    })));
+  }, [formData.end_visibility, formData.start_visibility, setLinks]);
+
   return {
     useVisibilityDates,
+    hasItemDates,
+    customWindowCount,
     handleResourceVisibilityToggle,
     handleItemDateChange,
     handlePrimaryLinkVisibilityToggle,
     handlePrimaryLinkDateChange,
     handleLinkVisibilityChange,
     handleLinkDateChange,
+    handleApplyItemDates,
   };
 };

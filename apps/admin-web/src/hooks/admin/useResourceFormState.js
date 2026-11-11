@@ -46,7 +46,7 @@ export const useResourceFormState = ({ initialData = {}, course, sourceType = 'n
   const [materialTypeFields, setMaterialTypeFields] = useState([]);
   const [errorMessage, setErrorMessage] = useState(null);
   const visibilityState = useVisibilityFormState({
-    defaultDates, initialData, sourceType, formData, setFormData, setLinks,
+    defaultDates, initialData, sourceType, formData, setFormData, links, setLinks,
   });
 
   return {
