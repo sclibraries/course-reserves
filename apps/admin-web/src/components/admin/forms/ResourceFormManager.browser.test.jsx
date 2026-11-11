@@ -505,8 +505,6 @@ describe('ResourceFormManager in Chromium', () => {
     await renderForm({
       link: 'https://example.test/primary',
       use_resource_visibility: 1,
-      start_visibility: '2026-09-01',
-      end_visibility: '',
       links: [
         {
           url: 'https://example.test/custom',
@@ -520,7 +518,7 @@ describe('ResourceFormManager in Chromium', () => {
           title: 'Synthetic ordinary link',
           use_link_visibility: 0,
           start_visibility: '2026-09-01',
-          end_visibility: '',
+          end_visibility: '2026-12-20',
         },
       ],
     }, ResourceFormType.NEW);
