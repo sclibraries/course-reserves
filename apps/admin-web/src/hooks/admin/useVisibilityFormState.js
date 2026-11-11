@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { isVideoMaterialType } from '../../util/edsMaterialType';
 import { isHitchcockVideoUrl } from '../../util/externalLinks';
 import { loadProxyLink } from '../../util/proxyUtil';
 
@@ -25,7 +26,7 @@ export const getVisibilityFormDefaults = ({ initialData = {}, sourceType = 'new'
     use_proxy: initialData.use_proxy,
   }).link;
   const isHitchcockVideo = isHitchcockVideoUrl(primaryUrl);
-  const isVideoType = String(initialData.material_type_id || initialData.material_type || '') === '3';
+  const isVideoType = isVideoMaterialType(initialData.material_type_id);
   const usesTermDates = !isEdit && !isReuse && (isVideoType || isHitchcockVideo);
   const has = (field) => Object.prototype.hasOwnProperty.call(initialData, field);
   const termDate = (field) => defaultDates[field === 'start_visibility' ? 'startDate' : 'endDate'];
@@ -72,7 +73,7 @@ export const useVisibilityFormState = ({
   const useVisibilityDates = normalizeVisibilityFlag(formData.use_resource_visibility);
 
   useEffect(() => {
-    const isVideoType = String(formData.material_type_id) === '3';
+    const isVideoType = isVideoMaterialType(formData.material_type_id);
     const isHitchcockVideo = isHitchcockVideoUrl(formData.link);
     if (isEdit || isReuse || (!isVideoType && !isHitchcockVideo)) return;
 
