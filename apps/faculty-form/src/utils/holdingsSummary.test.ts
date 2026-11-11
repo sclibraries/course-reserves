@@ -18,14 +18,14 @@ function result(overrides: Partial<DiscoverySearchResult> = {}): DiscoverySearch
 }
 
 describe('holdings summary rules', () => {
-  it.each(['Book', 'Audio', 'Video', 'Music Score', 'Map', 'Kit', 'Realia'])(
+  it.each(['Book', 'Audio', 'Video', 'Video Recording', 'Audio Recording', 'Sound Recording', 'Music Score', 'Map', 'Kit', 'Realia'])(
     'treats %s as physical catalog material',
     (publicationType) => {
       expect(isPhysicalRecord(result({ publicationType }))).toBe(true);
     },
   );
 
-  it.each(['eBook', 'Electronic Resource', 'Academic Journal'])(
+  it.each(['Streaming Video', 'Streaming Audio', 'eBook', 'Electronic Resource', 'Academic Journal'])(
     'does not treat %s as physical catalog material',
     (publicationType) => {
       expect(isPhysicalRecord(result({ publicationType }))).toBe(false);

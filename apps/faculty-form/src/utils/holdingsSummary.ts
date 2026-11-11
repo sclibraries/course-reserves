@@ -4,7 +4,10 @@ import type { DiscoverySearchResult, EDSHoldingCopy } from '@/services/discovery
 const PHYSICAL_PUBLICATION_TYPES = new Set([
   'book',
   'audio',
+  'audio recording',
   'video',
+  'video recording',
+  'sound recording',
   'music score',
   'map',
   'kit',
