@@ -76,8 +76,8 @@ export const buildFriendlyCourseUrl = (course) => {
     console.warn('Error building friendly course URL:', error);
   }
   
-  // Fallback to standard URL if friendly URL construction fails
-  return buildPublicCourseUrl(course.courseListingId);
+  // Router-relative path; buildPublicCourseUrl includes the basename for raw hrefs.
+  return course.courseListingId ? `/records?courseListingId=${course.courseListingId}` : '';
 };
 
 /**
