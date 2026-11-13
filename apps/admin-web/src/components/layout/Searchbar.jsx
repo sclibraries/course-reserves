@@ -48,7 +48,8 @@ function Searchbar() {
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
-  const [departments, setDepartments] = useState([]), [departmentError, setDepartmentError] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [departmentError, setDepartmentError] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [searchMode, setSearchMode] = useState('courses'); // 'courses' or 'items'
   const toggleAdvancedFilters = () => setAdvancedFiltersOpen(!advancedFiltersOpen);
@@ -87,7 +88,8 @@ function Searchbar() {
 
   // Fetch departments when college changes
   useEffect(() => {
-    setDepartments([]); setDepartmentError(false);
+    setDepartments([]);
+    setDepartmentError(false);
     if (!college || college === 'all') return;
     
     const collegeKey = college;
@@ -107,7 +109,8 @@ function Searchbar() {
         }
       })
       .catch(() => {
-        setDepartmentError(true); setDepartments([]);
+        setDepartmentError(true);
+        setDepartments([]);
       });
   }, [college]);
 
@@ -455,7 +458,7 @@ function Searchbar() {
 
                 {/* Department Filter */}
                 <FormGroup className="filter-item">
-                  <Label for="departmentSelect" className="filter-label">Department{departmentError && <span id="department-error" role="alert"> Could not load departments.</span>}</Label>
+                  <Label for="departmentSelect" className="filter-label">Department</Label>
                   <Input
                     id="departmentSelect"
                     type="select"
@@ -487,6 +490,7 @@ function Searchbar() {
                       <option key={dept.id} value={dept.name}>{dept.name}</option>
                     ))}
                   </Input>
+                  {departmentError && <span id="department-error" role="alert">Could not load departments.</span>}
                 </FormGroup>
 
                 {/* Term Filter */}
@@ -663,7 +667,7 @@ function Searchbar() {
 
                 {/* Department Filter */}
                 <FormGroup className="mobile-filter-item">
-                  <Label for="mobileDepartmentSelect" className="filter-label">Department{departmentError && <span id="mobile-department-error" role="alert"> Could not load departments.</span>}</Label>
+                  <Label for="mobileDepartmentSelect" className="filter-label">Department</Label>
                   <Input
                     id="mobileDepartmentSelect"
                     type="select"
@@ -677,6 +681,7 @@ function Searchbar() {
                       <option key={dept.id} value={dept.name}>{dept.name}</option>
                     ))}
                   </Input>
+                  {departmentError && <span id="mobile-department-error" role="alert">Could not load departments.</span>}
                 </FormGroup>
 
                 {/* Term Filter */}

@@ -53,12 +53,18 @@ describe('department load feedback', () => {
     ))));
 
     await waitFor(() => expect(getAllByRole(container, 'alert')).toHaveLength(3));
-    const selects = container.querySelectorAll('#departmentSelect, #mobileDepartmentSelect');
-    expect(selects).toHaveLength(3);
+    const selects = container.querySelectorAll('.search-panel-container #departmentSelect, .search-panel-container #mobileDepartmentSelect');
+    expect(selects).toHaveLength(2);
     selects.forEach((select) => {
       expect(select.disabled).toBe(true);
-      expect(select.parentElement.querySelector('[role="alert"]').textContent.trim()).toBe('Could not load departments.');
+      expect(select.parentElement.querySelector('label').textContent.trim()).toBe('Department');
+      const message = select.nextElementSibling;
+      expect(message.getAttribute('role')).toBe('alert');
+      expect(message.id).toBe(select.getAttribute('aria-describedby'));
+      expect(message.textContent.trim()).toBe('Could not load departments.');
     });
+    expect(container.querySelector('.horizontal-admin-sidebar [role="alert"]').textContent.trim())
+      .toBe('Could not load departments.');
     expect(mocks.getDepartments).toHaveBeenCalledTimes(2);
   });
 });

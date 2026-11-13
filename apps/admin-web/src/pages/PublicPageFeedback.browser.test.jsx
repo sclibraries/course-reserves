@@ -2,7 +2,8 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAllByRole, getByRole, getByText, waitFor } from '@testing-library/dom';
+import { fireEvent, getByRole, getByText, waitFor } from '@testing-library/dom';
+import { page } from '@vitest/browser/context';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '../test/browser';
 import CourseRecords from './CourseRecords';
 import Search from './Search';
@@ -110,10 +111,16 @@ describe('public page load feedback in Chromium', () => {
     useSearchStore.setState({ college: 'smith', type: 'all', query: '', department: '', sortOption: '', termId: null, terms: [] });
     useAdminSearchStore.setState({ college: 'smith', terms: [{ id: 'SYNTH-TERM', name: 'Synthetic Term' }], termId: 'SYNTH-TERM' });
     await mount(createElement(MemoryRouter, null, createElement(Searchbar)));
-    await waitFor(() => expect(getAllByRole(container, 'alert')).toHaveLength(2));
-    expect(getAllByRole(container, 'alert').map((alert) => alert.textContent.trim()))
-      .toEqual(['Could not load departments.', 'Could not load departments.']);
-    await checkAccessibilityAndReflow();
+    const widths = [320, 768, 1280];
+    for (const width of widths) {
+      await page.viewport(width, 900);
+      if (width === 320) {
+        await act(async () => fireEvent.click(getByRole(container, 'button', { name: 'Show advanced filters' })));
+      }
+      await waitFor(() => expect(getByRole(container, 'alert').textContent.trim()).toBe('Could not load departments.'));
+      await expectNoAxeViolations(container);
+    }
+    await expectNoHorizontalOverflow(widths);
     unmount();
 
     await mount(createElement(MemoryRouter, null, createElement(HorizontalAdminSidebar)));
