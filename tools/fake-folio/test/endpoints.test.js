@@ -449,6 +449,26 @@ test('control actions create the absent scenario, change reserve and item status
     response = await fetch(baseUrl + '/_fake-folio/api/reset', { method: 'POST' });
     assert.equal(response.status, 200);
 
+    const resetTerms = await getJson(baseUrl, '/folio/web/search/search-terms');
+    const resetTst101 = await getJson(baseUrl, coursesUrl +
+      new URLSearchParams({ query: 'courseNumber=="TST 101"' }));
+    const fall2027 = resetTerms.body.data.terms.find((term) => term.name === 'Fall 2027');
+    const fall2027Listing = resetTst101.body.data.courses.find((course) =>
+      course.courseListingObject.termObject.name === 'Fall 2027');
+
+    assert.ok(fall2027, 'reset seed is missing Fall 2027 term');
+    assert.equal(fall2027.id, '00000000-0000-4000-8000-000000000005');
+    assert.equal(fall2027.code, '2027FA');
+    assert.equal(fall2027.season, 'Fall');
+    assert.equal(fall2027.startDate, '2027-09-01T00:00:00Z');
+    assert.equal(fall2027.endDate, '2027-12-31T23:59:59Z');
+    assert.ok(fall2027Listing, 'reset seed is missing Fall 2027 TST 101 listing');
+    assert.equal(fall2027Listing.id, '00000000-0000-4000-8000-000000000124');
+    assert.equal(fall2027Listing.courseListingId, '00000000-0000-4000-8000-000000000211');
+    assert.equal(fall2027Listing.courseListingObject.registrarId, 'TST-101-01-202709');
+    assert.deepEqual(fall2027Listing.courseListingObject.instructorObjects.map((instructor) => instructor.name),
+      ['Test Faculty A']);
+
     const resetCourses = await getJson(baseUrl, coursesUrl +
       new URLSearchParams({ query: 'courseNumber=="TST 102"' }));
     assert.deepEqual(resetCourses.body.data.courses, []);

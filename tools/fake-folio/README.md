@@ -13,6 +13,10 @@ The seed includes these academic terms and registrar periods:
 | Fall 2025 | 2025-09-01 through 2025-12-31 | AP_202509, AP_202510, AP_202511, AP_202512 |
 | Fall 2026 | 2026-09-01 through 2026-12-31 | AP_202609, AP_202610, AP_202611, AP_202612 |
 | Spring 2027 | 2027-01-01 through 2027-05-31 | AP_202701, AP_202702, AP_202703, AP_202704, AP_202705 |
+| Fall 2027 | 2027-09-01 through 2027-12-31 | AP_202709, AP_202710, AP_202711, AP_202712 |
+
+To give Test Faculty A the Fall 2027 roster, run
+`php yii dev-seed/test-courses --upcoming-period=AP_202709` in the API container.
 
 Course ids, item ids and people are synthetic. Runtime edits are stored in the mounted runtime
 directory; reset restores the checked-in seed.
