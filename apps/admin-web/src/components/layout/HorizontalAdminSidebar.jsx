@@ -52,6 +52,7 @@ function HorizontalAdminSidebar() {
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
   const [departments, setDepartments] = useState([]);
+  const [departmentError, setDepartmentError] = useState(false);
   const [selectedSort, setSelectedSort] = useState('name');
 
   const searchAreas = [
@@ -89,10 +90,15 @@ function HorizontalAdminSidebar() {
 
   // Fetch departments whenever the selected college changes
   useEffect(() => {
+    setDepartments([]);
+    setDepartmentError(false);
     const collegeKey = college;
     const queryParam = getCollegeQuery(collegeKey);
     folioSearchService.getDepartments(queryParam)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Department request failed');
+        return res.json();
+      })
       .then((data) => {
         if (data && data.data && Array.isArray(data.data.departments)) {
           setDepartments(data.data.departments);
@@ -100,7 +106,7 @@ function HorizontalAdminSidebar() {
           setDepartments([]);
         }
       })
-      .catch(() => setDepartments([]));
+      .catch(() => { setDepartments([]); setDepartmentError(true); });
   }, [college]);
 
   const handleSearch = () => {
@@ -212,13 +218,13 @@ function HorizontalAdminSidebar() {
 
             {/* Department Filter */}
             <FormGroup className="filter-item">
-              <Label for="departmentSelect" className="filter-label">Department</Label>
+              <Label for="departmentSelect" className="filter-label">Department{departmentError && <span id="horizontal-department-error" role="alert"> Could not load departments.</span>}</Label>
               <Input
                 id="departmentSelect"
                 type="select"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                disabled={departments.length === 0}
+                disabled={departments.length === 0} aria-describedby={departmentError ? 'horizontal-department-error' : undefined}
                 className="filter-select"
               >
                 <option value="">All Departments</option>

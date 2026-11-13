@@ -11,6 +11,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import UnifiedResourceTable from '../../admin/UnifiedResourceTable';
 import { useResourceSortStore } from '../../../../store/resourceSortStore';
 import { useAdminResourceStore } from '../../../../store/adminResourceStore';
+import { notify } from '../../../../services/notify';
 
 function AdminResourcesTabs({
   course,
@@ -65,13 +66,6 @@ function AdminResourcesTabs({
   };
 
   const handleUnifiedReorder = async ({ electronic, print }) => {
-    console.log('handleUnifiedReorder called', { 
-      electronic, 
-      print, 
-      offering_id: course?.offering_id, 
-      folio_course_id: course?.folio_course_id 
-    });
-    
     if (course?.offering_id && course?.folio_course_id) {
       await updateUnifiedResourceOrder(
         { electronic, print }, 
@@ -79,10 +73,8 @@ function AdminResourcesTabs({
         course.folio_course_id
       );
     } else {
-      console.error('handleUnifiedReorder: Missing offering_id or folio_course_id', {
-        offering_id: course?.offering_id,
-        folio_course_id: course?.folio_course_id
-      });
+      notify.error("Couldn't update the resource order");
+      throw new Error('Missing course identifiers for resource order');
     }
   };
 

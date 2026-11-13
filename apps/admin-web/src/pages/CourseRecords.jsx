@@ -47,18 +47,24 @@ function CourseRecords() {
   const [filter, setFilter] = useState('all');
   const [viewMode, setViewMode] = useState('combined');
   const [searchQuery, setSearchQuery] = useState('');
+  const [resolutionError, setResolutionError] = useState(false);
 
   // Resolve UUID → FOLIO courseListingId
   useEffect(() => {
     if (!uuid) return;
+    setResolutionError(false);
     adminCourseService.getFolioCourseId(uuid, sectionParam)
-      .then(res => { if (res?.exists) setRecord(res.folio_course_id); })
-      .catch(e => console.info('No course found for this uuid' + e));
+      .then(res => {
+        if (res?.exists && res.folio_course_id) setRecord(res.folio_course_id);
+        else setResolutionError(true);
+      })
+      .catch(() => setResolutionError(true));
   }, [uuid, sectionParam, setRecord]);
 
   // Resolve courseCode → FOLIO courseListingId
   useEffect(() => {
     if (!courseCode) return;
+    setResolutionError(false);
     const resolve = async () => {
       try {
         const response = await fetch(`${config.api.urls.folio}${config.api.endpoints.folioSearch.courses}?query=(courseNumber=="${courseCode}")`);
@@ -68,12 +74,12 @@ function CourseRecords() {
           const currentCourse = result.data.courses
             .sort((a, b) => new Date(b.courseListingObject.termObject.startDate) - new Date(a.courseListingObject.termObject.startDate))[0];
           if (currentCourse?.courseListingId) setRecord(currentCourse.courseListingId);
-          else console.info('Course listing ID not found for the current course.');
+          else setResolutionError(true);
         } else {
-          console.info('No courses found matching the course code provided.');
+          setResolutionError(true);
         }
-      } catch (e) {
-        console.error(`Failed to fetch course data: ${e.message}`);
+      } catch {
+        setResolutionError(true);
       }
     };
     resolve();
@@ -157,6 +163,10 @@ function CourseRecords() {
   };
 
   const courseViewValue = { courseInfo, customizationProps, collegeParam };
+
+  if (resolutionError) {
+    return <Alert color="danger" role="alert">Could not load this course.</Alert>;
+  }
 
   return (
     <CourseViewContext.Provider value={courseViewValue}>

@@ -48,7 +48,7 @@ function Searchbar() {
   const [searchArea, setSearchArea] = useState('All fields');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All Colleges');
-  const [departments, setDepartments] = useState([]);
+  const [departments, setDepartments] = useState([]), [departmentError, setDepartmentError] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [searchMode, setSearchMode] = useState('courses'); // 'courses' or 'items'
   const toggleAdvancedFilters = () => setAdvancedFiltersOpen(!advancedFiltersOpen);
@@ -87,7 +87,7 @@ function Searchbar() {
 
   // Fetch departments when college changes
   useEffect(() => {
-    setDepartments([]);
+    setDepartments([]); setDepartmentError(false);
     if (!college || college === 'all') return;
     
     const collegeKey = college;
@@ -106,9 +106,8 @@ function Searchbar() {
           setDepartments([]);
         }
       })
-      .catch(error => {
-        console.error('Error fetching departments:', error);
-        setDepartments([]);
+      .catch(() => {
+        setDepartmentError(true); setDepartments([]);
       });
   }, [college]);
 
@@ -456,7 +455,7 @@ function Searchbar() {
 
                 {/* Department Filter */}
                 <FormGroup className="filter-item">
-                  <Label for="departmentSelect" className="filter-label">Department</Label>
+                  <Label for="departmentSelect" className="filter-label">Department{departmentError && <span id="department-error" role="alert"> Could not load departments.</span>}</Label>
                   <Input
                     id="departmentSelect"
                     type="select"
@@ -480,7 +479,7 @@ function Searchbar() {
 
                       setDepartment(newDept);
                     }}
-                    disabled={departments.length === 0}
+                    disabled={departments.length === 0} aria-describedby={departmentError ? 'department-error' : undefined}
                     className="filter-select"
                   >
                     <option value="">All Departments</option>
@@ -664,13 +663,13 @@ function Searchbar() {
 
                 {/* Department Filter */}
                 <FormGroup className="mobile-filter-item">
-                  <Label for="mobileDepartmentSelect" className="filter-label">Department</Label>
+                  <Label for="mobileDepartmentSelect" className="filter-label">Department{departmentError && <span id="mobile-department-error" role="alert"> Could not load departments.</span>}</Label>
                   <Input
                     id="mobileDepartmentSelect"
                     type="select"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    disabled={departments.length === 0}
+                    disabled={departments.length === 0} aria-describedby={departmentError ? 'mobile-department-error' : undefined}
                     className="filter-select"
                   >
                     <option value="">All Departments</option>

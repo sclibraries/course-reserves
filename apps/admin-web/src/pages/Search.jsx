@@ -45,6 +45,7 @@ function Search() {
   const [itemResults, setItemResults] = useState([]);
   const [itemLoading, setItemLoading] = useState(false);
   const [itemError, setItemError] = useState(null);
+  const [partialResults, setPartialResults] = useState(false);
   
   // Get college name for heading
   const getCollegeName = () => {
@@ -151,6 +152,7 @@ function Search() {
   // Fetch item search results when type is 'item'
   useEffect(() => {
     if (!isInitialized || type !== 'item') return;
+    setPartialResults(false);
     
     // Don't search if query is empty - prevent searching all items
     if (!query || query.trim() === '') {
@@ -210,23 +212,14 @@ function Search() {
             const electronicUrl = `${ELECTRONIC_SEARCH_URL}?name=${encodeURIComponent(query)}&term_id=${termId}`;
             
             const electronicResponse = await fetch(electronicUrl);
+            if (!electronicResponse.ok) throw new Error(`HTTP error! status: ${electronicResponse.status}`);
             
-            if (electronicResponse.ok) {
-              const electronicResult = await electronicResponse.json();
-              // The API returns reserves array, not resources
-              const reserves = electronicResult?.data?.reserves || [];
-              
-              // Mark electronic resources for identification
-              electronicReserves = reserves.map(reserve => ({
-                ...reserve,
-                isElectronic: true
-              }));
-              
-              console.log('Electronic reserves found:', electronicReserves.length);
-            }
-          } catch (electronicError) {
-            console.warn('Error fetching electronic resources:', electronicError);
-            // Continue with just print resources if electronic search fails
+            const electronicResult = await electronicResponse.json();
+            // The API returns reserves array, not resources
+            const reserves = electronicResult?.data?.reserves || [];
+            electronicReserves = reserves.map(reserve => ({ ...reserve, isElectronic: true }));
+          } catch {
+            setPartialResults(true);
           }
         }
         
@@ -344,6 +337,7 @@ function Search() {
       {/* Conditionally render based on search type */}
       {type === 'item' ? (
         <>
+          {partialResults && <div className="alert alert-warning" role="status">Search results may be incomplete because electronic resources could not be loaded.</div>}
           {!query || query.trim() === '' ? (
             <Alert color="info" className="mt-3">
               <h5>Search for Reserve Items</h5>

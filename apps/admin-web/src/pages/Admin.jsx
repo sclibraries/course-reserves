@@ -27,16 +27,18 @@ function Admin() {
     error: resourceError,
     loading: resourceLoading,
     setSearchResults,
+    setError,
   } = useResourceSearchStore();
   const cqlQuery = useBuildQuery(college, type, query, department, null, termId);
 
   const fetchResources = useCallback(async () => {
     try {
       setSearchResults(await adminResourceService.getAllResources());
-    } catch (error) {
-      console.error('Fetch resources failed:', error);
+      setError(null);
+    } catch {
+      setError(new Error("Couldn't load resources"));
     }
-  }, [setSearchResults]);
+  }, [setError, setSearchResults]);
 
   useEffect(() => { fetchTerms(); }, [fetchTerms]);
 
