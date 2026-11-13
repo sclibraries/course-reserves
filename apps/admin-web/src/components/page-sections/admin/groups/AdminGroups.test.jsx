@@ -6,9 +6,16 @@ const mocks = vi.hoisted(() => ({
   getAllGroups: vi.fn(), createGroup: vi.fn(), updateGroup: vi.fn(), deleteGroup: vi.fn(),
   getMembers: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getStaff: vi.fn(),
 }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
+vi.mock('../../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import AdminGroups from './AdminGroups';
 
@@ -28,6 +35,7 @@ async function renderAdminGroups() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.getAllGroups.mockReset().mockResolvedValue({ groups: [group] });
   mocks.createGroup.mockReset().mockResolvedValue({ group });
   mocks.updateGroup.mockReset().mockResolvedValue({ group });
@@ -74,26 +82,33 @@ describe('AdminGroups', () => {
     expect(mocks.updateGroup).toHaveBeenCalledWith(7, { name: 'Synthetic reserves', description: 'Course materials' });
   });
 
-  it('adds and removes staff members and explains group deletion conflicts', async () => {
+  it.each([
+    ['add', 'Added Test Handler to Synthetic acquisitions'],
+    ['remove', 'Removed Test Owner from Synthetic acquisitions'],
+  ])('shows the named success toast when members %s', async (action, successMessage) => {
     await renderAdminGroups();
     await act(async () => container.querySelector('button[aria-label="Manage members of Synthetic acquisitions"]').click());
 
     expect(mocks.getMembers).toHaveBeenCalledWith(7);
     expect(mocks.getStaff).toHaveBeenCalledWith('');
     expect(container.textContent).toContain('Test Owner');
-    const staffPicker = container.querySelector('select[name="add-member-username"]');
-    await act(async () => {
-      staffPicker.value = 'test-api078-handler';
-      staffPicker.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await act(async () => container.querySelector('button[data-action="add-member"]').click());
-    expect(mocks.addMember).toHaveBeenCalledWith(7, 'test-api078-handler');
+    if (action === 'add') {
+      const staffPicker = container.querySelector('select[name="add-member-username"]');
+      await act(async () => {
+        staffPicker.value = 'test-api078-handler';
+        staffPicker.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await act(async () => container.querySelector('button[data-action="add-member"]').click());
+      expect(mocks.addMember).toHaveBeenCalledWith(7, 'test-api078-handler');
 
-    await act(async () => container.querySelector('button[aria-label="Remove Test Owner from Synthetic acquisitions"]').click());
-    expect(mocks.removeMember).toHaveBeenCalledWith(7, 'test-api078-owner');
+      mocks.deleteGroup.mockRejectedValueOnce({ payload: { error_code: 'group_has_items' } });
+      await act(async () => container.querySelector('button[aria-label="Delete Synthetic acquisitions"]').click());
+      expect(container.textContent).toContain('Move or finish its items first');
+    } else {
+      await act(async () => container.querySelector('button[aria-label="Remove Test Owner from Synthetic acquisitions"]').click());
+      expect(mocks.removeMember).toHaveBeenCalledWith(7, 'test-api078-owner');
+    }
 
-    mocks.deleteGroup.mockRejectedValueOnce({ payload: { error_code: 'group_has_items' } });
-    await act(async () => container.querySelector('button[aria-label="Delete Synthetic acquisitions"]').click());
-    expect(container.textContent).toContain('Move or finish its items first');
+    expect(notifications.notify.success).toHaveBeenCalledWith(successMessage);
   });
 });

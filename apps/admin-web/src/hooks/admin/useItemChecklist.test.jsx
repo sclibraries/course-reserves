@@ -8,15 +8,17 @@ const mocks = vi.hoisted(() => ({
   completeItemChecklist: vi.fn(),
   getItemChecklist: vi.fn(),
   listTemplates: vi.fn(),
-  notifySuccess: vi.fn(),
-  notifyFromError: vi.fn(),
 }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { username: 'synthetic-user' } }) }));
 vi.mock('../../services/admin/checklistService', () => ({ checklistService: mocks }));
-vi.mock('../../services/notify', () => ({
-  notify: { success: mocks.notifySuccess, fromError: mocks.notifyFromError },
-}));
+vi.mock('../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import useItemChecklist from './useItemChecklist';
 
@@ -49,40 +51,46 @@ async function renderChecklist(onComplete = vi.fn()) {
 }
 
 describe('useItemChecklist notifications', () => {
-  it('announces assignment success and failure', async () => {
-    await renderChecklist();
-    await act(async () => hook.current.handleAssignChecklist('synthetic-template'));
-    expect(mocks.notifySuccess).toHaveBeenCalledWith('Checklist assigned');
-
-    mocks.notifySuccess.mockClear();
-    mocks.assignChecklistToItem.mockRejectedValueOnce(syntheticError);
-    await act(async () => hook.current.handleAssignChecklist('synthetic-template'));
-    expect(mocks.notifyFromError).toHaveBeenCalledWith(syntheticError, "Couldn't assign the checklist");
-    expect(mocks.notifySuccess).not.toHaveBeenCalled();
-  });
-
-  it('announces task completion and failure', async () => {
-    await renderChecklist();
-    await act(async () => hook.current.handleTaskToggle('task-1', false));
-    expect(mocks.notifySuccess).toHaveBeenCalledWith('Task completed');
-
-    mocks.notifySuccess.mockClear();
-    mocks.updateTaskStatus.mockRejectedValueOnce(syntheticError);
-    await act(async () => hook.current.handleTaskToggle('task-1', false));
-    expect(mocks.notifyFromError).toHaveBeenCalledWith(syntheticError, "Couldn't update the checklist task");
-    expect(mocks.notifySuccess).not.toHaveBeenCalled();
-  });
-
-  it('announces checklist completion and failure', async () => {
+  it.each([
+    [
+      'assignment',
+      'Checklist assigned',
+      "Couldn't assign the checklist",
+      () => hook.current.handleAssignChecklist('synthetic-template'),
+      () => mocks.assignChecklistToItem.mockRejectedValueOnce(syntheticError),
+    ],
+    [
+      'task completion',
+      'Task completed',
+      "Couldn't update the checklist task",
+      () => hook.current.handleTaskToggle('task-1', false),
+      () => mocks.updateTaskStatus.mockRejectedValueOnce(syntheticError),
+    ],
+    [
+      'item completion',
+      'Item completed',
+      "Couldn't complete the checklist",
+      () => hook.current.handleCompleteAll(),
+      () => mocks.completeItemChecklist.mockRejectedValueOnce(syntheticError),
+    ],
+  ])('announces %s success and failure', async (_action, successMessage, errorMessage, invoke, reject) => {
     const onComplete = await renderChecklist();
-    await act(async () => hook.current.handleCompleteAll());
-    expect(mocks.notifySuccess).toHaveBeenCalledWith('Item completed');
-    expect(onComplete).toHaveBeenCalledTimes(1);
+    await act(async () => invoke());
+    expect(notifications.notify.success).toHaveBeenCalledWith(successMessage);
+    if (_action === 'item completion') expect(onComplete).toHaveBeenCalledTimes(1);
 
-    mocks.notifySuccess.mockClear();
-    mocks.completeItemChecklist.mockRejectedValueOnce(syntheticError);
-    await act(async () => hook.current.handleCompleteAll());
-    expect(mocks.notifyFromError).toHaveBeenCalledWith(syntheticError, "Couldn't complete the checklist");
-    expect(mocks.notifySuccess).not.toHaveBeenCalled();
+    notifications.notify.success.mockClear();
+    reject();
+    await act(async () => invoke());
+    expect(notifications.notify.fromError).toHaveBeenCalledWith(syntheticError, errorMessage);
+    expect(notifications.notify.success).not.toHaveBeenCalled();
+  });
+
+  it('shows template load failures in an error toast with the reference', async () => {
+    mocks.listTemplates.mockRejectedValueOnce(syntheticError);
+
+    await renderChecklist();
+
+    expect(notifications.notify.fromError).toHaveBeenCalledWith(syntheticError, "Couldn't load checklist templates");
   });
 });

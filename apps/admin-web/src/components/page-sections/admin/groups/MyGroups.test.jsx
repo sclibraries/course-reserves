@@ -3,9 +3,16 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ getMyGroups: vi.fn(), getGroupQueue: vi.fn(), claimItem: vi.fn() }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
+vi.mock('../../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import MyGroups from './MyGroups';
 
@@ -28,6 +35,7 @@ async function renderMyGroups() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.getMyGroups.mockReset().mockResolvedValue({ groups });
   mocks.getGroupQueue.mockReset().mockResolvedValue({ items: [item], count: 1 });
   mocks.claimItem.mockReset().mockResolvedValue({ item });
@@ -53,13 +61,18 @@ describe('MyGroups', () => {
     expect(container.querySelector('button[aria-label="Claim Synthetic group item"]')).not.toBeNull();
   });
 
-  it('claims an item from a group queue and refreshes that queue', async () => {
+  it.each([
+    item,
+    { ...item, id: 99907812, title: 'Another synthetic group item' },
+  ])('names "$title" in its group queue claim toast', async (queuedItem) => {
+    mocks.getGroupQueue.mockResolvedValue({ items: [queuedItem], count: 1 });
     await renderMyGroups();
     await act(async () => container.querySelector('button[aria-label="Open Synthetic acquisitions queue"]').click());
-    await act(async () => container.querySelector('button[aria-label="Claim Synthetic group item"]').click());
+    await act(async () => container.querySelector(`button[aria-label="Claim ${queuedItem.title}"]`).click());
 
-    expect(mocks.claimItem).toHaveBeenCalledWith('new', 99907811);
+    expect(mocks.claimItem).toHaveBeenCalledWith(queuedItem.kind, queuedItem.id);
     expect(mocks.getGroupQueue).toHaveBeenCalledTimes(2);
+    expect(notifications.notify.success).toHaveBeenCalledWith(`Item claimed: ${queuedItem.title}`);
   });
 
 });

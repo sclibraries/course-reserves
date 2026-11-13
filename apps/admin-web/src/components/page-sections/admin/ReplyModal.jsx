@@ -58,7 +58,7 @@ const ReplyModal = ({ isOpen, toggle, parentMessage, submissionId, onReplySent }
       const users = await submissionWorkflowService.searchStaff(query);
       setStaffUsers(users);
     } catch (error) {
-      console.error('Failed to search staff:', error);
+      notify.fromError(error, "Couldn't search staff");
     } finally {
       setSearchingStaff(false);
     }

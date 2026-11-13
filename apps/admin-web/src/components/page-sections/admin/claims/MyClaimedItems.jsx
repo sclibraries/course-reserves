@@ -27,7 +27,11 @@ function MyClaimedItems() {
 
   const handleRelease = async (item) => {
     const key = `${item.kind}/${item.id}`;
-    await run(() => claimsApi.releaseItem(item.kind, item.id), { pendingKey: key, reload: loadItems });
+    await run(() => claimsApi.releaseItem(item.kind, item.id), {
+      pendingKey: key,
+      successMessage: `Item released: ${item.title}`,
+      reload: loadItems,
+    });
   };
 
   return (

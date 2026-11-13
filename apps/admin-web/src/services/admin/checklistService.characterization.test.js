@@ -146,4 +146,13 @@ describe('checklistService characterization', () => {
     await expect(checklistService.getTemplate(3)).rejects.toThrow('Failed to fetch checklist template');
     expect(fetchMock.mock.calls).toEqual([[`${courseApi}/checklist/get-template/3`, { headers }]]);
   });
+
+  it.each([
+    ['non-JSON response', { ok: true, headers: { get: () => 'text/html' } }],
+    ['failed response', { ok: false, headers: { get: () => 'application/json' } }],
+  ])('rejects listTemplates for a %s', async (_condition, response) => {
+    fetchMock.mockResolvedValue(response);
+
+    await expect(checklistService.listTemplates()).rejects.toThrow();
+  });
 });

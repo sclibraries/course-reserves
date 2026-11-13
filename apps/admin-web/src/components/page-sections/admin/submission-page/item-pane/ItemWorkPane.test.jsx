@@ -25,11 +25,18 @@ const mocks = vi.hoisted(() => ({
   createCommunication: vi.fn(),
   searchStaff: vi.fn(),
 }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
 vi.mock('../../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
 vi.mock('../../../../../services/admin/workflowFlows/workflowFlowsApi', () => ({ workflowFlowsApi: mocks }));
 vi.mock('../../../../../services/admin/submissionWorkflowService', () => ({ submissionWorkflowService: mocks }));
+vi.mock('../../../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import ItemWorkPane from './ItemWorkPane';
 
@@ -158,6 +165,7 @@ async function expectAccessible(target = container) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   Object.values(mocks).forEach((mock) => mock.mockReset());
   mocks.claimItem.mockResolvedValue({ item });
   mocks.releaseItem.mockResolvedValue({ item });
@@ -665,6 +673,23 @@ describe('ItemWorkPane messages and details', () => {
 
     await user.click(getByRole(container, 'button', { name: 'Reply to Reserve timing' }));
     expect(getByRole(document.body, 'heading', { name: 'Reply to Message' })).toBeTruthy();
+  });
+
+  it('shows staff search failures in an error toast with the reference', async () => {
+    const error = Object.assign(new Error('Synthetic provider detail'), { reference: 'SYNTH-STAFF-1' });
+    mocks.searchStaff.mockRejectedValueOnce(error);
+    const { user } = await renderPane();
+    await user.click(getByRole(container, 'tab', { name: 'Messages (1 unread)' }));
+    await user.click(getByRole(container, 'button', { name: 'Reply to Reserve timing' }));
+    const reply = getByRole(document.body, 'textbox', { name: /Your Reply/ });
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(reply, '@synthetic');
+      reply.setSelectionRange(10, 10);
+      reply.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    expect(notifications.notify.fromError).toHaveBeenCalledWith(error, "Couldn't search staff");
   });
 
   it('opens the existing staff message composer from Messages', async () => {

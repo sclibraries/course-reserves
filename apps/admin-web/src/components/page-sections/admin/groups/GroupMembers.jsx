@@ -35,14 +35,19 @@ function GroupMembers({ group }) {
   const handleAdd = async (event) => {
     event.preventDefault();
     if (!username) return;
+    const member = staff.find((person) => person.username === username);
     await run(() => staffGroupsApi.addMember(group.id, username), {
       reload: loadMembers,
+      successMessage: `Added ${member.display_name || member.username} to ${group.name}`,
       onSuccess: () => setUsername(''),
     });
   };
 
-  const handleRemove = async (memberUsername) => {
-    await run(() => staffGroupsApi.removeMember(group.id, memberUsername), { reload: loadMembers });
+  const handleRemove = async (memberUsername, displayName) => {
+    await run(() => staffGroupsApi.removeMember(group.id, memberUsername), {
+      reload: loadMembers,
+      successMessage: `Removed ${displayName} from ${group.name}`,
+    });
   };
 
   const memberUsernames = new Set(members.map((member) => member.username));
@@ -66,7 +71,7 @@ function GroupMembers({ group }) {
                       size="sm"
                       aria-label={`Remove ${displayName} from ${group.name}`}
                       disabled={pending}
-                      onClick={() => handleRemove(member.username)}
+                      onClick={() => handleRemove(member.username, displayName)}
                     >
                       Remove
                     </Button>

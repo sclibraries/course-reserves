@@ -34,7 +34,7 @@ export default function useItemChecklist(itemId, onComplete) {
       const data = await checklistService.listTemplates();
       setTemplates(data);
     } catch (err) {
-      console.error('Failed to load templates:', err);
+      notify.fromError(err, "Couldn't load checklist templates");
     }
   };
 
@@ -115,7 +115,7 @@ export default function useItemChecklist(itemId, onComplete) {
       const notes = taskNotes[taskId] || null;
       await checklistService.updateTaskStatus(itemId, taskId, completed, notes, user?.username);
     } catch (err) {
-      console.error('Failed to save notes:', err);
+      notify.fromError(err, "Couldn't save the checklist note");
     }
   };
 

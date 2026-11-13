@@ -17,32 +17,21 @@ class ChecklistService {
    * Get all checklist templates
    */
   async listTemplates() {
-    try {
-      const response = await authFetch(
-        `${apiConfig.urls.courseReserves}${apiConfig.endpoints.checklist.listTemplates}`,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+    const response = await authFetch(
+      `${apiConfig.urls.courseReserves}${apiConfig.endpoints.checklist.listTemplates}`,
+      {
+        headers: {
+          'Content-Type': 'application/json'
         }
-      );
-      
-      // Check if response is actually JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Checklist API not yet implemented - returning empty array');
-        return [];
       }
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch checklist templates');
-      }
-      return response.json();
-    } catch (error) {
-      console.error('Checklist API error:', error);
-      // Return empty array instead of throwing - backend not yet implemented
-      return [];
+    );
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Checklist API not yet implemented');
     }
+    if (!response.ok) throw new Error('Failed to fetch checklist templates');
+    return response.json();
   }
 
   /**

@@ -2,6 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ItemChecklistView from './ItemChecklistView';
+import ChecklistTemplateManager from './ChecklistTemplateManager';
 
 const mocks = vi.hoisted(() => ({
   checklistService: {
@@ -13,10 +14,17 @@ const mocks = vi.hoisted(() => ({
   },
   user: { username: 'test-staff' },
 }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../services/admin/checklistService', () => ({
   checklistService: mocks.checklistService,
 }));
+vi.mock('../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mocks.user }),
@@ -55,7 +63,7 @@ const templates = [
 
 const mounted = new Set();
 
-const renderComponent = async (props = {}) => {
+const renderComponent = async (props = {}, Component = ItemChecklistView) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -70,7 +78,7 @@ const renderComponent = async (props = {}) => {
   mounted.add(view);
 
   await act(async () => {
-    root.render(createElement(ItemChecklistView, { itemId: 88, ...props }));
+    root.render(createElement(Component, { itemId: 88, ...props }));
   });
 
   return view;
@@ -185,6 +193,19 @@ describe('ItemChecklistView characterization', () => {
     expect(mocks.checklistService.updateTaskStatus).toHaveBeenCalledWith(88, 1, false, 'test-note text', 'test-staff');
   });
 
+  it('keeps the typed note and shows an error toast with the reference when blur save fails', async () => {
+    const error = Object.assign(new Error('Synthetic provider detail'), { reference: 'SYNTH-NOTE-1' });
+    mocks.checklistService.updateTaskStatus.mockRejectedValueOnce(error);
+    const view = await renderComponent();
+    const notes = view.container.querySelector('textarea[placeholder="Optional notes..."]');
+    await changeValue(notes, 'Synthetic note');
+
+    await act(async () => notes.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+
+    expect(notes.value).toBe('Synthetic note');
+    expect(notifications.notify.fromError).toHaveBeenCalledWith(error, "Couldn't save the checklist note");
+  });
+
   it('reports required tasks remaining and completes after they are checked', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const onComplete = vi.fn();
@@ -216,5 +237,12 @@ describe('ItemChecklistView characterization', () => {
 
     expect(view.container.textContent).toContain('Failed to load checklist. Please try again.');
     expect(findButton(view.container, 'Try Again')).toBeTruthy();
+  });
+
+  it('shows the existing template error when listTemplates rejects', async () => {
+    mocks.checklistService.listTemplates.mockRejectedValueOnce(new Error('Synthetic provider detail'));
+    const view = await renderComponent({}, ChecklistTemplateManager);
+
+    expect(view.container.textContent).toContain('Failed to load checklist templates. Please try again.');
   });
 });

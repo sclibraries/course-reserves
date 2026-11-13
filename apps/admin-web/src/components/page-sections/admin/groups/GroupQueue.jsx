@@ -33,6 +33,7 @@ function GroupQueue({ group, onBack }) {
     const key = `${item.kind}/${item.id}`;
     await run(() => claimsApi.claimItem(item.kind, item.id), {
       pendingKey: key,
+      successMessage: `Item claimed: ${item.title}`,
       reload: loadQueue,
       onError: async (requestError) => {
       if (requestError?.payload?.error_code === 'already_claimed') await loadQueue(true);

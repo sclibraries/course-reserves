@@ -3,8 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ getMyItems: vi.fn(), releaseItem: vi.fn() }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
+vi.mock('../../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import MyClaimedItems from './MyClaimedItems';
 
@@ -26,6 +33,7 @@ async function renderItems() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.getMyItems.mockReset().mockResolvedValue({ items });
   mocks.releaseItem.mockReset().mockResolvedValue({ item: items[0] });
 });
@@ -48,13 +56,15 @@ describe('MyClaimedItems', () => {
     expect(container.textContent).toContain('Expires in 23 h');
   });
 
-  it('releases a claimed item and reloads My items', async () => {
+  it.each(items)('releases "$title" with a named success toast', async (item) => {
+    mocks.getMyItems.mockResolvedValue({ items: [item] });
     await renderItems();
 
-    await act(async () => container.querySelector('button[aria-label="Release Expires later"]').click());
+    await act(async () => container.querySelector(`button[aria-label="Release ${item.title}"]`).click());
 
-    expect(mocks.releaseItem).toHaveBeenCalledWith('new', 1);
+    expect(mocks.releaseItem).toHaveBeenCalledWith(item.kind, item.id);
     expect(mocks.getMyItems).toHaveBeenCalledTimes(2);
+    expect(notifications.notify.success).toHaveBeenCalledWith(`Item released: ${item.title}`);
   });
 
 });

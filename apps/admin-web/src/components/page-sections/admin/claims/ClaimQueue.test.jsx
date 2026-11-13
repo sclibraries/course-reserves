@@ -3,8 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ getQueue: vi.fn(), claimItem: vi.fn() }));
+const notifications = vi.hoisted(() => {
+  const toast = { id: 'synthetic-toast' };
+  const notify = Object.fromEntries(['success', 'info', 'warning', 'error', 'fromError']
+    .map((method) => [method, vi.fn(() => toast)]));
+  return { toast, notify, toUserError: vi.fn(() => toast) };
+});
 
 vi.mock('../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
+vi.mock('../../../../services/notify', () => ({ notify: notifications.notify, toUserError: notifications.toUserError }));
 
 import ClaimQueue from './ClaimQueue';
 
@@ -27,6 +34,7 @@ async function renderQueue() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.getQueue.mockReset().mockResolvedValue({ items, count: items.length });
   mocks.claimItem.mockReset().mockResolvedValue({ item: items[0] });
 });
@@ -79,6 +87,15 @@ describe('ClaimQueue', () => {
     expect(container.textContent).toContain('Already claimed by Test Staff.');
     expect(mocks.getQueue).toHaveBeenCalledTimes(2);
     expect(container.querySelector('[data-item-id="3"]')).toBeNull();
+  });
+
+  it.each([items[0], items[1]])('names "$title" in its claim success toast', async (item) => {
+    mocks.getQueue.mockResolvedValue({ items: [item], count: 1 });
+    await renderQueue();
+
+    await act(async () => container.querySelector(`button[aria-label="Claim ${item.title}"]`).click());
+
+    expect(notifications.notify.success).toHaveBeenCalledWith(`Item claimed: ${item.title}`);
   });
 
 });
