@@ -14,12 +14,43 @@ const mocks = vi.hoisted(() => ({
   createCommunication: vi.fn(), searchStaff: vi.fn(),
 }));
 
+const feedback = vi.hoisted(() => {
+  const toUserError = vi.fn((error, message = 'Something went wrong') => ({
+    message,
+    reference: error?.reference || error?.payload?.reference || error?.payload?.reference_id,
+  }));
+  const showToast = (message, role) => {
+    const toast = document.createElement('div');
+    toast.dataset.testToast = 'true';
+    toast.setAttribute('role', role);
+    toast.textContent = message;
+    document.body.append(toast);
+  };
+  const notify = {
+    success: vi.fn((message) => showToast(message, 'status')),
+    info: vi.fn((message) => showToast(message, 'status')),
+    warning: vi.fn((message) => showToast(message, 'status')),
+    error: vi.fn((message, { reference } = {}) => {
+      const text = message.replace(/[.!?]+$/, '');
+      showToast(reference ? `${text}. Reference: ${reference}` : text, 'alert');
+    }),
+  };
+  notify.fromError = vi.fn((error, message) => {
+    const userError = toUserError(error, message);
+    notify.error(userError.message, { reference: userError.reference });
+  });
+  return { notify, toUserError };
+});
+
 vi.mock('../../../../../services/admin/workflowClaims/claimsApi', () => ({ claimsApi: mocks }));
 vi.mock('../../../../../services/admin/staffGroupsApi', () => ({ staffGroupsApi: mocks }));
 vi.mock('../../../../../services/admin/workflowFlows/workflowFlowsApi', () => ({ workflowFlowsApi: mocks }));
 vi.mock('../../../../../services/admin/submissionWorkflowService', () => ({ submissionWorkflowService: mocks }));
+vi.mock('../../../../../services/notify', () => ({ notify: feedback.notify, toUserError: feedback.toUserError }));
 
 import ItemWorkPane from './ItemWorkPane';
+import useItemClaimActions from '../../../../../hooks/admin/useItemClaimActions';
+import { renderHook } from '../../../../../hooks/admin/testUtils/renderHook';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 expect.extend({ toHaveNoViolations });
@@ -71,10 +102,15 @@ PaneHarness.propTypes = {
 
 let root;
 let container;
+let hook;
 
 function actUser() {
   const user = userEvent.setup();
-  return { click: (...args) => act(async () => user.click(...args)) };
+  return {
+    click: (...args) => act(async () => user.click(...args)),
+    selectOptions: (...args) => act(async () => user.selectOptions(...args)),
+    type: (...args) => act(async () => user.type(...args)),
+  };
 }
 
 async function renderPane({ paneItem = item, refreshClaim = false, onReopen = vi.fn() } = {}) {
@@ -98,8 +134,8 @@ beforeEach(() => {
   mocks.releaseItem.mockResolvedValue({ item });
   mocks.handoffItem.mockResolvedValue({ item });
   mocks.takeoverItem.mockResolvedValue({ item });
-  mocks.getStaff.mockResolvedValue({ items: [] });
-  mocks.getGroupsForHandoff.mockResolvedValue({ groups: [] });
+  mocks.getStaff.mockResolvedValue({ items: [{ username: 'test-handler', display_name: 'Test Handler' }] });
+  mocks.getGroupsForHandoff.mockResolvedValue({ groups: [{ id: 7, name: 'Acquisitions' }] });
   mocks.getItemTimeline.mockResolvedValue({ items: [] });
   mocks.getItemFlow.mockResolvedValue(flowState());
   mocks.getFlows.mockResolvedValue({ flows: [{ id: 3, name: 'Alternate synthetic flow' }] });
@@ -108,6 +144,8 @@ beforeEach(() => {
   mocks.switchFlow.mockResolvedValue(flowState());
   mocks.createCommunication.mockResolvedValue({ id: 1 });
   mocks.searchStaff.mockResolvedValue([]);
+  Object.values(feedback.notify).forEach((mock) => mock.mockClear());
+  feedback.toUserError.mockClear();
 });
 
 afterEach(() => {
@@ -115,6 +153,9 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  hook?.unmount();
+  hook = null;
+  document.querySelectorAll('[data-test-toast]').forEach((toast) => toast.remove());
 });
 
 describe('ItemWorkPane claim state', () => {
@@ -129,6 +170,33 @@ describe('ItemWorkPane claim state', () => {
     await expectAccessible(pane);
     await user.click(getByRole(process, 'button', { name: 'Claim item' }));
     expect(mocks.claimItem).toHaveBeenCalledWith('new', 7501);
+  });
+
+  it.each([
+    ['claim', { claimed_by: null }, async () => act(async () => hook.current.claim()), 'Item claimed'],
+    ['release', {}, async () => act(async () => hook.current.release()), 'Item released'],
+    ['hand off to a staff member', {}, async () => {
+      mocks.getStaff.mockResolvedValueOnce({ items: [{ username: 'test-handler', display_name: 'Test Handler' }] });
+      await act(async () => hook.current.openHandoff());
+      await act(async () => hook.current.setToUsername('test-handler'));
+      await act(async () => hook.current.submitHandoff());
+    }, 'Handed off to Test Handler'],
+    ['hand off to a group', {}, async () => {
+      mocks.getGroupsForHandoff.mockResolvedValueOnce({ groups: [{ id: 7, name: 'Acquisitions' }] });
+      await act(async () => hook.current.openHandoff());
+      await act(async () => hook.current.changeHandoffTargetType('group'));
+      await act(async () => hook.current.setToGroupId('7'));
+      await act(async () => hook.current.submitHandoff());
+    }, 'Handed off to Acquisitions'],
+    ['take over', { claimed_by: 'another-staff' }, async () => act(async () => hook.current.submitTakeover('Synthetic reason')), 'Item taken over'],
+  ])('shows the success toast when staff %s an item', async (_action, claimState, perform, message) => {
+    hook = await renderHook((props) => useItemClaimActions(props), {
+      item: { ...item, ...claimState }, currentUsername: 'synthetic-staff', onChanged: vi.fn(),
+    });
+
+    await perform();
+
+    expect(getByText(document.body, message)).toBeTruthy();
   });
 
   it('reloads the flow after claiming and enables outcomes without manual reload', async () => {
@@ -146,17 +214,58 @@ describe('ItemWorkPane claim state', () => {
     expect(getByRole(process, 'button', { name: 'Reload item flow' })).toBeTruthy();
   });
 
-  it('shows the formatted group claim refusal next to the Claim button', async () => {
-    mocks.claimItem.mockRejectedValueOnce({ payload: { error_code: 'not_group_member' } });
-    const assigned = { id: 12, name: 'Acquisitions' };
-    const { pane, user } = await renderPane({ paneItem: { ...item, claimed_by: null, assigned_group: assigned } });
+  it.each([
+    ['claim', { claimed_by: null, claimed_by_display: null, assigned_group: { id: 12, name: 'Acquisitions' } }, 'not_group_member', 'SYNTH-CLAIM', 'Only group members can claim this; use Take over with a reason. Reference: SYNTH-CLAIM'],
+    ['release', {}, 'not_claimed_by_you', 'SYNTH-RELEASE', 'You can release only items claimed by you. Reference: SYNTH-RELEASE'],
+  ])('shows %s failures as referenced toast text without a duplicate inline error', async (action, paneItem, errorCode, reference, message) => {
+    mocks[action === 'claim' ? 'claimItem' : 'releaseItem'].mockRejectedValueOnce({
+      payload: { error_code: errorCode, reference },
+    });
+    const { pane, user } = await renderPane({ paneItem: { ...item, ...paneItem } });
     const process = getByRole(pane, 'region', { name: 'Process Synthetic reserve item' });
 
-    expect(getByText(process, 'Assigned to Acquisitions. Claim this item to work on it')).toBeTruthy();
-    await user.click(getByRole(process, 'button', { name: 'Claim item' }));
-    expect((await waitFor(() => getByRole(process, 'alert'))).textContent)
-      .toBe('Only group members can claim this; use Take over with a reason.');
+    if (action === 'claim') {
+      expect(getByText(process, 'Assigned to Acquisitions. Claim this item to work on it')).toBeTruthy();
+      await user.click(getByRole(process, 'button', { name: 'Claim item' }));
+    } else {
+      await user.click(getByRole(pane, 'button', { name: 'Release Synthetic reserve item' }));
+    }
+
+    await waitFor(() => expect(getByText(document.body, message)).toBeTruthy());
+    expect(queryByRole(process, 'alert')).toBeNull();
     await expectAccessible(pane);
+  });
+
+  it.each([
+    ['hand off', { ...item }, async (user, pane) => {
+      mocks.getStaff.mockResolvedValueOnce({ items: [{ username: 'test-handler', display_name: 'Test Handler' }] });
+      await user.click(getByRole(pane, 'button', { name: 'Hand off Synthetic reserve item' }));
+      const dialog = getByRole(document.body, 'dialog', { name: 'Hand off Synthetic reserve item' });
+      await waitFor(() => expect(getByRole(dialog, 'combobox', { name: 'Staff member' })).toBeTruthy());
+      await user.selectOptions(getByRole(dialog, 'combobox', { name: 'Staff member' }), 'test-handler');
+      await user.click(getByRole(dialog, 'button', { name: 'Send handoff' }));
+      return dialog;
+    }],
+    ['take over', { ...item, claimed_by: 'another-staff' }, async (user, pane) => {
+      await user.click(getByRole(pane, 'button', { name: 'Take over Synthetic reserve item' }));
+      const dialog = getByRole(document.body, 'dialog', { name: 'Take over Synthetic reserve item' });
+      await user.type(getByRole(dialog, 'textbox', { name: 'Reason for taking over (required)' }), 'Synthetic reason');
+      await user.click(getByRole(dialog, 'button', { name: 'Take over item' }));
+      return dialog;
+    }],
+  ])('keeps a failed %s inline in its open dialog without a toast', async (_action, paneItem, perform) => {
+    const reject = new Error('Synthetic request failed');
+    mocks.handoffItem.mockRejectedValueOnce(reject);
+    mocks.takeoverItem.mockRejectedValueOnce(reject);
+    const { pane, user } = await renderPane({ paneItem });
+
+    const dialog = await perform(user, pane);
+
+    await waitFor(() => expect(getByRole(dialog, 'alert').textContent).toBe('Synthetic request failed'));
+    expect(feedback.notify.error).not.toHaveBeenCalled();
+    await expectAccessible(document.body);
+    await user.click(getByRole(dialog, 'button', { name: 'Cancel' }));
+    await waitFor(() => expect(queryByRole(document.body, 'dialog')).toBeNull());
   });
 
   it('shows the existing access path when another staff member holds the claim', async () => {

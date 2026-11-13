@@ -42,19 +42,21 @@ function useSwitchFlow({ item, canAct, onFlowStateChange, onChanged, clearItemEr
   const submitSwitchFlow = useCallback(async (reasonValue) => {
     const reason = reasonValue.trim();
     if (!selectedFlow || !reason || !canAct) return false;
+    const flowName = flows.find((flow) => String(flow.id) === selectedFlow)?.name;
 
     const result = await run(() => workflowFlowsApi.switchFlow(item.kind, item.id, {
         flow_id: parseFlowId(selectedFlow),
         reason: reason.trim(),
       }), {
       reload: onChanged,
+      successMessage: `Switched to ${flowName}`,
       onSuccess: (flow) => {
         onFlowStateChange?.(flow);
         setOpen(false);
       },
     });
     return result !== null;
-  }, [canAct, item.kind, item.id, onChanged, onFlowStateChange, run, selectedFlow]);
+  }, [canAct, flows, item.kind, item.id, onChanged, onFlowStateChange, run, selectedFlow]);
 
   return {
     open, loading, flows, selectedFlow, pending, error, canAct,

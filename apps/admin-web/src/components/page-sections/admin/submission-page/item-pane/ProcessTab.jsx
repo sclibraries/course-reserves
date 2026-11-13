@@ -63,7 +63,6 @@ function ProcessTab({ item, claims, flow, switchFlow, onGoToWork, onReopen, onCh
               </Button>
             )}
           </div>
-          {!item.claimed_by && claims.error && <p className="tw-text-sm tw-text-destructive" role="alert">{claims.error}</p>}
         </div>
       )}
       <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3">
