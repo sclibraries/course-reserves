@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { notify } from "@/services/notify";
 import { useTermsStore } from "@/store/termsStore";
 import { Loader2 } from "lucide-react";
 
@@ -126,7 +125,6 @@ export const CourseModal = ({ open, onOpenChange, onSave, initialData, isEditing
     setErrors({});
     
     onOpenChange(false);
-    notify.success('Course created');
   };
 
   const handleCancel = () => {

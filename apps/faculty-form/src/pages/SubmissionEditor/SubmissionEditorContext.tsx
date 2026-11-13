@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+import type { RefObject } from 'react';
 import type { CourseReserve, CourseItem } from '@/store/courseReservesStore';
 import type { AddMaterialOptions } from '@/handlers/addMaterialHandler';
 import type { LockInfo } from '@/hooks/useSubmissionLock';
@@ -29,6 +30,7 @@ export interface SubmissionEditorContextValue {
   courseHandlers: AnyHandlers;
   dragHandlers: AnyHandlers;
   submissionHandlers: AnyHandlers;
+  submitButtonRef: RefObject<HTMLButtonElement>;
   // Wrapped actions that trigger markChanged
   markChanged: () => void;
   removeItemFromFolder: (reserveId: string, itemId: string) => void;

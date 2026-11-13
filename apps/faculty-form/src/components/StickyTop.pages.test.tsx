@@ -2,7 +2,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
-import { NewSubmissionHeader } from '@/components/pageHeaders/NewSubmissionHeader';
 import { SubmissionDetailHeader } from '@/components/pageHeaders/SubmissionDetailHeader';
 import type { CourseReserve } from '@/store/courseReservesStore';
 
@@ -27,7 +26,6 @@ const pageHeaders = [
     name: 'dashboard',
     render: <DashboardHeader user={null} isAuthenticated={false} termsLoading={false} termName="Fall 2026" onLogout={noOp} />,
   },
-  { name: 'new submission', render: <NewSubmissionHeader onBack={noOp} /> },
   {
     name: 'submission detail',
     render: <SubmissionDetailHeader reserve={reserve} canEdit={false} onBack={noOp} onEdit={noOp} onDelete={noOp} />,

@@ -12,7 +12,6 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const stickyHeaderRoutes = [
   '/',
-  '/new-submission',
   '/submission/reserve-test/edit',
   '/submission/reserve-test/edit/add',
   '/submission/reserve-test/edit/add/record/synthetic-db/synthetic-an',

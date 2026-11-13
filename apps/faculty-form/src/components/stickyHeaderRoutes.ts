@@ -2,7 +2,6 @@ import { matchPath } from 'react-router-dom';
 
 export const STICKY_HEADER_ROUTES = {
   dashboard: '/',
-  newSubmission: '/new-submission',
   submissionEdit: '/submission/:id/edit',
   addMaterials: '/submission/:id/edit/add',
   addMaterialsRecord: '/submission/:id/edit/add/record/:dbId/:an',

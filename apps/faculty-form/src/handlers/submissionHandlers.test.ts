@@ -109,14 +109,14 @@ describe('createSubmissionHandlers', () => {
       vi.fn()
     );
 
-    handlers.confirmSubmit(false);
-
-    await vi.waitFor(() => {
-      expect(notify.error).toHaveBeenCalledWith(
-        "Couldn't submit this reserve request",
-        { reference: '7F3K2Q' }
-      );
+    await expect(handlers.confirmSubmit(false)).resolves.toEqual({
+      success: false,
+      message: "Couldn't submit this reserve request",
     });
+    expect(notify.error).toHaveBeenCalledWith(
+      "Couldn't submit this reserve request",
+      { reference: '7F3K2Q' }
+    );
 
     expect(navigate).not.toHaveBeenCalled();
   });

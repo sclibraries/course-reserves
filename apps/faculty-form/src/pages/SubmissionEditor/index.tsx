@@ -32,6 +32,7 @@ import CourseTitleRow from './CourseTitleRow';
 const SubmissionEditor = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const submitButtonRef = React.useRef<HTMLButtonElement>(null);
   const isAddMaterialsPage = location.pathname.includes('/edit/add');
   const {
     id, reserve, user,
@@ -142,7 +143,7 @@ const SubmissionEditor = () => {
     isReadOnly, lockInfo,
     saveDraft, ensureServerUuid, isSaving, hasUnsavedChanges, lastSaveTime, saveError,
     saveStatus,
-    itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers,
+    itemHandlers, folderHandlers, courseHandlers, dragHandlers, submissionHandlers, submitButtonRef,
     markChanged,
     removeItemFromFolder: (...a: Parameters<typeof removeItemFromFolder>) => { removeItemFromFolder(...a); markChanged(); },
     moveItemInFolder: (...a: Parameters<typeof moveItemInFolder>) => { moveItemInFolder(...a); markChanged(); },

@@ -22,6 +22,7 @@ export const createFolderHandlers = (
 
   const handleUpdateFolder = (folderId: string, updates: Partial<Pick<CourseFolder, 'title' | 'description' | 'isOpen'>>) => {
     updateFolder(reserveId, folderId, updates);
+    if (updates.title) notify.success(`Folder renamed to ${updates.title}`);
   };
 
   const handleDeleteFolder = (folderId: string) => {

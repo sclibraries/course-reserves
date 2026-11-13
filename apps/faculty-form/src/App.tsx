@@ -5,7 +5,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
-import NewSubmission from "./pages/NewSubmission";
 import SubmissionEditor from "./pages/SubmissionEditor"
 import SubmissionDetail from "./pages/SubmissionDetail";
 import NotFound from "./pages/NotFound";
@@ -46,11 +45,6 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/faculty/accept-proxy-invitation/:token" element={<AcceptProxyInvitation />} />
-          <Route path={STICKY_HEADER_ROUTES.newSubmission} element={
-            <ProtectedRoute>
-              <NewSubmission />
-            </ProtectedRoute>
-          } />
           <Route path={STICKY_HEADER_ROUTES.submissionEdit} element={
             <ProtectedRoute>
               <SubmissionEditor />

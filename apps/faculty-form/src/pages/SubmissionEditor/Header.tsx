@@ -37,6 +37,7 @@ export default function Header() {
     saveError,
     saveStatus,
     submissionHandlers,
+    submitButtonRef,
   } = useSubmissionEditorContext();
 
   return (
@@ -90,7 +91,7 @@ export default function Header() {
                 Reuse last time’s list
               </Button>
             )}
-            <Button onClick={submissionHandlers.handleSubmit} disabled={isReadOnly}>
+            <Button ref={submitButtonRef} onClick={submissionHandlers.handleSubmit} disabled={isReadOnly}>
               {isEditingSubmission ? 'Update Submission' : 'Submit to Library'}
             </Button>
           </div>

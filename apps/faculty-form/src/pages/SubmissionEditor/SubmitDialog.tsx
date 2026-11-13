@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
@@ -24,11 +26,40 @@ export default function SubmitDialog({
   emailConfirmation,
   setEmailConfirmation,
 }: SubmitDialogProps) {
-  const { reserve, isEditingSubmission, submissionHandlers, isReadOnly } = useSubmissionEditorContext();
+  const { reserve, isEditingSubmission, submissionHandlers, isReadOnly, submitButtonRef } = useSubmissionEditorContext();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showSubmitDialog) setSubmitError(null);
+  }, [showSubmitDialog]);
+
+  const handleSubmit = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (isSubmitting || isReadOnly) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const result = await submissionHandlers.confirmSubmit(emailConfirmation);
+      if (result.success) setShowSubmitDialog(false);
+      else setSubmitError(result.message);
+    } catch {
+      setSubmitError("Couldn't submit this reserve request");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-      <AlertDialogContent>
+    <AlertDialog
+      open={showSubmitDialog}
+      onOpenChange={(open) => { if (!isSubmitting) setShowSubmitDialog(open); }}
+    >
+      <AlertDialogContent onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        submitButtonRef.current?.focus();
+      }}>
         <AlertDialogHeader>
           <AlertDialogTitle>
             {isEditingSubmission ? 'Update Submission?' : 'Submit to Library?'}
@@ -49,6 +80,7 @@ export default function SubmitDialog({
               </>
             )}
           </AlertDialogDescription>
+          {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
           {!isEditingSubmission && (
             <div className="flex items-center space-x-2 pt-2">
               <Checkbox
@@ -66,9 +98,9 @@ export default function SubmitDialog({
           )}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction disabled={isReadOnly} onClick={() => submissionHandlers.confirmSubmit(emailConfirmation)}>
-            {isEditingSubmission ? 'Update' : 'Submit'}
+          <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction disabled={isReadOnly || isSubmitting} onClick={handleSubmit}>
+            {isSubmitting ? 'Submitting...' : isEditingSubmission ? 'Update' : 'Submit'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
