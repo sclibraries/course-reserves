@@ -154,7 +154,7 @@ describe('submissionHandlers server draft submit', () => {
 
     await expect(handlers.confirmSubmit(false)).resolves.toEqual({ success: false, message: expectedMessage });
     expect(notify.error).toHaveBeenCalledTimes(toast ? 1 : 0);
-    if (toast) expect(notify.error).toHaveBeenCalledWith("Couldn't submit this reserve request", { reference: undefined });
+    if (toast) expect(notify.error).toHaveBeenCalledWith(expectedMessage);
     expect(navigate).not.toHaveBeenCalled();
   });
 });

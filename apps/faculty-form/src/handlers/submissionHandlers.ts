@@ -63,8 +63,7 @@ export const createSubmissionHandlers = (
             ? 'This list was changed on another device'
             : "Couldn't submit this reserve request");
           if (!alreadySurfaced) {
-            const feedback = getSafeErrorFeedback(null, message);
-            notify.error(feedback.message, { reference: feedback.reference });
+            notify.error(message);
           }
           return { success: false, message };
         }
