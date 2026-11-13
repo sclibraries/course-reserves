@@ -7,6 +7,7 @@ import { submissionWorkflowService } from '../../../services/admin/submissionWor
 import { buildProcessingHandoff, getProcessingBlockReason } from '../../../services/admin/processingHandoff';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { Button } from '../../ui/button';
+import useMutation from '../../../hooks/admin/useMutation';
 import useSubmissionLinking from '../../../hooks/admin/useSubmissionLinking';
 import DraftSubmissionView from './submission/DraftSubmissionView';
 import SubmissionPage from './submission-page/SubmissionPage';
@@ -29,6 +30,7 @@ function SubmissionDetail() {
     clearError,
     updateItemStatus,
   } = useSubmissionWorkflowStore();
+  const { run } = useMutation();
   const [currentUser, setCurrentUser] = useState(null);
 
   const refreshSubmission = useCallback(() => fetchSubmissionDetail(submissionId), [fetchSubmissionDetail, submissionId]);
@@ -47,7 +49,7 @@ function SubmissionDetail() {
       try {
         setCurrentUser(await submissionWorkflowService.getCurrentUser());
       } catch (userError) {
-        console.error('Failed to load current user:', userError);
+        notify.fromError(userError, "Couldn't load your user information");
       }
     };
     loadCurrentUser();
@@ -55,25 +57,29 @@ function SubmissionDetail() {
 
   const handleLock = async () => {
     if (selectedSubmission) {
-      const result = await lockSubmission(selectedSubmission.submission.uuid, 'Processing items');
-      if (result.success) await refreshSubmission();
+      await run(() => lockSubmission(selectedSubmission.submission.uuid, 'Processing items'), {
+        successMessage: 'Submission locked',
+        reload: refreshSubmission,
+        onError: (requestError) => notify.fromError(requestError, "Couldn't lock the submission"),
+      });
     }
   };
   const handleUnlock = async () => {
     if (selectedSubmission) {
-      const result = await unlockSubmission(selectedSubmission.submission.uuid);
-      if (result.success) await refreshSubmission();
+      await run(() => unlockSubmission(selectedSubmission.submission.uuid), {
+        successMessage: 'Submission unlocked',
+        reload: refreshSubmission,
+        onError: (requestError) => notify.fromError(requestError, "Couldn't unlock the submission"),
+      });
     }
   };
   const handleReopen = async (itemId) => {
     if (confirm('Are you sure you want to reopen this item for processing?')) {
-      const result = await updateItemStatus(itemId, 'in_progress');
-      if (result.success) {
-        notify.success('Item reopened');
-        await refreshSubmission();
-      } else {
-        notify.fromError(result.error, "Couldn't reopen the item");
-      }
+      await run(() => updateItemStatus(itemId, 'in_progress'), {
+        successMessage: 'Item reopened',
+        reload: refreshSubmission,
+        onError: (requestError) => notify.fromError(requestError, "Couldn't reopen the item"),
+      });
     }
   };
   const handleGoToWork = (item) => {

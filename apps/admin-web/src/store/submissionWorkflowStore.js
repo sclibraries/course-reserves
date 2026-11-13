@@ -97,42 +97,14 @@ const useSubmissionWorkflowStore = create((set, get) => ({
   /**
    * Lock a submission for processing
    */
-  lockSubmission: async (submissionUuid, lockReason) => {
-    try {
-      await submissionWorkflowService.lockSubmission(submissionUuid, lockReason);
-      
-      // Refresh the current submission detail if it's loaded
-      const { selectedSubmission } = get();
-      if (selectedSubmission?.submission.uuid === submissionUuid) {
-        await get().fetchSubmissionDetail(selectedSubmission.submission.id);
-      }
-      
-      return { success: true };
-    } catch (error) {
-      set({ error: error.message || 'Failed to lock submission' });
-      return { success: false, error: error.message };
-    }
-  },
+  lockSubmission: (submissionUuid, lockReason) =>
+    submissionWorkflowService.lockSubmission(submissionUuid, lockReason),
 
   /**
    * Unlock a submission
    */
-  unlockSubmission: async (submissionUuid) => {
-    try {
-      await submissionWorkflowService.unlockSubmission(submissionUuid);
-      
-      // Refresh the current submission detail if it's loaded
-      const { selectedSubmission } = get();
-      if (selectedSubmission?.submission.uuid === submissionUuid) {
-        await get().fetchSubmissionDetail(selectedSubmission.submission.id);
-      }
-      
-      return { success: true };
-    } catch (error) {
-      set({ error: error.message || 'Failed to unlock submission' });
-      return { success: false, error: error.message };
-    }
-  },
+  unlockSubmission: (submissionUuid) =>
+    submissionWorkflowService.unlockSubmission(submissionUuid),
 
   /**
    * Update an individual item's status and notes
@@ -229,24 +201,10 @@ const useSubmissionWorkflowStore = create((set, get) => ({
    * Quick status update
    * @param {number} itemId - Item ID
    * @param {string} status - New status
-   * @returns {Promise<Object>} Result with success flag
+   * @returns {Promise<Object>} Updated item response
    */
-  updateItemStatus: async (itemId, status) => {
-    try {
-      const result = await submissionWorkflowService.updateItemStatus(itemId, status);
-      
-      // Refresh the current submission detail
-      const { selectedSubmission } = get();
-      if (selectedSubmission) {
-        await get().fetchSubmissionDetail(selectedSubmission.submission.id);
-      }
-      
-      return { success: true, item: result.item };
-    } catch (error) {
-      set({ error: error.message || 'Failed to update status' });
-      return { success: false, error: error.message };
-    }
-  },
+  updateItemStatus: (itemId, status) =>
+    submissionWorkflowService.updateItemStatus(itemId, status),
 
   /**
    * Change page in pagination

@@ -17,7 +17,23 @@ const mocks = vi.hoisted(() => ({
   recheckSubmission: vi.fn(),
   getSyllabi: vi.fn().mockResolvedValue([]),
   downloadOriginal: vi.fn(),
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    fromError: vi.fn(),
+  },
+  toUserError: vi.fn((error, message = 'Something went wrong') => ({
+    message,
+    reference: error?.reference || error?.payload?.reference || error?.payload?.reference_id,
+  })),
 }));
+
+mocks.notify.fromError.mockImplementation((error, message) => {
+  const userError = mocks.toUserError(error, message);
+  mocks.notify.error(userError.message, { reference: userError.reference });
+});
 
 vi.mock('../../../../../services/admin/submissionSyllabiService', async (importOriginal) => ({
   ...await importOriginal(),
@@ -37,6 +53,10 @@ vi.mock('../../../../../services/admin/submissionWorkflowService', () => ({
     unlinkSubmission: mocks.unlinkSubmission,
     recheckSubmission: mocks.recheckSubmission,
   },
+}));
+vi.mock('../../../../../services/notify', () => ({
+  notify: mocks.notify,
+  toUserError: mocks.toUserError,
 }));
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...await importOriginal(),
@@ -112,6 +132,20 @@ function Harness({ record = submission, items = [] }) {
   );
 }
 
+function LinkingActionsHarness() {
+  const linking = useSubmissionLinking(submission, [], vi.fn());
+  return (
+    <div>
+      <button onClick={linking.actions.link}>Run link</button>
+      <button onClick={() => linking.actions.override('Synthetic reason')}>Run override</button>
+      <button onClick={() => linking.actions.correct('AFR 155', '01', 'Synthetic reason')}>Run correct</button>
+      <button onClick={() => linking.actions.unlink('Synthetic reason')}>Run unlink</button>
+      <button onClick={linking.actions.recheck}>Run recheck</button>
+      {linking.error && <p role="alert">{linking.error}</p>}
+    </div>
+  );
+}
+
 Harness.propTypes = {
   record: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object),
@@ -131,6 +165,20 @@ async function renderLinking(props = {}) {
   };
 }
 
+async function renderLinkingActions() {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<LinkingActionsHarness />));
+  return {
+    container,
+    unmount: () => {
+      act(() => root.unmount());
+      container.remove();
+    },
+  };
+}
+
 async function expectAccessible() {
   const result = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } });
   expect(result.violations).toEqual([]);
@@ -138,6 +186,8 @@ async function expectAccessible() {
 
 beforeEach(() => {
   mocks.navigate.mockReset();
+  Object.values(mocks.notify).forEach((mock) => mock.mockClear());
+  mocks.toUserError.mockClear();
   mocks.getCandidates.mockReset().mockResolvedValue({
     items: [exactCandidate, mismatchCandidate],
     checked_at: '2026-10-16T12:00:00Z',
@@ -153,6 +203,32 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; });
 
 describe('submission linking step', () => {
+  it.each([
+    ['link', 'Submission linked'],
+    ['override', 'Submission link overridden'],
+    ['correct', 'Submission corrected'],
+    ['unlink', 'Submission unlinked'],
+    ['recheck', 'FOLIO course re-checked'],
+  ])('shows the %s success toast', async (action, message) => {
+    const view = await renderLinkingActions();
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: `Run ${action}` })));
+
+    expect(mocks.notify.success).toHaveBeenCalledWith(message);
+    view.unmount();
+  });
+
+  it('keeps a failed link inline without showing a second toast', async () => {
+    mocks.linkSubmission.mockRejectedValueOnce(new Error('Synthetic link failure'));
+    const view = await renderLinkingActions();
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Run link' })));
+
+    expect(screen.getByRole('alert').textContent).toBe('Synthetic link failure');
+    expect(mocks.notify.error).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('updates the comparison when a candidate card is selected', async () => {
     const view = await renderLinking();
 

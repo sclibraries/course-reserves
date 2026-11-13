@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { submissionWorkflowService } from '../../services/admin/submissionWorkflowService';
+import useMutation from './useMutation';
 import {
   getCandidateFieldMatches,
   getLinkingErrorMessage,
@@ -19,10 +20,15 @@ export default function useSubmissionLinking(submission, items = [], onChanged =
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineLoaded, setTimelineLoaded] = useState(false);
   const [timelineError, setTimelineError] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
   const [activeQuery, setActiveQuery] = useState('');
-  const clearError = useCallback(() => setError(''), []);
+  const activeAction = useRef('');
+  const {
+    pending: saving,
+    error,
+    setError,
+    run,
+  } = useMutation((requestError) => getLinkingErrorMessage(requestError, activeAction.current));
+  const clearError = useCallback(() => setError(''), [setError]);
 
   const loadCandidates = useCallback(async (query = '') => {
     if (!uuid) return;
@@ -43,7 +49,7 @@ export default function useSubmissionLinking(submission, items = [], onChanged =
     } finally {
       setCandidateLoading(false);
     }
-  }, [linkedId, uuid]);
+  }, [linkedId, setError, uuid]);
 
   useEffect(() => { loadCandidates(); }, [loadCandidates]);
 
@@ -62,22 +68,15 @@ export default function useSubmissionLinking(submission, items = [], onChanged =
     }
   }, [timelineLoaded, uuid]);
 
-  const runAction = useCallback(async (action, request) => {
-    setError('');
-    setSaving(true);
-    try {
+  const runAction = useCallback(async (action, request, successMessage) => {
+    activeAction.current = action;
+    return (await run(async () => {
       await request();
       await loadCandidates(activeQuery);
       if (timelineLoaded) await refreshTimeline(true);
       await onChanged();
-      return true;
-    } catch (requestError) {
-      setError(getLinkingErrorMessage(requestError, action));
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }, [activeQuery, loadCandidates, onChanged, refreshTimeline, timelineLoaded]);
+    }, { successMessage })) !== null;
+  }, [activeQuery, loadCandidates, onChanged, refreshTimeline, run, timelineLoaded]);
 
   const searchCandidates = useCallback((query) => {
     const normalized = query.trim();
@@ -97,18 +96,18 @@ export default function useSubmissionLinking(submission, items = [], onChanged =
   const actions = useMemo(() => ({
     link: () => selectedCandidate && runAction('link', () => submissionWorkflowService.linkSubmission(uuid, {
       folio_course_listing_id: selectedCandidate.folio_course_listing_id,
-    })),
+    }), 'Submission linked'),
     override: (reason) => selectedCandidate && runAction('override', () => submissionWorkflowService.overrideSubmissionLink(uuid, {
       folio_course_listing_id: selectedCandidate.folio_course_listing_id,
       reason,
-    })),
+    }), 'Submission link overridden'),
     correct: (courseCode, section, reason) => runAction('correct', () => submissionWorkflowService.correctSubmission(uuid, {
       course_code: courseCode.trim(),
       section: section.trim(),
       reason,
-    })),
-    unlink: (reason) => runAction('unlink', () => submissionWorkflowService.unlinkSubmission(uuid, { reason })),
-    recheck: () => runAction('recheck', () => submissionWorkflowService.recheckSubmission(uuid)),
+    }), 'Submission corrected'),
+    unlink: (reason) => runAction('unlink', () => submissionWorkflowService.unlinkSubmission(uuid, { reason }), 'Submission unlinked'),
+    recheck: () => runAction('recheck', () => submissionWorkflowService.recheckSubmission(uuid), 'FOLIO course re-checked'),
   }), [runAction, selectedCandidate, uuid]);
 
   return {
