@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useCourseStore from '../store';
 import useSearchStore from '../store/searchStore';
@@ -46,12 +46,6 @@ function Search() {
   const [itemLoading, setItemLoading] = useState(false);
   const [itemError, setItemError] = useState(null);
   const [partialResults, setPartialResults] = useState(false);
-  const partialResultsRef = useRef(null);
-
-  useLayoutEffect(() => {
-    // Reactstrap Alert sets role="alert" itself; this notice needs status semantics.
-    partialResultsRef.current?.setAttribute('role', 'status');
-  }, [partialResults]);
   
   // Get college name for heading
   const getCollegeName = () => {
@@ -343,15 +337,7 @@ function Search() {
       {/* Conditionally render based on search type */}
       {type === 'item' ? (
         <>
-          {partialResults && (
-            <Alert
-              color="warning"
-              role="status"
-              innerRef={partialResultsRef}
-            >
-              Search results may be incomplete because electronic resources could not be loaded.
-            </Alert>
-          )}
+          {partialResults && <div className="alert alert-warning" role="status">Search results may be incomplete because electronic resources could not be loaded.</div>}
           {!query || query.trim() === '' ? (
             <Alert color="info" className="mt-3">
               <h5>Search for Reserve Items</h5>

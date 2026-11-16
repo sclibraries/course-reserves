@@ -308,8 +308,9 @@ function HorizontalAdminSidebar() {
                   style={{ backgroundColor: resetButtonBgColor || '#6c757d' }}
                   className="action-button reset-button"
                   type="button"
+                  aria-label="Reset search filters"
                 >
-                  <FaRedo className="button-icon" />
+                  <FaRedo className="button-icon" aria-hidden="true" />
                 </Button>
               </div>
             </div>

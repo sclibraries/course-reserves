@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
   resourceStore: {
     results: [], pagination: {}, error: null, loading: false,
     filters: { name: '', materialTypeId: '', metadata: {}, startDate: '', endDate: '', page: 1, perPage: 20 },
-    setSearchResults: vi.fn(), setPagination: vi.fn(), setFilters: vi.fn(), resetFilters: vi.fn(),
+    setSearchResults: vi.fn(), setError: vi.fn(), setPagination: vi.fn(), setFilters: vi.fn(), resetFilters: vi.fn(),
   },
   getAllResources: vi.fn().mockResolvedValue([]),
   getPins: vi.fn(),
