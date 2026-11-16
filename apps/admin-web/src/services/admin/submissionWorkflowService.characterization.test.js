@@ -100,13 +100,6 @@ const requestCases = [
     expected: result,
   },
   {
-    name: 'completeProcessing',
-    invoke: () => submissionWorkflowService.completeProcessing(23, { staff_notes: 'Synthetic note' }),
-    url: `${courseApi}/submission-workflow/item/23/complete-processing`,
-    init: { method: 'POST', headers, body: JSON.stringify({ staff_notes: 'Synthetic note' }) },
-    expected: result,
-  },
-  {
     name: 'switchItemWorkflow',
     invoke: () => submissionWorkflowService.switchItemWorkflow(24, 6),
     url: `${courseApi}/submission-workflow/item/24/switch-workflow`,

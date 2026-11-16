@@ -160,37 +160,6 @@ export const itemsApi = {
   },
 
   /**
-   * Publish a processed faculty workflow item into the course reserves course.
-   * @param {number} itemId - Item ID from submission_new_resources
-   * @param {Object} payload - Optional completion details
-   * @returns {Promise<Object>} Completion response with materialization ids
-   */
-  async completeProcessing(itemId, payload = {}) {
-    try {
-      const response = await authFetch(
-        `${apiConfig.urls.courseReserves}/submission-workflow/item/${itemId}/complete-processing`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to complete processing: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error completing item processing:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Switch the workflow for an item to a new template
    * @param {number} itemId - Item ID
    * @param {number} newTemplateId - ID of the new workflow template

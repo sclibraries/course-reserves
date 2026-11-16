@@ -31,38 +31,6 @@ describe('submissionWorkflowService.updateItemStatus', () => {
   });
 });
 
-describe('submissionWorkflowService.completeProcessing', () => {
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        item: {
-          id: 123,
-          item_status: 'complete',
-          materialized_resource_id: 456,
-          materialized_course_resource_id: 789,
-        },
-      }),
-    }));
-  });
-
-  it('publishes a processed workflow item through the routed completion endpoint', async () => {
-    const result = await submissionWorkflowService.completeProcessing(123, {
-      staff_notes: 'Ready for students',
-    });
-
-    expect(fetch).toHaveBeenCalledWith(
-      'https://course-reserves.test/submission-workflow/item/123/complete-processing',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ staff_notes: 'Ready for students' }),
-      })
-    );
-    expect(result.item.materialized_resource_id).toBe(456);
-  });
-});
-
 describe('submissionWorkflowService.formatSubmissionDetail', () => {
   it('exposes the roster and link state fields used by the linking panel', () => {
     const formatted = submissionWorkflowService.formatSubmissionDetail({

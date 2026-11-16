@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Row, Col, Button, Alert, Spinner } from 'reactstrap';
 import { fetchCourseData } from '../components/page-sections/course-record/api';
 import { adminCourseService } from '../services/admin/adminCourseService';
-import { submissionWorkflowService } from '../services/admin/submissionWorkflowService';
 import { useAdminResourceStore } from '../store/adminResourceStore';
 import { transformFolioCourseToLocal } from '../util/adminTransformers';
 
@@ -52,8 +51,6 @@ function AdminElectronicResources() {
   const [error, setError] = useState(null);
   const [showReusePrompt, setShowReusePrompt] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
-  const [processingComplete, setProcessingComplete] = useState(false);
-  const [completingProcessing, setCompletingProcessing] = useState(false);
 
   // Unified modal state
   const resourceFormModal = useResourceFormModal();
@@ -312,23 +309,6 @@ function AdminElectronicResources() {
     await fetchResources(course.offering_id);
   };
 
-  const handleCompleteProcessing = async () => {
-    if (!processingContext?.itemId) return;
-
-    setCompletingProcessing(true);
-    try {
-      await submissionWorkflowService.completeProcessing(processingContext.itemId);
-      setProcessingComplete(true);
-      await handleUpdateResources();
-      notify.success('Submission item published');
-    } catch (err) {
-      console.error(err);
-      notify.fromError(err, "Couldn't publish the submission item");
-    } finally {
-      setCompletingProcessing(false);
-    }
-  };
-
   const copyToClipboard = async (permanentLink) => {
     try {
       await navigator.clipboard.writeText(permanentLink);
@@ -387,19 +367,11 @@ function AdminElectronicResources() {
 
       {processingContext && (
         <Alert color="primary" className="mb-3 custom-alert">
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <span>
-              Processing submission item #{processingContext.itemId}
-              {processingComplete ? ' published to this course.' : ''}
-            </span>
-            <Button
-              color={processingComplete ? 'success' : 'primary'}
-              size="sm"
-              disabled={processingComplete || completingProcessing}
-              onClick={handleCompleteProcessing}
-            >
-              {completingProcessing ? 'Publishing...' : processingComplete ? 'Published' : 'Publish Processed Item'}
-            </Button>
+          <div>
+            Processing submission item #{processingContext.itemId}.
+          </div>
+          <div>
+            Publishing from a submission isn&apos;t available yet. Add the item to this course with the resource form.
           </div>
         </Alert>
       )}
