@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildFacultyAccessCookieDeletion,
   buildFacultyAuthorizeUrl,
+  FACULTY_ACCESS_TOKEN_COOKIE,
   getPostLoginDestination,
   mergeUserScopedState,
   readSessionFromCookie,
@@ -27,14 +29,31 @@ const tokenFor = (claims: Record<string, unknown>) => {
 
 describe('session helpers', () => {
   it.each([
-    ['valid access token restores its identity', `accessToken=${encodeURIComponent(tokenFor(payload))}`, payload],
-    ['expired access token is rejected', `accessToken=${encodeURIComponent(tokenFor({ ...payload, exp: now }))}`, null],
-    ['malformed JWT is rejected', 'accessToken=header.payload.signature', null],
-    ['malformed cookie encoding is rejected', 'accessToken=%E0%A4%A', null],
-    ['missing access token is rejected', 'other=value', null],
+    ['valid faculty access token restores its identity', `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(tokenFor(payload))}`, payload],
+    ['expired faculty access token is rejected', `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(tokenFor({ ...payload, exp: now }))}`, null],
+    ['malformed JWT is rejected', `${FACULTY_ACCESS_TOKEN_COOKIE}=header.payload.signature`, null],
+    ['malformed cookie encoding is rejected', `${FACULTY_ACCESS_TOKEN_COOKIE}=%E0%A4%A`, null],
+    ['missing faculty access token is rejected', 'other=value', null],
   ])('%s', (_name, cookie, expected) => {
     const session = readSessionFromCookie(cookie, now);
     expect(session).toEqual(expected);
+  });
+
+  it.each([
+    [
+      'production host',
+      'libtools2.smith.edu',
+      'https:',
+      `${FACULTY_ACCESS_TOKEN_COOKIE}=; Path=/; Domain=libtools2.smith.edu; Secure; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict`,
+    ],
+    [
+      'local host',
+      'localhost',
+      'http:',
+      `${FACULTY_ACCESS_TOKEN_COOKIE}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict`,
+    ],
+  ])('builds the %s cookie deletion string', (_name, hostname, protocol, expected) => {
+    expect(buildFacultyAccessCookieDeletion(hostname, protocol)).toBe(expected);
   });
 
   it.each([

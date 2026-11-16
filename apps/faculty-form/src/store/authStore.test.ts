@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_NOTICE_SESSION_KEY } from '@/services/session';
+import { AUTH_NOTICE_SESSION_KEY, FACULTY_ACCESS_TOKEN_COOKIE } from '@/services/session';
 
 const mocks = vi.hoisted(() => ({
   notifyModule: {
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/notify', () => mocks.notifyModule);
 
 const now = 1_800_000_000;
+const staffCookieName = ['access', 'Token'].join('');
 
 const tokenFor = (username: string, exp = now + 3600, internalId = 'test-id-123') => {
   const encode = (value: string) => btoa(value).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -60,7 +61,7 @@ describe('authStore session lifecycle', () => {
     vi.stubGlobal('fetch', vi.fn());
     localStorage.clear();
     sessionStorage.clear();
-    document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT`;
     mocks.notifyModule.notify.success.mockReset();
     mocks.notifyModule.notify.error.mockReset();
     mocks.notifyModule.notify.info.mockReset();
@@ -86,7 +87,7 @@ describe('authStore session lifecycle', () => {
   });
 
   it('initializes from cookie claims without a persisted user', async () => {
-    document.cookie = `accessToken=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
     const { useAuthStore } = await loadStores();
 
     useAuthStore.getState().initializeFromCookie();
@@ -116,7 +117,7 @@ describe('authStore session lifecycle', () => {
       user: { username: 'test-faculty-a', role: 'faculty', full_name: 'Old User', exp: now + 3600 },
       isAuthenticated: true,
     }));
-    document.cookie = `accessToken=${encodeURIComponent(tokenFor(cookieUser))}; Path=/`;
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(tokenFor(cookieUser))}; Path=/`;
 
     const stores = await loadStores();
     stores.useAuthStore.getState().initializeFromCookie();
@@ -148,7 +149,7 @@ describe('authStore session lifecycle', () => {
     }
   });
 
-  it('rejects persisted authentication and clears stored form data when the cookie is absent', async () => {
+  it('rejects persisted authentication and clears stored form data when only the staff cookie is present', async () => {
     for (const [key, state] of Object.entries(createStoredFormData('test-faculty-a'))) {
       localStorage.setItem(key, envelope(state, key === 'course-reserves-storage' ? 1 : 0));
     }
@@ -156,6 +157,7 @@ describe('authStore session lifecycle', () => {
       user: { username: 'test-faculty-a', role: 'faculty', full_name: 'Test Faculty A', exp: now + 3600 },
       isAuthenticated: true,
     }));
+    document.cookie = `${staffCookieName}=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
     const { useAuthStore, useReserveStore, useDraftStore, useCourseAssignmentsStore, useActingForStore } = await loadStores();
 
     useAuthStore.getState().initializeFromCookie();
@@ -194,6 +196,7 @@ describe('authStore session lifecycle', () => {
       full_name: 'Test Faculty A', institution: 'SM', role: 'faculty', internal_id: 'test-id-123',
     });
     expect(cookie.mock.calls[0]?.[0]).toContain('Max-Age=1234');
+    expect(cookie.mock.calls[0]?.[0]).toContain(`${FACULTY_ACCESS_TOKEN_COOKIE}=`);
     expect(useAuthStore.getState()).toMatchObject({
       user: { username: 'test-faculty-a', role: 'faculty', exp: now + 1234 },
       isAuthenticated: true,
@@ -206,7 +209,7 @@ describe('authStore session lifecycle', () => {
     ['expired', 'expired', '/form/submission/reserve-a'],
   ] as const)('clears every in-memory store and records the %s notice', async (_name, reason, expectedDestination) => {
     vi.stubEnv('VITE_BASE_PATH', '/form/');
-    document.cookie = `accessToken=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
     const stores = await loadStores();
     stores.useAuthStore.getState().initializeFromCookie();
     stores.useReserveStore.setState({ reserves: [{ id: 'reserve-a' }] as never });
@@ -217,6 +220,7 @@ describe('authStore session lifecycle', () => {
     });
     stores.useActingForStore.getState().selectFaculty({ username: 'test-faculty-b', displayName: 'Test Faculty B' });
     sessionStorage.setItem('faculty-form-return-destination', '/form/submission/reserve-a');
+    const cookie = vi.spyOn(document, 'cookie', 'set');
 
     stores.useAuthStore.getState().logout({ reason });
 
@@ -231,6 +235,9 @@ describe('authStore session lifecycle', () => {
     expect(localStorage.getItem('acting-for-selection')).toBeNull();
     expect(sessionStorage.getItem('faculty-form-return-destination')).toBe(expectedDestination);
     expect(sessionStorage.getItem(AUTH_NOTICE_SESSION_KEY)).toBe(reason);
+    expect(cookie.mock.calls[cookie.mock.calls.length - 1]?.[0]).toBe(
+      `${FACULTY_ACCESS_TOKEN_COOKIE}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict`,
+    );
     expect(mocks.notifyModule.notify.success).not.toHaveBeenCalled();
     expect(stores.FACULTY_FORM_AUTH_PATH).toBe('/form/auth');
   });

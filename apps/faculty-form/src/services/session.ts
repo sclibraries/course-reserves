@@ -13,7 +13,14 @@ export interface SessionUser {
 export const RETURN_DESTINATION_SESSION_KEY = 'faculty-form-return-destination';
 export const PROXY_INVITATION_SESSION_KEY = 'faculty-proxy-invitation-token';
 export const AUTH_NOTICE_SESSION_KEY = 'faculty-form-auth-notice';
+export const FACULTY_ACCESS_TOKEN_COOKIE = 'facultyAccessToken';
 export type AuthNoticeReason = 'manual' | 'expired';
+
+export const buildFacultyAccessCookieDeletion = (hostname: string, protocol: string): string => {
+  const domainAttribute = hostname === 'libtools2.smith.edu' ? '; Domain=libtools2.smith.edu' : '';
+  const secureAttribute = protocol === 'https:' ? '; Secure' : '';
+  return `${FACULTY_ACCESS_TOKEN_COOKIE}=; Path=/${domainAttribute}${secureAttribute}; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict`;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -58,7 +65,7 @@ const decodeSessionToken = (token: string, now: number): SessionUser | null => {
 
 // These claims identify the UI session; the API still verifies each request.
 export const readSessionFromCookie = (cookie: string, now: number): SessionUser | null => {
-  const token = readCookieValue(cookie, 'accessToken');
+  const token = readCookieValue(cookie, FACULTY_ACCESS_TOKEN_COOKIE);
   return token ? decodeSessionToken(token, now) : null;
 };
 

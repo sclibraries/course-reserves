@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_ENDPOINTS } from '@/config/endpoints';
+import { FACULTY_ACCESS_TOKEN_COOKIE } from '@/services/session';
 import { getCatalogAvailability } from './catalogAvailabilityApi';
 
 describe('getCatalogAvailability', () => {
   beforeEach(() => {
-    document.cookie = 'accessToken=faculty-token; Path=/';
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=faculty-token; Path=/`;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const accessionNumbers = new URL(String(input)).searchParams.get('an')?.split(',') || [];
       return {

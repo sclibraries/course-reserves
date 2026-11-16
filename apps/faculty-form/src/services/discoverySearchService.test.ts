@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FACULTY_ACCESS_TOKEN_COOKIE } from '@/services/session';
 import { retrieveDiscoveryRecord, searchDiscovery } from './discoverySearchService';
 
 const searchFailure = (status: number, payload: unknown = {}) => ({
@@ -34,7 +35,7 @@ describe('searchDiscovery', () => {
       }),
     }));
 
-    document.cookie = 'accessToken=faculty-token; Path=/';
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=faculty-token; Path=/`;
   });
 
   it('sends the faculty bearer token to the EBSCO proxy', async () => {

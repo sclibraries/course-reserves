@@ -1,5 +1,6 @@
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FACULTY_ACCESS_TOKEN_COOKIE } from '@/services/session';
 import type { CourseAssignment } from './courseAssignmentsStore';
 import type { useCourseAssignmentsStore as CourseAssignmentsStore } from './courseAssignmentsStore';
 
@@ -77,7 +78,7 @@ describe('courseAssignmentsStore', () => {
     capturedConfig = undefined;
     responseData = { success: true, courses: [course] };
     adapterError = null;
-    document.cookie = `accessToken=${encodeURIComponent(ACCESS_TOKEN)}; Path=/`;
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(ACCESS_TOKEN)}; Path=/`;
     apiClient.defaults.adapter = (async (config) => {
       adapterCalls += 1;
       capturedConfig = config;

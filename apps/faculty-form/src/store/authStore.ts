@@ -4,7 +4,9 @@ import { API_ENDPOINTS } from '@/config/endpoints';
 import {
   appPathForRoute,
   AUTH_NOTICE_SESSION_KEY,
+  buildFacultyAccessCookieDeletion,
   type AuthNoticeReason,
+  FACULTY_ACCESS_TOKEN_COOKIE,
   PROXY_INVITATION_SESSION_KEY,
   readCookieValue,
   readSessionFromCookie,
@@ -20,7 +22,7 @@ export type User = SessionUser;
 
 export const FACULTY_FORM_AUTH_PATH = appPathForRoute('/auth', import.meta.env.VITE_BASE_PATH || '/');
 
-export const getAccessToken = (): string | null => readCookieValue(document.cookie, 'accessToken');
+export const getAccessToken = (): string | null => readCookieValue(document.cookie, FACULTY_ACCESS_TOKEN_COOKIE);
 
 export const getAuthHeaders = (): HeadersInit => {
   const token = getAccessToken();
@@ -93,7 +95,7 @@ export const useAuthStore = create<AuthState>()(
         error: null,
 
         logout: ({ reason }) => {
-          document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict';
+          document.cookie = buildFacultyAccessCookieDeletion(window.location.hostname, window.location.protocol);
           clearAllUserData();
           set({ user: null, isAuthenticated: false, loading: false, initialized: true, error: null });
           localStorage.removeItem('auth-store');
@@ -161,11 +163,11 @@ export const useAuthStore = create<AuthState>()(
             const data = await response.json();
             const now = Math.floor(Date.now() / 1000);
             const user = typeof data.token === 'string'
-              ? readSessionFromCookie(`accessToken=${encodeURIComponent(data.token)}`, now)
+              ? readSessionFromCookie(`${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(data.token)}`, now)
               : null;
             if (!user) throw new Error('Mock login returned an invalid access token');
 
-            document.cookie = `accessToken=${encodeURIComponent(data.token)}; Path=/; SameSite=Strict; Max-Age=${user.exp - now}`;
+            document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(data.token)}; Path=/; SameSite=Strict; Max-Age=${user.exp - now}`;
             prepareUserData(user.username);
             set({ user, isAuthenticated: true, loading: false, initialized: true, error: null });
           } catch (error) {

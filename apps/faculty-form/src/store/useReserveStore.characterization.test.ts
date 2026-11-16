@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FACULTY_ACCESS_TOKEN_COOKIE } from '@/services/session';
 import type { CourseReserve } from './useReserveStore';
 
 let store: typeof import('./useReserveStore').useReserveStore;
@@ -259,7 +260,7 @@ describe('useReserveStore characterization', () => {
     const token = `${encode('{"alg":"none"}')}.${encode(JSON.stringify({
       username: 'test-faculty-a', role: 'faculty', exp: now + 3600,
     }))}.synthetic-signature`;
-    document.cookie = `accessToken=${encodeURIComponent(token)}; Path=/`;
+    document.cookie = `${FACULTY_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/`;
     const legacyReserve = {
       id: 'reserve-legacy', courseCode: 'ENG 101', courseTitle: 'Source course',
       section: '01', instructors: 'Faculty One', term: '2026SP', status: 'draft',
