@@ -1,6 +1,7 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
+import { appPathForRoute, RETURN_DESTINATION_SESSION_KEY } from "@/services/session";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -14,22 +15,22 @@ interface ProtectedRouteProps {
  * - If authOnly=true, redirects authenticated users to / (for login page)
  */
 export const ProtectedRoute = ({ children, authOnly = false }: ProtectedRouteProps) => {
-  const { isAuthenticated, initializeFromCookie } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const location = useLocation();
+  const basename = import.meta.env.VITE_BASE_PATH || '/';
+  const [destinationSaved, setDestinationSaved] = useState(authOnly || isAuthenticated);
 
-  // Initialize auth from persisted state on mount
+  // Save before redirecting so a full-page sign-in round trip returns here.
   useEffect(() => {
-    initializeFromCookie();
-  }, [initializeFromCookie]);
-
-  // Auth-only route (e.g., /auth): redirect authenticated users to home
-  if (authOnly && isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
+    if (authOnly || isAuthenticated) return;
+    const destination = appPathForRoute(`${location.pathname}${location.search}${location.hash}`, basename);
+    try { sessionStorage.setItem(RETURN_DESTINATION_SESSION_KEY, destination); } catch { /* Session storage can be disabled. */ }
+    setDestinationSaved(true);
+  }, [authOnly, basename, isAuthenticated, location.hash, location.pathname, location.search]);
 
   // Protected route: redirect unauthenticated users to /auth
   if (!authOnly && !isAuthenticated) {
-    return <Navigate to="/auth" replace state={{ from: location }} />;
+    return destinationSaved ? <Navigate to="/auth" replace /> : null;
   }
 
   return <>{children}</>;

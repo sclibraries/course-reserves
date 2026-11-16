@@ -159,6 +159,7 @@ export interface CourseReserve {
 export interface CourseReservesState {
   // Data
   reserves: CourseReserve[];
+  ownerUsername: string | null;
   _initialized: boolean;
   loading: boolean;
   error: string | null;

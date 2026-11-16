@@ -5,6 +5,18 @@ import axios, {
   type AxiosResponse,
 } from 'axios';
 import { getAccessToken, useAuthStore } from '@/store/authStore';
+import {
+  isAuthAppPath,
+  isPathInBasename,
+  RETURN_DESTINATION_SESSION_KEY,
+} from '@/services/session';
+
+const saveCurrentDestination = () => {
+  const basename = import.meta.env.VITE_BASE_PATH || '/';
+  const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (isAuthAppPath(window.location.pathname, basename) || !isPathInBasename(destination, basename)) return;
+  try { sessionStorage.setItem(RETURN_DESTINATION_SESSION_KEY, destination); } catch { /* Session storage can be disabled. */ }
+};
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_BASE_API_URL ?? 'https://libtools2.smith.edu',
@@ -26,7 +38,8 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     const status = error.response?.status;
     if (status === 401) {
-      useAuthStore.getState().logout();
+      saveCurrentDestination();
+      useAuthStore.getState().logout(true);
     } else if (status === 423) {
       window.dispatchEvent(new CustomEvent('cr:submission-locked'));
     }

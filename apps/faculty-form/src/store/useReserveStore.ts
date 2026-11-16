@@ -8,6 +8,9 @@ import { createReservesSlice } from './reserve/reservesSlice';
 import { createSubmissionFetchSlice } from './reserve/submissionFetchSlice';
 import { createSubmissionLifecycleSlice } from './reserve/submissionLifecycleSlice';
 import { fromLegacy } from '@/utils/listLayout';
+import { mergeUserScopedState, readSessionUsername, stampUserScopedState } from '@/services/session';
+
+const currentUsername = () => readSessionUsername(document.cookie, Math.floor(Date.now() / 1000));
 
 export type {
   CourseFolder,
@@ -23,6 +26,7 @@ export const useReserveStore = create<CourseReservesState>()(
     persist(
       (set, get, api) => ({
         reserves: [],
+        ownerUsername: null,
         _initialized: true,
         loading: false,
         error: null,
@@ -37,10 +41,20 @@ export const useReserveStore = create<CourseReservesState>()(
       {
         name: 'course-reserves-storage',
         version: 1,
-        partialize: (state) => ({
+        partialize: (state) => stampUserScopedState({
           reserves: state.reserves,
           _initialized: state._initialized,
-        }),
+        }, currentUsername()),
+        merge: (persistedState, currentState) => {
+          const merged = mergeUserScopedState(
+            persistedState as Partial<CourseReservesState> & { ownerUsername?: string | null },
+            currentState,
+            currentUsername() ?? null,
+          );
+          if (merged) return merged;
+          localStorage.removeItem('course-reserves-storage');
+          return currentState;
+        },
         migrate: (persistedState, version) => {
           if (version >= 1) return persistedState as CourseReservesState;
           const persisted = persistedState as Partial<CourseReservesState>;

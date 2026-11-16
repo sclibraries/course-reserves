@@ -5,26 +5,22 @@ import { MockLoginForm } from './MockLoginForm';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const setMockUser = vi.fn();
-const fetchCourseAssignments = vi.fn();
-const navigate = vi.fn();
-
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => navigate,
+const mocks = vi.hoisted(() => ({
+  setMockUser: vi.fn(),
+  fetchCourseAssignments: vi.fn(),
+  authModule: { useAuthStore: () => ({ loading: false, setMockUser: mocks.setMockUser }) },
+  assignmentModule: {
+    useCourseAssignmentsStore: () => ({ fetchCourseAssignments: mocks.fetchCourseAssignments }),
+  },
+  notifyModule: {
+    notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
+    getSafeErrorFeedback: vi.fn(() => ({ message: 'Safe error' })),
+  },
 }));
 
-vi.mock('@/store/authStore', () => ({
-  useAuthStore: () => ({
-    loading: false,
-    setMockUser,
-  }),
-}));
-
-vi.mock('@/store/courseAssignmentsStore', () => ({
-  useCourseAssignmentsStore: () => ({
-    fetchCourseAssignments,
-  }),
-}));
+vi.mock('@/store/authStore', () => mocks.authModule);
+vi.mock('@/store/courseAssignmentsStore', () => mocks.assignmentModule);
+vi.mock('@/services/notify', () => mocks.notifyModule);
 
 describe('MockLoginForm', () => {
   let container: HTMLDivElement | null = null;
@@ -70,8 +66,8 @@ describe('MockLoginForm', () => {
     const loginPromise = new Promise<void>((resolve) => {
       resolveLogin = resolve;
     });
-    setMockUser.mockReturnValue(loginPromise);
-    fetchCourseAssignments.mockResolvedValue(undefined);
+    mocks.setMockUser.mockReturnValue(loginPromise);
+    mocks.fetchCourseAssignments.mockResolvedValue(undefined);
     render();
 
     const nameInput = container!.querySelector<HTMLInputElement>('#custom-name')!;
@@ -86,21 +82,22 @@ describe('MockLoginForm', () => {
       button.click();
     });
 
-    expect(setMockUser).toHaveBeenCalledWith('Faculty Member', 'faculty-id');
-    expect(fetchCourseAssignments).not.toHaveBeenCalled();
+    expect(mocks.setMockUser).toHaveBeenCalledWith('Faculty Member', 'faculty-id');
+    expect(mocks.fetchCourseAssignments).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveLogin();
       await loginPromise;
     });
 
-    expect(fetchCourseAssignments).toHaveBeenCalledOnce();
-    expect(fetchCourseAssignments).toHaveBeenCalledWith();
+    expect(mocks.fetchCourseAssignments).toHaveBeenCalledOnce();
+    expect(mocks.fetchCourseAssignments).toHaveBeenCalledWith();
+    expect(mocks.notifyModule.notify.success).toHaveBeenCalledWith('Signed in');
   });
 
   it('lists the dev-seed test accounts and signs in with one click', async () => {
-    setMockUser.mockResolvedValue(undefined);
-    fetchCourseAssignments.mockResolvedValue(undefined);
+    mocks.setMockUser.mockResolvedValue(undefined);
+    mocks.fetchCourseAssignments.mockResolvedValue(undefined);
     render();
 
     const section = container!.querySelector('section[aria-label="Test accounts"]')!;
@@ -114,7 +111,7 @@ describe('MockLoginForm', () => {
       buttons[0].click();
     });
 
-    expect(setMockUser).toHaveBeenCalledWith('Test Faculty A', '999078001');
-    expect(navigate).toHaveBeenCalledWith('/');
+    expect(mocks.setMockUser).toHaveBeenCalledWith('Test Faculty A', '999078001');
+    expect(mocks.notifyModule.notify.success).toHaveBeenCalledWith('Signed in');
   });
 });

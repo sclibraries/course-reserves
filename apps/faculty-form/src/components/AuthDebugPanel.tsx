@@ -277,7 +277,7 @@ export const AuthDebugPanel = () => {
               )}
               
               <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
-                💡 <strong>Mock Login:</strong> This calls the backend mock-login endpoint to generate a real JWT token for testing. Token will be valid for 1 hour.
+                💡 <strong>Mock Login:</strong> This uses the development or test API to issue a synthetic access token.
               </div>
             </div>
           )}

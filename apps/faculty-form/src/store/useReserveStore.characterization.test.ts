@@ -254,6 +254,12 @@ describe('useReserveStore characterization', () => {
   });
 
   it('migrates a legacy persisted reserve without changing its mixed order', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const encode = (value: string) => btoa(value).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const token = `${encode('{"alg":"none"}')}.${encode(JSON.stringify({
+      username: 'test-faculty-a', role: 'faculty', exp: now + 3600,
+    }))}.synthetic-signature`;
+    document.cookie = `accessToken=${encodeURIComponent(token)}; Path=/`;
     const legacyReserve = {
       id: 'reserve-legacy', courseCode: 'ENG 101', courseTitle: 'Source course',
       section: '01', instructors: 'Faculty One', term: '2026SP', status: 'draft',
@@ -269,7 +275,7 @@ describe('useReserveStore characterization', () => {
       ],
     };
     localStorage.setItem('course-reserves-storage', JSON.stringify({
-      state: { reserves: [legacyReserve], _initialized: true },
+      state: { reserves: [legacyReserve], _initialized: true, ownerUsername: 'test-faculty-a' },
       version: 0,
     }));
 

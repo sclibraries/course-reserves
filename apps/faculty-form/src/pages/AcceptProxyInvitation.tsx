@@ -10,8 +10,12 @@ import {
 } from '@/services/api/facultyProxyApi';
 import { useAuthStore } from '@/store/authStore';
 import { useActingForStore } from '@/store/actingForStore';
-
-export const PROXY_INVITATION_SESSION_KEY = 'faculty-proxy-invitation-token';
+import { getSafeErrorFeedback, notify } from '@/services/notify';
+import {
+  buildFacultyAuthorizeUrl,
+  getPostLoginDestination,
+  PROXY_INVITATION_SESSION_KEY,
+} from '@/services/session';
 
 const clearStoredInvitationToken = () => {
   try { sessionStorage.removeItem(PROXY_INVITATION_SESSION_KEY); } catch { /* Session storage can be disabled. */ }
@@ -33,7 +37,7 @@ const AcceptProxyInvitation = () => {
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [validating, setValidating] = useState(true);
   const [accepting, setAccepting] = useState(false);
-  const [acceptMessage, setAcceptMessage] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -57,14 +61,19 @@ const AcceptProxyInvitation = () => {
   };
 
   const signInUrl = () => {
-    const basePath = (import.meta.env.VITE_BASE_PATH || '/').replace(/\/?$/, '/');
-    const redirect = `${window.location.origin}${basePath}faculty/accept-proxy-invitation/${encodeURIComponent(token)}`;
-    return `${API_ENDPOINTS.AUTH.BASE_URL}${API_ENDPOINTS.AUTH.FACULTY_AUTHORIZE}?redirect=${encodeURIComponent(redirect)}`;
+    const basename = import.meta.env.VITE_BASE_PATH || '/';
+    const destination = getPostLoginDestination(token, null, basename);
+    return buildFacultyAuthorizeUrl(
+      `${API_ENDPOINTS.AUTH.BASE_URL}${API_ENDPOINTS.AUTH.FACULTY_AUTHORIZE}`,
+      window.location.origin,
+      basename,
+      destination,
+    );
   };
 
   const handleAccept = async () => {
     setAccepting(true);
-    setAcceptMessage(null);
+    setNeedsSignIn(false);
     try {
       const accepted = await acceptProxyInvitation(token);
       clearStoredInvitationToken();
@@ -76,17 +85,24 @@ const AcceptProxyInvitation = () => {
         username: grant.faculty_id,
         displayName: grant.faculty_display_name || grant.faculty_id,
       });
+      notify.success('Invitation accepted');
       navigate('/', { replace: true });
     } catch (error) {
-      const { status, message } = errorDetails(error);
+      const { status } = errorDetails(error);
       if (status === 409 || status === 410) clearStoredInvitationToken();
-      setAcceptMessage(status === 401
+      if (status === 401) {
+        setNeedsSignIn(true);
+        try { sessionStorage.setItem(PROXY_INVITATION_SESSION_KEY, token); } catch { /* Session storage can be disabled. */ }
+      }
+      const message = status === 401
         ? 'Please sign in again to accept this invitation.'
-        : message || (status === 409
+        : status === 409
           ? 'This invitation can no longer be accepted by this account.'
           : status === 410
             ? 'This invitation has expired.'
-            : 'Unable to accept this invitation.'));
+            : 'Unable to accept this invitation.';
+      const feedback = getSafeErrorFeedback(error, message);
+      notify.error(feedback.message, { reference: feedback.reference });
     } finally {
       setAccepting(false);
     }
@@ -104,11 +120,12 @@ const AcceptProxyInvitation = () => {
           <p className="text-sm text-muted-foreground">Invitation expires {new Date(invitation.invitation_expires_at).toLocaleString()}.</p>
         </section>
       ) : <p role="alert">{validationMessage}</p>}
-      {invitation && !isAuthenticated && <Button asChild><a href={signInUrl()} onClick={handleSignIn}>Sign in to accept</a></Button>}
+      {invitation && (!isAuthenticated || needsSignIn) && <Button asChild><a href={signInUrl()} onClick={handleSignIn}>
+        {needsSignIn ? 'Sign in again' : 'Sign in to accept'}
+      </a></Button>}
       {invitation && isAuthenticated && <Button disabled={accepting} onClick={handleAccept}>
         {accepting ? 'Accepting…' : 'Accept invitation'}
       </Button>}
-      {acceptMessage && <p role="alert">{acceptMessage}</p>}
       <p><Link to="/">Return to dashboard</Link></p>
     </main>
   );

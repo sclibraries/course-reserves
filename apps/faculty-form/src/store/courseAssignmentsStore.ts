@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { API_ENDPOINTS } from '@/config/endpoints';
 import apiClient from '@/services/apiClient';
+import { mergeUserScopedState, readSessionUsername, stampUserScopedState } from '@/services/session';
+
+const currentUsername = () => readSessionUsername(document.cookie, Math.floor(Date.now() / 1000));
 
 // Types for course assignments from the backend
 export interface CourseAssignment {
@@ -45,6 +48,7 @@ export interface CourseAssignment {
 interface CourseAssignmentsState {
   // Data
   assignments: CourseAssignment[];
+  ownerUsername: string | null;
   loading: boolean;
   error: string | null;
   actingForAssignments: CourseAssignment[];
@@ -65,6 +69,7 @@ export const useCourseAssignmentsStore = create<CourseAssignmentsState>()(
       (set) => ({
         // Initial state
         assignments: [],
+        ownerUsername: null,
         loading: false,
         error: null,
         actingForAssignments: [],
@@ -172,9 +177,20 @@ export const useCourseAssignmentsStore = create<CourseAssignmentsState>()(
     }),
     {
       name: 'course-assignments-storage',
-      partialize: (state) => ({
+      partialize: (state) => stampUserScopedState({
         assignments: state.assignments,
-      }),
+        actingForAssignments: state.actingForAssignments,
+      }, currentUsername()),
+      merge: (persistedState, currentState) => {
+        const merged = mergeUserScopedState(
+          persistedState as Partial<CourseAssignmentsState> & { ownerUsername?: string | null },
+          currentState,
+          currentUsername() ?? null,
+        );
+        if (merged) return merged;
+        localStorage.removeItem('course-assignments-storage');
+        return currentState;
+      },
     }
     ),
     { name: 'courseAssignments' }

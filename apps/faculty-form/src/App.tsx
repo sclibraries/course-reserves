@@ -14,60 +14,71 @@ import { RouteActingForBanner } from "./components/RouteActingForBanner";
 import { ProxyInvitationResume } from "./components/ProxyInvitationResume";
 import { ProxyAccessSync } from "./components/ProxyAccessSync";
 import { STICKY_HEADER_ROUTES } from "./components/stickyHeaderRoutes";
+import { useEffect } from "react";
+import { useAuthStore } from "./store/authStore";
 
 const queryClient = new QueryClient();
+
+const AuthStartup = () => {
+  const { initialized, initializeFromCookie } = useAuthStore();
+
+  useEffect(() => initializeFromCookie(), [initializeFromCookie]);
+
+  if (!initialized) return <main role="status" aria-live="polite">Checking your sign-in…</main>;
+
+  return <>
+    <ProxyInvitationResume />
+    <ProxyAccessSync />
+    <RouteActingForBanner />
+    <Routes>
+      <Route path="/auth" element={
+        <ProtectedRoute authOnly>
+          <Auth />
+        </ProtectedRoute>
+      } />
+
+      <Route path={STICKY_HEADER_ROUTES.dashboard} element={
+        <ProtectedRoute>
+          <Index />
+        </ProtectedRoute>
+      } />
+      <Route path="/designees" element={
+        <ProtectedRoute>
+          <ManageDesignees />
+        </ProtectedRoute>
+      } />
+      <Route path="/faculty/accept-proxy-invitation/:token" element={<AcceptProxyInvitation />} />
+      <Route path={STICKY_HEADER_ROUTES.submissionEdit} element={
+        <ProtectedRoute>
+          <SubmissionEditor />
+        </ProtectedRoute>
+      } />
+      <Route path={STICKY_HEADER_ROUTES.addMaterialsRecord} element={
+        <ProtectedRoute>
+          <SubmissionEditor />
+        </ProtectedRoute>
+      } />
+      <Route path={STICKY_HEADER_ROUTES.addMaterials} element={
+        <ProtectedRoute>
+          <SubmissionEditor />
+        </ProtectedRoute>
+      } />
+      <Route path={STICKY_HEADER_ROUTES.submissionDetail} element={
+        <ProtectedRoute>
+          <SubmissionDetail />
+        </ProtectedRoute>
+      } />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner />
       <BrowserRouter basename={import.meta.env.VITE_BASE_PATH || '/'}>
-        <ProxyInvitationResume />
-        <ProxyAccessSync />
-        <RouteActingForBanner />
-        <Routes>
-          {/* Auth-only route - redirects to / if authenticated */}
-          <Route path="/auth" element={
-            <ProtectedRoute authOnly>
-              <Auth />
-            </ProtectedRoute>
-          } />
-          
-          {/* Protected routes - require authentication */}
-          <Route path={STICKY_HEADER_ROUTES.dashboard} element={
-            <ProtectedRoute>
-              <Index />
-            </ProtectedRoute>
-          } />
-          <Route path="/designees" element={
-            <ProtectedRoute>
-              <ManageDesignees />
-            </ProtectedRoute>
-          } />
-          <Route path="/faculty/accept-proxy-invitation/:token" element={<AcceptProxyInvitation />} />
-          <Route path={STICKY_HEADER_ROUTES.submissionEdit} element={
-            <ProtectedRoute>
-              <SubmissionEditor />
-            </ProtectedRoute>
-          } />
-          <Route path={STICKY_HEADER_ROUTES.addMaterialsRecord} element={
-            <ProtectedRoute>
-              <SubmissionEditor />
-            </ProtectedRoute>
-          } />
-          <Route path={STICKY_HEADER_ROUTES.addMaterials} element={
-            <ProtectedRoute>
-              <SubmissionEditor />
-            </ProtectedRoute>
-          } />
-          <Route path={STICKY_HEADER_ROUTES.submissionDetail} element={
-            <ProtectedRoute>
-              <SubmissionDetail />
-            </ProtectedRoute>
-          } />
-          {/* 404 - public */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthStartup />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

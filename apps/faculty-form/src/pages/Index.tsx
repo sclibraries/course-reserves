@@ -28,7 +28,7 @@ const Index = () => {
     refreshTermsIfStale, 
     loading: termsLoading,
   } = useTermsStore();
-  const { user, isAuthenticated, initializeFromCookie, logout } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const { assignments, loading: assignmentsLoading, error: assignmentsError } = useDashboardCourseAssignments();
   const hasAnyUnsavedChanges = useHasAnyUnsavedChanges();
   useLegacyDraftUpload(isAuthenticated && !!user);
@@ -41,8 +41,7 @@ const Index = () => {
   useEffect(() => {
     initialize();
     refreshTermsIfStale();
-    initializeFromCookie();
-  }, [initialize, refreshTermsIfStale, initializeFromCookie]);
+  }, [initialize, refreshTermsIfStale]);
 
   // Fetch submissions from backend when authenticated and start polling
   useEffect(() => {

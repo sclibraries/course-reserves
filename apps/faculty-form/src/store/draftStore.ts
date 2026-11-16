@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
+import { mergeUserScopedState, readSessionUsername, stampUserScopedState } from '@/services/session';
+
+const currentUsername = () => readSessionUsername(document.cookie, Math.floor(Date.now() / 1000));
 
 /**
  * Draft Payload Structure for Backend
@@ -134,6 +137,7 @@ export interface DraftFolderPayload {
 interface DraftState {
   // Current draft being edited (by reserve ID)
   drafts: Record<string, DraftPayload>;
+  ownerUsername: string | null;
   
   // Save status tracking
   savingStatus: Record<string, 'idle' | 'saving' | 'saved' | 'error'>;
@@ -177,6 +181,7 @@ export const useDraftStore = create<DraftState>()(
     persist(
       (set, get) => ({
         drafts: {},
+        ownerUsername: null,
         savingStatus: {},
         lastSaveTime: {},
         saveErrors: {},
@@ -276,6 +281,16 @@ export const useDraftStore = create<DraftState>()(
       }),
       {
         name: 'draft-storage',
+        partialize: (state) => stampUserScopedState({
+          drafts: state.drafts, savingStatus: state.savingStatus,
+          lastSaveTime: state.lastSaveTime, saveErrors: state.saveErrors,
+          hasUnsavedChanges: state.hasUnsavedChanges,
+        }, currentUsername()),
+        merge: (persistedState, currentState) => {
+          const merged = mergeUserScopedState(persistedState as Partial<DraftState>, currentState, currentUsername());
+          if (!merged) localStorage.removeItem('draft-storage');
+          return merged ?? currentState;
+        },
       }
     ),
     { name: 'DraftStore' }

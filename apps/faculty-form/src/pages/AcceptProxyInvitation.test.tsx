@@ -1,34 +1,44 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { getByRole } from '@testing-library/dom';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useResumeProxyInvitation } from '@/hooks/useResumeProxyInvitation';
 import AcceptProxyInvitation from './AcceptProxyInvitation';
 
-const mocks = vi.hoisted(() => ({
-  validateProxyInvitation: vi.fn(),
-  acceptProxyInvitation: vi.fn(),
-  getMyFacultyAccess: vi.fn(),
-  selectedFaculty: null as { username: string; displayName: string } | null,
-  authState: { isAuthenticated: false, loading: false, initializeFromCookie: vi.fn() },
-}));
-
-vi.mock('@/services/api/facultyProxyApi', () => ({
-  validateProxyInvitation: mocks.validateProxyInvitation,
-  acceptProxyInvitation: mocks.acceptProxyInvitation,
-  getMyFacultyAccess: mocks.getMyFacultyAccess,
-}));
-
-vi.mock('@/store/authStore', () => ({
-  useAuthStore: (selector: (state: typeof mocks.authState) => unknown) => selector(mocks.authState),
-}));
-
-vi.mock('@/store/actingForStore', () => {
-  const selectFaculty = (faculty: { username: string; displayName: string }) => { mocks.selectedFaculty = faculty; };
-  const clearSelection = () => { mocks.selectedFaculty = null; };
-  const getState = () => ({ selectedFaculty: mocks.selectedFaculty, selectFaculty, clearSelection });
-  return { useActingForStore: Object.assign((selector: (state: ReturnType<typeof getState>) => unknown) => selector(getState()), { getState }) };
+const mocks = vi.hoisted(() => {
+  const authState = { isAuthenticated: false, loading: false, initializeFromCookie: vi.fn() };
+  const actingForState: { selectedFaculty: { username: string; displayName: string } | null } = { selectedFaculty: null };
+  const selectFaculty = (faculty: { username: string; displayName: string }) => { actingForState.selectedFaculty = faculty; };
+  const clearSelection = () => { actingForState.selectedFaculty = null; };
+  const getState = () => ({ ...actingForState, selectFaculty, clearSelection });
+  const useActingForStore = Object.assign(
+    (selector: (state: ReturnType<typeof getState>) => unknown) => selector(getState()),
+    { getState },
+  );
+  const validateProxyInvitation = vi.fn();
+  const acceptProxyInvitation = vi.fn();
+  const getMyFacultyAccess = vi.fn();
+  return {
+    authState,
+    actingForState,
+    proxyApiModule: {
+      validateProxyInvitation,
+      acceptProxyInvitation,
+      getMyFacultyAccess,
+    },
+    authModule: { useAuthStore: (selector: (state: typeof authState) => unknown) => selector(authState) },
+    actingForModule: { useActingForStore },
+    sonnerModule: { toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } },
+  };
 });
+
+vi.mock('@/services/api/facultyProxyApi', () => mocks.proxyApiModule);
+
+vi.mock('@/store/authStore', () => mocks.authModule);
+
+vi.mock('@/store/actingForStore', () => mocks.actingForModule);
+vi.mock('sonner', () => mocks.sonnerModule);
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -44,14 +54,14 @@ describe('AcceptProxyInvitation', () => {
 
   beforeEach(() => {
     vi.stubEnv('VITE_BASE_PATH', '/form/');
-    mocks.selectedFaculty = null;
+    mocks.actingForState.selectedFaculty = null;
     sessionStorage.clear();
-    mocks.authState = {
+    Object.assign(mocks.authState, {
       isAuthenticated: false,
       loading: false,
-      initializeFromCookie: vi.fn(),
-    };
-    mocks.validateProxyInvitation.mockResolvedValue({
+    });
+    mocks.authState.initializeFromCookie.mockReset();
+    mocks.proxyApiModule.validateProxyInvitation.mockReset().mockResolvedValue({
       valid: true,
       invitation: {
         faculty_name: 'Test Faculty',
@@ -59,8 +69,10 @@ describe('AcceptProxyInvitation', () => {
         invitation_expires_at: '2099-01-01T00:00:00Z',
       },
     });
-    mocks.acceptProxyInvitation.mockReset();
-    mocks.getMyFacultyAccess.mockReset();
+    mocks.proxyApiModule.acceptProxyInvitation.mockReset();
+    mocks.proxyApiModule.getMyFacultyAccess.mockReset();
+    mocks.sonnerModule.toast.error.mockReset();
+    mocks.sonnerModule.toast.success.mockReset();
   });
 
   afterEach(() => {
@@ -113,7 +125,7 @@ describe('AcceptProxyInvitation', () => {
   it('validates for signed-out visitors, preserves the token, and links to sign-in', async () => {
     await renderPage();
 
-    expect(mocks.validateProxyInvitation).toHaveBeenCalledWith('test-token');
+    expect(mocks.proxyApiModule.validateProxyInvitation).toHaveBeenCalledWith('test-token');
     expect(container?.textContent).toContain('Test Faculty');
     expect(container?.textContent).toContain('Edit selected courses (1)');
     expect(container?.textContent).toContain('Sign in to accept');
@@ -132,7 +144,7 @@ describe('AcceptProxyInvitation', () => {
 
   it('shows a clear invalid invitation message', async () => {
     sessionStorage.setItem('faculty-proxy-invitation-token', 'test-token');
-    mocks.validateProxyInvitation.mockResolvedValue({ valid: false, message: 'Invalid or expired invitation token' });
+    mocks.proxyApiModule.validateProxyInvitation.mockResolvedValue({ valid: false, message: 'Invalid or expired invitation token' });
     await renderPage();
 
     expect(container?.textContent).toContain('Invalid or expired invitation token');
@@ -141,7 +153,7 @@ describe('AcceptProxyInvitation', () => {
 
   it('shows the validation response for an expired invitation', async () => {
     sessionStorage.setItem('faculty-proxy-invitation-token', 'test-token');
-    mocks.validateProxyInvitation.mockResolvedValue({ valid: false, message: 'Invitation has expired' });
+    mocks.proxyApiModule.validateProxyInvitation.mockResolvedValue({ valid: false, message: 'Invitation has expired' });
     await renderPage();
 
     expect(container?.textContent).toContain('Invitation has expired');
@@ -170,11 +182,11 @@ describe('AcceptProxyInvitation', () => {
 
   it('accepts a valid invitation and opens the dashboard in acting-for mode', async () => {
     mocks.authState.isAuthenticated = true;
-    mocks.acceptProxyInvitation.mockResolvedValue({
+    mocks.proxyApiModule.acceptProxyInvitation.mockResolvedValue({
       success: true,
       permission: { permission_id: 42 },
     });
-    mocks.getMyFacultyAccess.mockResolvedValue({
+    mocks.proxyApiModule.getMyFacultyAccess.mockResolvedValue({
       items: [{
         permission_id: 42,
         faculty_id: 'test-faculty',
@@ -188,31 +200,43 @@ describe('AcceptProxyInvitation', () => {
     expect(container?.textContent).toContain('Accept invitation');
     await clickButton('Accept invitation');
 
-    expect(mocks.acceptProxyInvitation).toHaveBeenCalledWith('test-token');
-    expect(mocks.selectedFaculty).toEqual({
+    expect(mocks.proxyApiModule.acceptProxyInvitation).toHaveBeenCalledWith('test-token');
+    expect(mocks.actingForState.selectedFaculty).toEqual({
       username: 'test-faculty',
       displayName: 'Test Faculty',
     });
     expect(sessionStorage.getItem('faculty-proxy-invitation-token')).toBeNull();
+    expect(mocks.sonnerModule.toast.success).toHaveBeenCalledWith('Invitation accepted', undefined);
     expect(container?.querySelector('[data-testid="dashboard"]')).not.toBeNull();
     expect(container?.querySelector('[data-testid="location"]')?.textContent).toBe('/');
   });
 
   it.each([
-    [401, 'Please sign in again'],
-    [409, 'This invitation was already used by another account'],
-    [410, 'This invitation has expired'],
-  ])('explains API acceptance status %i', async (status, expected) => {
+    [401, 'Please sign in again to accept this invitation.', true],
+    [409, 'This invitation can no longer be accepted by this account.', false],
+    [410, 'This invitation has expired.', false],
+  ])('gives safe feedback for API acceptance status %i', async (status, message, showSignIn) => {
     mocks.authState.isAuthenticated = true;
-    mocks.acceptProxyInvitation.mockRejectedValue({
-      response: { status, data: { message: expected } },
+    mocks.proxyApiModule.acceptProxyInvitation.mockRejectedValue({
+      response: { status, data: { message: 'unsafe server detail', reference_id: '7F3K2Q' } },
     });
     await renderPage();
     sessionStorage.setItem('faculty-proxy-invitation-token', 'test-token');
     await clickButton('Accept invitation');
 
-    expect(container?.textContent).toContain(expected);
+    expect(mocks.sonnerModule.toast.error).toHaveBeenCalledWith(message, {
+      description: 'Reference: 7F3K2Q',
+      duration: Infinity,
+    });
     expect(sessionStorage.getItem('faculty-proxy-invitation-token'))
       .toBe(status === 401 ? 'test-token' : null);
+    if (showSignIn) {
+      const signIn = getByRole(container!, 'link', { name: 'Sign in again' }) as HTMLAnchorElement;
+      expect(new URL(signIn.href).searchParams.get('redirect')).toBe(
+        `${window.location.origin}/form/faculty/accept-proxy-invitation/test-token`,
+      );
+      await clickLink('Sign in again');
+      expect(sessionStorage.getItem('faculty-proxy-invitation-token')).toBe('test-token');
+    }
   });
 });
