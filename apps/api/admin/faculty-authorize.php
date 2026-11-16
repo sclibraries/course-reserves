@@ -73,7 +73,7 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
     if ($hasAccess) {
         // Build JWTs directly from Shibboleth (no SQL lookup)
         $issuedAt = time();
-        $accessExpiration = $issuedAt + 3600;    // 1 hour
+        $accessExpiration = $issuedAt + FacultyTokenClaims::ACCESS_TOKEN_LIFETIME; // 8 hours
         $refreshExpiration = $issuedAt + 86400;  // 1 day
 
         $fullName = trim(($firstname ?? '') . ' ' . ($lastname ?? ''));

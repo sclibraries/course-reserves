@@ -105,10 +105,10 @@ class FacultySubmissionController extends BaseRestController
         $role = $request->post('role', 'faculty');
         $email = $username . '@' . $this->getInstitutionDomain($institution);
 
-        // Create access token (1 hour)
+        // Create access token (8 hours)
         $secretKey = getenv('JWT_SECRET_KEY');
         $issuedAt = time();
-        $expire = $issuedAt + 3600; // 1 hour
+        $expire = $issuedAt + FacultyTokenClaims::ACCESS_TOKEN_LIFETIME;
 
         $identityClaims = [
             'username' => $username,
@@ -151,7 +151,7 @@ class FacultySubmissionController extends BaseRestController
                 'role' => $role,
                 'exp' => $expire,
             ],
-            'message' => 'Mock login successful. This token is valid for 1 hour.',
+            'message' => 'Mock login successful. This token is valid for 8 hours.',
             'warning' => 'This is a MOCK token for development only!',
         ];
     }

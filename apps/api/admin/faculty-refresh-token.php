@@ -48,7 +48,7 @@ try {
     }
 
     $issuedAt = time();
-    $accessExpiration = $issuedAt + 3600;   // 1 hour
+    $accessExpiration = $issuedAt + FacultyTokenClaims::ACCESS_TOKEN_LIFETIME; // 8 hours
     $refreshExpiration = $issuedAt + 86400; // 1 day
     $decodedClaims = (array) $decoded;
     $role = (new FacultyRoleResolver())->forRefresh(

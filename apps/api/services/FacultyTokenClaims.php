@@ -9,6 +9,8 @@ use app\components\Roles;
  */
 class FacultyTokenClaims
 {
+    public const ACCESS_TOKEN_LIFETIME = 28800;
+
     /**
      * Add canonical identity and time claims to an authorization payload.
      *

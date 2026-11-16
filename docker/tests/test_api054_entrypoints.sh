@@ -72,6 +72,23 @@ port=18080
 log=/tmp/api054-entrypoints-server.log
 if [ "$environment" = unset ]; then
     env -u YII_ENV php -S "127.0.0.1:$port" -t /app >"$log" 2>&1 &
+elif [ "$environment" = test ]; then
+    cat >/tmp/api054-shibboleth-server-vars.php <<'PHP'
+<?php
+if (isset($_SERVER["SCRIPT_NAME"]) && $_SERVER["SCRIPT_NAME"] === "/admin/faculty-authorize.php") {
+    foreach (["fcIdNumber", "uid", "givenName", "sn", "fcPersonAffiliation", "mail"] as $name) {
+        $value = getenv($name);
+        if ($value !== false) {
+            $_SERVER[$name] = $value;
+        }
+    }
+}
+PHP
+    env YII_ENV=test fcIdNumber=999000130@smith.edu uid=test-api130-faculty \
+        givenName=Synthetic sn=Faculty fcPersonAffiliation=faculty \
+        mail=test-api130-faculty@example.test \
+        php -d auto_prepend_file=/tmp/api054-shibboleth-server-vars.php \
+        -S "127.0.0.1:$port" -t /app >"$log" 2>&1 &
 else
     env YII_ENV="$environment" php -S "127.0.0.1:$port" -t /app >"$log" 2>&1 &
 fi
@@ -101,6 +118,9 @@ check_status() {
             exit 1
         }
     fi
+    if [ "$environment" = test ] && [ "$path" = /admin/faculty-authorize.php ]; then
+        check_faculty_authorize_lifetime "$headers"
+    fi
 }
 
 check_post_status() {
@@ -116,6 +136,32 @@ check_post_status() {
     printf 'POST %s (%s) -> %s\n' "$path" "$environment" "$status"
 }
 
+check_faculty_authorize_lifetime() {
+    headers=$1
+    php -r '
+        require "/app/config/environment.php";
+        require "/app/vendor/autoload.php";
+        $headers = file_get_contents($argv[1]);
+        if (!preg_match("/^Set-Cookie: accessToken=([^;\\r\\n]+).*; Expires=([^;\\r\\n]+)/mi", $headers, $cookie)) {
+            fwrite(STDERR, "faculty-authorize did not issue its accessToken cookie\n");
+            exit(1);
+        }
+        $claims = (array) \Firebase\JWT\JWT::decode(
+            rawurldecode($cookie[1]),
+            new \Firebase\JWT\Key(getenv("JWT_SECRET_KEY"), "HS256")
+        );
+        if ($claims["exp"] - $claims["iat"] !== 28800) {
+            fwrite(STDERR, "faculty-authorize access token lifetime was not 28800 seconds\n");
+            exit(1);
+        }
+        if (strtotime($cookie[2]) !== $claims["exp"]) {
+            fwrite(STDERR, "faculty-authorize accessToken cookie expiry did not match token exp\n");
+            exit(1);
+        }
+        echo "faculty-authorize -> exp - iat = 28800; accessToken Expires matches exp\n";
+    ' "$headers"
+}
+
 check_status /web/index.php/__api054_probe 404
 if [ "$environment" = test ]; then
     check_status /web/index-test.php 200
@@ -123,7 +169,11 @@ else
     check_status /web/index-test.php 404
 fi
 check_status /admin/authorize.php '400 401'
-check_status /admin/faculty-authorize.php '400 401'
+if [ "$environment" = test ]; then
+    check_status /admin/faculty-authorize.php 302
+else
+    check_status /admin/faculty-authorize.php '400 401'
+fi
 check_status /admin/faculty-refresh-token.php '400 401'
 check_status /admin/refresh-token.php '400 401'
 if [ "$environment" = dev ]; then
