@@ -5,7 +5,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Auth from './Auth';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '@/test/browser';
-import { RETURN_DESTINATION_SESSION_KEY } from '@/services/session';
+import { RETURN_DESTINATION_SESSION_KEY, appPathForRoute } from '@/services/session';
+
+// Vitest's stubEnv needs process.env, which Chromium lacks; use the basename the page itself reads.
+const savedPath = appPathForRoute('/submission/reserve-a?tab=items#item-2', import.meta.env.VITE_BASE_PATH || '/');
 
 const mocks = vi.hoisted(() => ({
   debugMode: false,
@@ -28,7 +31,6 @@ describe('faculty sign-in page in Chromium', () => {
 
   afterEach(() => {
     act(() => root?.unmount());
-    vi.unstubAllEnvs();
     sessionStorage.clear();
     container?.remove();
     container = null;
@@ -36,10 +38,9 @@ describe('faculty sign-in page in Chromium', () => {
   });
 
   const renderPage = async (mode: 'production' | 'mock') => {
-    vi.stubEnv('VITE_BASE_PATH', '/form/');
     mocks.debugMode = mode === 'mock';
     if (mode === 'production') {
-      sessionStorage.setItem(RETURN_DESTINATION_SESSION_KEY, '/form/submission/reserve-a?tab=items#item-2');
+      sessionStorage.setItem(RETURN_DESTINATION_SESSION_KEY, savedPath);
     }
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -59,7 +60,7 @@ describe('faculty sign-in page in Chromium', () => {
       const authorizeUrl = new URL(action.href);
       expect(authorizeUrl.pathname).toContain('faculty-authorize.php');
       expect(authorizeUrl.searchParams.get('redirect')).toBe(
-        `${window.location.origin}/form/submission/reserve-a?tab=items#item-2`,
+        `${window.location.origin}${savedPath}`,
       );
     } else {
       getByRole(container!, role, { name });
