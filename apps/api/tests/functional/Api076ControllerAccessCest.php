@@ -144,6 +144,34 @@ class Api076ControllerAccessCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
     }
 
+    public function analyticsCountsActionsAndSkipsInvalidOrEmptyValues(FunctionalTester $I)
+    {
+        $metadataValues = [];
+        for ($count = 11; $count > 0; $count--) {
+            for ($copy = 0; $copy < $count; $copy++) {
+                $metadataValues[] = json_encode(['action' => 'action-' . $count]);
+            }
+        }
+        $metadataValues[] = '{"action":';
+        $metadataValues[] = json_encode(['query' => 'without-action']);
+        $metadataValues[] = json_encode(['action' => '']);
+        $metadataValues[] = json_encode(['action' => '']);
+        $metadataValues[] = json_encode(['action' => '']);
+        $events = array_map(function ($metadata) {
+            return ['SM', 'search', 'test-api076-action', 'test-api076-term', $metadata];
+        }, $metadataValues);
+        \Yii::$app->db->createCommand()->batchInsert(
+            'tracking_events', ['college', 'event_type', 'course_id', 'term', 'metadata'], $events
+        )->execute();
+
+        $this->requestAs($I, 'staff', 'GET', 'tracking/analytics');
+        $expectedTopActions = [];
+        for ($count = 11; $count > 1; $count--) {
+            $expectedTopActions[] = ['action' => 'action-' . $count, 'count' => $count];
+        }
+        \PHPUnit\Framework\Assert::assertSame($expectedTopActions, $I->grabJsonResponse()['topActions']);
+    }
+
     public function trackingRejectsUnknownEventsAndIgnoresClientOwnedFields(FunctionalTester $I)
     {
         $validEvent = [

@@ -198,35 +198,20 @@ class TrackingController extends ActiveController
             ->asArray()
             ->all();
             
-        // Analyze metadata to extract actions (requires custom processing)
-        $actionCounts = [];
-        $events = (clone $query)->select(['metadata'])->asArray()->all();
-        foreach ($events as $event) {
-            if (!empty($event['metadata'])) {
-                $metadata = json_decode($event['metadata'], true);
-                if (isset($metadata['action'])) {
-                    $action = $metadata['action'];
-                    if (!isset($actionCounts[$action])) {
-                        $actionCounts[$action] = 0;
-                    }
-                    $actionCounts[$action]++;
-                }
-            }
-        }
-        
-        // Format action counts for the frontend
-        $topActions = [];
-        foreach ($actionCounts as $action => $count) {
-            $topActions[] = ['action' => $action, 'count' => $count];
-        }
-        
-        // Sort actions by count, descending
-        usort($topActions, function($a, $b) {
-            return $b['count'] - $a['count'];
-        });
-        
-        // Limit to top 10 actions
-        $topActions = array_slice($topActions, 0, 10);
+        $topActions = (clone $query)->select([
+            "CASE WHEN JSON_VALID(metadata) THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.action')) END AS action",
+            'COUNT(*) AS count',
+        ])
+            ->groupBy(['action'])
+            ->having(['and', ['IS NOT', 'action', null], ['<>', 'action', '']])
+            ->orderBy(['count' => SORT_DESC])
+            ->limit(10)
+            ->asArray()
+            ->all();
+        $topActions = array_map(function ($action) {
+            $action['count'] = (int)$action['count'];
+            return $action;
+        }, $topActions);
 
         return [
             'collegeData' => $collegeData,
