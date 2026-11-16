@@ -50,7 +50,7 @@ export const AuthDebugPanel = () => {
 
   const handleConfirmLogout = () => {
     setLogoutDialogOpen(false);
-    logout();
+    logout({ reason: 'manual' });
   };
 
   const handleSaveAndLogout = async () => {
@@ -72,7 +72,7 @@ export const AuthDebugPanel = () => {
 
       notify.success('All changes saved');
       setLogoutDialogOpen(false);
-      logout();
+      logout({ reason: 'manual' });
     } catch (error) {
       console.error('Failed to save drafts:', error);
       const feedback = getSafeErrorFeedback(error, "Couldn't save your drafts");

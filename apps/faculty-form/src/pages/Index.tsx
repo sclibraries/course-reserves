@@ -34,7 +34,7 @@ const Index = () => {
   useLegacyDraftUpload(isAuthenticated && !!user);
   const { isSaving: isSavingBeforeLogout, handleSaveAndLogout } = useDraftLogout(() => {
     setLogoutDialogOpen(false);
-    logout();
+    logout({ reason: 'manual' });
   });
 
   // Initialize stores on first load
@@ -71,7 +71,7 @@ const Index = () => {
 
   const handleConfirmLogout = () => {
     setLogoutDialogOpen(false);
-    logout();
+    logout({ reason: 'manual' });
   };
 
   // Convert CourseReserve to Submission format - memoized to avoid recalculation

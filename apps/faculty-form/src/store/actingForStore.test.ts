@@ -35,7 +35,7 @@ describe('actingForStore', () => {
       username: 'test-faculty',
       displayName: 'Test Faculty',
     });
-    useAuthStore.getState().logout();
+    useAuthStore.getState().logout({ reason: 'manual' });
 
     expect(useActingForStore.getState().selectedFaculty).toBeNull();
   });

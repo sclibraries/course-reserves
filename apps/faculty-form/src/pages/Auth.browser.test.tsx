@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Auth from './Auth';
 import { expectNoAxeViolations, expectNoHorizontalOverflow } from '@/test/browser';
-import { RETURN_DESTINATION_SESSION_KEY, appPathForRoute } from '@/services/session';
+import { AUTH_NOTICE_SESSION_KEY, RETURN_DESTINATION_SESSION_KEY, appPathForRoute } from '@/services/session';
 
 // Vitest's stubEnv needs process.env, which Chromium lacks; use the basename the page itself reads.
 const savedPath = appPathForRoute('/submission/reserve-a?tab=items#item-2', import.meta.env.VITE_BASE_PATH || '/');
@@ -17,11 +17,16 @@ const mocks = vi.hoisted(() => ({
   assignmentsModule: {
     useCourseAssignmentsStore: () => ({ fetchCourseAssignments: vi.fn() }),
   },
+  notifyModule: {
+    notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
+    getSafeErrorFeedback: vi.fn(() => ({ message: 'Safe error' })),
+  },
 }));
 
 vi.mock('@/lib/debug', () => mocks.debugModule);
 vi.mock('@/store/authStore', () => mocks.authModule);
 vi.mock('@/store/courseAssignmentsStore', () => mocks.assignmentsModule);
+vi.mock('@/services/notify', () => mocks.notifyModule);
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -70,5 +75,26 @@ describe('faculty sign-in page in Chromium', () => {
 
     await expectNoHorizontalOverflow([320, 768, 1280]);
     await expectNoAxeViolations(container!);
+  });
+
+  it.each([
+    ['manual', 'success', 'Signed out of Course Reserves. Close the browser to end your campus sign-in.'],
+    ['expired', 'error', 'Your session has ended. Sign in again to continue.'],
+  ] as const)('shows the %s logout notice once, then clears it', async (reason, kind, message) => {
+    mocks.notifyModule.notify.success.mockReset();
+    mocks.notifyModule.notify.error.mockReset();
+    sessionStorage.setItem(AUTH_NOTICE_SESSION_KEY, reason);
+
+    await renderPage('production');
+
+    expect(mocks.notifyModule.notify[kind]).toHaveBeenCalledWith(message);
+    expect(sessionStorage.getItem(AUTH_NOTICE_SESSION_KEY)).toBeNull();
+
+    act(() => root?.unmount());
+    container?.remove();
+    root = null;
+    container = null;
+    await renderPage('production');
+    expect(mocks.notifyModule.notify[kind]).toHaveBeenCalledOnce();
   });
 });

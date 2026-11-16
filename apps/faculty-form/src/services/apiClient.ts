@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     if (status === 401) {
       saveCurrentDestination();
-      useAuthStore.getState().logout(true);
+      useAuthStore.getState().logout({ reason: 'expired' });
     } else if (status === 423) {
       window.dispatchEvent(new CustomEvent('cr:submission-locked'));
     }

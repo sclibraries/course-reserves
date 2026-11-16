@@ -12,6 +12,8 @@ export interface SessionUser {
 
 export const RETURN_DESTINATION_SESSION_KEY = 'faculty-form-return-destination';
 export const PROXY_INVITATION_SESSION_KEY = 'faculty-proxy-invitation-token';
+export const AUTH_NOTICE_SESSION_KEY = 'faculty-form-auth-notice';
+export type AuthNoticeReason = 'manual' | 'expired';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

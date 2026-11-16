@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { API_ENDPOINTS } from '@/config/endpoints';
-import { notify } from '@/services/notify';
 import {
   appPathForRoute,
+  AUTH_NOTICE_SESSION_KEY,
+  type AuthNoticeReason,
   PROXY_INVITATION_SESSION_KEY,
   readCookieValue,
   readSessionFromCookie,
@@ -32,7 +33,7 @@ interface AuthState {
   loading: boolean;
   initialized: boolean;
   error: string | null;
-  logout: (preserveReturn?: boolean) => void;
+  logout: (options: { reason: AuthNoticeReason }) => void;
   updateUser: (updates: Partial<User>) => void;
   checkTokenExpiration: () => boolean;
   initializeFromCookie: () => void;
@@ -91,18 +92,18 @@ export const useAuthStore = create<AuthState>()(
         initialized: false,
         error: null,
 
-        logout: (preserveReturn = false) => {
+        logout: ({ reason }) => {
           document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict';
           clearAllUserData();
           set({ user: null, isAuthenticated: false, loading: false, initialized: true, error: null });
           localStorage.removeItem('auth-store');
-          if (!preserveReturn) {
+          if (reason === 'manual') {
             try {
               sessionStorage.removeItem(RETURN_DESTINATION_SESSION_KEY);
               sessionStorage.removeItem(PROXY_INVITATION_SESSION_KEY);
             } catch { /* Session storage can be disabled. */ }
           }
-          notify.success('Signed out of Course Reserves. Close the browser to end your campus sign-in.');
+          try { sessionStorage.setItem(AUTH_NOTICE_SESSION_KEY, reason); } catch { /* Session storage can be disabled. */ }
           window.location.href = FACULTY_FORM_AUTH_PATH;
         },
 
@@ -114,7 +115,7 @@ export const useAuthStore = create<AuthState>()(
         checkTokenExpiration: () => {
           const user = sessionFromCookie();
           if (!user) {
-            get().logout();
+            get().logout({ reason: 'expired' });
             return false;
           }
           prepareUserData(user.username);

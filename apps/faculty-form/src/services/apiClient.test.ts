@@ -59,7 +59,7 @@ describe('apiClient 401 return destination', () => {
     await expect(apiClient.get('/synthetic')).rejects.toMatchObject({ response: { status: 401 } });
 
     expect(sessionStorage.getItem(RETURN_DESTINATION_SESSION_KEY)).toBe(expected);
-    expect(mocks.logout).toHaveBeenCalledWith(true);
+    expect(mocks.logout).toHaveBeenCalledWith({ reason: 'expired' });
     const destination = getPostLoginDestination(
       null,
       sessionStorage.getItem(RETURN_DESTINATION_SESSION_KEY),

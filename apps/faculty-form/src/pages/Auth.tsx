@@ -1,10 +1,13 @@
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, ShieldCheck } from "lucide-react";
 import { MockLoginForm } from "@/components/auth/MockLoginForm";
 import { isDebugEnabled } from "@/lib/debug";
 import { Button } from "@/components/ui/button";
 import { API_ENDPOINTS } from "@/config/endpoints";
+import { notify } from "@/services/notify";
 import {
+  AUTH_NOTICE_SESSION_KEY,
   buildFacultyAuthorizeUrl,
   getPostLoginDestination,
   PROXY_INVITATION_SESSION_KEY,
@@ -13,6 +16,16 @@ import {
 
 const Auth = () => {
   const isDevMode = isDebugEnabled();
+
+  useEffect(() => {
+    let reason: string | null;
+    try {
+      reason = sessionStorage.getItem(AUTH_NOTICE_SESSION_KEY);
+      if (reason !== null) sessionStorage.removeItem(AUTH_NOTICE_SESSION_KEY);
+    } catch { return; }
+    if (reason === 'manual') notify.success('Signed out of Course Reserves. Close the browser to end your campus sign-in.');
+    if (reason === 'expired') notify.error('Your session has ended. Sign in again to continue.');
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

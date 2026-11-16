@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AUTH_NOTICE_SESSION_KEY } from '@/services/session';
 
 const mocks = vi.hoisted(() => ({
   notifyModule: {
@@ -200,7 +201,10 @@ describe('authStore session lifecycle', () => {
     });
   });
 
-  it('clears every in-memory store and gives app-only sign-out feedback', async () => {
+  it.each([
+    ['manual', 'manual', null],
+    ['expired', 'expired', '/form/submission/reserve-a'],
+  ] as const)('clears every in-memory store and records the %s notice', async (_name, reason, expectedDestination) => {
     vi.stubEnv('VITE_BASE_PATH', '/form/');
     document.cookie = `accessToken=${encodeURIComponent(tokenFor('test-faculty-a'))}; Path=/`;
     const stores = await loadStores();
@@ -214,7 +218,7 @@ describe('authStore session lifecycle', () => {
     stores.useActingForStore.getState().selectFaculty({ username: 'test-faculty-b', displayName: 'Test Faculty B' });
     sessionStorage.setItem('faculty-form-return-destination', '/form/submission/reserve-a');
 
-    stores.useAuthStore.getState().logout();
+    stores.useAuthStore.getState().logout({ reason });
 
     expect(stores.useReserveStore.getState().reserves).toEqual([]);
     expect(stores.useDraftStore.getState().drafts).toEqual({});
@@ -225,10 +229,9 @@ describe('authStore session lifecycle', () => {
     expect(localStorage.getItem('course-assignments-storage')).toBeNull();
     expect(localStorage.getItem('draft-storage')).toBeNull();
     expect(localStorage.getItem('acting-for-selection')).toBeNull();
-    expect(sessionStorage.getItem('faculty-form-return-destination')).toBeNull();
-    expect(mocks.notifyModule.notify.success).toHaveBeenCalledWith(
-      'Signed out of Course Reserves. Close the browser to end your campus sign-in.',
-    );
+    expect(sessionStorage.getItem('faculty-form-return-destination')).toBe(expectedDestination);
+    expect(sessionStorage.getItem(AUTH_NOTICE_SESSION_KEY)).toBe(reason);
+    expect(mocks.notifyModule.notify.success).not.toHaveBeenCalled();
     expect(stores.FACULTY_FORM_AUTH_PATH).toBe('/form/auth');
   });
 });
