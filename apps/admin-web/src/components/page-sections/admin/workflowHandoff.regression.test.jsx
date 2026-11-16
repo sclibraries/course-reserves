@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SubmissionDetail from './SubmissionDetail';
 import MyWorkQueue from './MyWorkQueue';
+import { formatClaimedItem } from '../../../services/admin/submissionWorkflow/submissionFormatters';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -326,6 +327,27 @@ describe('workflow processing handoff regression', () => {
         }),
       },
     });
+
+    view.unmount();
+  });
+
+  it('renders details already formatted from object resource_data', async () => {
+    mocks.storeState.claimedItems = [formatClaimedItem({
+      id: 88,
+      resource_data: {
+        title: 'Synthetic work queue title',
+        authors: 'Synthetic author',
+        materialType: 'Book',
+      },
+      submission: { course_code: 'ENG 101', faculty_display_name: 'Test Faculty' },
+      processingContext,
+    })];
+
+    const view = await renderComponent(<MyWorkQueue />);
+
+    expect(view.container.textContent).toContain('Synthetic work queue title');
+    expect(view.container.textContent).toContain('Synthetic author');
+    expect(view.container.textContent).toContain('Book');
 
     view.unmount();
   });

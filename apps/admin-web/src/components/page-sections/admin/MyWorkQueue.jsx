@@ -36,41 +36,7 @@ const MyWorkQueue = () => {
     fetchClaimedItems();
   }, [fetchClaimedItems]);
 
-  // Parse resource_data JSON for each item
-  const formatItems = () => {
-    if (!claimedItems) return [];
-    
-    console.log('MyWorkQueue - formatItems called with claimedItems:', claimedItems);
-    
-    return claimedItems.map(item => {
-      let resourceData = {};
-      try {
-        resourceData = item.resource_data ? JSON.parse(item.resource_data) : {};
-      } catch (e) {
-        console.warn('Failed to parse resource_data:', e);
-      }
-      
-      const formatted = {
-        ...item,
-        title: resourceData.title || 'Untitled',
-        authors: resourceData.authors || '',
-        materialTypeName: item.materialType?.name || resourceData.materialType || 'Unknown',
-        barcode: item.source_barcode || resourceData.barcode,
-        callNumber: item.source_call_number || resourceData.callNumber,
-        url: resourceData.url
-      };
-      
-      console.log('MyWorkQueue - Formatted item:', {
-        id: formatted.id,
-        submission_id: formatted.submission_id,
-        resource_id: formatted.resource_id
-      });
-      
-      return formatted;
-    });
-  };
-
-  const formattedItems = formatItems();
+  const formattedItems = claimedItems || [];
 
   // Loading state
   if (loading && !claimedItems) {

@@ -1,3 +1,5 @@
+import { readResourceData } from './resourceData';
+
 /**
  * Format submission for display in queue
  * @param {Object} submission - Raw submission data from API
@@ -30,15 +32,8 @@ export function formatSubmissionForDisplay(submission) {
   const reuseResources = submission.reuseResources || [];
   const allResources = [...newResources, ...reuseResources];
 
-  // Parse resource_data JSON for each item
   const items = allResources.map(resource => {
-    let data = {};
-    try {
-      data = resource.resource_data ? JSON.parse(resource.resource_data) : {};
-    } catch (e) {
-      console.warn('Failed to parse resource_data:', e);
-      data = { title: 'Unknown', materialType: 'unknown' };
-    }
+    const data = readResourceData(resource.resource_data);
 
     return {
       id: resource.id,
@@ -133,12 +128,7 @@ export function formatProcessingContext(context) {
 }
 
 export function formatClaimedItem(item) {
-  let resourceData = {};
-  try {
-    resourceData = item.resource_data ? JSON.parse(item.resource_data) : {};
-  } catch (e) {
-    console.warn('Failed to parse resource_data:', e);
-  }
+  const resourceData = readResourceData(item.resource_data);
 
   return {
     ...item,

@@ -1,4 +1,5 @@
 import { formatProcessingContext } from './submissionFormatters';
+import { readResourceData } from './resourceData';
 
 /**
  * Format detailed submission data
@@ -26,17 +27,7 @@ export function formatSubmissionDetail(response) {
     ...newResources.map(resource => ({ ...resource, is_reuse: false })),
     ...reuseResources.map(resource => ({ ...resource, is_reuse: true })),
   ].map((resource) => {
-    let data = {};
-    try {
-      if (resource.resource_data) {
-        data = typeof resource.resource_data === 'string'
-          ? JSON.parse(resource.resource_data)
-          : resource.resource_data;
-      }
-    } catch (e) {
-      console.warn('Failed to parse resource_data:', e);
-      data = { title: 'Unknown', materialType: 'unknown' };
-    }
+    const data = readResourceData(resource.resource_data);
 
     // Get communications for this resource
     const itemCommunications = communicationsByResource[resource.id] || [];

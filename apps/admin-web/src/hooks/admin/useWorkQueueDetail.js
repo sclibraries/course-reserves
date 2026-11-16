@@ -4,6 +4,7 @@ import { notify } from '../../services/notify';
 import useSubmissionWorkflowStore from '../../store/submissionWorkflowStore';
 import { submissionWorkflowService } from '../../services/admin/submissionWorkflowService';
 import { matchesCommunicationChannel } from '../../util/messageChannels';
+import { readResourceData } from '../../services/admin/submissionWorkflow/resourceData';
 import {
   buildWorkQueueProcessingAction,
   findSelectedWorkQueueItem
@@ -37,12 +38,7 @@ export default function useWorkQueueDetail() {
     if (!claimedItems) return [];
 
     return claimedItems.map(item => {
-      let resourceData = {};
-      try {
-        resourceData = item.resource_data ? JSON.parse(item.resource_data) : {};
-      } catch (err) {
-        console.warn('Failed to parse resource_data:', err);
-      }
+      const resourceData = readResourceData(item.resource_data);
 
       return {
         ...item,
