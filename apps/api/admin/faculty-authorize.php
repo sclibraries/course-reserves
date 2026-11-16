@@ -114,9 +114,9 @@ if ($fcIdNumber && $username && $firstname && $lastname && $aff) {
         // Set access token cookie — not HttpOnly so JS can read it for Authorization header
         $domainAttr = $cookieDomain ? '; Domain=' . $cookieDomain : '';
         $secureAttr = $cookieSecure ? '; Secure' : '';
-        header('Set-Cookie: accessToken=' . rawurlencode($accessToken) . '; Path=/' . $domainAttr . $secureAttr . '; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $accessExpiration), false);
+        header('Set-Cookie: ' . FacultyTokenClaims::ACCESS_COOKIE_NAME . '=' . rawurlencode($accessToken) . '; Path=/' . $domainAttr . $secureAttr . '; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $accessExpiration), false);
         // Set refresh token cookie — HttpOnly prevents XSS from stealing the long-lived token
-        header('Set-Cookie: refreshToken=' . rawurlencode($refreshToken) . '; Path=/' . $domainAttr . $secureAttr . '; HttpOnly; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $refreshExpiration), false);
+        header('Set-Cookie: ' . FacultyTokenClaims::REFRESH_COOKIE_NAME . '=' . rawurlencode($refreshToken) . '; Path=/' . $domainAttr . $secureAttr . '; HttpOnly; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $refreshExpiration), false);
 
         // Determine redirect target
         // Accept multiple param names commonly used by frontends: redirect, return, returnTo, next

@@ -70,6 +70,7 @@ set -eu
 environment=$1
 port=18080
 log=/tmp/api054-entrypoints-server.log
+faculty_entrypoint_failures=0
 if [ "$environment" = unset ]; then
     env -u YII_ENV php -S "127.0.0.1:$port" -t /app >"$log" 2>&1 &
 elif [ "$environment" = test ]; then
@@ -106,7 +107,12 @@ check_status() {
     expected=$2
     headers=/tmp/api054-entrypoints-headers
     body=/tmp/api054-entrypoints-body
-    status=$(curl -sS -D "$headers" -o "$body" -w '%{http_code}' "http://127.0.0.1:$port$path")
+    if [ "$environment" = test ] && [ "$path" = /admin/faculty-authorize.php ]; then
+        status=$(curl -sS -H 'Host: libtools2.smith.edu' -H 'X-Forwarded-Proto: https' \
+            -D "$headers" -o "$body" -w '%{http_code}' "http://127.0.0.1:$port$path")
+    else
+        status=$(curl -sS -D "$headers" -o "$body" -w '%{http_code}' "http://127.0.0.1:$port$path")
+    fi
     case " $expected " in
         *" $status "*) ;;
         *) printf '%s (%s) returned %s; expected %s\n' "$path" "$environment" "$status" "$expected" >&2; cat "$body" >&2; exit 1 ;;
@@ -120,6 +126,7 @@ check_status() {
     fi
     if [ "$environment" = test ] && [ "$path" = /admin/faculty-authorize.php ]; then
         check_faculty_authorize_lifetime "$headers"
+        check_faculty_refresh_tokens
     fi
 }
 
@@ -138,28 +145,216 @@ check_post_status() {
 
 check_faculty_authorize_lifetime() {
     headers=$1
-    php -r '
+    validation=$(php -r '
         require "/app/config/environment.php";
         require "/app/vendor/autoload.php";
         $headers = file_get_contents($argv[1]);
-        if (!preg_match("/^Set-Cookie: accessToken=([^;\\r\\n]+).*; Expires=([^;\\r\\n]+)/mi", $headers, $cookie)) {
-            fwrite(STDERR, "faculty-authorize did not issue its accessToken cookie\n");
-            exit(1);
+        $cookies = [];
+        foreach (preg_split("/\\r?\\n/", $headers) as $line) {
+            if (stripos($line, "Set-Cookie:") !== 0) {
+                continue;
+            }
+            $parts = explode(";", trim(substr($line, strlen("Set-Cookie:"))));
+            $pair = array_shift($parts);
+            $separator = strpos($pair, "=");
+            if ($separator === false) {
+                continue;
+            }
+            $name = substr($pair, 0, $separator);
+            $cookies[$name] = [
+                "value" => rawurldecode(substr($pair, $separator + 1)),
+                "attributes" => array_map("trim", $parts),
+            ];
         }
-        $claims = (array) \Firebase\JWT\JWT::decode(
-            rawurldecode($cookie[1]),
-            new \Firebase\JWT\Key(getenv("JWT_SECRET_KEY"), "HS256")
-        );
-        if ($claims["exp"] - $claims["iat"] !== 28800) {
-            fwrite(STDERR, "faculty-authorize access token lifetime was not 28800 seconds\n");
-            exit(1);
+
+        $failures = [];
+        foreach (["facultyAccessToken", "facultyRefreshToken"] as $name) {
+            if (!isset($cookies[$name])) {
+                $failures[] = "faculty-authorize did not issue its $name cookie";
+            }
         }
-        if (strtotime($cookie[2]) !== $claims["exp"]) {
-            fwrite(STDERR, "faculty-authorize accessToken cookie expiry did not match token exp\n");
-            exit(1);
+        foreach (["accessToken", "refreshToken"] as $name) {
+            if (isset($cookies[$name])) {
+                $failures[] = "faculty-authorize still issued the $name cookie";
+            }
         }
-        echo "faculty-authorize -> exp - iat = 28800; accessToken Expires matches exp\n";
-    ' "$headers"
+        $accessCookie = $cookies["facultyAccessToken"] ?? $cookies["accessToken"] ?? null;
+        $refreshCookie = $cookies["facultyRefreshToken"] ?? $cookies["refreshToken"] ?? null;
+        if ($accessCookie !== null) {
+            if (!in_array("Path=/", $accessCookie["attributes"], true)
+                || !in_array("SameSite=Strict", $accessCookie["attributes"], true)
+                || !in_array("Domain=libtools2.smith.edu", $accessCookie["attributes"], true)
+                || !in_array("Secure", $accessCookie["attributes"], true)
+                || in_array("HttpOnly", $accessCookie["attributes"], true)) {
+                $failures[] = "faculty access cookie attributes changed";
+            }
+            $expires = null;
+            foreach ($accessCookie["attributes"] as $attribute) {
+                if (stripos($attribute, "Expires=") === 0) {
+                    $expires = substr($attribute, strlen("Expires="));
+                }
+            }
+            try {
+                $claims = (array) \Firebase\JWT\JWT::decode(
+                    $accessCookie["value"],
+                    new \Firebase\JWT\Key(getenv("JWT_SECRET_KEY"), "HS256")
+                );
+                if ($claims["exp"] - $claims["iat"] !== 28800) {
+                    $failures[] = "faculty-authorize access token lifetime was not 28800 seconds";
+                }
+                if ($expires === null || strtotime($expires) !== $claims["exp"]) {
+                    $failures[] = "faculty access cookie Expires did not match token exp";
+                }
+                if (strpos($headers, "Location: https://libtools2.smith.edu/course-reserves/faculty") === false) {
+                    $failures[] = "faculty-authorize redirect changed";
+                }
+            } catch (\Throwable $error) {
+                $failures[] = "faculty-authorize access token could not be decoded";
+            }
+        }
+        if ($refreshCookie !== null) {
+            if (!in_array("Path=/", $refreshCookie["attributes"], true)
+                || !in_array("HttpOnly", $refreshCookie["attributes"], true)
+                || !in_array("SameSite=Strict", $refreshCookie["attributes"], true)
+                || !in_array("Domain=libtools2.smith.edu", $refreshCookie["attributes"], true)
+                || !in_array("Secure", $refreshCookie["attributes"], true)) {
+                $failures[] = "faculty refresh cookie attributes changed";
+            }
+            $expires = null;
+            foreach ($refreshCookie["attributes"] as $attribute) {
+                if (stripos($attribute, "Expires=") === 0) {
+                    $expires = substr($attribute, strlen("Expires="));
+                }
+            }
+            try {
+                $claims = (array) \Firebase\JWT\JWT::decode(
+                    $refreshCookie["value"],
+                    new \Firebase\JWT\Key(getenv("JWT_REFRESH_SECRET_KEY"), "HS256")
+                );
+                if ($claims["exp"] - $claims["iat"] !== 86400) {
+                    $failures[] = "faculty-authorize refresh token lifetime was not 86400 seconds";
+                }
+                if ($expires === null || strtotime($expires) !== $claims["exp"]) {
+                    $failures[] = "faculty refresh cookie Expires did not match token exp";
+                }
+            } catch (\Throwable $error) {
+                $failures[] = "faculty-authorize refresh token could not be decoded";
+            }
+            file_put_contents("/tmp/api054-faculty-refresh-token", $refreshCookie["value"]);
+        }
+        foreach ($failures as $failure) {
+            echo "FAIL: $failure\n";
+        }
+        if (!$failures) {
+            echo "faculty-authorize -> faculty cookies, attributes and 28800-second access lifetime passed\n";
+        }
+    ' "$headers")
+    printf '%s\n' "$validation"
+    case "$validation" in
+        *FAIL:*) faculty_entrypoint_failures=1 ;;
+    esac
+    if [ -s /tmp/api054-faculty-refresh-token ]; then
+        faculty_refresh_token=$(php -r 'echo file_get_contents($argv[1]);' /tmp/api054-faculty-refresh-token)
+    else
+        printf 'FAIL: faculty-authorize did not provide a refresh token for refresh checks\n' >&2
+        faculty_entrypoint_failures=1
+        faculty_refresh_token=
+    fi
+}
+
+check_faculty_refresh_tokens() {
+    if [ -z "$faculty_refresh_token" ]; then
+        return
+    fi
+
+    sleep 1
+    headers=/tmp/api054-faculty-refresh-headers
+    body=/tmp/api054-faculty-refresh-body
+    status=$(curl -sS -X POST -D "$headers" -o "$body" -w '%{http_code}' \
+        -H 'Host: libtools2.smith.edu' -H 'X-Forwarded-Proto: https' \
+        --cookie "facultyRefreshToken=$faculty_refresh_token" \
+        "http://127.0.0.1:$port/admin/faculty-refresh-token.php")
+    if [ "$status" != 200 ]; then
+        printf 'FAIL: faculty refresh cookie returned HTTP %s; expected 200\n' "$status" >&2
+        faculty_entrypoint_failures=1
+    else
+        rotation=$(php -r '
+            $headers = file_get_contents($argv[1]);
+            $body = json_decode(file_get_contents($argv[2]), true);
+            $original = $argv[3];
+            $cookie = null;
+            $attributes = [];
+            foreach (preg_split("/\\r?\\n/", $headers) as $line) {
+                $prefix = "Set-Cookie: facultyRefreshToken=";
+                if (stripos($line, $prefix) === 0) {
+                    $parts = explode(";", trim(substr(trim($line), strlen($prefix))));
+                    $cookie = rawurldecode(array_shift($parts));
+                    $attributes = array_map("trim", $parts);
+                }
+            }
+            $failures = [];
+            if (!is_array($body) || !isset($body["accessToken"], $body["refreshToken"])) {
+                $failures[] = "faculty refresh JSON fields accessToken/refreshToken were missing";
+            }
+            if ($cookie === null) {
+                $failures[] = "faculty refresh did not set the facultyRefreshToken cookie";
+            } elseif ($cookie === $original) {
+                $failures[] = "faculty refresh did not rotate its refresh token";
+            }
+            if (!in_array("Path=/", $attributes, true)
+                || !in_array("HttpOnly", $attributes, true)
+                || !in_array("SameSite=Strict", $attributes, true)
+                || !in_array("Domain=libtools2.smith.edu", $attributes, true)
+                || !in_array("Secure", $attributes, true)) {
+                $failures[] = "faculty refresh cookie attributes changed";
+            }
+            if ($cookie !== null && isset($body["refreshToken"]) && $cookie !== $body["refreshToken"]) {
+                $failures[] = "faculty refresh cookie did not match JSON refreshToken";
+            }
+            foreach ($failures as $failure) {
+                echo "FAIL: $failure\n";
+            }
+            if (!$failures) {
+                echo "faculty refresh cookie -> 200, facultyRefreshToken rotated; JSON accessToken/refreshToken preserved\n";
+            }
+        ' "$headers" "$body" "$faculty_refresh_token")
+        printf '%s\n' "$rotation"
+        case "$rotation" in
+            *FAIL:*) faculty_entrypoint_failures=1 ;;
+        esac
+    fi
+
+    status=$(curl -sS -X POST -H 'Content-Type: application/json' \
+        -H 'Host: libtools2.smith.edu' -H 'X-Forwarded-Proto: https' \
+        -d "{\"refreshToken\":\"$faculty_refresh_token\"}" \
+        -o "$body" -w '%{http_code}' "http://127.0.0.1:$port/admin/faculty-refresh-token.php")
+    if [ "$status" != 200 ]; then
+        printf 'FAIL: faculty JSON body refreshToken fallback returned HTTP %s; expected 200\n' "$status" >&2
+        faculty_entrypoint_failures=1
+    else
+        body_fields=$(php -r '
+            $body = json_decode(file_get_contents($argv[1]), true);
+            if (!is_array($body) || !isset($body["accessToken"], $body["refreshToken"])) {
+                echo "FAIL: faculty JSON body fallback did not return accessToken/refreshToken\n";
+            } else {
+                echo "faculty JSON body refreshToken fallback -> 200; accessToken/refreshToken preserved\n";
+            }
+        ' "$body")
+        printf '%s\n' "$body_fields"
+        case "$body_fields" in
+            *FAIL:*) faculty_entrypoint_failures=1 ;;
+        esac
+    fi
+
+    status=$(curl -sS -X POST -H 'Host: libtools2.smith.edu' -H 'X-Forwarded-Proto: https' \
+        --cookie "refreshToken=$faculty_refresh_token" \
+        -o "$body" -w '%{http_code}' "http://127.0.0.1:$port/admin/faculty-refresh-token.php")
+    if [ "$status" != 401 ]; then
+        printf 'FAIL: staff-named refreshToken cookie returned HTTP %s; expected 401\n' "$status" >&2
+        faculty_entrypoint_failures=1
+    else
+        printf 'staff-named refreshToken cookie only -> HTTP 401\n'
+    fi
 }
 
 check_status /web/index.php/__api054_probe 404
@@ -197,6 +392,9 @@ else
     check_status /admin/authorize-dev.php 400
     check_status /admin/refresh-token-local.php 404
     check_status /admin/refresh-token-dev.php 400
+fi
+if [ "$faculty_entrypoint_failures" -ne 0 ]; then
+    exit 1
 fi
 CONTAINER_SCRIPT
 done

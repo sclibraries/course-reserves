@@ -10,6 +10,8 @@ use app\components\Roles;
 class FacultyTokenClaims
 {
     public const ACCESS_TOKEN_LIFETIME = 28800;
+    public const ACCESS_COOKIE_NAME = 'facultyAccessToken';
+    public const REFRESH_COOKIE_NAME = 'facultyRefreshToken';
 
     /**
      * Add canonical identity and time claims to an authorization payload.

@@ -30,7 +30,7 @@ $refreshSecretKey = getenv('JWT_REFRESH_SECRET_KEY');
 
 try {
     // Accept refresh token from HttpOnly cookie (preferred) or JSON body (fallback)
-    $refreshToken = $_COOKIE['refreshToken'] ?? null;
+    $refreshToken = $_COOKIE[FacultyTokenClaims::REFRESH_COOKIE_NAME] ?? null;
     if (!$refreshToken) {
         $input = json_decode(file_get_contents('php://input'), true);
         $refreshToken = $input['refreshToken'] ?? null;
@@ -79,7 +79,7 @@ try {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
     $domainAttr = $cookieDomain ? '; Domain=' . $cookieDomain : '';
     $secureAttr = ($scheme === 'https') ? '; Secure' : '';
-    header('Set-Cookie: refreshToken=' . rawurlencode($newRefreshToken) . '; Path=/' . $domainAttr . $secureAttr . '; HttpOnly; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $refreshExpiration), false);
+    header('Set-Cookie: ' . FacultyTokenClaims::REFRESH_COOKIE_NAME . '=' . rawurlencode($newRefreshToken) . '; Path=/' . $domainAttr . $secureAttr . '; HttpOnly; SameSite=Strict; Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $refreshExpiration), false);
 
     echo json_encode([
         'accessToken' => $newAccessToken,
