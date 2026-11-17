@@ -15,7 +15,13 @@ class FacultySubmissionItemUpdateService
         $this->publication = $publication ?: new SubmissionPublicationStateService();
     }
 
-    public function updateItems($submission, $itemsData, array $folderUuidToNameMap = [], ?array $lockedItems = null)
+    public function updateItems(
+        $submission,
+        $itemsData,
+        array $folderUuidToNameMap = [],
+        ?array $lockedItems = null,
+        array $placementChangedItemIds = []
+    )
     {
         $existingItems = $lockedItems !== null ? $lockedItems : SubmissionNewResource::find()
             ->where(['submission_id' => $submission->submission_id])->indexBy('id')->all();
@@ -57,8 +63,17 @@ class FacultySubmissionItemUpdateService
                     $item->source_call_number = $itemData['call_number'];
                 }
                 $item->save();
-                if ($before !== PublicationDraftSnapshot::fromNewItem($item->getAttributes())) {
-                    $this->publication->invalidateDraft('new', $item->id, $item->submission_id);
+                $after = PublicationDraftSnapshot::fromNewItem($item->getAttributes());
+                $class = $before === $after
+                    ? null
+                    : ItemChangeClass::classify($this->changedFields($before, $after));
+                if (isset($placementChangedItemIds[$itemId])
+                    && $class !== ItemChangeClass::IDENTITY
+                    && $class !== ItemChangeClass::DISPLAY_ONLY) {
+                    $class = ItemChangeClass::PLACEMENT;
+                }
+                if ($class !== null) {
+                    $this->publication->recordChange('new', $item->id, $item->submission_id, $class);
                 }
                 $processedItemIds[] = $itemId;
                 continue;
@@ -93,6 +108,21 @@ class FacultySubmissionItemUpdateService
                 $item->delete();
             }
         }
+    }
+
+    private function changedFields(array $before, array $after)
+    {
+        $fields = [];
+        foreach (array_keys($before + $after) as $key) {
+            $old = $before[$key] ?? null;
+            $new = $after[$key] ?? null;
+            if (is_array($old) && is_array($new)) {
+                $fields = array_merge($fields, $this->changedFields($old, $new));
+            } elseif ($old !== $new) {
+                $fields[] = $key;
+            }
+        }
+        return $fields;
     }
 
     private function updatedResourceData(array $currentData, array $itemData): array

@@ -93,8 +93,12 @@ class Api114ResourceChildInvalidationCest extends Api109FunctionalCest
 
     public function testProtectionMaterializationBookkeepingAndSharedSourceMutationSkipOnlyPublisher(FunctionalTester $I)
     {
+        $this->mapTypesToSameFlow([$this->materialTypeId('ebook')]);
         $items = $this->createDependentItems('bookkeeping-source-mutation');
         $before = $this->primeRevisions($I, $items);
+        $this->request($I, 'GET', 'workflow-flow/item-flow', [], $items['reuse']);
+        $I->seeResponseCodeIs(200);
+        $oldReuseRun = $this->latestRun('reuse', $items['reuse']['id']);
         $publisher = SubmissionNewResource::findOne($items['new']['id']);
         $publisher->materialized_resource_id = $items['resource_id'];
         $publisher->materialized_course_resource_id = 114001;
@@ -116,6 +120,13 @@ class Api114ResourceChildInvalidationCest extends Api109FunctionalCest
         $after = $this->currentRevisions($I, $items);
         Assert::assertSame($before['new'], $after['new'], 'The bookkeeping publisher draft must remain unchanged.');
         Assert::assertSame($before['reuse'] + 1, $after['reuse'], 'The other dependent draft must still invalidate.');
+
+        $this->request($I, 'GET', 'workflow-flow/item-flow', [], $items['reuse']);
+        $I->seeResponseCodeIs(200);
+        $reuseRuns = $this->runs('reuse', $items['reuse']['id']);
+        Assert::assertCount(2, $reuseRuns);
+        Assert::assertSame((int)$oldReuseRun['id'], (int)$reuseRuns[0]['id']);
+        Assert::assertSame('superseded', $reuseRuns[0]['finish_state']);
     }
 
     private function createDependentItems($suffix)

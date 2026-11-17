@@ -58,8 +58,11 @@ class SubmissionItemDetailsService
             $afterAudit = $this->detailAuditSnapshot($after);
             $afterInputAudit = $this->inputAuditSnapshot($after);
             if ($before !== $after) {
-                $this->publication->invalidateDraft($kind, $id, $item['submission_id']);
-                $this->supersedeOpenRun($kind, $id, $now);
+                $class = ItemChangeClass::classify($this->changedFields($before, $after));
+                $this->publication->recordChange($kind, $id, $item['submission_id'], $class);
+                if ($class === ItemChangeClass::IDENTITY) {
+                    $this->supersedeOpenRun($kind, $id, $now);
+                }
             }
             if ($beforeAudit !== $afterAudit) {
                 $this->events->record(
@@ -231,6 +234,22 @@ class SubmissionItemDetailsService
             'assigned_pages' => $projection['inputs']['assigned_pages'],
             'access_path' => $item['access_path'] ?? null,
         ];
+    }
+
+    private function changedFields(array $before, array $after)
+    {
+        $fields = [];
+        foreach ($before['inputs'] as $field => $value) {
+            if ($value !== $after['inputs'][$field]) {
+                $fields[] = $field;
+            }
+        }
+        foreach (['material_type_id', 'material_type_key', 'destination_class', 'access_path'] as $field) {
+            if ($before[$field] !== $after[$field]) {
+                $fields[] = $field;
+            }
+        }
+        return $fields;
     }
 
     private function detailAuditSnapshot(array $snapshot)

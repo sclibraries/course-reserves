@@ -93,9 +93,20 @@ class SubmittedSubmissionUpdateService
                 throw new \RuntimeException('Failed to update submission: ' . json_encode($submission->errors));
             }
 
-            $folderMap = isset($data['folders']) ? $this->updateFolders($submission, $folderData, $folders, $lockedItems) : [];
+            $placementChangedItemIds = [];
+            $folderMap = isset($data['folders'])
+                ? $this->updateFolders($submission, $folderData, $folders, $lockedItems, $placementChangedItemIds)
+                : [];
             if (isset($data['items'])) {
-                $this->items->updateItems($submission, $data['items'], $folderMap, $lockedItems);
+                $this->items->updateItems(
+                    $submission, $data['items'], $folderMap, $lockedItems, $placementChangedItemIds
+                );
+            } else {
+                foreach (array_keys($placementChangedItemIds) as $itemId) {
+                    $this->publication->recordChange(
+                        'new', $itemId, $submission->submission_id, ItemChangeClass::PLACEMENT
+                    );
+                }
             }
             $transaction->commit();
             return ['submission' => $submission];
@@ -117,7 +128,13 @@ class SubmittedSubmissionUpdateService
         }
     }
 
-    private function updateFolders($submission, array $folderData, array $existingFolders, array $lockedItems)
+    private function updateFolders(
+        $submission,
+        array $folderData,
+        array $existingFolders,
+        array $lockedItems,
+        array &$placementChangedItemIds
+    )
     {
         $folderMap = SubmissionMaterializationGuard::folderUuidToNameMap($folderData);
         $processedNames = [];
@@ -145,7 +162,6 @@ class SubmittedSubmissionUpdateService
             $processedNames[] = $name;
         }
 
-        $changedItemIds = [];
         foreach ($existingFolders as $name => $folder) {
             if (in_array($name, $processedNames, true)) {
                 continue;
@@ -160,18 +176,17 @@ class SubmittedSubmissionUpdateService
                 $item->position_in_folder = null;
                 $item->save();
                 if ($before !== PublicationDraftSnapshot::fromNewItem($item->getAttributes())) {
-                    $this->publication->invalidateDraft('new', $item->id, $submission->submission_id);
-                    $changedItemIds[(int)$item->id] = true;
+                    $placementChangedItemIds[(int)$item->id] = true;
                 }
             }
             $folder->delete();
         }
 
         foreach ($lockedItems as $item) {
-            if (isset($changedItemIds[(int)$item->id]) || !isset($changedNames[$item->folder_name])) {
+            if (isset($placementChangedItemIds[(int)$item->id]) || !isset($changedNames[$item->folder_name])) {
                 continue;
             }
-            $this->publication->invalidateDraft('new', $item->id, $submission->submission_id);
+            $placementChangedItemIds[(int)$item->id] = true;
         }
         return $folderMap;
     }
