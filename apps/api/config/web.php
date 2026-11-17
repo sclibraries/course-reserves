@@ -41,7 +41,11 @@ $config = [
             'enableAutoLogin' => false,
         ],
         'errorHandler' => [
+            'class' => \app\components\ApiErrorHandler::class,
             'errorAction' => 'site/error',
+        ],
+        'workflowNotificationQueue' => [
+            'class' => \app\services\WorkflowNotificationQueue::class,
         ],
         'mailer' => [
             'class' => 'yii\swiftmailer\Mailer',

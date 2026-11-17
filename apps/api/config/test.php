@@ -16,6 +16,12 @@ return [
     'language' => 'en-US',
     'components' => [
         'db' => $db,
+        'errorHandler' => [
+            'class' => \app\components\ApiErrorHandler::class,
+        ],
+        'workflowNotificationQueue' => [
+            'class' => \app\services\WorkflowNotificationQueue::class,
+        ],
         'mailer' => [
             'useFileTransport' => true,
         ],

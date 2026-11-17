@@ -8,6 +8,44 @@ use yii\db\IntegrityException;
 /** Runs a database operation atomically and maps unique-key conflicts when requested. */
 class Transactional
 {
+    public static function retrying(callable $callback)
+    {
+        $db = Yii::$app->db;
+        if ($db->getTransaction() !== null) {
+            return self::run($callback);
+        }
+
+        $notifications = Yii::$app->get('workflowNotificationQueue');
+        for ($attempt = 1; ; $attempt++) {
+            $transaction = $db->beginTransaction();
+            try {
+                $result = call_user_func($callback, $transaction);
+                if ($transaction->isActive) {
+                    $transaction->commit();
+                }
+            } catch (\Throwable $exception) {
+                try {
+                    self::rollBack($transaction, $exception);
+                } finally {
+                    $notifications->discard();
+                }
+                if (!self::isDeadlock($exception) && !self::isAssociationChange($exception)) {
+                    throw $exception;
+                }
+                if ($attempt < 3) {
+                    continue;
+                }
+
+                $reference = EbscoFailureReference::generate();
+                Yii::error('Item operation contention reference=' . $reference, __METHOD__);
+                throw new ItemContention($reference, $exception);
+            }
+
+            $notifications->flushAfterCommit();
+            return $result;
+        }
+    }
+
     public static function run(callable $callback, ?callable $onIntegrity = null, ?callable $onFailure = null)
     {
         $transaction = Yii::$app->db->beginTransaction();
@@ -54,6 +92,16 @@ class Transactional
     {
         for (; $exception !== null; $exception = $exception->getPrevious()) {
             if (self::mysqlCode($exception) === 1213) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function isAssociationChange(?\Throwable $exception)
+    {
+        for (; $exception !== null; $exception = $exception->getPrevious()) {
+            if ($exception instanceof ItemAssociationChanged) {
                 return true;
             }
         }
