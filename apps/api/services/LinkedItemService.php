@@ -20,9 +20,9 @@ class LinkedItemService
         $this->submittedScope = $submittedScope ?: new SubmittedSubmissionScope();
     }
 
-    public function withLinkedItem($kind, $id, callable $callback)
+    public function withLinkedItem($kind, $id, callable $callback, $retrying = false)
     {
-        $outcome = Transactional::run(function ($transaction) use ($kind, $id, $callback) {
+        $operation = function ($transaction) use ($kind, $id, $callback, $retrying) {
             $submissionId = $this->repository->submissionId($kind, $id);
             if (!$submissionId) {
                 return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
@@ -50,12 +50,23 @@ class LinkedItemService
             if ($notification) {
                 $item = $this->repository->find($kind, $id, true);
             }
+            $result = $callback($item, $transaction, $now);
+            if ($retrying && $notification && $transaction->isActive) {
+                Yii::$app->get('workflowNotificationQueue')->enqueue(function () use ($notification) {
+                    $this->expiry->notify($notification);
+                });
+            }
             return [
-                'result' => $callback($item, $transaction, $now),
-                'notification' => $transaction->isActive ? $notification : null,
+                'result' => $result,
+                'notification' => !$retrying && $transaction->isActive ? $notification : null,
             ];
-        });
-        $this->expiry->notify($outcome['notification']);
+        };
+        $outcome = $retrying
+            ? Transactional::retrying($operation)
+            : Transactional::run($operation);
+        if (!$retrying) {
+            $this->expiry->notify($outcome['notification']);
+        }
         return $outcome['result'];
     }
 

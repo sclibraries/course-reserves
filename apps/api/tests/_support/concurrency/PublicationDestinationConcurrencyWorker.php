@@ -56,9 +56,13 @@ $request = PublicationDestinationConcurrencyWire::read(STDIN);
 $operation = $request['op'] ?? '';
 $testDbConfig = require $apiRoot . '/config/test_db.php';
 $checklistWorker = strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete';
+$sharedRowWorker = strpos($operation, 'shared_') === 0;
+if ($sharedRowWorker) {
+    require_once __DIR__ . '/SharedRowConcurrencyWorkerOps.php';
+}
 $testDbConfig['commandClass'] = $checklistWorker
     ? Api119A2ChecklistConcurrencyCommand::class
-    : PublicationDestinationConcurrencyCommand::class;
+    : ($sharedRowWorker ? SharedRowConcurrencyWorkerCommand::class : PublicationDestinationConcurrencyCommand::class);
 if ($checklistWorker) {
     require_once __DIR__ . '/Api119A2ChecklistWorker.php';
     $config = ArrayHelper::merge(
@@ -74,6 +78,9 @@ if ($checklistWorker) {
     $application = new \yii\console\Application($config);
 }
 $db = \Yii::$app->db;
+if ($sharedRowWorker) {
+    \Yii::$app->set('workflowNotificationQueue', new \app\services\WorkflowNotificationQueue());
+}
 $db->open();
 $db->createCommand('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
 $db->createCommand('SET SESSION innodb_lock_wait_timeout = 10')->execute();
@@ -95,6 +102,9 @@ $attempt = 0;
 /** Reports the final frame; the exit code alone never counts as a result. */
 function finishConcurrencyWorker($operation, $attempt, array $frame)
 {
+    if (strpos($operation, 'shared_') === 0) {
+        $frame['sql_failures'] = SharedRowConcurrencyWorkerOps::sqlFailures();
+    }
     PublicationDestinationConcurrencyWire::write(STDOUT, array_merge([
         'op' => $operation,
         'attempt' => $attempt,
@@ -155,6 +165,10 @@ try {
 
 function runConcurrencyOperation($operation, array $request, $db, &$attempt)
 {
+    if (strpos($operation, 'shared_') === 0) {
+        PublicationDestinationConcurrencyWorkerOps::assertFixtureManifest($request['manifest'] ?? [], $db);
+        return SharedRowConcurrencyWorkerOps::run($operation, $request, $db);
+    }
     if (strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete') {
         return Api119A2ChecklistWorker::run($operation, $request, $db);
     }

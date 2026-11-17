@@ -18,10 +18,10 @@ class AccessPathMappingService
         $this->publicationInvalidator = $publicationInvalidator ?: new SubmissionPublicationInvalidator();
     }
 
-    public function getMapping()
+    public function getMapping($forUpdate = false)
     {
         $rows = [];
-        foreach ($this->mappings->all() as $row) {
+        foreach ($this->mappings->all($forUpdate) as $row) {
             $rows[$row['access_path']] = $this->format($row);
         }
         $mapping = [];
@@ -33,27 +33,27 @@ class AccessPathMappingService
 
     public function putMapping(array $body, array $actor)
     {
-        $rows = $this->normalize($body['mapping'] ?? null);
-        if ($rows === null) {
-            return $this->result(400, ['error_code' => 'invalid_mapping']);
-        }
-        $before = $this->getMapping()['mapping'];
-        $after = array_map([$this, 'format'], $rows);
-        $beforeByPath = [];
-        $afterByPath = [];
-        foreach ($before as $row) {
-            $beforeByPath[$row['access_path']] = $row;
-        }
-        foreach ($after as $row) {
-            $afterByPath[$row['access_path']] = $row;
-        }
-        $changedPaths = [];
-        foreach (array_unique(array_merge(array_keys($beforeByPath), array_keys($afterByPath))) as $path) {
-            if (($beforeByPath[$path] ?? null) !== ($afterByPath[$path] ?? null)) {
-                $changedPaths[] = $path;
+        return Transactional::retrying(function () use ($body, $actor) {
+            $before = $this->getMapping(true)['mapping'];
+            $rows = $this->normalize($body['mapping'] ?? null);
+            if ($rows === null) {
+                return $this->result(400, ['error_code' => 'invalid_mapping']);
             }
-        }
-        return Transactional::run(function () use ($rows, $before, $after, $actor, $changedPaths) {
+            $after = array_map([$this, 'format'], $rows);
+            $beforeByPath = [];
+            $afterByPath = [];
+            foreach ($before as $row) {
+                $beforeByPath[$row['access_path']] = $row;
+            }
+            foreach ($after as $row) {
+                $afterByPath[$row['access_path']] = $row;
+            }
+            $changedPaths = [];
+            foreach (array_unique(array_merge(array_keys($beforeByPath), array_keys($afterByPath))) as $path) {
+                if (($beforeByPath[$path] ?? null) !== ($afterByPath[$path] ?? null)) {
+                    $changedPaths[] = $path;
+                }
+            }
             $this->publicationInvalidator->accessPaths($changedPaths);
             $this->mappings->replace($rows);
             $this->events->record(

@@ -217,9 +217,9 @@ class ItemClaimService
         $this->expiry->notify($notification);
     }
 
-    public function withLinkedItem($kind, $id, callable $callback)
+    public function withLinkedItem($kind, $id, callable $callback, $retrying = false)
     {
-        return $this->linkedItems->withLinkedItem($kind, $id, $callback);
+        return $this->linkedItems->withLinkedItem($kind, $id, $callback, $retrying);
     }
 
     public function completeLegacyChecklistItem($kind, array $item, array $actor)

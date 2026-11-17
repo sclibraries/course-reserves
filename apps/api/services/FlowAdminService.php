@@ -57,17 +57,17 @@ class FlowAdminService
     public function createVersion($id, array $body, array $actor)
     {
         $steps = $this->normalizeSteps($body['steps'] ?? []);
-        $errors = $this->validate($steps);
-        if ($errors) {
-            return $this->result(400, ['error_code' => 'invalid_flow', 'errors' => $errors]);
-        }
-        return Transactional::run(function ($transaction) use ($id, $actor, $steps) {
+        return Transactional::retrying(function ($transaction) use ($id, $actor, $steps) {
+            $errors = $this->validate($steps);
+            if ($errors) {
+                return $this->result(400, ['error_code' => 'invalid_flow', 'errors' => $errors]);
+            }
             $flow = $this->flows->flow($id, true);
             if (!$flow) {
                 $transaction->rollBack();
                 return $this->result(404, ['error_code' => 'unknown_flow']);
             }
-            $latest = $this->flows->latestVersion($id);
+            $latest = $this->flows->latestVersion($id, true);
             $version = (int)$latest['version'] + 1;
             $this->flows->insertVersion($id, $version, $steps, $actor['username']);
             $this->publicationInvalidator->unpinnedFlowItems($id);
@@ -140,48 +140,46 @@ class FlowAdminService
         if (!is_array($rows)) {
             return $this->result(400, ['error_code' => 'invalid_mapping']);
         }
-        $types = $this->flows->allMaterialTypes();
-        $known = [];
-        foreach ($types as $type) {
-            $known[$type['material_type']] = true;
-        }
-        $normalized = [];
-        foreach ($rows as $row) {
-            if (!is_array($row) || !is_scalar($row['material_type'] ?? null)) {
+        return Transactional::retrying(function () use ($rows, $actor) {
+            $types = $this->flows->allMaterialTypes(true);
+            $known = [];
+            foreach ($types as $type) {
+                $known[$type['material_type']] = $type;
+            }
+            $normalized = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || !is_scalar($row['material_type'] ?? null)) {
+                    return $this->result(400, ['error_code' => 'invalid_mapping']);
+                }
+                $name = (string)$row['material_type'];
+                if (!isset($known[$name]) || array_key_exists($name, $normalized)) {
+                    return $this->result(400, ['error_code' => 'invalid_mapping']);
+                }
+                $flowId = $row['flow_id'] ?? null;
+                if ($flowId !== null && (!is_scalar($flowId) || !$this->flows->flow($flowId))) {
+                    return $this->result(400, ['error_code' => 'invalid_mapping']);
+                }
+                $normalized[$name] = [
+                    'material_type_id' => (int)$known[$name]['material_type_id'],
+                    'flow_id' => $flowId === null ? null : (int)$flowId,
+                ];
+            }
+            if (count($normalized) !== count($known)) {
                 return $this->result(400, ['error_code' => 'invalid_mapping']);
             }
-            $name = (string)$row['material_type'];
-            if (!isset($known[$name]) || array_key_exists($name, $normalized)) {
-                return $this->result(400, ['error_code' => 'invalid_mapping']);
+            $before = [];
+            $after = [];
+            $changedMaterialTypeIds = [];
+            foreach ($types as $type) {
+                $name = $type['material_type'];
+                $oldFlowId = $type['flow_id'] === null ? null : (int)$type['flow_id'];
+                $newFlowId = $normalized[$name]['flow_id'];
+                $before[] = ['material_type' => $name, 'flow_id' => $oldFlowId];
+                $after[] = ['material_type' => $name, 'flow_id' => $newFlowId];
+                if ($oldFlowId !== $newFlowId) {
+                    $changedMaterialTypeIds[] = (int)$type['material_type_id'];
+                }
             }
-            $flowId = $row['flow_id'] ?? null;
-            if ($flowId !== null && (!is_scalar($flowId) || !$this->flows->flow($flowId))) {
-                return $this->result(400, ['error_code' => 'invalid_mapping']);
-            }
-            $normalized[$name] = [
-                'material_type_id' => (int)$this->materialTypeId($types, $name),
-                'flow_id' => $flowId === null ? null : (int)$flowId,
-            ];
-        }
-        if (count($normalized) !== count($known)) {
-            return $this->result(400, ['error_code' => 'invalid_mapping']);
-        }
-        $before = $this->getMapping()['mapping'];
-        $after = [];
-        $beforeByName = [];
-        foreach ($before as $row) {
-            $beforeByName[$row['material_type']] = $row['flow_id'];
-        }
-        $changedMaterialTypeIds = [];
-        foreach ($types as $type) {
-            $name = $type['material_type'];
-            $flowId = $normalized[$name]['flow_id'];
-            $after[] = ['material_type' => $name, 'flow_id' => $flowId];
-            if ((int)($beforeByName[$name] ?? 0) !== (int)($flowId ?? 0)) {
-                $changedMaterialTypeIds[] = (int)$type['material_type_id'];
-            }
-        }
-        return Transactional::run(function () use ($normalized, $before, $after, $actor, $changedMaterialTypeIds) {
             $this->publicationInvalidator->materialTypes($changedMaterialTypeIds);
             $this->flows->replaceMappings(array_values($normalized));
             $this->events->record(null, null, $actor, 'flow_mapping_updated', null, ['mapping' => $before], ['mapping' => $after]);
@@ -223,13 +221,4 @@ class FlowAdminService
         return $steps;
     }
 
-    private function materialTypeId(array $types, $name)
-    {
-        foreach ($types as $type) {
-            if ($type['material_type'] === $name) {
-                return (int)$type['material_type_id'];
-            }
-        }
-        return 0;
-    }
 }

@@ -71,7 +71,7 @@ class FlowConfigurationService
                 $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor),
                 $this->sequences->count($run['id'], true)
             ));
-        });
+        }, true);
     }
 
     public function setAccessPath($kind, $itemId, array $actor, array $body)

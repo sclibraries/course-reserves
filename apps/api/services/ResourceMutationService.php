@@ -28,7 +28,7 @@ class ResourceMutationService
 
     public function update($id, array $data, $publishingItem = null)
     {
-        return Transactional::run(function () use ($id, $data, $publishingItem) {
+        return Transactional::retrying(function () use ($id, $data, $publishingItem) {
             $this->lockResource($id);
             $resource = Resources::findOne($id);
             if (!$resource) {
@@ -73,7 +73,7 @@ class ResourceMutationService
 
     public function addLink($resourceId, array $data)
     {
-        return Transactional::run(function () use ($resourceId, $data) {
+        return Transactional::retrying(function () use ($resourceId, $data) {
             $this->lockResource($resourceId);
             if (!Resources::findOne($resourceId)) {
                 throw new NotFoundHttpException('Resource not found');
@@ -96,21 +96,41 @@ class ResourceMutationService
 
     public function deleteLink($id)
     {
-        return Transactional::run(function () use ($id) {
+        return Transactional::retrying(function () use ($id) {
             $link = ResourceLinks::findOne($id);
             if (!$link) {
                 throw new NotFoundHttpException('Link not found');
             }
             $resourceId = (int)$link->resource_id;
             $this->lockResource($resourceId);
-            $link = ResourceLinks::findOne($id);
+            $link = ResourceLinks::findBySql(
+                'SELECT * FROM resource_links WHERE link_id = :id FOR UPDATE', [':id' => (int)$id]
+            )->one();
             if (!$link) {
                 throw new NotFoundHttpException('Link not found');
+            }
+            if ((int)$link->resource_id !== $resourceId) {
+                throw new ItemAssociationChanged('The resource link moved while it was being deleted.');
             }
             if ($link->delete()) {
                 $this->invalidator->sourceResource($resourceId);
             }
             return ['success' => true];
+        });
+    }
+
+    public function delete($id)
+    {
+        return Transactional::retrying(function () use ($id) {
+            $this->lockResource($id);
+            $resource = Resources::findOne($id);
+            if (!$resource) {
+                throw new NotFoundHttpException('Resource not found');
+            }
+            if (!$resource->delete()) {
+                throw new BadRequestHttpException('Failed to delete resource.');
+            }
+            return true;
         });
     }
 

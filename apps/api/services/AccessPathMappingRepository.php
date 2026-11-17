@@ -15,10 +15,11 @@ class AccessPathMappingRepository
         )->queryOne() ?: null;
     }
 
-    public function all()
+    public function all($forUpdate = false)
     {
         return Yii::$app->db->createCommand(
             'SELECT access_path, flow_id, group_id FROM access_path_flows ORDER BY access_path'
+                . ($forUpdate ? ' FOR UPDATE' : '')
         )->queryAll();
     }
 

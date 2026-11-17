@@ -26,7 +26,7 @@ class ResourceController extends ActiveController
     public function actions()
     {
         $actions = parent::actions();
-        unset($actions['update']);
+        unset($actions['update'], $actions['delete']);
 
         // Override the index action's data provider
         $actions['index']['prepareDataProvider'] = function() {
@@ -117,6 +117,13 @@ class ResourceController extends ActiveController
     {
         return Yii::$container->get(\app\services\ResourceMutationService::class)
             ->update($id, Yii::$app->request->getBodyParams());
+    }
+
+    public function actionDelete($id)
+    {
+        Yii::$container->get(\app\services\ResourceMutationService::class)->delete($id);
+        Yii::$app->response->statusCode = 204;
+        return null;
     }
 
     public function actionAddLink($resourceId)

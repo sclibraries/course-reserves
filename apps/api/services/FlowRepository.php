@@ -21,10 +21,11 @@ class FlowRepository
         )->queryOne() ?: null;
     }
 
-    public function latestVersion($flowId)
+    public function latestVersion($flowId, $forUpdate = false)
     {
         return Yii::$app->db->createCommand(
-            'SELECT * FROM flow_versions WHERE flow_id = :flow_id ORDER BY version DESC LIMIT 1',
+            'SELECT * FROM flow_versions WHERE flow_id = :flow_id ORDER BY version DESC LIMIT 1'
+                . ($forUpdate ? ' FOR UPDATE' : ''),
             [':flow_id' => (int)$flowId]
         )->queryOne() ?: null;
     }
@@ -195,11 +196,12 @@ class FlowRepository
         return Yii::$app->db->createCommand('SELECT name FROM staff_groups ORDER BY name')->queryColumn();
     }
 
-    public function allMaterialTypes()
+    public function allMaterialTypes($forUpdate = false)
     {
         return Yii::$app->db->createCommand(
             'SELECT mt.material_type_id, mt.name AS material_type, m.flow_id FROM material_types mt '
             . 'LEFT JOIN material_type_flows m ON m.material_type_id = mt.material_type_id ORDER BY mt.name ASC'
+            . ($forUpdate ? ' FOR UPDATE' : '')
         )->queryAll();
     }
 
