@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/notify', () => mocks.notifyModule);
 
 const now = 1_800_000_000;
-const staffCookieName = ['access', 'Token'].join('');
+// The staff app's cookie name; the faculty form must ignore it.
+const staffCookieName = 'accessToken';
 
 const tokenFor = (username: string, exp = now + 3600, internalId = 'test-id-123') => {
   const encode = (value: string) => btoa(value).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
