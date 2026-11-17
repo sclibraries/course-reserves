@@ -187,9 +187,9 @@ class ItemClaimService
         return $this->result(200, ['items' => $this->eventLog->itemTimeline($kind, $id)]);
     }
 
-    public function recordActivity($kind, $id)
+    public function recordActivity($kind, array $item)
     {
-        $this->activityService->recordActivity($kind, $id);
+        $this->activityService->recordActivity($kind, $item);
     }
 
     public function claimActorMatches(array $item, array $actor)
@@ -222,9 +222,9 @@ class ItemClaimService
         return $this->linkedItems->withLinkedItem($kind, $id, $callback);
     }
 
-    public function completeLegacyChecklistItem($kind, $id, array $actor)
+    public function completeLegacyChecklistItem($kind, array $item, array $actor)
     {
-        $this->activityService->completeLegacyChecklistItem($kind, $id, $actor);
+        $this->activityService->completeLegacyChecklistItem($kind, $item, $actor);
     }
 
     public function legacyClaimedNewItems($username)

@@ -24,22 +24,61 @@ require_once __DIR__ . '/PublicationDestinationConcurrencyProbe.php';
 require_once __DIR__ . '/PublicationDestinationConcurrencyCommand.php';
 require_once __DIR__ . '/PublicationDestinationConcurrencyWorkerOps.php';
 
+class Api119A2ChecklistConcurrencyCommand extends PublicationDestinationConcurrencyCommand
+{
+    private static $observer;
+
+    public static function setObserver($observer)
+    {
+        self::$observer = $observer;
+    }
+
+    public function execute()
+    {
+        $result = parent::execute();
+        if (self::$observer !== null) {
+            call_user_func(self::$observer, $this->getRawSql());
+        }
+        return $result;
+    }
+
+    protected function queryInternal($method, $fetchMode = null)
+    {
+        $result = parent::queryInternal($method, $fetchMode);
+        if (self::$observer !== null) {
+            call_user_func(self::$observer, $this->getRawSql());
+        }
+        return $result;
+    }
+}
+
+$request = PublicationDestinationConcurrencyWire::read(STDIN);
+$operation = $request['op'] ?? '';
 $testDbConfig = require $apiRoot . '/config/test_db.php';
-$testDbConfig['commandClass'] = PublicationDestinationConcurrencyCommand::class;
-$config = ArrayHelper::merge(
-    require $apiRoot . '/config/console.php',
-    ['components' => ['db' => $testDbConfig]]
-);
-$application = new \yii\console\Application($config);
+$checklistWorker = strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete';
+$testDbConfig['commandClass'] = $checklistWorker
+    ? Api119A2ChecklistConcurrencyCommand::class
+    : PublicationDestinationConcurrencyCommand::class;
+if ($checklistWorker) {
+    require_once __DIR__ . '/Api119A2ChecklistWorker.php';
+    $config = ArrayHelper::merge(
+        require $apiRoot . '/config/test.php',
+        ['components' => ['db' => $testDbConfig]]
+    );
+    $application = new \yii\web\Application($config);
+} else {
+    $config = ArrayHelper::merge(
+        require $apiRoot . '/config/console.php',
+        ['components' => ['db' => $testDbConfig]]
+    );
+    $application = new \yii\console\Application($config);
+}
 $db = \Yii::$app->db;
 $db->open();
 $db->createCommand('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
 $db->createCommand('SET SESSION innodb_lock_wait_timeout = 10')->execute();
 
 PublicationDestinationConcurrencyCommand::resetQueries();
-
-$request = PublicationDestinationConcurrencyWire::read(STDIN);
-$operation = $request['op'] ?? '';
 $sessionTimestamp = $request['session_timestamp'] ?? null;
 if ($sessionTimestamp !== null) {
     if (!is_numeric($sessionTimestamp) || (string)(int)$sessionTimestamp !== (string)$sessionTimestamp) {
@@ -67,11 +106,15 @@ function finishConcurrencyWorker($operation, $attempt, array $frame)
 
 function failureFrame(\Throwable $exception)
 {
-    return [
+    $frame = [
         'ok' => false,
         'error' => get_class($exception) . ': ' . $exception->getMessage(),
         'mysql_code' => PublicationDestinationConcurrencyWorkerOps::mysqlCode($exception),
     ];
+    if ($exception instanceof \yii\web\HttpException) {
+        $frame['status_code'] = $exception->statusCode;
+    }
+    return $frame;
 }
 
 try {
@@ -112,6 +155,9 @@ try {
 
 function runConcurrencyOperation($operation, array $request, $db, &$attempt)
 {
+    if (strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete') {
+        return Api119A2ChecklistWorker::run($operation, $request, $db);
+    }
     if ($operation === 'preflight') {
         return ['round_trip' => true];
     }

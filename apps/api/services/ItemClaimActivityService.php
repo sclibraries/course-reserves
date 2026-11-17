@@ -18,66 +18,52 @@ class ItemClaimActivityService
         $this->expiry = $expiry;
     }
 
-    public function recordActivity($kind, $id)
+    public function recordActivity($kind, array $item)
     {
         $notification = null;
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            $item = $this->repository->find($kind, $id, true);
-            if ($item && $item['link_state'] === 'linked') {
-                $now = $this->expiry->now();
-                $notification = $this->expiry->expireLocked($kind, $item, $now);
-                if (!$notification) {
-                    $this->repository->touchActivity($kind, $id, $now);
-                }
+        if ($item['link_state'] === 'linked') {
+            $now = $this->expiry->now();
+            $notification = $this->expiry->expireLocked($kind, $item, $now);
+            if (!$notification) {
+                $this->repository->touchActivity($kind, $item['id'], $now);
             }
-            $transaction->commit();
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
         }
-        $this->expiry->notify($notification);
+        $this->queueNotification($notification);
     }
 
-    public function completeLegacyChecklistItem($kind, $id, array $actor)
+    public function completeLegacyChecklistItem($kind, array $item, array $actor)
     {
-        $transaction = Yii::$app->db->getTransaction();
-        $ownsTransaction = !$transaction || !$transaction->isActive;
-        if ($ownsTransaction) {
-            $transaction = Yii::$app->db->beginTransaction();
-        }
         $notification = null;
-        try {
-            $item = $this->repository->find($kind, $id, true);
-            if ($item && $item['link_state'] === 'linked') {
-                $now = $this->expiry->now();
-                $notification = $this->expiry->expireLocked($kind, $item, $now);
-                if (!$notification) {
-                    $before = $this->snapshot($item);
-                    $this->repository->clearClaimForChecklistCompletion($kind, $id, $now);
-                    if (!empty($item['claimed_by'])) {
-                        $after = $before;
-                        $after['claimed_by'] = null;
-                        $after['claimed_at'] = null;
-                        $after['last_activity_at'] = $now;
-                        $this->eventLog->record(
-                            $item['submission_id'], $id, $actor, 'released', 'Checklist completed', $before, $after, $kind
-                        );
-                    }
+        if ($item['link_state'] === 'linked') {
+            $now = $this->expiry->now();
+            $notification = $this->expiry->expireLocked($kind, $item, $now);
+            if (!$notification) {
+                $before = $this->snapshot($item);
+                $affected = $this->repository->clearClaimForChecklistCompletion($kind, $item['id'], $now);
+                if ($affected === false || (!empty($item['claimed_by']) && (int)$affected < 1)) {
+                    throw new \RuntimeException('Failed to release claim for checklist completion.');
+                }
+                if (!empty($item['claimed_by'])) {
+                    $after = $before;
+                    $after['claimed_by'] = null;
+                    $after['claimed_at'] = null;
+                    $after['last_activity_at'] = $now;
+                    $this->eventLog->record(
+                        $item['submission_id'], $item['id'], $actor, 'released', 'Checklist completed', $before, $after, $kind
+                    );
                 }
             }
-            if ($ownsTransaction) {
-                $transaction->commit();
-            }
-        } catch (\Throwable $exception) {
-            if ($ownsTransaction && $transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
         }
-        $this->expiry->notify($notification);
+        $this->queueNotification($notification);
+    }
+
+    private function queueNotification($notification)
+    {
+        if ($notification) {
+            Yii::$app->get('workflowNotificationQueue')->enqueue(function () use ($notification) {
+                $this->expiry->notify($notification);
+            });
+        }
     }
 
     private function snapshot(array $item)

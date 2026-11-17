@@ -13,9 +13,7 @@ use app\models\ChecklistTemplate;
 use app\models\ChecklistTemplateTask;
 use app\models\ItemChecklist;
 use app\models\ItemChecklistTask;
-use app\models\SubmissionNewResource;
-use app\services\SubmissionLinkGuard;
-use app\services\ItemClaimService;
+use app\services\ChecklistWriteService;
 
 class ChecklistController extends Controller
 {
@@ -312,59 +310,11 @@ class ChecklistController extends Controller
      */
     public function actionAssignChecklist()
     {
-        $itemId = Yii::$app->request->get('itemId');
-        $data = Yii::$app->request->post();
-        
-        if (empty($data['template_id'])) {
-            throw new BadRequestHttpException('template_id is required');
-        }
-
-        // Check if item exists
-        $item = SubmissionNewResource::findOne($itemId);
-        if (!$item) throw new NotFoundHttpException('Item not found');
-        if ($blocked = SubmissionLinkGuard::errorResponse($item->submission)) return $blocked;
-
-        // Check if template exists
-        $template = ChecklistTemplate::findOne($data['template_id']);
-        if (!$template) {
-            throw new NotFoundHttpException('Template not found');
-        }
-
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            // Create item checklist
-            $checklist = new ItemChecklist();
-            $checklist->submission_item_id = $itemId;
-            $checklist->template_id = $data['template_id'];
-            
-            $checklist->assigned_by = Yii::$app->user->identity->id;
-
-            if (!$checklist->save()) {
-                throw new BadRequestHttpException('Failed to assign checklist: ' . json_encode($checklist->errors));
-            }
-
-            // Copy tasks from template
-            foreach ($template->tasks as $templateTask) {
-                $task = new ItemChecklistTask();
-                $task->item_checklist_id = $checklist->id;
-                $task->template_task_id = $templateTask->id;
-                $task->completed = false;
-
-                if (!$task->save()) {
-                    throw new BadRequestHttpException('Failed to create task: ' . json_encode($task->errors));
-                }
-            }
-
-            $transaction->commit();
-            
-            // Reload with tasks
-            $checklist->refresh();
-            return $checklist->toArray([], ['tasks'], true);
-            
-        } catch (\Exception $e) {
-            $transaction->rollBack();
-            throw $e;
-        }
+        return Yii::$container->get(ChecklistWriteService::class)->assign(
+            Yii::$app->request->get('itemId'),
+            Yii::$app->request->post('template_id'),
+            Yii::$app->user->identity->id
+        );
     }
 
     /**
@@ -373,46 +323,12 @@ class ChecklistController extends Controller
      */
     public function actionUpdateTask()
     {
-        $itemId = Yii::$app->request->get('itemId');
-        $taskId = Yii::$app->request->get('taskId');
-        $data = Yii::$app->request->post();
-        
-        $task = ItemChecklistTask::find()
-            ->joinWith('itemChecklist')
-            ->where([
-                'item_checklist_tasks.id' => $taskId,
-                'item_checklists.submission_item_id' => $itemId
-            ])
-            ->one();
-
-        if (!$task) throw new NotFoundHttpException('Task not found');
-        if ($blocked = SubmissionLinkGuard::errorResponse($task->itemChecklist->submissionItem->submission)) return $blocked;
-
-        if (isset($data['completed'])) {
-            $task->completed = (bool)$data['completed'];
-            
-            if ($task->completed) {
-                $task->completed_at = date('Y-m-d H:i:s');
-                $task->completed_by = (string)Yii::$app->user->identity->id;
-            } else {
-                $task->completed_at = null;
-                $task->completed_by = null;
-            }
-        }
-
-        if (isset($data['notes'])) {
-            $task->notes = $data['notes'];
-        }
-
-        if (!$task->save()) {
-            throw new BadRequestHttpException('Failed to update task: ' . json_encode($task->errors));
-        }
-        Yii::$container->get(ItemClaimService::class)->recordActivity('new', $itemId);
-
-        return [
-            'success' => true,
-            'task' => $task->toArrayWithTemplate()
-        ];
+        return Yii::$container->get(ChecklistWriteService::class)->updateTask(
+            Yii::$app->request->get('itemId'),
+            Yii::$app->request->get('taskId'),
+            Yii::$app->request->post(),
+            Yii::$app->user->identity->id
+        );
     }
 
     /**
@@ -421,60 +337,12 @@ class ChecklistController extends Controller
      */
     public function actionCompleteChecklist()
     {
-        $itemId = Yii::$app->request->get('itemId');
-        
-        $checklist = ItemChecklist::find()
-            ->where(['submission_item_id' => $itemId])
-            ->one();
-
-        if (!$checklist) throw new NotFoundHttpException('No checklist assigned to this item');
-        if ($blocked = SubmissionLinkGuard::errorResponse($checklist->submissionItem->submission)) return $blocked;
-
-        // Check if all required tasks are complete
-        if (!$checklist->areRequiredTasksComplete()) {
-            throw new BadRequestHttpException('All required tasks must be completed first');
-        }
-
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            ItemChecklistTask::updateAll(
-                [
-                    'completed' => true,
-                    'completed_at' => date('Y-m-d H:i:s'),
-                    'completed_by' => (string)Yii::$app->user->identity->id
-                ],
-                [
-                    'item_checklist_id' => $checklist->id,
-                    'completed' => false
-                ]
-            );
-
-            $checklist->completed_at = date('Y-m-d H:i:s');
-            $checklist->completed_by = (string)Yii::$app->user->identity->id;
-            $checklist->save();
-
-            $item = SubmissionNewResource::findOne($itemId);
-            if ($item) {
-                $item->item_status = 'completed';
-                $item->save();
-                $identity = Yii::$app->user->identity;
-                Yii::$container->get(ItemClaimService::class)->completeLegacyChecklistItem('new', $itemId, [
-                    'username' => $identity->username ?? (string)$identity->id,
-                    'role' => $identity->role,
-                ]);
-            }
-
-            $transaction->commit();
-
-            return [
-                'success' => true,
-                'message' => 'Item checklist completed'
-            ];
-            
-        } catch (\Exception $e) {
-            $transaction->rollBack();
-            throw $e;
-        }
+        $identity = Yii::$app->user->identity;
+        return Yii::$container->get(ChecklistWriteService::class)->complete(
+            Yii::$app->request->get('itemId'),
+            $identity->id,
+            ['username' => $identity->username ?? (string)$identity->id, 'role' => $identity->role]
+        );
     }
 
     // ============================================

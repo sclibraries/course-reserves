@@ -78,17 +78,17 @@ class ItemChecklist extends ActiveRecord
     /**
      * Check if all required tasks are completed
      */
-    public function areRequiredTasksComplete()
+    public function areRequiredTasksComplete(array $checklistTasks, array $templateTasks)
     {
-        $incompleteTasks = ItemChecklistTask::find()
-            ->joinWith('templateTask')
-            ->where([
-                'item_checklist_id' => $this->id,
-                'completed' => false
-            ])
-            ->andWhere(['checklist_template_tasks.optional' => false])
-            ->count();
-        
-        return (int)$incompleteTasks === 0;
+        $optionalById = [];
+        foreach ($templateTasks as $templateTask) {
+            $optionalById[(int)$templateTask->id] = (bool)$templateTask->optional;
+        }
+        foreach ($checklistTasks as $task) {
+            if (!$task->completed && empty($optionalById[(int)$task->template_task_id])) {
+                return false;
+            }
+        }
+        return true;
     }
 }
