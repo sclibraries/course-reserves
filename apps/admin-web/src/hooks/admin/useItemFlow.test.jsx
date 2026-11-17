@@ -39,6 +39,8 @@ import useItemFlow from './useItemFlow';
 const item = { kind: 'new', id: 99907811 };
 const state = (stepKey = 'own_it', stepLabel = 'Process item') => ({
   flow: { id: 7, name: 'Print book', version: 1 },
+  run_id: 42,
+  result_seq: 2,
   current_step: { step: { key: stepKey, kind: 'action', label: stepLabel, outcomes: [] } },
   finished: null, history: [], can_act: true,
 });
@@ -73,7 +75,7 @@ describe('useItemFlow', () => {
     await actSubmit({ key: 'done', reason_required: false }, { notes: 'Located item' });
 
     expect(mocks.submitStepResult).toHaveBeenCalledWith('new', 99907811, {
-      step_key: 'own_it', outcome_key: 'done', notes: 'Located item',
+      run_id: 42, result_seq: 2, step_key: 'own_it', outcome_key: 'done', notes: 'Located item',
     });
     expect(hook.current.flowState.current_step.step.key).toBe('available');
     expect(hook.current.error).toBe('');
@@ -108,15 +110,20 @@ describe('useItemFlow', () => {
     expect(getByText(document.body, "Couldn't record Process item. Reference: SYNTH-FOLIO")).toBeTruthy();
   });
 
-  it('exposes generic request errors', async () => {
-    mocks.submitStepResult.mockRejectedValueOnce({ message: 'Connection lost', reference: 'SYNTH-STEP' });
+  it('shows run_context_required once with its reference without refetching', async () => {
+    mocks.submitStepResult.mockRejectedValueOnce({
+      payload: { error_code: 'run_context_required', reference: 'SYNTH-CONTEXT' },
+    });
     hook = await renderHook((props) => useItemFlow(props), { item, onChanged });
 
     await actSubmit({ key: 'done' });
 
+    expect(mocks.getItemFlow).toHaveBeenCalledTimes(1);
+    expect(mocks.submitStepResult).toHaveBeenCalledTimes(1);
+    expect(feedback.notify.error).toHaveBeenCalledTimes(1);
     expect(hook.current.error).toBe('');
     expect(hook.current.notice).toBe('');
-    expect(getByText(document.body, "Couldn't record Process item. Reference: SYNTH-STEP")).toBeTruthy();
+    expect(getByText(document.body, "Couldn't record Process item. Reference: SYNTH-CONTEXT")).toBeTruthy();
   });
 });
 

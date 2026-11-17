@@ -17,6 +17,7 @@ class FlowRunner
     private $presenter;
     private $publication;
     private $configuration;
+    private $sequences;
 
     public function __construct(
         $flows = null,
@@ -34,6 +35,7 @@ class FlowRunner
         $this->groups = $groups ?: new StaffGroupRepository();
         $this->events = $events ?: new WorkflowEventLog();
         $this->presenter = new FlowStatePresenter($this->flows);
+        $this->sequences = new FlowResultSequenceRepository();
         $this->publication = $publication ?: new SubmissionPublicationStateService(
             null, $this->claims, $this->items, $this->flows, $this->events
         );
@@ -43,7 +45,8 @@ class FlowRunner
             $this->claims,
             $this->events,
             $accessPathMappings ?: new AccessPathMappingRepository(),
-            $this->publication
+            $this->publication,
+            $this->sequences
         );
     }
 
@@ -70,7 +73,8 @@ class FlowRunner
                 }
             }
             $state = $this->presenter->present(
-                $kind, $itemId, $item, $latest, $this->claims->claimActorMatches($item, $actor)
+                $kind, $itemId, $item, $latest, $this->claims->claimActorMatches($item, $actor),
+                $latest ? $this->sequences->count($latest['id'], true) : 0
             );
             return $this->result(200, $state);
         });
@@ -78,20 +82,41 @@ class FlowRunner
 
     public function stepResult($kind, $itemId, array $actor, array $body)
     {
+        $runId = $body['run_id'] ?? null;
+        $resultSeq = $body['result_seq'] ?? null;
+        if (!is_int($runId) || $runId < 1 || !is_int($resultSeq) || $resultSeq < 0) {
+            $reference = Yii::$app->security->generateRandomString(12);
+            Yii::error('Step result run context rejected. reference=' . $reference, __METHOD__);
+            return $this->result(400, ['error_code' => 'run_context_required', 'reference' => $reference]);
+        }
         $stepKey = $this->trimmedString($body['step_key'] ?? null);
         $outcomeKey = $this->trimmedString($body['outcome_key'] ?? null);
         if ($stepKey === '' || $outcomeKey === '') {
             return $this->result(400, ['error_code' => 'unknown_outcome']);
         }
         return $this->claims->withLinkedItem($kind, $itemId, function ($item, $transaction, $now) use (
-            $kind, $itemId, $actor, $body, $stepKey, $outcomeKey
+            $kind, $itemId, $actor, $body, $stepKey, $outcomeKey, $runId, $resultSeq
         ) {
             if (!$this->claims->claimActorMatches($item, $actor)) {
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
             $run = $this->flows->openRun($kind, $itemId, true);
-            if (!$run) {
+            if (!$run || (int)$run['id'] !== $runId) {
                 $transaction->rollBack();
+                return $this->result(409, ['error_code' => 'stale_step']);
+            }
+            $publicationState = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
+            $currentResultSeq = $this->sequences->count($run['id'], true);
+            if ((int)$run['workflow_revision'] < (int)$publicationState['workflow_revision']) {
+                $this->flows->updateRun($run['id'], [
+                    'current_step_key' => null,
+                    'finish_state' => 'superseded',
+                    'closed_at' => $now,
+                    'closed_reason' => 'draft_inputs_changed',
+                ]);
+                return $this->result(409, ['error_code' => 'stale_step']);
+            }
+            if ($resultSeq !== $currentResultSeq) {
                 return $this->result(409, ['error_code' => 'stale_step']);
             }
             if ($run['current_step_key'] !== $stepKey) {
@@ -163,7 +188,8 @@ class FlowRunner
             $item = $this->items->find($kind, $itemId);
             $this->publication->syncFlowReadiness($kind, $itemId, $item, $run);
             $state = $this->presenter->present(
-                $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor)
+                $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor),
+                $currentResultSeq + 1
             );
             return $this->result(200, $state);
         });

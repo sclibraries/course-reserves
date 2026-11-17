@@ -85,6 +85,7 @@ class Api105ReusePreparationCest extends BaseFunctionalCest
         $this->request($I, 'POST', 'workflow-claim/claim', [], $params);
         $I->seeResponseCodeIs(200);
         $this->request($I, 'POST', 'workflow-flow/step-result', [
+            'run_id' => $flow['run_id'], 'result_seq' => $flow['result_seq'],
             'step_key' => 'publish', 'outcome_key' => 'done',
         ], $params);
         $I->seeResponseCodeIs(200);

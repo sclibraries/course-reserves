@@ -110,6 +110,9 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
 
         $this->request($I, 'GET', 'workflow-flow/item-flow', [], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
+        $state = $this->response($I);
+        Assert::assertSame((int)$this->latestRun('new', $item['id'])['id'], (int)$state['run_id']);
+        Assert::assertSame(0, $state['result_seq']);
         $run = $this->latestRun('new', $item['id']);
         Assert::assertSame(5, (int)$run['draft_revision']);
         Assert::assertSame(2, (int)$run['workflow_revision']);
@@ -117,9 +120,12 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
         $this->setRevisions($item, 6, 2);
         $this->recordChange($item, ItemChangeClass::DISPLAY_ONLY);
         $this->request($I, 'POST', 'workflow-flow/step-result', [
+            'run_id' => $state['run_id'], 'result_seq' => $state['result_seq'],
             'step_key' => 'start', 'outcome_key' => 'done',
         ], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
+        Assert::assertSame((int)$run['id'], (int)$this->response($I)['run_id']);
+        Assert::assertSame(1, $this->response($I)['result_seq']);
         Assert::assertSame('available_online', $this->response($I)['finished']['finish_state']);
         $this->request($I, 'GET', 'workflow-publication/state', [], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
@@ -146,6 +152,8 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
             'flow_id' => $this->extraFlowId, 'reason' => 'Synthetic flow change',
         ], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
+        Assert::assertSame((int)$this->latestRun('new', $item['id'])['id'], (int)$this->response($I)['run_id']);
+        Assert::assertSame(0, $this->response($I)['result_seq']);
         $latest = $this->latestRun('new', $item['id']);
         Assert::assertSame(9, (int)$latest['draft_revision']);
         Assert::assertSame(4, (int)$latest['workflow_revision']);

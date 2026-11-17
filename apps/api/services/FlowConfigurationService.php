@@ -17,8 +17,9 @@ class FlowConfigurationService
     private $accessPathMappings;
     private $accessPathPresenter;
     private $publication;
+    private $sequences;
 
-    public function __construct($flows, $items, $claims, $events, $accessPathMappings, $publication)
+    public function __construct($flows, $items, $claims, $events, $accessPathMappings, $publication, $sequences)
     {
         $this->flows = $flows;
         $this->items = $items;
@@ -28,6 +29,7 @@ class FlowConfigurationService
         $this->accessPathMappings = $accessPathMappings;
         $this->accessPathPresenter = new AccessPathResponsePresenter();
         $this->publication = $publication;
+        $this->sequences = $sequences;
     }
 
     public function switchFlow($kind, $itemId, array $actor, array $body)
@@ -66,7 +68,8 @@ class FlowConfigurationService
             $item = $this->items->find($kind, $itemId);
             $this->publication->syncFlowReadiness($kind, $itemId, $item, $run);
             return $this->result(200, $this->presenter->present(
-                $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor)
+                $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor),
+                $this->sequences->count($run['id'], true)
             ));
         });
     }

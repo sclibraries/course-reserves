@@ -25,13 +25,17 @@ describe('workflowFlowsApi contract', () => {
 
   it('posts an outcome and switches flows with the exact request bodies', async () => {
     await workflowFlowsApi.submitStepResult('new', 99907811, {
+      run_id: 14, result_seq: 2,
       step_key: 'own_it', outcome_key: 'no', notes: 'Not owned locally', reason: 'Order needed',
     });
     await workflowFlowsApi.switchFlow('new', 99907811, { flow_id: 7, reason: 'Use the article flow' });
 
     expect(mocks.authFetch).toHaveBeenNthCalledWith(1, `${baseUrl}/workflow/item/new/99907811/step-result`, expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ step_key: 'own_it', outcome_key: 'no', notes: 'Not owned locally', reason: 'Order needed' }),
+      body: JSON.stringify({
+        run_id: 14, result_seq: 2,
+        step_key: 'own_it', outcome_key: 'no', notes: 'Not owned locally', reason: 'Order needed',
+      }),
     }));
     expect(mocks.authFetch).toHaveBeenNthCalledWith(2, `${baseUrl}/workflow/item/new/99907811/switch-flow`, expect.objectContaining({
       method: 'POST', body: JSON.stringify({ flow_id: 7, reason: 'Use the article flow' }),

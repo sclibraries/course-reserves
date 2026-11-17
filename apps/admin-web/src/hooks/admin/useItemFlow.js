@@ -45,7 +45,7 @@ function useItemFlow({ item, onChanged }) {
       () => workflowFlowsApi.submitStepResult(
         item.kind,
         item.id,
-        buildStepResultBody(step, outcome, notes, reason),
+        buildStepResultBody(step, outcome, flowState, notes, reason),
       ),
       {
         successMessage: `Recorded ${step.label}`,

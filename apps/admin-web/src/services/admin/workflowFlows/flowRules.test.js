@@ -11,11 +11,14 @@ describe('workflow flow rules', () => {
   it('builds a result body with trimmed action notes and required reasons only', () => {
     const actionStep = { key: 'recall', kind: 'action' };
     const needsReason = { key: 'cannot_get', reason_required: true };
+    const flowState = { run_id: 81, result_seq: 3 };
 
-    expect(buildStepResultBody(actionStep, needsReason, '  Recall placed  ', '  Order needed  ')).toEqual({
+    expect(buildStepResultBody(actionStep, needsReason, flowState, '  Recall placed  ', '  Order needed  ')).toEqual({
+      run_id: 81, result_seq: 3,
       step_key: 'recall', outcome_key: 'cannot_get', notes: 'Recall placed', reason: 'Order needed',
     });
-    expect(buildStepResultBody({ key: 'own_it', kind: 'question' }, { key: 'yes' }, 'ignored', 'ignored')).toEqual({
+    expect(buildStepResultBody({ key: 'own_it', kind: 'question' }, { key: 'yes' }, flowState, 'ignored', 'ignored')).toEqual({
+      run_id: 81, result_seq: 3,
       step_key: 'own_it', outcome_key: 'yes',
     });
   });

@@ -3,6 +3,7 @@
 require_once __DIR__ . '/PublicationDestinationConcurrencyWire.php';
 
 use app\services\PublicationDestinationRegistry;
+use app\services\FlowRunner;
 use yii\helpers\ArrayHelper;
 
 ini_set('display_errors', '0');
@@ -136,6 +137,11 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt)
     $registry = new PublicationDestinationRegistry($db, null, null, $probe);
     $item = $request['item'] ?? [];
     $operations = [
+        'step_result' => function () use ($request) {
+            return (new FlowRunner())->stepResult(
+                $request['kind'], $request['item_id'], $request['actor'], $request['body']
+            );
+        },
         'register_owned' => function () use ($registry, $item, $request) {
             return $registry->registerOwned($item, $request['pointer']);
         },

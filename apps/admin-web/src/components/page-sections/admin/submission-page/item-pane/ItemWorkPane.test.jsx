@@ -101,6 +101,7 @@ function flowState(overrides = {}) {
   return {
     flow: { id: 7, name: 'Print book', version: 1 },
     run_id: 91,
+    result_seq: 3,
     current_step: {
       step: {
         key: 'own_it',
@@ -398,7 +399,7 @@ describe('ItemWorkPane process and history', () => {
     await user.click(getByRole(container, 'button', { name: 'Yes' }));
 
     await waitFor(() => expect(mocks.submitStepResult).toHaveBeenCalledWith('new', 99907851, {
-      step_key: 'own_it', outcome_key: 'yes',
+      run_id: 91, result_seq: 3, step_key: 'own_it', outcome_key: 'yes',
     }));
     expect(getByRole(container, 'heading', { name: 'Is it available?' })).toBeTruthy();
   });
@@ -415,7 +416,7 @@ describe('ItemWorkPane process and history', () => {
     await user.type(getByRole(container, 'textbox', { name: 'Action notes' }), 'Recall sent to borrower');
     await user.click(getByRole(container, 'button', { name: 'Done' }));
     await waitFor(() => expect(mocks.submitStepResult).toHaveBeenCalledWith('new', 99907851, {
-      step_key: 'recall', outcome_key: 'done', notes: 'Recall sent to borrower',
+      run_id: 91, result_seq: 3, step_key: 'recall', outcome_key: 'done', notes: 'Recall sent to borrower',
     }));
 
     mocks.getItemFlow.mockResolvedValueOnce(flowState({
@@ -437,7 +438,7 @@ describe('ItemWorkPane process and history', () => {
     await user.click(confirm);
 
     await waitFor(() => expect(mocks.submitStepResult).toHaveBeenLastCalledWith('new', 99907851, {
-      step_key: 'own_it', outcome_key: 'no', reason: 'Order is needed',
+      run_id: 91, result_seq: 3, step_key: 'own_it', outcome_key: 'no', reason: 'Order is needed',
     }));
   });
 

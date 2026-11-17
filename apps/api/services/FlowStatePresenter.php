@@ -12,12 +12,13 @@ class FlowStatePresenter
         $this->flows = $flows;
     }
 
-    public function present($kind, $itemId, array $item, $run, $canAct)
+    public function present($kind, $itemId, array $item, $run, $canAct, $resultSeq = 0)
     {
         if (!$run) {
             return [
                 'flow' => null,
                 'run_id' => null,
+                'result_seq' => 0,
                 'current_step' => null,
                 'finished' => null,
                 'history' => $this->flows->history($kind, $itemId),
@@ -28,6 +29,7 @@ class FlowStatePresenter
         return [
             'flow' => ['id' => (int)$run['flow_id'], 'name' => $run['flow_name'], 'version' => (int)$run['version']],
             'run_id' => (int)$run['id'],
+            'result_seq' => (int)$resultSeq,
             'current_step' => $currentStep ? ['step' => $currentStep] : null,
             'finished' => $run['finish_state'] === null ? null : [
                 'finish_state' => $run['finish_state'], 'reason' => $run['finish_reason'],

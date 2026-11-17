@@ -93,8 +93,11 @@ class Api105PublicationCest extends BaseFunctionalCest
         $item = $this->createItem('online', 'new', $this->customMaterialTypeId);
         $this->request($I, 'GET', 'workflow-flow/item-flow', [], $this->staffToken, $item);
         $I->seeResponseCodeIs(200);
+        $flow = $this->response($I);
         $this->claim($I, $item);
         $this->request($I, 'POST', 'workflow-flow/step-result', [
+            'run_id' => $flow['run_id'],
+            'result_seq' => $flow['result_seq'],
             'step_key' => 'publish',
             'outcome_key' => 'done',
         ], $this->staffToken, $item);

@@ -222,7 +222,13 @@ class Api103EbookCest extends BaseFunctionalCest
 
     private function postStep(FunctionalTester $I, $itemId, $step, $outcome, array $extra = [])
     {
-        $this->request($I, 'POST', 'workflow-flow/step-result', array_merge([
+        $context = \Yii::$app->db->createCommand(
+            'SELECT r.id AS run_id, (SELECT COUNT(*) FROM item_flow_step_results result WHERE result.run_id = r.id) AS result_seq '
+            . 'FROM item_flow_runs r WHERE r.item_kind = "new" AND r.item_id = :id AND r.closed_at IS NULL '
+            . 'ORDER BY r.id DESC LIMIT 1', [':id' => $itemId]
+        )->queryOne();
+        $context = array_map('intval', $context);
+        $this->request($I, 'POST', 'workflow-flow/step-result', array_merge($context, [
             'step_key' => $step,
             'outcome_key' => $outcome,
         ], $extra), ['kind' => 'new', 'id' => $itemId]);
