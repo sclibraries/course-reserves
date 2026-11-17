@@ -15,8 +15,9 @@ class SubmissionPublicationStateRepository
         }
         foreach (['new' => 'submission_new_resources', 'reuse' => 'submission_reuse_resources'] as $kind => $table) {
             Yii::$app->db->createCommand(
-                'INSERT IGNORE INTO submission_publication_state (item_kind, item_id, submission_id) '
-                . 'SELECT :kind, id, submission_id FROM ' . $table . ' WHERE submission_id = :submission_id',
+                'INSERT IGNORE INTO submission_publication_state '
+                . '(item_kind, item_id, submission_id, workflow_revision) '
+                . 'SELECT :kind, id, submission_id, 1 FROM ' . $table . ' WHERE submission_id = :submission_id',
                 [':kind' => $kind, ':submission_id' => (int)$submissionId]
             )->execute();
         }
@@ -25,8 +26,8 @@ class SubmissionPublicationStateRepository
     public function lock($kind, $itemId, $submissionId)
     {
         Yii::$app->db->createCommand(
-            'INSERT INTO submission_publication_state (item_kind, item_id, submission_id) '
-            . 'VALUES (:kind, :item_id, :submission_id) ON DUPLICATE KEY UPDATE '
+            'INSERT INTO submission_publication_state (item_kind, item_id, submission_id, workflow_revision) '
+            . 'VALUES (:kind, :item_id, :submission_id, 1) ON DUPLICATE KEY UPDATE '
             . 'submission_id = VALUES(submission_id)',
             [':kind' => $kind, ':item_id' => (int)$itemId, ':submission_id' => (int)$submissionId]
         )->execute();

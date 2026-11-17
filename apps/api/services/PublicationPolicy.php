@@ -19,8 +19,16 @@ class PublicationPolicy
     {
         return self::isReadyRun($run)
             && $state !== null
-            && isset($run['draft_revision'])
-            && (int)$run['draft_revision'] === (int)$state['draft_revision'];
+            && isset($run['draft_revision'], $run['workflow_revision'], $state['draft_revision'], $state['workflow_revision'])
+            && (int)$run['draft_revision'] === (int)$state['draft_revision']
+            && (int)$run['workflow_revision'] === (int)$state['workflow_revision'];
+    }
+
+    public function isManualReady(array $state, array $item, ?array $run, ?array $mapping = null)
+    {
+        return ($state['readiness_source'] ?? null) === 'manual'
+            && (int)$state['readiness_revision'] === (int)$state['draft_revision']
+            && json_decode($state['readiness_context_json'] ?: 'null', true) === $this->context($item, $run, $mapping);
     }
 
     public function context(array $item, ?array $run = null, ?array $mapping = null)
@@ -48,9 +56,7 @@ class PublicationPolicy
     )
     {
         $flowReady = self::runMatchesDraft($run, $state);
-        $manualReady = $state['readiness_source'] === 'manual'
-            && (int)$state['readiness_revision'] === (int)$state['draft_revision']
-            && json_decode($state['readiness_context_json'] ?: 'null', true) === $this->context($item, $run, $mapping);
+        $manualReady = $this->isManualReady($state, $item, $run, $mapping);
         $readiness = null;
         if ($flowReady) {
             $readiness = [

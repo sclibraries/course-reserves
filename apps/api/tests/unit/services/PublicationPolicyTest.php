@@ -29,15 +29,23 @@ class PublicationPolicyTest extends \Codeception\Test\Unit
         ]));
     }
 
-    public function testFlowReadinessMustMatchTheCurrentDraftRevision()
+    public function testFlowReadinessMustMatchBothCurrentRevisions()
     {
         $run = [
             'id' => 12,
             'closed_at' => '2026-10-29 12:00:00',
             'finish_state' => 'prepared',
             'draft_revision' => 2,
+            'workflow_revision' => 3,
         ];
-        $this->assertTrue(PublicationPolicy::runMatchesDraft($run, ['draft_revision' => 2]));
-        $this->assertFalse(PublicationPolicy::runMatchesDraft($run, ['draft_revision' => 1]));
+        $state = ['draft_revision' => 2, 'workflow_revision' => 3];
+        $this->assertTrue(PublicationPolicy::runMatchesDraft($run, $state));
+        $this->assertFalse(PublicationPolicy::runMatchesDraft($run, [
+            'draft_revision' => 1, 'workflow_revision' => 3,
+        ]));
+        $this->assertFalse(PublicationPolicy::runMatchesDraft($run, [
+            'draft_revision' => 2, 'workflow_revision' => 4,
+        ]));
+        $this->assertFalse(PublicationPolicy::runMatchesDraft($run, ['draft_revision' => 2]));
     }
 }

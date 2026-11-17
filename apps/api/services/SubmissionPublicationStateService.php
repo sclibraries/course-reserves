@@ -136,16 +136,63 @@ class SubmissionPublicationStateService
         });
     }
 
-    public function invalidateDraft($kind, $itemId, $submissionId)
+    public function recordChange($kind, $itemId, $submissionId, $class)
     {
         $state = $this->lockForWrite($kind, $itemId, $submissionId);
+        $draftRevision = (int)$state['draft_revision'] + 1;
         $hasPublished = $state['published_revision'] !== null;
-        $revision = (int)$state['draft_revision'] + 1;
-        $this->states->save($kind, $itemId, array_merge($this->clearReadiness(), [
-            'draft_revision' => $revision,
-            'state' => $hasPublished ? 'published_with_pending_edits' : 'pending',
+        $values = [
+            'draft_revision' => $draftRevision,
             'pending_changes' => $hasPublished ? 'pending' : 'none',
-        ]));
+        ];
+        if ($class === ItemChangeClass::IDENTITY) {
+            $values['workflow_revision'] = (int)$state['workflow_revision'] + 1;
+            $values = array_merge($values, $this->clearReadiness(), [
+                'state' => $this->stateWithoutReadiness(array_merge($state, ['draft_revision' => $draftRevision])),
+            ]);
+        } elseif ($class === ItemChangeClass::DISPLAY_ONLY) {
+            $run = $this->flows->openRun($kind, $itemId, true);
+            if ($run && (int)$run['draft_revision'] === (int)$state['draft_revision']
+                && (int)$run['workflow_revision'] === (int)$state['workflow_revision']) {
+                $this->flows->updateRun($run['id'], ['draft_revision' => $draftRevision]);
+            }
+            $values = array_merge($values, $this->clearReadiness(), [
+                'state' => $this->stateWithoutReadiness(array_merge($state, ['draft_revision' => $draftRevision])),
+            ]);
+        } elseif ($class === ItemChangeClass::PLACEMENT) {
+            $run = $this->flows->latestRun($kind, $itemId, true);
+            $item = $this->items->find($kind, $itemId);
+            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
+            $flowReady = PublicationPolicy::runMatchesDraft($run, $state);
+            $manualReady = $this->policy->isManualReady($state, $item, $run, $mapping);
+            if ($flowReady) {
+                $this->flows->updateRun($run['id'], ['draft_revision' => $draftRevision]);
+                $values = array_merge($values, [
+                    'state' => 'ready',
+                    'readiness_source' => 'flow',
+                    'readiness_reason' => ($run['finish_reason'] ?? null) ?: null,
+                    'readiness_run_id' => (int)$run['id'],
+                    'readiness_revision' => $draftRevision,
+                    'readiness_context_json' => json_encode(
+                        $this->policy->context($item, $run), JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            } elseif ($manualReady) {
+                $values['readiness_revision'] = $draftRevision;
+            } else {
+                $values = array_merge($values, $this->clearReadiness(), [
+                    'state' => $this->stateWithoutReadiness(array_merge($state, ['draft_revision' => $draftRevision])),
+                ]);
+            }
+        } else {
+            throw new \InvalidArgumentException('Unknown item change class.');
+        }
+        $this->states->save($kind, $itemId, $values);
+    }
+
+    public function invalidateDraft($kind, $itemId, $submissionId)
+    {
+        $this->recordChange($kind, $itemId, $submissionId, ItemChangeClass::IDENTITY);
     }
 
     public function invalidateContext($kind, $itemId, $submissionId)
@@ -220,6 +267,7 @@ class SubmissionPublicationStateService
             'item_id' => (int)$itemId,
             'state' => 'pending',
             'draft_revision' => 1,
+            'workflow_revision' => 1,
             'published_revision' => null,
             'pending_changes' => 'none',
             'readiness_source' => null,

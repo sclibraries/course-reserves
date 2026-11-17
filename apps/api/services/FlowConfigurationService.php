@@ -164,7 +164,8 @@ class FlowConfigurationService
         $item = $this->items->find($kind, $itemId);
         $publicationState = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
         $runId = $this->flows->insertRun(
-            $kind, $itemId, $flowId, $version['version'], $firstStep, $publicationState['draft_revision']
+            $kind, $itemId, $flowId, $version['version'], $firstStep,
+            $publicationState['draft_revision'], $publicationState['workflow_revision']
         );
         return $this->result(200, [
             'run' => $this->flows->run($runId), 'changed' => true, 'before' => $before,

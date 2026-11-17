@@ -52,7 +52,7 @@ class FlowRunner
         return $this->claims->withLinkedItem($kind, $itemId, function ($item, $transaction, $now) use ($kind, $itemId, $actor) {
             $latest = $this->flows->latestRun($kind, $itemId, true);
             $state = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
-            if ($latest && (int)$latest['draft_revision'] < (int)$state['draft_revision']) {
+            if ($latest && (int)$latest['workflow_revision'] < (int)$state['workflow_revision']) {
                 if (empty($latest['closed_at'])) {
                     $this->flows->updateRun($latest['id'], [
                         'current_step_key' => null,
@@ -185,7 +185,8 @@ class FlowRunner
         $firstStep = $steps[0]['key'];
         $publicationState = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
         $runId = $this->flows->insertRun(
-            $kind, $itemId, $mapping['id'], $mapping['version'], $firstStep, $publicationState['draft_revision']
+            $kind, $itemId, $mapping['id'], $mapping['version'], $firstStep,
+            $publicationState['draft_revision'], $publicationState['workflow_revision']
         );
         $this->events->record(
             $item['submission_id'], $itemId, $actor, 'flow_selected', null, [],
