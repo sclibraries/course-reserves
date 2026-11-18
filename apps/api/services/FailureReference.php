@@ -2,7 +2,7 @@
 
 namespace app\services;
 
-class EbscoFailureReference
+class FailureReference
 {
     const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const LENGTH = 6;

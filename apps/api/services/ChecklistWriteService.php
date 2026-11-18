@@ -17,11 +17,13 @@ class ChecklistWriteService
 {
     private $repository;
     private $claims;
+    private $itemLock;
 
-    public function __construct($repository = null, $claims = null)
+    public function __construct($repository = null, $claims = null, $itemLock = null)
     {
         $this->repository = $repository ?: new ItemClaimRepository();
         $this->claims = $claims ?: Yii::$container->get(ItemClaimService::class);
+        $this->itemLock = $itemLock ?: new ItemWriteLock($this->repository);
     }
 
     public function assign($itemId, $templateId, $actorId)
@@ -172,28 +174,14 @@ class ChecklistWriteService
 
     private function lockItem($itemId)
     {
-        $submissionId = $this->repository->submissionId('new', $itemId);
-        if (!$submissionId) {
-            throw new NotFoundHttpException('Item not found');
-        }
-        $submission = FacultySubmission::findBySql(
-            'SELECT * FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
-            [':id' => (int)$submissionId]
-        )->one();
-        if (!$submission) {
+        $locked = $this->itemLock->lock('new', $itemId);
+        if ($locked['missing'] === 'submission') {
             throw new NotFoundHttpException('Submission not found');
         }
-        $item = SubmissionNewResource::findBySql(
-            'SELECT * FROM submission_new_resources WHERE id = :id FOR UPDATE',
-            [':id' => (int)$itemId]
-        )->one();
-        if (!$item) {
+        if ($locked['missing'] !== null) {
             throw new NotFoundHttpException('Item not found');
         }
-        if ((int)$item->submission_id !== (int)$submissionId) {
-            throw new ItemAssociationChanged('The item moved to another submission.');
-        }
-        return [$submission, $item];
+        return [$locked['submission'], $locked['item']];
     }
 
     private function lockChecklist($itemId)

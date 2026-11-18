@@ -13,6 +13,16 @@ class WorkflowNotificationQueue
         $this->notifications[] = $notification;
     }
 
+    public function checkpoint()
+    {
+        return count($this->notifications);
+    }
+
+    public function discardSince($checkpoint)
+    {
+        $this->notifications = array_slice($this->notifications, 0, (int)$checkpoint);
+    }
+
     public function flushAfterCommit()
     {
         $notifications = $this->notifications;
@@ -22,7 +32,7 @@ class WorkflowNotificationQueue
             try {
                 call_user_func($notification);
             } catch (\Throwable $exception) {
-                $reference = EbscoFailureReference::generate();
+                $reference = FailureReference::generate();
                 Yii::error(
                     'Workflow notification failed reference=' . $reference . ' exception=' . get_class($exception),
                     __METHOD__

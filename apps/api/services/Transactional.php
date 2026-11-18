@@ -11,23 +11,30 @@ class Transactional
     public static function retrying(callable $callback)
     {
         $db = Yii::$app->db;
-        if ($db->getTransaction() !== null) {
-            return self::run($callback);
+        $transaction = $db->getTransaction();
+        $notifications = $transaction !== null ? Yii::$app->get('workflowNotificationQueue') : null;
+        if ($transaction !== null) {
+            return self::runRetryingSavepoint($callback, $transaction, $notifications);
         }
 
         $notifications = Yii::$app->get('workflowNotificationQueue');
         for ($attempt = 1; ; $attempt++) {
+            $checkpoint = $notifications->checkpoint();
             $transaction = $db->beginTransaction();
+            $level = $transaction->level;
             try {
                 $result = call_user_func($callback, $transaction);
-                if ($transaction->isActive) {
+                if ($transaction->level === $level) {
                     $transaction->commit();
+                    $notifications->flushAfterCommit();
+                } else {
+                    $notifications->discardSince($checkpoint);
                 }
             } catch (\Throwable $exception) {
                 try {
-                    self::rollBack($transaction, $exception);
+                    self::rollBackToLevel($transaction, 0, $exception);
                 } finally {
-                    $notifications->discard();
+                    $notifications->discardSince($checkpoint);
                 }
                 if (!self::isDeadlock($exception) && !self::isAssociationChange($exception)) {
                     throw $exception;
@@ -36,13 +43,35 @@ class Transactional
                     continue;
                 }
 
-                $reference = EbscoFailureReference::generate();
+                $reference = FailureReference::generate();
                 Yii::error('Item operation contention reference=' . $reference, __METHOD__);
                 throw new ItemContention($reference, $exception);
             }
-
-            $notifications->flushAfterCommit();
             return $result;
+        }
+    }
+
+    private static function runRetryingSavepoint(callable $callback, $transaction, WorkflowNotificationQueue $notifications)
+    {
+        $baseLevel = $transaction->level;
+        $checkpoint = $notifications->checkpoint();
+        $transaction = Yii::$app->db->beginTransaction();
+        $savepointLevel = $transaction->level;
+        try {
+            $result = call_user_func($callback, $transaction);
+            if ($transaction->level === $savepointLevel) {
+                $transaction->commit();
+            } else {
+                $notifications->discardSince($checkpoint);
+            }
+            return $result;
+        } catch (\Throwable $exception) {
+            try {
+                self::rollBackToLevel($transaction, $baseLevel, $exception);
+            } finally {
+                $notifications->discardSince($checkpoint);
+            }
+            throw $exception;
         }
     }
 
@@ -85,6 +114,13 @@ class Transactional
             if (self::mysqlCode($exception) !== 1305 || !self::isDeadlock($cause)) {
                 throw $exception;
             }
+        }
+    }
+
+    private static function rollBackToLevel($transaction, $level, \Throwable $cause)
+    {
+        while ($transaction->isActive && $transaction->level > $level) {
+            self::rollBack($transaction, $cause);
         }
     }
 

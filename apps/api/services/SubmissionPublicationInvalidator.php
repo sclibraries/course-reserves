@@ -7,13 +7,14 @@ use Yii;
 /** Finds items affected by shared flow and access-path mapping writes and invalidates them under lock. */
 class SubmissionPublicationInvalidator
 {
-    private $items;
     private $publication;
+    private $itemLock;
 
     public function __construct($items = null, $publication = null)
     {
-        $this->items = $items ?: new ItemClaimRepository();
+        $items = $items ?: new ItemClaimRepository();
         $this->publication = $publication ?: Yii::$container->get(SubmissionPublicationStateService::class);
+        $this->itemLock = new ItemWriteLock($items);
     }
 
     public function materialTypes(array $materialTypeIds)
@@ -111,17 +112,15 @@ class SubmissionPublicationInvalidator
                 && (int)($publishingItem['id'] ?? 0) === (int)$row['id']) {
                 continue;
             }
-            Yii::$app->db->createCommand(
-                'SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
-                [':id' => (int)$row['submission_id']]
-            )->queryScalar();
-            $item = $this->items->find($row['kind'], $row['id'], true);
-            if ($item && (int)$item['submission_id'] === (int)$row['submission_id']) {
-                if ($draft) {
-                    $this->publication->invalidateDraft($row['kind'], $row['id'], $row['submission_id']);
-                } else {
-                    $this->publication->invalidateContext($row['kind'], $row['id'], $row['submission_id']);
-                }
+            $locked = $this->itemLock->lock($row['kind'], $row['id']);
+            if ($locked['missing'] !== null) {
+                continue;
+            }
+            $submissionId = $locked['submission_id'];
+            if ($draft) {
+                $this->publication->invalidateDraft($row['kind'], $row['id'], $submissionId);
+            } else {
+                $this->publication->invalidateContext($row['kind'], $row['id'], $submissionId);
             }
         }
     }

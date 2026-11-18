@@ -19,7 +19,7 @@ class EbscoErrorMapper
             throw $exception;
         }
 
-        $reference = EbscoFailureReference::generate();
+        $reference = FailureReference::generate();
         $settings = isset(Yii::$app->params['ebsco']) ? Yii::$app->params['ebsco'] : [];
         $secretValues = array_merge($requestSecrets, [
             isset($settings['userId']) ? $settings['userId'] : null,

@@ -52,17 +52,51 @@ class Api119A2ChecklistConcurrencyCommand extends PublicationDestinationConcurre
     }
 }
 
+class Api119A4ItemLockConcurrencyCommand extends PublicationDestinationConcurrencyCommand
+{
+    private static $observer;
+
+    public static function setObserver($observer)
+    {
+        self::$observer = $observer;
+    }
+
+    public function execute()
+    {
+        $result = parent::execute();
+        if (self::$observer !== null) {
+            call_user_func(self::$observer, $this->getRawSql());
+        }
+        return $result;
+    }
+
+    protected function queryInternal($method, $fetchMode = null)
+    {
+        $result = parent::queryInternal($method, $fetchMode);
+        if (self::$observer !== null) {
+            call_user_func(self::$observer, $this->getRawSql());
+        }
+        return $result;
+    }
+}
+
 $request = PublicationDestinationConcurrencyWire::read(STDIN);
 $operation = $request['op'] ?? '';
 $testDbConfig = require $apiRoot . '/config/test_db.php';
 $checklistWorker = strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete';
 $sharedRowWorker = strpos($operation, 'shared_') === 0;
+$itemLockWorker = strpos($operation, 'item_lock_') === 0;
 if ($sharedRowWorker) {
     require_once __DIR__ . '/SharedRowConcurrencyWorkerOps.php';
 }
+if ($itemLockWorker) {
+    require_once __DIR__ . '/ItemWriteConcurrencyWorkerOps.php';
+}
 $testDbConfig['commandClass'] = $checklistWorker
     ? Api119A2ChecklistConcurrencyCommand::class
-    : ($sharedRowWorker ? SharedRowConcurrencyWorkerCommand::class : PublicationDestinationConcurrencyCommand::class);
+    : ($itemLockWorker
+        ? Api119A4ItemLockConcurrencyCommand::class
+        : ($sharedRowWorker ? SharedRowConcurrencyWorkerCommand::class : PublicationDestinationConcurrencyCommand::class));
 if ($checklistWorker) {
     require_once __DIR__ . '/Api119A2ChecklistWorker.php';
     $config = ArrayHelper::merge(
@@ -78,7 +112,7 @@ if ($checklistWorker) {
     $application = new \yii\console\Application($config);
 }
 $db = \Yii::$app->db;
-if ($sharedRowWorker) {
+if ($sharedRowWorker || $itemLockWorker) {
     \Yii::$app->set('workflowNotificationQueue', new \app\services\WorkflowNotificationQueue());
 }
 $db->open();
@@ -171,6 +205,9 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt)
     }
     if (strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete') {
         return Api119A2ChecklistWorker::run($operation, $request, $db);
+    }
+    if (strpos($operation, 'item_lock_') === 0) {
+        return ItemWriteConcurrencyWorkerOps::run($request);
     }
     if ($operation === 'preflight') {
         return ['round_trip' => true];

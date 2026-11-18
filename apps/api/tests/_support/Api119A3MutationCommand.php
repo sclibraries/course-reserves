@@ -121,7 +121,7 @@ trait Api119A3MutationRequestSupport
             $item = $this->item($operation . '-item', null, $resourceId);
             $link = $this->link($resourceId, $operation . '-link');
             $case += ['resource_id' => $resourceId, 'item_id' => $item['id'], 'link_id' => $link['id']];
-            $case['failure_pattern'] = '/SELECT submission_id FROM faculty_submissions WHERE submission_id = .* FOR UPDATE/i';
+            $case['failure_pattern'] = '/SELECT \* FROM faculty_submissions WHERE submission_id = .* FOR UPDATE/i';
             if ($operation === 'resource-update') {
                 $case += ['method' => 'PUT', 'route' => 'resource/update', 'params' => ['id' => $resourceId],
                     'body' => ['name' => $this->prefix . 'updated']];

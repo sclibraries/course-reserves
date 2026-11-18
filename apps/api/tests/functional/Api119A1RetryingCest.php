@@ -133,6 +133,56 @@ class Api119A1RetryingCest extends BaseFunctionalCest
         Assert::assertSame(0, Api116B1CommittedConnection::level());
     }
 
+    public function testExplicitAndNestedRollbacksDiscardOnlyRolledBackNotifications(FunctionalTester $I)
+    {
+        $queue = \Yii::$app->get('workflowNotificationQueue');
+        $sent = [];
+        $explicitResult = Transactional::retrying(function ($transaction) use ($queue, &$sent) {
+            $this->insertCourse('-explicit-rollback');
+            $queue->enqueue(function () use (&$sent) {
+                $sent[] = 'explicit';
+            });
+            $transaction->rollBack();
+            return 'rolled-back';
+        });
+        $explicit = ['result' => $explicitResult, 'rows' => $this->courseNames(), 'notifications' => $sent];
+
+        $sent = [];
+        $nestedResult = Transactional::retrying(function () use ($queue, &$sent) {
+            $this->insertCourse('-parent');
+            $queue->enqueue(function () use (&$sent) {
+                $sent[] = 'parent';
+            });
+            $nested = Transactional::retrying(function ($savepoint) use ($queue, &$sent) {
+                $this->insertCourse('-nested');
+                $queue->enqueue(function () use (&$sent) {
+                    $sent[] = 'nested';
+                });
+                $savepoint->rollBack();
+                return 'rejected';
+            });
+            $level = Api116B1CommittedConnection::level();
+            $this->insertCourse('-parent-after');
+            return ['nested' => $nested, 'parent_level' => $level];
+        });
+
+        Assert::assertSame([
+            'result' => 'rolled-back',
+            'rows' => [],
+            'notifications' => [],
+        ], $explicit);
+        Assert::assertSame([
+            'result' => ['nested' => 'rejected', 'parent_level' => 1],
+            'rows' => [$this->prefix . '-parent', $this->prefix . '-parent-after'],
+            'notifications' => ['parent'],
+        ], [
+            'result' => $nestedResult,
+            'rows' => $this->courseNames(),
+            'notifications' => $sent,
+        ]);
+        Assert::assertSame(0, Api116B1CommittedConnection::level());
+    }
+
     public function testTimeoutIsNotRetriedAndNestedRetryingRethrows(FunctionalTester $I)
     {
         $attempts = 0;
