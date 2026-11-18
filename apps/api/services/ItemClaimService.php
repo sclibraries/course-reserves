@@ -17,6 +17,7 @@ class ItemClaimService
     private $eventLog;
     private $presenter;
     private $expiry;
+    private $readService;
     private $transitionService;
     private $activityService;
     private $groups;
@@ -37,6 +38,7 @@ class ItemClaimService
         $this->expiry = new ItemClaimExpiryService($this->repository, $this->eventLog, $nowProvider, $notifier);
         $this->submittedScope = new SubmittedSubmissionScope();
         $this->linkedItems = new LinkedItemService($this->repository, $this->expiry, $this->submittedScope);
+        $this->readService = new ItemClaimReadService($this->linkedItems, $this->eventLog);
         $this->transitionService = new ItemClaimTransitionService(
             $this->repository,
             $this->eventLog,
@@ -58,8 +60,7 @@ class ItemClaimService
             }
             $before = $this->snapshot($item);
             if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
-                $current = $this->repository->find($kind, $id, true);
-                if ($current && !empty($current['assigned_group_id']) && !$this->groups->isMember($current['assigned_group_id'], $username)) {
+                if (!empty($item['assigned_group_id']) && !$this->groups->isMember($item['assigned_group_id'], $username)) {
                     return $this->result(403, ['error_code' => 'not_group_member']);
                 }
                 return $this->result(409, [
@@ -67,7 +68,14 @@ class ItemClaimService
                     'claimed_by_display' => $item['claimed_by_display'],
                 ]);
             }
-            $claimed = $this->repository->find($kind, $id);
+            $claimant = $this->repository->findStaffByUsername($username);
+            $claimed = $item;
+            $claimed['claimed_by'] = $username;
+            $claimed['claimed_at'] = $now;
+            $claimed['last_activity_at'] = $now;
+            $claimed['status'] = 'in_progress';
+            $claimed['claimed_by_display'] = $claimant && !empty($claimant['full_name'])
+                ? $claimant['full_name'] : $username;
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
             );
@@ -86,20 +94,12 @@ class ItemClaimService
         if ($toUsername === '') {
             return $this->result(400, ['error_code' => 'to_username_required']);
         }
-        $target = $this->repository->findStaffByUsername($toUsername);
-        if (!$target) {
-            return $this->result(404, ['error_code' => 'unknown_staff']);
-        }
-        return $this->transitionService->transition('handoff', $kind, $id, $actor, $reason, $target);
+        return $this->transitionService->transition('handoff', $kind, $id, $actor, $reason, $toUsername);
     }
 
     public function handoffToGroup($kind, $id, $groupId, array $actor, $reason = null)
     {
-        $group = $this->groups->find((int)$groupId);
-        if (!$group) {
-            return $this->result(404, ['error_code' => 'group_not_found']);
-        }
-        return $this->transitionService->transition('group_handoff', $kind, $id, $actor, $reason, $group);
+        return $this->transitionService->transition('group_handoff', $kind, $id, $actor, $reason, (int)$groupId);
     }
 
     public function takeover($kind, $id, array $actor, $reason)
@@ -164,27 +164,7 @@ class ItemClaimService
 
     public function timeline($kind, $id)
     {
-        $outcome = Transactional::run(function ($transaction) use ($kind, $id) {
-            $item = $this->repository->find($kind, $id, true);
-            if (!$item) {
-                $transaction->rollBack();
-                return ['result' => $this->result(404, ['error_code' => 'item_not_found'])];
-            }
-            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
-                $transaction->rollBack();
-                return ['result' => $this->result(409, $blocked)];
-            }
-            if ($item['link_state'] !== 'linked') {
-                $transaction->rollBack();
-                return ['result' => $this->result(409, ['error_code' => 'submission_not_linked'])];
-            }
-            return ['notification' => $this->expiry->expireLocked($kind, $item, $this->expiry->now())];
-        });
-        if (isset($outcome['result'])) {
-            return $outcome['result'];
-        }
-        $this->expiry->notify($outcome['notification']);
-        return $this->result(200, ['items' => $this->eventLog->itemTimeline($kind, $id)]);
+        return $this->readService->timeline($kind, $id);
     }
 
     public function recordActivity($kind, array $item)
@@ -197,29 +177,14 @@ class ItemClaimService
         return $this->transitionService->isClaimedBy($item, $actor);
     }
 
-    public function expireClaimLocked($kind, array $item, $now)
-    {
-        return $this->expiry->expireLocked($kind, $item, $now);
-    }
-
-    public function claimNow()
-    {
-        return $this->expiry->now();
-    }
-
     public function renewClaimLocked($kind, $id, $now)
     {
         return $this->repository->touchActivity($kind, $id, $now);
     }
 
-    public function notifyClaimExpiry($notification)
+    public function withLinkedItem($kind, $id, callable $callback, ?callable $beforeProjection = null)
     {
-        $this->expiry->notify($notification);
-    }
-
-    public function withLinkedItem($kind, $id, callable $callback, $retrying = false)
-    {
-        return $this->linkedItems->withLinkedItem($kind, $id, $callback, $retrying);
+        return $this->linkedItems->withLinkedItem($kind, $id, $callback, $beforeProjection);
     }
 
     public function completeLegacyChecklistItem($kind, array $item, array $actor)

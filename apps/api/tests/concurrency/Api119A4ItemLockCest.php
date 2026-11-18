@@ -77,6 +77,48 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
         }
     }
 
+    public function linkedClaimRetriesWhenDiscoveryFindsTheItemInItsNewSubmission(ConcurrencyTester $I)
+    {
+        $offeringId = $this->fixture->createOffering('linked-claim');
+        $moving = $this->fixture->createItem('claim-moving', $offeringId);
+        $target = $this->fixture->createItem('claim-target', $offeringId);
+        $label = 'linked-claim';
+        $this->supervisor->start($label, [
+            'op' => 'item_lock_linked_claim',
+            'kind' => 'new',
+            'item_id' => $moving['id'],
+            'actor' => $this->prefix . 'worker',
+            'pause_attempts' => 2,
+        ]);
+        $ready = $this->supervisor->awaitPhase($label, 'ready', 0);
+        Assert::assertNotSame($this->parentConnectionId, (int)$ready['connection_id']);
+        Assert::assertSame('reserves_test', $ready['database']);
+        Assert::assertSame('REPEATABLE-READ', $ready['isolation_level']);
+        $this->connections[$label] = (int)$ready['connection_id'];
+        $this->supervisor->release($label, 'ready', 0);
+
+        $firstDiscovery = $this->supervisor->awaitPhase($label, 'discovered', 1);
+        Assert::assertSame(1, preg_match('/submission_new_resources/', $firstDiscovery['context']['sql']));
+        \Yii::$app->db->createCommand()->update('submission_new_resources', [
+            'submission_id' => $target['submission_id'],
+        ], ['id' => $moving['id']])->execute();
+        $this->supervisor->release($label, 'discovered', 1);
+
+        $retryDiscovery = $this->supervisor->awaitPhase($label, 'discovered', 2);
+        Assert::assertSame(1, preg_match('/submission_new_resources/', $retryDiscovery['context']['sql']));
+        $this->supervisor->release($label, 'discovered', 2);
+
+        $result = $this->supervisor->complete($label);
+        Assert::assertSame(200, $result['result']['status']);
+        Assert::assertSame($this->prefix . 'worker', $result['result']['body']['item']['claimed_by']);
+        Assert::assertSame($target['submission_id'], (int)$result['result']['body']['item']['submission_id']);
+        Assert::assertSame(1, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM submission_new_resources WHERE id = :id AND claimed_by = :actor',
+            [':id' => $moving['id'], ':actor' => $this->prefix . 'worker']
+        )->queryScalar());
+        $this->assertAcquisitionAttempts($result['queries'], 'new', 2);
+    }
+
     public function invalidatorMovementRetriesTheWholeResourceOwner(ConcurrencyTester $I)
     {
         $offeringId = $this->fixture->createOffering('invalidator');

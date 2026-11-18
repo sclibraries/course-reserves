@@ -71,7 +71,9 @@ class FlowConfigurationService
                 $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor),
                 $this->sequences->count($run['id'], true)
             ));
-        }, true);
+        }, function () use ($flowId) {
+            $this->flows->flow($flowId, true);
+        });
     }
 
     public function setAccessPath($kind, $itemId, array $actor, array $body)
@@ -79,8 +81,9 @@ class FlowConfigurationService
         $value = $body['access_path'] ?? null;
         $accessPath = is_scalar($value) ? trim((string)$value) : '';
         $reason = $this->trimmedString($body['reason'] ?? null);
+        $mapping = null;
         return $this->claims->withLinkedItem($kind, $itemId, function ($item, $transaction, $now) use (
-            $kind, $itemId, $actor, $accessPath, $reason
+            $kind, $itemId, $actor, $accessPath, $reason, &$mapping
         ) {
             if (!$this->claims->claimActorMatches($item, $actor)) {
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
@@ -91,7 +94,6 @@ class FlowConfigurationService
             $currentPath = (string)($item['access_path'] ?? '');
             if ($currentPath === $accessPath) {
                 $this->claims->renewClaimLocked($kind, $itemId, $now);
-                $mapping = $this->accessPathMappings->find($accessPath);
                 $hasFlowMapping = $mapping && $mapping['flow_id'] !== null;
                 $openRun = $this->flows->openRun($kind, $itemId, true);
                 if (!$hasFlowMapping && $openRun) {
@@ -105,7 +107,6 @@ class FlowConfigurationService
                 return $this->result(400, ['error_code' => 'reason_required']);
             }
             $this->publication->invalidateDraft($kind, $itemId, $item['submission_id']);
-            $mapping = $this->accessPathMappings->find($accessPath);
             $flowId = $mapping && $mapping['flow_id'] !== null ? (int)$mapping['flow_id'] : null;
             $groupId = $mapping && $mapping['group_id'] !== null ? (int)$mapping['group_id'] : null;
             if ($flowId !== null) {
@@ -139,6 +140,11 @@ class FlowConfigurationService
                 ['access_path' => $currentPath === '' ? null : $currentPath], $eventAfter, $kind
             );
             return $this->result(200, $after);
+        }, function () use ($accessPath, &$mapping) {
+            $mapping = $this->accessPathMappings->find($accessPath);
+            if ($mapping && $mapping['flow_id'] !== null) {
+                $this->flows->flow((int)$mapping['flow_id'], true);
+            }
         });
     }
 

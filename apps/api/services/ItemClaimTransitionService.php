@@ -2,6 +2,8 @@
 
 namespace app\services;
 
+use Yii;
+
 /** Performs conditional release, person hand-off, and takeover writes. */
 class ItemClaimTransitionService
 {
@@ -28,10 +30,21 @@ class ItemClaimTransitionService
 
     public function transition($operation, $kind, $id, array $actor, $reason, $target)
     {
-        $notice = null;
-        $result = $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use (
-            $operation, $kind, $id, $actor, $reason, $target, &$notice
+        return $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use (
+            $operation, $kind, $id, $actor, $reason, $target
         ) {
+            if ($operation === 'handoff') {
+                $target = $this->repository->findStaffByUsername($target);
+                if (!$target) {
+                    return $this->result(404, ['error_code' => 'unknown_staff']);
+                }
+            } elseif ($operation === 'group_handoff') {
+                $target = $this->groups->find((int)$target);
+                if (!$target) {
+                    return $this->result(404, ['error_code' => 'group_not_found']);
+                }
+            }
+
             $actorUsername = (string)($actor['username'] ?? $actor['id'] ?? '');
             $previousHolder = $item['claimed_by'];
             if ($operation === 'takeover' && $previousHolder === null) {
@@ -61,25 +74,24 @@ class ItemClaimTransitionService
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, $eventType, $reason, $before, $this->snapshot($after), $kind
             );
-            $notice = [$item, $actorUsername, $previousHolder];
-            return $this->result(200, ['item' => $this->presenter->present($after, $this->expiry->hours())]);
-        });
-        if ($notice) {
-            list($item, $actorUsername, $previousHolder) = $notice;
             if ($operation === 'handoff') {
-                $this->notify('claim_handed_off', $this->notificationContext($kind, $id, $item, $actorUsername, $target['username']));
+                $this->queueNotification(
+                    'claim_handed_off', $this->notificationContext($kind, $id, $item, $actorUsername, $target['username'])
+                );
             } elseif ($operation === 'takeover') {
-                $this->notify('claim_taken_over', $this->notificationContext($kind, $id, $item, $actorUsername, $previousHolder));
+                $this->queueNotification(
+                    'claim_taken_over', $this->notificationContext($kind, $id, $item, $actorUsername, $previousHolder)
+                );
             } elseif ($operation === 'group_handoff') {
                 foreach ($this->groups->memberUsernames($target['id']) as $memberUsername) {
                     $context = $this->notificationContext($kind, $id, $item, $actorUsername, $memberUsername);
                     $context['group_id'] = (int)$target['id'];
                     $context['group_name'] = $target['name'];
-                    $this->notify('group_handoff', $context);
+                    $this->queueNotification('group_handoff', $context);
                 }
             }
-        }
-        return $result;
+            return $this->result(200, ['item' => $this->presenter->present($after, $this->expiry->hours())]);
+        });
     }
 
     private function snapshot(array $item)
@@ -104,9 +116,11 @@ class ItemClaimTransitionService
         ];
     }
 
-    private function notify($eventType, array $context)
+    private function queueNotification($eventType, array $context)
     {
-        $this->notifier->notify($eventType, $context);
+        Yii::$app->get('workflowNotificationQueue')->enqueue(function () use ($eventType, $context) {
+            $this->notifier->notify($eventType, $context);
+        });
     }
 
     public function isClaimedBy(array $item, array $actor)

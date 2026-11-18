@@ -4,75 +4,64 @@ namespace app\services;
 
 use Yii;
 
-/** Locks one linked item, expires its claim, and coordinates the resulting notification. */
+/** Acquires a linked item through the shared write lock and coordinates lazy expiry. */
 class LinkedItemService
 {
     use ServiceResult;
 
-    private $repository;
+    private $itemLock;
+    private $projection;
     private $expiry;
     private $submittedScope;
 
     public function __construct($repository, $expiry, $submittedScope = null)
     {
-        $this->repository = $repository;
+        $this->itemLock = new ItemWriteLock($repository);
+        $this->projection = new ItemWriteLockProjection();
         $this->expiry = $expiry;
         $this->submittedScope = $submittedScope ?: new SubmittedSubmissionScope();
     }
 
-    public function withLinkedItem($kind, $id, callable $callback, $retrying = false)
+    public function withLinkedItem($kind, $id, callable $callback, ?callable $beforeProjection = null)
     {
-        $operation = function ($transaction) use ($kind, $id, $callback, $retrying) {
-            $submissionId = $this->repository->submissionId($kind, $id);
-            if (!$submissionId) {
+        return Transactional::retrying(function ($transaction) use ($kind, $id, $callback, $beforeProjection) {
+            $locked = $this->itemLock->lock($kind, $id);
+            if ($locked['missing'] !== null) {
                 return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
             }
-            $submission = Yii::$app->db->createCommand(
-                'SELECT status, link_state FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
-                [':id' => (int)$submissionId]
-            )->queryOne();
-            if (!$submission) {
-                return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
+            if ($beforeProjection !== null) {
+                call_user_func($beforeProjection);
             }
-            if ($blocked = $this->submittedScope->guardStatus($submission['status'])) {
+
+            $item = $this->projection->project($locked);
+            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
                 return $this->reject($transaction, 409, $blocked);
             }
-            if ($submission['link_state'] !== 'linked') {
+            if ($item['link_state'] !== 'linked') {
                 return $this->reject($transaction, 409, ['error_code' => 'submission_not_linked']);
-            }
-            $item = $this->repository->find($kind, $id, true);
-            if (!$item) {
-                return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
             }
 
             $now = $this->expiry->now();
             $notification = $this->expiry->expireLocked($kind, $item, $now);
             if ($notification) {
-                $item = $this->repository->find($kind, $id, true);
-            }
-            $result = $callback($item, $transaction, $now);
-            if ($retrying && $notification && $transaction->isActive) {
-                Yii::$app->get('workflowNotificationQueue')->enqueue(function () use ($notification) {
-                    $this->expiry->notify($notification);
+                $notice = $notification;
+                Yii::$app->get('workflowNotificationQueue')->enqueue(function () use ($notice) {
+                    $this->expiry->notify($notice);
                 });
+                $locked = $this->itemLock->lock($kind, $id);
+                if ($locked['missing'] !== null) {
+                    return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
+                }
+                $item = $this->projection->project($locked);
             }
-            return [
-                'result' => $result,
-                'notification' => !$retrying && $transaction->isActive ? $notification : null,
-            ];
-        };
-        $outcome = $retrying
-            ? Transactional::retrying($operation)
-            : Transactional::run($operation);
-        if (!$retrying) {
-            $this->expiry->notify($outcome['notification']);
-        }
-        return $outcome['result'];
+
+            return call_user_func($callback, $item, $transaction, $now);
+        });
     }
 
     private function reject($transaction, $status, array $body)
     {
         $transaction->rollBack();
-        return ['result' => $this->result($status, $body), 'notification' => null];
+        return $this->result($status, $body);
     }
 }

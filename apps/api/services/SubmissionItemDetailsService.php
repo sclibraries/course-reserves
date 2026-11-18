@@ -42,6 +42,14 @@ class SubmissionItemDetailsService
         return $this->claims->withLinkedItem($kind, $id, function ($item, $transaction, $now) use (
             $kind, $id, $actor, $details
         ) {
+            $attemptDetails = $details;
+            if (isset($attemptDetails['staff_material_type_id'])
+                && !MaterialTypes::findOne($attemptDetails['staff_material_type_id'])) {
+                $transaction->rollBack();
+                return $this->result(400, [
+                    'error_code' => 'invalid_item_detail', 'field' => 'effective_material_type_id',
+                ]);
+            }
             if (!$this->claims->claimActorMatches($item, $actor)) {
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
@@ -50,9 +58,9 @@ class SubmissionItemDetailsService
             $before = $this->detailSnapshot($kind, $item);
             $beforeAudit = $this->detailAuditSnapshot($before);
             $beforeInputAudit = $this->inputAuditSnapshot($before);
-            $this->clearInvalidAccessPath($item, $details);
-            $this->mergeCorrections($item, $details);
-            $this->items->updateDetails($kind, $id, $details, $now);
+            $this->clearInvalidAccessPath($item, $attemptDetails);
+            $this->mergeCorrections($item, $attemptDetails);
+            $this->items->updateDetails($kind, $id, $attemptDetails, $now);
             $updated = $this->items->find($kind, $id);
             $after = $this->detailSnapshot($kind, $updated);
             $afterAudit = $this->detailAuditSnapshot($after);
@@ -112,8 +120,7 @@ class SubmissionItemDetailsService
             $value = $payload['effective_material_type_id'];
             if ($value === null || $value === '') {
                 $details['staff_material_type_id'] = null;
-            } elseif ((is_int($value) || (is_string($value) && ctype_digit($value))) && (int)$value > 0
-                && MaterialTypes::findOne((int)$value)) {
+            } elseif ((is_int($value) || (is_string($value) && ctype_digit($value))) && (int)$value > 0) {
                 $details['staff_material_type_id'] = (int)$value;
             } else {
                 return ['error_code' => 'invalid_item_detail', 'field' => 'effective_material_type_id'];

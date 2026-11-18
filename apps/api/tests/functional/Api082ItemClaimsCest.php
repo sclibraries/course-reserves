@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
+
 use PHPUnit\Framework\Assert;
 use app\services\ItemClaimRepository;
 use app\services\ItemClaimService;
@@ -19,10 +21,12 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
     private $resourceId;
     private $submissions = [];
     private $courseIds = [];
+    private $restoreDb;
 
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->restoreDb = Api116B1CommittedConnection::swap();
         $this->cleanup();
         $this->insertUser('staff', 'staff', 'Synthetic API-082 Staff');
         $this->insertUser('target', 'staff', 'Synthetic API-082 Target');
@@ -48,7 +52,6 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             'material_type_id' => $this->materialTypeId,
         ])->execute();
         $this->resourceId = (int)$db->getLastInsertID();
-
         $case = $this;
         \Yii::$container->set(ItemClaimService::class, function ($container = null) use ($case) {
             return new ItemClaimService(
@@ -66,22 +69,25 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
 
     public function _after(FunctionalTester $I)
     {
-        $this->cleanup();
-        \Yii::$container->clear(ItemClaimService::class);
+        try {
+            $this->cleanup();
+        } finally {
+            \Yii::$app->get('workflowNotificationQueue')->discard();
+            \Yii::$container->clear(ItemClaimService::class);
+            if ($this->restoreDb !== null) call_user_func($this->restoreDb);
+        }
     }
 
     public function claimIsAtomicAndWorksForNewAndReuseItems(FunctionalTester $I)
     {
         $submission = $this->createSubmission('atomic');
         $reuseId = $this->createReuseItem($submission['submission_id'], 'API-082 reused book', 2);
-
         $this->request($I, 'POST', 'workflow-claim/claim', [], $this->staffToken, [
             'kind' => 'new', 'id' => $submission['new_item_id'],
         ]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame('test-api082-staff', $this->response($I)['item']['claimed_by']);
         Assert::assertSame('Synthetic API-082 Staff', $this->response($I)['item']['claimed_by_display']);
-
         $this->request($I, 'POST', 'workflow-claim/claim', [], $this->targetToken, [
             'kind' => 'new', 'id' => $submission['new_item_id'],
         ]);
@@ -93,13 +99,11 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             'new', $submission['new_item_id'], 'test-api082-target', $this->clockNow
         ));
         Assert::assertSame('test-api082-staff', $this->claimRow('new', $submission['new_item_id'])['claimed_by']);
-
         $this->request($I, 'POST', 'workflow-claim/claim', [], $this->targetToken, [
             'kind' => 'reuse', 'id' => $reuseId,
         ]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame('reuse', $this->response($I)['item']['kind']);
-
         $events = \Yii::$app->db->createCommand(
             'SELECT item_kind, event_type FROM workflow_events WHERE submission_id = :submission_id ORDER BY id',
             [':submission_id' => $submission['submission_id']]
@@ -108,7 +112,6 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             ['item_kind' => 'new', 'event_type' => 'claimed'],
             ['item_kind' => 'reuse', 'event_type' => 'claimed'],
         ], $events);
-
         $this->request($I, 'GET', 'workflow-claim/timeline', [], $this->staffToken, [
             'kind' => 'new', 'id' => $submission['new_item_id'],
         ]);
@@ -124,14 +127,11 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             ['kind' => 'new', 'id' => $submission['new_item_id']],
             ['kind' => 'reuse', 'id' => $this->createReuseItem($submission['submission_id'], 'API-082 reused book', 2)],
         ];
-
         foreach ($items as $item) {
             $this->claim($I, $item['kind'], $item['id'], $this->staffToken);
-
             $this->request($I, 'POST', 'workflow-claim/release', [], $this->targetToken, $item);
             $I->seeResponseCodeIs(409);
             Assert::assertSame('not_claimed_by_you', $this->response($I)['error_code']);
-
             $this->request($I, 'POST', 'workflow-claim/release', ['reason' => 'Synthetic release'], $this->staffToken, $item);
             $I->seeResponseCodeIs(200);
             Assert::assertNull($this->response($I)['item']['claimed_by']);

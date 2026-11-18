@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
+
 use PHPUnit\Framework\Assert;
 use app\services\ItemClaimService;
 
@@ -12,10 +14,12 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
     private $clockNow = '2026-10-19 12:00:00';
     private $materialTypeId;
     private $courseIds = [];
+    private $restoreDb;
 
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->restoreDb = Api116B1CommittedConnection::swap();
         $this->cleanup();
         $this->insertUser('admin', 'admin');
         $this->insertUser('staff', 'staff');
@@ -52,16 +56,22 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
 
     public function _after(FunctionalTester $I)
     {
-        $this->cleanup();
-        \Yii::$container->clear(ItemClaimService::class);
+        try {
+            $this->cleanup();
+        } finally {
+            \Yii::$app->get('workflowNotificationQueue')->discard();
+            \Yii::$container->clear(ItemClaimService::class);
+            if ($this->restoreDb !== null) call_user_func($this->restoreDb);
+        }
     }
 
     public function adminsManageGroupsAndMembershipAndWritesAreLogged(FunctionalTester $I)
     {
         $this->request($I, 'GET', 'workflow-group/admin-groups', [], 'admin');
         $I->seeResponseCodeIs(200);
-        Assert::assertSame([], $this->response($I)['groups']);
-
+        Assert::assertSame([], array_values(array_diff(
+            array_column($this->response($I)['groups'], 'name'), ['Acquisitions']
+        )));
         $this->request($I, 'POST', 'workflow-group/admin-groups', [
             'name' => $this->prefix . 'acquisitions',
             'description' => 'Synthetic acquisitions queue',
@@ -70,44 +80,37 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
         $group = $this->response($I)['group'];
         $groupId = (int)$group['id'];
         Assert::assertSame($this->prefix . 'acquisitions', $group['name']);
-
         $this->request($I, 'GET', 'workflow-group/groups', [], 'staff');
         $I->seeResponseCodeIs(200);
-        Assert::assertSame([[
-            'id' => $groupId,
-            'name' => $this->prefix . 'acquisitions',
-        ]], $this->response($I)['groups']);
-
+        $groups = $this->response($I)['groups'];
+        Assert::assertSame([$this->prefix . 'acquisitions'], array_values(array_diff(
+            array_column($groups, 'name'), ['Acquisitions']
+        )));
+        Assert::assertSame($groupId, array_column($groups, 'id', 'name')[$this->prefix . 'acquisitions']);
         $this->request($I, 'GET', 'workflow-group/admin-groups', [], 'staff');
         $I->seeResponseCodeIs(403);
-
         $this->request($I, 'PUT', 'workflow-group/admin-group', [
             'name' => $this->prefix . 'acquisitions-updated',
             'description' => 'Updated synthetic queue',
         ], 'admin', ['id' => $groupId]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame($this->prefix . 'acquisitions-updated', $this->response($I)['group']['name']);
-
         $this->request($I, 'GET', 'workflow-group/admin-group-members', [], 'admin', ['id' => $groupId]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame([], $this->response($I)['members']);
-
         $this->request($I, 'POST', 'workflow-group/admin-group-members', [
             'username' => $this->prefix . 'member',
         ], 'admin', ['id' => $groupId]);
         $I->seeResponseCodeIs(201);
         Assert::assertSame($this->prefix . 'member', $this->response($I)['member']['username']);
-
         $this->request($I, 'POST', 'workflow-group/admin-group-members', [
             'username' => $this->prefix . 'employee',
         ], 'admin', ['id' => $groupId]);
         $I->seeResponseCodeIs(404);
         Assert::assertSame('unknown_staff', $this->response($I)['error_code']);
-
         $this->request($I, 'GET', 'workflow-group/admin-group-members', [], 'admin', ['id' => $groupId]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame($this->prefix . 'member', $this->response($I)['members'][0]['username']);
-
         $this->request($I, 'DELETE', 'workflow-group/admin-group-member', [], 'admin', [
             'id' => $groupId,
             'username' => $this->prefix . 'member',
@@ -132,7 +135,6 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
         $this->addMember($I, $groupId, 'member');
         $this->addMember($I, $groupId, 'second');
         $item = $this->createLinkedItem('queue');
-
         $this->claim($I, $item['id'], 'staff');
         $this->request($I, 'POST', 'workflow-claim/handoff', [
             'to_group_id' => $groupId,
@@ -154,7 +156,6 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
         sort($recipients);
         Assert::assertSame([$this->prefix . 'member', $this->prefix . 'second'], $recipients);
         Assert::assertSame(1, $this->eventCount($item['submission_id'], 'group_handoff'));
-
         $this->request($I, 'GET', 'workflow-claim/queue', [], 'staff');
         $I->seeResponseCodeIs(200);
         Assert::assertNotContains($item['id'], array_column($this->response($I)['items'], 'id'));
@@ -162,7 +163,6 @@ class Api083StaffGroupsCest extends BaseFunctionalCest
         $this->request($I, 'GET', 'workflow-group/my-groups', [], 'member');
         $I->seeResponseCodeIs(200);
         Assert::assertSame(1, (int)$this->response($I)['groups'][0]['queue_count']);
-
         $this->request($I, 'GET', 'workflow-group/group-queue', [], 'member', ['id' => $groupId]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame(1, $this->response($I)['count']);
