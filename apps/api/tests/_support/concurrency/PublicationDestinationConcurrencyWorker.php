@@ -112,9 +112,7 @@ if ($checklistWorker) {
     $application = new \yii\console\Application($config);
 }
 $db = \Yii::$app->db;
-if ($sharedRowWorker || $itemLockWorker) {
-    \Yii::$app->set('workflowNotificationQueue', new \app\services\WorkflowNotificationQueue());
-}
+\Yii::$app->set('workflowNotificationQueue', new \app\services\WorkflowNotificationQueue());
 $db->open();
 $db->createCommand('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
 $db->createCommand('SET SESSION innodb_lock_wait_timeout = 10')->execute();
