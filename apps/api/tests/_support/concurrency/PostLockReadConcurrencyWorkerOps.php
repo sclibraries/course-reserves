@@ -8,20 +8,15 @@ use app\services\SubmissionItemDetailsService;
 class PostLockReadConcurrencyWorkerOps
 {
     private static $paused;
+    private static $request;
 
     public static function run(array $request, $db)
     {
+        self::$request = $request;
         PublicationDestinationConcurrencyWorkerOps::assertFixtureManifest($request['manifest'] ?? [], $db);
         self::$paused = false;
-        Api119A4ItemLockConcurrencyCommand::setObserver(function ($sql) use ($request) {
-            if (self::$paused || !preg_match(
-                '/SELECT\s+submission_id\s+FROM\s+submission_(?:new|reuse)_resources\s+WHERE\s+id\s*=/i',
-                $sql
-            )) {
-                return;
-            }
-            self::$paused = true;
-            self::checkpoint($request['op'], $sql);
+        Api119A4ItemLockConcurrencyCommand::setObserver(function ($sql) {
+            self::observe($sql);
         });
 
         try {
@@ -63,6 +58,51 @@ class PostLockReadConcurrencyWorkerOps
 
     private static function invoke(array $request)
     {
+        if ($request['op'] === 'item_lock_a5_flow_get') {
+            return (new \app\services\FlowRunner())->getItemFlow(
+                $request['kind'], $request['item_id'], $request['actor']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_step_result') {
+            return (new \app\services\FlowRunner())->stepResult(
+                $request['kind'], $request['item_id'], $request['actor'], $request['body']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_switch_flow') {
+            return (new \app\services\FlowRunner())->switchFlow(
+                $request['kind'], $request['item_id'], $request['actor'], $request['body']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_set_access_path') {
+            return (new \app\services\FlowRunner())->setAccessPath(
+                $request['kind'], $request['item_id'], $request['actor'], $request['body']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_contract') {
+            return (new \app\services\SubmissionPublicationStateService())->contract(
+                $request['kind'], $request['item_id'], $request['actor']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_mark_ready') {
+            return (new \app\services\SubmissionPublicationStateService())->markReady(
+                $request['kind'], $request['item_id'], $request['actor'], $request['body']['reason'] ?? null
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_input_projection') {
+            return (new \app\services\SubmissionInputProjectionService())->project(
+                $request['kind'], $request['item_id']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_placement') {
+            $claims = \Yii::$container->get(\app\services\ItemClaimService::class);
+            return $claims->withLinkedItem($request['kind'], $request['item_id'], function ($item) use ($request) {
+                (new \app\services\SubmissionPublicationStateService())->recordChange(
+                    $request['kind'], $request['item_id'], $item['submission_id'],
+                    \app\services\ItemChangeClass::PLACEMENT
+                );
+                return ['status' => 200, 'body' => []];
+            });
+        }
         $actor = $request['actor'];
         if ($request['op'] === 'item_lock_a5_details') {
             return (new SubmissionItemDetailsService())->update(
@@ -91,18 +131,34 @@ class PostLockReadConcurrencyWorkerOps
         return ['status' => $result['status'], 'body' => $body];
     }
 
-    private static function checkpoint($operation, $sql)
+    private static function checkpoint($operation, $sql, $phase)
     {
         PublicationDestinationConcurrencyWire::write(STDOUT, [
             'op' => $operation,
             'attempt' => 1,
-            'phase' => 'discovered',
+            'phase' => $phase,
             'context' => ['sql' => $sql],
         ]);
         $answer = PublicationDestinationConcurrencyWire::read(STDIN);
-        if (($answer['command'] ?? null) !== 'go' || ($answer['phase'] ?? null) !== 'discovered'
+        if (($answer['command'] ?? null) !== 'go' || ($answer['phase'] ?? null) !== $phase
             || (int)($answer['attempt'] ?? -1) !== 1) {
-            throw new \RuntimeException('Post-lock read worker received an invalid discovery acknowledgement.');
+            throw new \RuntimeException('Post-lock read worker received an invalid ' . $phase . ' acknowledgement.');
+        }
+    }
+
+    private static function observe($sql)
+    {
+        if (self::$paused) {
+            return;
+        }
+        $phase = self::$request['pause_after'] ?? 'discovered';
+        $patterns = [
+            'discovered' => '/SELECT\s+submission_id\s+FROM\s+submission_(?:new|reuse)_resources\s+WHERE\s+id\s*=/i',
+            'item_locked' => '/SELECT\s+\*\s+FROM\s+submission_(?:new|reuse)_resources\s+WHERE\s+id\s*=.*FOR\s+UPDATE/i',
+        ];
+        if (isset($patterns[$phase]) && preg_match($patterns[$phase], $sql)) {
+            self::$paused = true;
+            self::checkpoint(self::$request['op'], $sql, $phase);
         }
     }
 }

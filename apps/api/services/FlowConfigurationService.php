@@ -18,6 +18,7 @@ class FlowConfigurationService
     private $accessPathPresenter;
     private $publication;
     private $sequences;
+    private $itemProjection;
 
     public function __construct($flows, $items, $claims, $events, $accessPathMappings, $publication, $sequences)
     {
@@ -30,6 +31,7 @@ class FlowConfigurationService
         $this->accessPathPresenter = new AccessPathResponsePresenter();
         $this->publication = $publication;
         $this->sequences = $sequences;
+        $this->itemProjection = new ItemWriteLockProjection();
     }
 
     public function switchFlow($kind, $itemId, array $actor, array $body)
@@ -46,7 +48,7 @@ class FlowConfigurationService
             if (!$this->claims->claimActorMatches($item, $actor)) {
                 return $this->result(409, ['error_code' => 'not_claimed_by_you']);
             }
-            $replacement = $this->replaceOpenRun($kind, $itemId, $flowId, $reason, $now);
+            $replacement = $this->replaceOpenRun($kind, $itemId, $flowId, $reason, $now, $item['submission_id']);
             if ($replacement['status'] !== 200) {
                 $transaction->rollBack();
                 return $replacement;
@@ -100,7 +102,7 @@ class FlowConfigurationService
                     $this->closeOpenRun($openRun, $reason ?: 'access_path_unmapped', $now);
                     $this->publication->invalidateContext($kind, $itemId, $item['submission_id']);
                 }
-                $run = $hasFlowMapping ? $this->flows->latestRun($kind, $itemId) : null;
+                $run = $hasFlowMapping ? $this->flows->latestRun($kind, $itemId, true) : null;
                 return $this->result(200, $this->accessPathPresenter->present($accessPath, $run, $item, $mapping));
             }
             if ($currentPath !== '' && $reason === '') {
@@ -110,7 +112,9 @@ class FlowConfigurationService
             $flowId = $mapping && $mapping['flow_id'] !== null ? (int)$mapping['flow_id'] : null;
             $groupId = $mapping && $mapping['group_id'] !== null ? (int)$mapping['group_id'] : null;
             if ($flowId !== null) {
-                $replacement = $this->replaceOpenRun($kind, $itemId, $flowId, $reason ?: null, $now);
+                $replacement = $this->replaceOpenRun(
+                    $kind, $itemId, $flowId, $reason ?: null, $now, $item['submission_id']
+                );
                 if ($replacement['status'] !== 200) {
                     $transaction->rollBack();
                     return $replacement;
@@ -130,8 +134,8 @@ class FlowConfigurationService
                 }
             }
             $this->items->setAccessPath($kind, $itemId, $accessPath);
-            $item = $this->items->find($kind, $itemId);
-            $run = $flowId === null ? null : $this->flows->latestRun($kind, $itemId);
+            $item = $this->itemProjection->reread($kind, $itemId, $item['submission_id']);
+            $run = $flowId === null ? null : $this->flows->latestRun($kind, $itemId, true);
             $after = $this->accessPathPresenter->present($accessPath, $run, $item, $mapping);
             $eventAfter = $after;
             unset($eventAfter['warning']);
@@ -141,14 +145,14 @@ class FlowConfigurationService
             );
             return $this->result(200, $after);
         }, function () use ($accessPath, &$mapping) {
-            $mapping = $this->accessPathMappings->find($accessPath);
+            $mapping = $this->accessPathMappings->find($accessPath, true);
             if ($mapping && $mapping['flow_id'] !== null) {
                 $this->flows->flow((int)$mapping['flow_id'], true);
             }
         });
     }
 
-    private function replaceOpenRun($kind, $itemId, $flowId, $reason, $now)
+    private function replaceOpenRun($kind, $itemId, $flowId, $reason, $now, $submissionId)
     {
         if (!$this->flows->flow($flowId, true)) {
             return $this->result(404, ['error_code' => 'unknown_flow']);
@@ -157,7 +161,7 @@ class FlowConfigurationService
         if ($oldRun && (int)$oldRun['flow_id'] === (int)$flowId) {
             return $this->result(200, ['run' => $oldRun, 'changed' => false, 'before' => null]);
         }
-        $version = $this->flows->latestVersion($flowId);
+        $version = $this->flows->latestVersion($flowId, true);
         if (!$version) {
             return $this->result(409, ['error_code' => 'flow_version_missing']);
         }
@@ -170,14 +174,13 @@ class FlowConfigurationService
         if ($oldRun) {
             $this->closeOpenRun($oldRun, $reason, $now);
         }
-        $item = $this->items->find($kind, $itemId);
-        $publicationState = $this->publication->lockForWrite($kind, $itemId, $item['submission_id']);
+        $publicationState = $this->publication->lockForWrite($kind, $itemId, $submissionId);
         $runId = $this->flows->insertRun(
             $kind, $itemId, $flowId, $version['version'], $firstStep,
             $publicationState['draft_revision'], $publicationState['workflow_revision']
         );
         return $this->result(200, [
-            'run' => $this->flows->run($runId), 'changed' => true, 'before' => $before,
+            'run' => $this->flows->run($runId, true), 'changed' => true, 'before' => $before,
         ]);
     }
 

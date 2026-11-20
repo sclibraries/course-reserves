@@ -11,35 +11,37 @@ class SubmissionPublicationStateService
 
     private $states;
     private $claims;
-    private $items;
     private $flows;
     private $events;
     private $policy;
+    private $mappingReads;
+    private $itemProjection;
 
     public function __construct($states = null, $claims = null, $items = null, $flows = null, $events = null, $policy = null)
     {
         $this->states = $states ?: new SubmissionPublicationStateRepository();
         $this->claims = $claims ?: Yii::$container->get(ItemClaimService::class);
-        $this->items = $items ?: new ItemClaimRepository();
         $this->flows = $flows ?: new FlowRepository();
         $this->events = $events ?: new WorkflowEventLog();
         $this->policy = $policy ?: new PublicationPolicy();
+        $this->mappingReads = new FlowMappingReadRepository();
+        $this->itemProjection = new ItemWriteLockProjection();
     }
 
     public function contract($kind, $itemId, array $actor)
     {
         return $this->claims->withLinkedItem($kind, $itemId, function ($item) use ($kind, $itemId, $actor) {
             $state = $this->states->lock($kind, $itemId, $item['submission_id']);
-            $run = $this->flows->latestRun($kind, $itemId);
-            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
-            $lastEvents = $this->states->lastClaimEvents([['kind' => $kind, 'id' => $itemId]]);
+            $run = $this->flows->latestRun($kind, $itemId, true);
+            $mapping = $run ? null : $this->mappingReads->materialTypeFlow(EffectiveMaterialType::id($item));
+            $lastEvent = $this->states->lastClaimEvent($kind, $itemId);
             return $this->result(200, [
                 'publication' => $this->policy->present(
                     $item,
                     $state,
                     $actor,
                     $run,
-                    $lastEvents[$kind . ':' . (int)$itemId] ?? null,
+                    $lastEvent,
                     $mapping
                 ),
             ]);
@@ -101,7 +103,7 @@ class SubmissionPublicationStateService
             }
             $state = $this->states->lock($kind, $itemId, $item['submission_id']);
             $run = $this->flows->latestRun($kind, $itemId, true);
-            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
+            $mapping = $run ? null : $this->mappingReads->materialTypeFlow(EffectiveMaterialType::id($item));
             $context = $this->policy->context($item, $run, $mapping);
             $before = $this->readinessSnapshot($state);
             $this->claims->renewClaimLocked($kind, $itemId, $now);
@@ -120,16 +122,16 @@ class SubmissionPublicationStateService
                 $item['submission_id'], $itemId, $actor, 'item_marked_ready', $reason,
                 $before, ['source' => 'manual', 'revision' => (int)$state['draft_revision'], 'context' => $context], $kind
             );
-            $updated = $this->items->find($kind, $itemId);
+            $updated = $this->itemProjection->reread($kind, $itemId, $item['submission_id']);
             $saved = $this->states->find($kind, $itemId);
-            $lastEvents = $this->states->lastClaimEvents([['kind' => $kind, 'id' => $itemId]]);
+            $lastEvent = $this->states->lastClaimEvent($kind, $itemId);
             return $this->result(200, [
                 'publication' => $this->policy->present(
                     $updated,
                     $saved,
                     $actor,
                     $run,
-                    $lastEvents[$kind . ':' . (int)$itemId] ?? null,
+                    $lastEvent,
                     $mapping
                 ),
             ]);
@@ -161,8 +163,8 @@ class SubmissionPublicationStateService
             ]);
         } elseif ($class === ItemChangeClass::PLACEMENT) {
             $run = $this->flows->latestRun($kind, $itemId, true);
-            $item = $this->items->find($kind, $itemId);
-            $mapping = $run ? null : $this->flows->mappedFlow(EffectiveMaterialType::id($item));
+            $item = $this->itemProjection->reread($kind, $itemId, $submissionId);
+            $mapping = $run ? null : $this->mappingReads->materialTypeFlow(EffectiveMaterialType::id($item));
             $flowReady = PublicationPolicy::runMatchesDraft($run, $state);
             $manualReady = $this->policy->isManualReady($state, $item, $run, $mapping);
             if ($flowReady) {

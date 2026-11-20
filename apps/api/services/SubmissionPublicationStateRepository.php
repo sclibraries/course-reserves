@@ -38,13 +38,24 @@ class SubmissionPublicationStateRepository
         )->queryOne();
     }
 
-    public function find($kind, $itemId)
+    public function find($kind, $itemId, $forShare = false)
     {
         return Yii::$app->db->createCommand(
             'SELECT * FROM submission_publication_state '
-            . 'WHERE item_kind = :kind AND item_id = :item_id LIMIT 1',
+            . 'WHERE item_kind = :kind AND item_id = :item_id LIMIT 1'
+            . ($forShare ? ' LOCK IN SHARE MODE' : ''),
             [':kind' => $kind, ':item_id' => (int)$itemId]
         )->queryOne() ?: null;
+    }
+
+    public function lastClaimEvent($kind, $itemId)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT event_type FROM workflow_events WHERE item_kind = :kind AND item_id = :item_id '
+            . 'AND event_type IN ("claimed", "claim_expired", "released", "handed_off", '
+            . '"taken_over", "group_handoff") ORDER BY id DESC LIMIT 1 LOCK IN SHARE MODE',
+            [':kind' => $kind, ':item_id' => (int)$itemId]
+        )->queryScalar() ?: null;
     }
 
     public function forSubmission($submissionId)

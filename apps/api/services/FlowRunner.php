@@ -18,6 +18,8 @@ class FlowRunner
     private $publication;
     private $configuration;
     private $sequences;
+    private $mappingReads;
+    private $itemProjection;
 
     public function __construct(
         $flows = null,
@@ -36,6 +38,8 @@ class FlowRunner
         $this->events = $events ?: new WorkflowEventLog();
         $this->presenter = new FlowStatePresenter($this->flows);
         $this->sequences = new FlowResultSequenceRepository();
+        $this->mappingReads = new FlowMappingReadRepository();
+        $this->itemProjection = new ItemWriteLockProjection();
         $this->publication = $publication ?: new SubmissionPublicationStateService(
             null, $this->claims, $this->items, $this->flows, $this->events
         );
@@ -67,7 +71,7 @@ class FlowRunner
                 $latest = null;
             }
             if (!$latest) {
-                $mapping = $this->flows->mappedFlow(EffectiveMaterialType::id($item));
+                $mapping = $this->mappingReads->materialTypeFlow(EffectiveMaterialType::id($item));
                 if ($mapping) {
                     $latest = $this->startRun($kind, $itemId, $item, $mapping, $actor);
                 }
@@ -184,8 +188,8 @@ class FlowRunner
                     return $this->result($handoff['status'], $handoff['body']);
                 }
             }
-            $run = $this->flows->run($run['id']);
-            $item = $this->items->find($kind, $itemId);
+            $run = $this->flows->run($run['id'], true);
+            $item = $this->itemProjection->reread($kind, $itemId, $item['submission_id']);
             $this->publication->syncFlowReadiness($kind, $itemId, $item, $run);
             $state = $this->presenter->present(
                 $kind, $itemId, $item, $run, $this->claims->claimActorMatches($item, $actor),
@@ -218,7 +222,7 @@ class FlowRunner
             $item['submission_id'], $itemId, $actor, 'flow_selected', null, [],
             ['run_id' => $runId, 'flow_id' => (int)$mapping['id'], 'version' => (int)$mapping['version'], 'current_step_key' => $firstStep], $kind
         );
-        $run = $this->flows->run($runId);
+        $run = $this->flows->run($runId, true);
         $this->publication->syncFlowReadiness($kind, $itemId, $item, $run);
         return $run;
     }

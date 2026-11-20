@@ -25,13 +25,13 @@ class SubmissionInputProjectionService
     public function project($kind, $itemId)
     {
         return $this->claims->withLinkedItem($kind, $itemId, function ($item) use ($kind, $itemId) {
-            $state = $this->states->find($kind, $itemId);
+            $state = $this->states->find($kind, $itemId, true);
             $referenceId = (int)($item['materialized_physical_reference_id'] ?? 0);
             if ($referenceId > 0 && !empty($item['offering_id'])) {
                 $item['established_folio_instance_id'] = Yii::$app->db->createCommand(
                     'SELECT folio_instance_id FROM physical_resource_references '
                     . 'WHERE reference_id = :reference AND offering_id = :offering '
-                    . 'AND identity_status = "verified" LIMIT 1', [
+                    . 'AND identity_status = "verified" LIMIT 1 LOCK IN SHARE MODE', [
                         ':reference' => $referenceId,
                         ':offering' => $item['offering_id'],
                     ]

@@ -7,10 +7,11 @@ use Yii;
 /** Persists the admin mapping from acquisition paths to flows and staff groups. */
 class AccessPathMappingRepository
 {
-    public function find($accessPath)
+    public function find($accessPath, $forShare = false)
     {
         return Yii::$app->db->createCommand(
-            'SELECT access_path, flow_id, group_id FROM access_path_flows WHERE access_path = :path LIMIT 1',
+            'SELECT access_path, flow_id, group_id FROM access_path_flows WHERE access_path = :path LIMIT 1'
+                . ($forShare ? ' LOCK IN SHARE MODE' : ''),
             [':path' => $accessPath]
         )->queryOne() ?: null;
     }
