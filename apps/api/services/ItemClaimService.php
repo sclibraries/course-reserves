@@ -22,6 +22,7 @@ class ItemClaimService
     private $groups;
     private $submittedScope;
     private $linkedItems;
+    private $expiryLinkedItems;
 
     public function __construct($repository = null, $eventLog = null, $nowProvider = null, $notifier = null, $groups = null)
     {
@@ -37,6 +38,17 @@ class ItemClaimService
         $this->expiry = new ItemClaimExpiryService($this->repository, $this->eventLog, $nowProvider, $notifier);
         $this->submittedScope = new SubmittedSubmissionScope();
         $this->linkedItems = new LinkedItemService($this->repository, $this->expiry, $this->submittedScope);
+        $this->expiryLinkedItems = new LinkedItemService(
+            $this->repository,
+            $this->expiry,
+            new class extends SubmittedSubmissionScope {
+                public function guardStatus($status)
+                {
+                    return $status === FacultySubmission::STATUS_DRAFT
+                        ? ['error_code' => 'submission_not_submitted'] : null;
+                }
+            }
+        );
         $this->readService = new ItemClaimReadService(
             $this->linkedItems, $this->eventLog, $this->repository, $this->expiry, $this->presenter
         );
@@ -142,7 +154,7 @@ class ItemClaimService
 
     public function queue($term, $type, $page)
     {
-        $this->expiry->expireDueClaims();
+        $this->expireDueClaims();
         $page = max(1, (int)$page);
         $rows = $this->listRepository->queuePage($term, $type, $page, self::PAGE_SIZE);
         return [
@@ -153,7 +165,7 @@ class ItemClaimService
 
     public function myItems($username)
     {
-        $this->expiry->expireDueClaims();
+        $this->expireDueClaims();
         return ['items' => $this->presentRows($this->listRepository->myItems($username))];
     }
 
@@ -199,7 +211,7 @@ class ItemClaimService
 
     public function expireDueClaims()
     {
-        return $this->expiry->expireDueClaims($this->linkedItems);
+        return $this->expiry->expireDueClaims($this->expiryLinkedItems);
     }
 
     public function claimsForSubmission($submissionId)
@@ -214,7 +226,7 @@ class ItemClaimService
 
     public function expireCandidate(array $reference)
     {
-        return $this->expiry->expireCandidate($reference, $this->linkedItems);
+        return $this->expiry->expireCandidate($reference, $this->expiryLinkedItems);
     }
 
     private function presentRows(array $rows)

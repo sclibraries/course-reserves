@@ -85,7 +85,7 @@ class ItemClaimReadService
             unset($rows);
 
             // Locked rows own claim state; these two reads add batched display and group names.
-            $displayRows = $this->repository->claimsBySubmission($submissionId);
+            $displayRows = $this->repository->claimsBySubmission($submissionId, $items);
             $claims = ['new' => [], 'reuse' => []];
             foreach ($items as $kind => $rows) {
                 foreach ($rows as $id => $item) {

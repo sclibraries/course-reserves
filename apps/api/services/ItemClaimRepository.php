@@ -85,27 +85,58 @@ class ItemClaimRepository
         )->queryScalar();
     }
 
-    public function claimsBySubmission($submissionId)
+    public function claimsBySubmission($submissionId, $lockedItems = null)
     {
         $claims = ['new' => [], 'reuse' => []];
         foreach (['new', 'reuse'] as $kind) {
-            $rows = Yii::$app->db->createCommand(
-                'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
-                . 'i.assigned_group_id, i.item_status AS status, s.status AS submission_status, s.link_state, '
-                . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
-                . 'group_ref.name AS assigned_group_name '
-                . 'FROM ' . $this->table($kind) . ' i '
-                . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
-                . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
-                . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
-                . 'WHERE i.submission_id = :submission_id',
-                [':submission_id' => (int)$submissionId]
-            )->queryAll();
+            $rows = $lockedItems === null
+                ? $this->claimRowsBySubmission($kind, $submissionId)
+                : $this->claimDisplayRows($lockedItems[$kind] ?? []);
             foreach ($rows as $row) {
                 $claims[$kind][(int)$row['id']] = $row;
             }
         }
         return $claims;
+    }
+
+    private function claimRowsBySubmission($kind, $submissionId)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT i.id, i.submission_id, i.claimed_by, i.claimed_at, i.last_activity_at, '
+            . 'i.assigned_group_id, i.item_status AS status, s.status AS submission_status, s.link_state, '
+            . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
+            . 'group_ref.name AS assigned_group_name '
+            . 'FROM ' . $this->table($kind) . ' i '
+            . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
+            . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
+            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
+            . 'WHERE i.submission_id = :submission_id',
+            [':submission_id' => (int)$submissionId]
+        )->queryAll();
+    }
+
+    private function claimDisplayRows(array $items)
+    {
+        $sources = [];
+        $params = [];
+        if (!$items) {
+            $sources[] = 'SELECT NULL AS id, NULL AS claimed_by, NULL AS assigned_group_id FROM DUAL WHERE 1 = 0';
+        } else {
+            foreach (array_values($items) as $index => $item) {
+                $sources[] = 'SELECT :id' . $index . ' AS id, :claimant' . $index . ' AS claimed_by, '
+                    . ':group' . $index . ' AS assigned_group_id';
+                $params[':id' . $index] = (int)$item['id'];
+                $params[':claimant' . $index] = $item['claimed_by'];
+                $params[':group' . $index] = $item['assigned_group_id'];
+            }
+        }
+        return Yii::$app->db->createCommand(
+            'SELECT current_item.id, ' . self::claimedByDisplayNameSql() . ' AS claimed_by_display, '
+            . 'group_ref.name AS assigned_group_name FROM (' . implode(' UNION ALL ', $sources) . ') current_item '
+            . 'LEFT JOIN users claimant ON claimant.username = current_item.claimed_by '
+            . 'LEFT JOIN staff_groups group_ref ON group_ref.id = current_item.assigned_group_id',
+            $params
+        )->queryAll();
     }
 
     public function claimIfUnclaimed($kind, $id, $username, $now)

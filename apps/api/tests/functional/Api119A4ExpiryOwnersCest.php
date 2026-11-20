@@ -172,6 +172,19 @@ class Api119A4ExpiryOwnersCest extends BaseFunctionalCest
         Assert::assertCount(2, $references);
         $failedId = $references[0]['id'];
         $expiredId = $references[1]['id'];
+        $consoleService = new class($service, array_merge([$ineligibleRef], $references)) {
+            private $service;
+            private $references;
+            public $attempted = [];
+            public function __construct($service, array $references) { $this->service = $service; $this->references = $references; }
+            public function expiredClaimCandidates() { return $this->references; }
+            public function expireCandidate(array $reference)
+            {
+                $this->attempted[] = $reference['id'];
+                return $this->service->expireCandidate($reference);
+            }
+        };
+        Yii::$container->set(ItemClaimService::class, function () use ($consoleService) { return $consoleService; });
         $this->observer = Api116B1CommittedConnection::open(Yii::$app->db, [PDO::ATTR_CASE => PDO::CASE_NATURAL]);
         $this->notifications = [];
         $originalApp = Yii::$app;
@@ -190,9 +203,10 @@ class Api119A4ExpiryOwnersCest extends BaseFunctionalCest
             $command = new \app\commands\WorkflowController('workflow', Yii::$app);
             Assert::assertSame(\yii\console\ExitCode::OK, $command->actionExpireClaims());
             Assert::assertSame(3, Api119A4TestCommand::discoveries());
+            Assert::assertSame([$ineligible['id'], $failedId, $expiredId], $consoleService->attempted);
         } finally {
             Api119A4TestCommand::resetHarness();
-            Yii::setApplication($originalApp);
+            Yii::$app = $originalApp;
             Yii::setLogger($originalLogger);
         }
 

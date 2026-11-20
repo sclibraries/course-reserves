@@ -77,7 +77,6 @@ class ItemClaimExpiryService
     public function expireCandidate(array $reference, $linkedItems)
     {
         $claimBefore = null;
-        $responseStatus = Yii::$app->response->statusCode;
         $result = $linkedItems->withLinkedItem(
             $reference['kind'],
             $reference['id'],
@@ -90,9 +89,6 @@ class ItemClaimExpiryService
                 $claimBefore = $this->repository->lockedClaimState($reference['kind'], $reference['id']);
             }
         );
-        if (is_array($result) && $result['status'] === 409) {
-            Yii::$app->response->statusCode = $responseStatus;
-        }
         return $result === true;
     }
 

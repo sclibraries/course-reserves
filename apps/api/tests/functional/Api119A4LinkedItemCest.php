@@ -134,7 +134,8 @@ class Api119A4LinkedItemCest extends BaseFunctionalCest
         $personItem = $this->createItem('person-handoff');
         $this->claimItem($I, $personItem['id']);
         Api119A4TestCommand::failAfterQuery(
-            '/FROM users WHERE username = ["\']?' . preg_quote($this->username('target'), '/') . '["\']?/i',
+            '/FROM users(?:\\s+claimant)? WHERE (?:claimant\\.)?username = ["\']?'
+                . preg_quote($this->username('target'), '/') . '["\']?/i',
             1
         );
         $this->request($I, 'POST', 'workflow-claim/handoff', [
