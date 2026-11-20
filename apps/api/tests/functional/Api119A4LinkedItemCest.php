@@ -7,6 +7,7 @@ require_once __DIR__ . '/../_support/concurrency/ItemWriteConcurrencyWorkerOps.p
 use PHPUnit\Framework\Assert;
 use app\services\FlowRunner;
 use app\services\ItemClaimService;
+use app\services\SubmittedSubmissionScope;
 use app\services\Transactional;
 
 /** Covers retry ownership, nested notices, per-attempt target/input reads, and response wiring. */
@@ -91,6 +92,21 @@ class Api119A4LinkedItemCest extends BaseFunctionalCest
         Yii::$app->db->commandClass = $this->oldCommandClass;
         $this->cleanup();
         call_user_func($this->restoreDb);
+    }
+
+    public function submittedScopeKeepsItsPureRuleAndHttpConflictBehavior(FunctionalTester $I)
+    {
+        $scope = new SubmittedSubmissionScope();
+        $originalStatus = Yii::$app->response->statusCode;
+        try {
+            Yii::$app->response->setStatusCode(200);
+            Assert::assertSame(['error_code' => 'submission_not_submitted'], $scope->blockedBodyForStatus('draft'));
+            Assert::assertSame(200, Yii::$app->response->statusCode);
+            Assert::assertSame(['error_code' => 'submission_not_submitted'], $scope->guardStatus('draft'));
+            Assert::assertSame(409, Yii::$app->response->statusCode);
+        } finally {
+            Yii::$app->response->setStatusCode($originalStatus);
+        }
     }
 
     public function linkedCallersRetryAndKeepTheContentionEnvelope(FunctionalTester $I)

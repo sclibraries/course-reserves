@@ -12,14 +12,15 @@ class LinkedItemService
     private $itemLock;
     private $projection;
     private $expiry;
-    private $submittedScope;
+    private $statusGuard;
 
-    public function __construct($repository, $expiry, $submittedScope = null)
+    public function __construct($repository, $expiry, $submittedScope = null, ?callable $statusGuard = null)
     {
         $this->itemLock = new ItemWriteLock($repository);
         $this->projection = new ItemWriteLockProjection();
         $this->expiry = $expiry;
-        $this->submittedScope = $submittedScope ?: new SubmittedSubmissionScope();
+        $submittedScope = $submittedScope ?: new SubmittedSubmissionScope();
+        $this->statusGuard = $statusGuard ?: [$submittedScope, 'guardStatus'];
     }
 
     public function withLinkedItem($kind, $id, callable $callback, ?callable $beforeProjection = null)
@@ -34,7 +35,7 @@ class LinkedItemService
             }
 
             $item = $this->projection->project($locked);
-            if ($blocked = $this->submittedScope->guardStatus($item['submission_status'])) {
+            if ($blocked = call_user_func($this->statusGuard, $item['submission_status'])) {
                 return $this->reject($transaction, 409, $blocked);
             }
             if ($item['link_state'] !== 'linked') {

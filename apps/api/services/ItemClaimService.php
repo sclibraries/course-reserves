@@ -41,13 +41,8 @@ class ItemClaimService
         $this->expiryLinkedItems = new LinkedItemService(
             $this->repository,
             $this->expiry,
-            new class extends SubmittedSubmissionScope {
-                public function guardStatus($status)
-                {
-                    return $status === FacultySubmission::STATUS_DRAFT
-                        ? ['error_code' => 'submission_not_submitted'] : null;
-                }
-            }
+            $this->submittedScope,
+            [$this->submittedScope, 'blockedBodyForStatus']
         );
         $this->readService = new ItemClaimReadService(
             $this->linkedItems, $this->eventLog, $this->repository, $this->expiry, $this->presenter

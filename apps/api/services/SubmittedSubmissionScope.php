@@ -28,20 +28,29 @@ class SubmittedSubmissionScope
         return $query;
     }
 
-    public function guardStatus($status)
+    public function blockedBodyForStatus($status)
     {
         if ($status !== FacultySubmission::STATUS_DRAFT) {
             return null;
         }
-        Yii::$app->response->statusCode = 409;
         return ['error_code' => 'submission_not_submitted'];
+    }
+
+    public function guardStatus($status)
+    {
+        $body = $this->blockedBodyForStatus($status);
+        if ($body !== null) {
+            Yii::$app->response->statusCode = 409;
+        }
+        return $body;
     }
 
     public function guardServiceResult($status, $transaction)
     {
-        if (!$body = $this->guardStatus($status)) {
+        if (!$body = $this->blockedBodyForStatus($status)) {
             return null;
         }
+        Yii::$app->response->statusCode = 409;
         $transaction->rollBack();
         return ['status' => 409, 'body' => $body];
     }
@@ -56,10 +65,8 @@ class SubmittedSubmissionScope
 
     public function guard($submissionId)
     {
-        if ($this->isDraft($submissionId)) {
-            Yii::$app->response->statusCode = 409;
-            return ['error_code' => 'submission_not_submitted'];
-        }
-        return null;
+        return $this->isDraft($submissionId)
+            ? $this->guardStatus(FacultySubmission::STATUS_DRAFT)
+            : null;
     }
 }
