@@ -18,6 +18,7 @@ use app\models\CourseOfferings;
 use app\models\ResourceLinks;
 use app\services\SubmissionCourseScaffoldService;
 use app\services\CourseOfferingLinkService;
+use app\services\CourseResourceCreateService;
 use app\components\Roles;
 use app\filters\RoleAccessFilter;
 
@@ -1528,152 +1529,15 @@ class CourseController extends ActiveController
         ];
     }
 
-        public function actionCreateResource()
-        {
-            // Retrieve the courseId from POST parameters (non-JSON)
-            $courseId = Yii::$app->request->post('courseId');
-            $folioData = Yii::$app->request->post('folioData');
-
-            // Decode the JSON raw body into an associative array
-            $body = json_decode(Yii::$app->request->getRawBody(), true);
-
-            // Verify that the course exists
-            $course = Courses::findOne($courseId);
-            if (!$course) {
-                throw new NotFoundHttpException('Course not found.');
-            }
-
-            // Use the exact offering selected in the React form. Looking up an
-            // offering by course and term is ambiguous when a course has
-            // multiple sections in the same term.
-            $offeringId = filter_var(
-                $body['offering_id'] ?? null,
-                FILTER_VALIDATE_INT,
-                ['options' => ['min_range' => 1]]
-            );
-            if ($offeringId === false) {
-                throw new BadRequestHttpException('A valid "offering_id" is required.');
-            }
-
-            $courseOffering = CourseOfferings::findOne($offeringId);
-            if (!$courseOffering) {
-                throw new NotFoundHttpException('Course offering not found.');
-            }
-            if ((int)$courseOffering->course_id !== (int)$courseId) {
-                throw new BadRequestHttpException('The selected offering does not belong to this course.');
-            }
-
-            $folioCourseId = $folioData['courseListingId'] ?? null;
-            if (!$folioCourseId) {
-                throw new BadRequestHttpException('A FOLIO course listing is required.');
-            }
-            if ((string)$courseOffering->folio_course_id !== (string)$folioCourseId) {
-                throw new BadRequestHttpException('The selected offering does not match the FOLIO course listing.');
-            }
-
-            // Ensure the required "title" field is present
-            $title = $body['title'] ?? null;
-            if (!$title) {
-                throw new BadRequestHttpException('Resource "title" is required.');
-            }
-
-            // Retrieve other data from the request
-            $link              = $body['link'] ?? null;
-            $notes             = $body['notes'] ?? null;
-            $materialTypeId    = $body['material_type_id'] ?? null;
-
-            // New fields from the form:
-            $internalNote      = $body['internal_note'] ?? null;
-            $externalNote      = $body['external_note'] ?? null;
-            $startVisibility   = $body['start_visibility'] ?? null;
-            $endVisibility     = $body['end_visibility'] ?? null;
-            $primaryLinkStartVisibility = $body['primary_link_start_visibility'] ?? null;
-            $primaryLinkEndVisibility = $body['primary_link_end_visibility'] ?? null;
-            $useResourceVisibility = isset($body['use_resource_visibility']) ? (int)$body['use_resource_visibility'] : 0;
-            $usePrimaryLinkVisibility = isset($body['use_primary_link_visibility']) ? (int)$body['use_primary_link_visibility'] : 0;
-            $useProxy          = isset($body['use_proxy']) ? (int)$body['use_proxy'] : 0;
-            $folderId          = $body['folder'] ?? null;
-
-            // Get additional links if provided
-            $additionalLinks   = $body['links'] ?? [];
-
-            // Start transaction
-            $transaction = Yii::$app->db->beginTransaction();
-
-            try {
-                // Create and populate the resource model
-                $resource = new Resources();
-                $resource->name = $title;
-                $resource->item_url = $link;
-                $resource->description = $notes;
-                $resource->material_type_id = $materialTypeId;
-                $resource->internal_note = $internalNote;
-                $resource->external_note = $externalNote;
-                // Note: Visibility will be set on course_resources, but keep for backward compatibility
-                $resource->start_visibility = $startVisibility;
-                $resource->end_visibility = $endVisibility;
-                $resource->use_proxy = $useProxy;
-                $resource->folder_id = $folderId;
-
-                if (!$resource->save()) {
-                    throw new ServerErrorHttpException('Failed to create resource: ' . json_encode($resource->getErrors()));
-                }
-
-                if (!empty($additionalLinks) && is_array($additionalLinks)) {
-                    Yii::$container->get(\app\services\ResourceMutationService::class)
-                        ->replaceLinks($resource->resource_id, $additionalLinks);
-                }
-
-                // Process and save metadata if provided
-                if (!empty($body['metadata']) && is_array($body['metadata'])) {
-                    foreach ($body['metadata'] as $fieldName => $fieldValue) {
-                        // Skip if the field value is blank or only whitespace.
-                        if (is_string($fieldValue) && trim($fieldValue) === '') {
-                            continue;
-                        }
-                        $metadata = new ResourceMetadata();
-                        $metadata->resource_id = $resource->resource_id;
-                        $metadata->field_name = $fieldName;
-                        $metadata->field_value = $fieldValue;
-                        if (!$metadata->save()) {
-                            throw new ServerErrorHttpException('Failed to save metadata: ' . json_encode($metadata->getErrors()));
-                        }
-                    }
-                }
-
-                // Link the resource to the course with visibility settings
-                $courseResource = new CourseResources();
-                $courseResource->offering_id = $courseOffering->offering_id;
-                $courseResource->resource_id = $resource->resource_id;
-                
-                // Set visibility fields on the course_resources relationship
-                $courseResource->start_visibility = $startVisibility;
-                $courseResource->end_visibility = $endVisibility;
-                $courseResource->use_resource_visibility = $useResourceVisibility;
-                $courseResource->primary_link_start_visibility = $primaryLinkStartVisibility;
-                $courseResource->primary_link_end_visibility = $primaryLinkEndVisibility;
-                $courseResource->use_primary_link_visibility = $usePrimaryLinkVisibility;
-                
-                if (!$courseResource->save()) {
-                    throw new ServerErrorHttpException('Failed to link resource: ' . json_encode($courseResource->getErrors()));
-                }
-
-                // Commit transaction
-                $transaction->commit();
-
-                return [
-                    'resource' => $resource,
-                    'course_offering' => $courseOffering->offering_id,
-                    'links' => ResourceLinks::findAll(['resource_id' => $resource->resource_id]),
-                    'metadata' => ResourceMetadata::findAll(['resource_id' => $resource->resource_id]),
-                    'success'  => true,
-                ];
-            } catch (\Exception $e) {
-                // Roll back transaction on error
-                $transaction->rollBack();
-                throw $e;
-            }
-        }
+    public function actionCreateResource()
+    {
+        $request = Yii::$app->request;
+        return (new CourseResourceCreateService())->create(
+            $request->post('courseId'),
+            $request->post('folioData'),
+            json_decode($request->getRawBody(), true)
+        );
+    }
 
 
     /**

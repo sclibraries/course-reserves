@@ -4,6 +4,7 @@ namespace app\controllers;
 
 use yii\filters\Cors;
 use yii\data\ActiveDataProvider;
+use app\actions\ResourceCreateAction;
 use app\models\Resources;
 use app\models\ResourceMetadata;
 use app\models\CourseResources;
@@ -27,6 +28,7 @@ class ResourceController extends ActiveController
     {
         $actions = parent::actions();
         unset($actions['update'], $actions['delete']);
+        $actions['create']['class'] = ResourceCreateAction::class;
 
         // Override the index action's data provider
         $actions['index']['prepareDataProvider'] = function() {

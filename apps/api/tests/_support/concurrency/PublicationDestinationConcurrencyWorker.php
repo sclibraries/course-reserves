@@ -215,6 +215,10 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt)
         require_once __DIR__ . '/ItemClaimBatchConcurrencyWorkerOps.php';
         return ItemClaimBatchConcurrencyWorkerOps::run($request);
     }
+    if (strpos($operation, 'item_lock_owner_') === 0) {
+        require_once __DIR__ . '/ResourceOwnerConcurrencyWorkerOps.php';
+        return ResourceOwnerConcurrencyWorkerOps::run($request);
+    }
     if (strpos($operation, 'item_lock_') === 0) {
         return ItemWriteConcurrencyWorkerOps::run($request);
     }

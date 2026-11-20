@@ -4,6 +4,7 @@ namespace app\commands;
 
 use app\services\ApprovedUserLookup;
 use app\services\DevSeedService;
+use app\services\ItemContention;
 use yii\console\Controller;
 use yii\console\ExitCode;
 use yii\helpers\Console;
@@ -82,7 +83,8 @@ class DevSeedController extends Controller
 
             return ExitCode::OK;
         } catch (\Throwable $exception) {
-            $this->stderr($exception->getMessage() . "\n", Console::FG_RED);
+            $reference = $exception instanceof ItemContention ? ' reference=' . $exception->reference : '';
+            $this->stderr($exception->getMessage() . $reference . "\n", Console::FG_RED);
             return ExitCode::UNSPECIFIED_ERROR;
         }
     }

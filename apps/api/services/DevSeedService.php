@@ -35,8 +35,7 @@ class DevSeedService
         $this->validatePeriod($currentPeriod);
         $this->validatePeriod($upcomingPeriod);
 
-        $transaction = $this->db->beginTransaction();
-        try {
+        $state = Transactional::retrying(function () use ($currentPeriod, $upcomingPeriod) {
             $flowMapping = (new PrintBookFlowMapping($this->db))->findOrCreate(true);
             $ebookFlowMapping = (new EbookFlowMapping($this->db))->findOrCreate(true, 'dev-seed');
             $previousCourse = (new DevSeedPreviousCourseService())->seed();
@@ -59,20 +58,17 @@ class DevSeedService
                 $this->db->createCommand()->upsert('course_assignments', $assignment, true)->execute();
             }
 
-            $transaction->commit();
-        } catch (\Throwable $exception) {
-            $transaction->rollBack();
-            throw $exception;
-        }
+            return compact('flowMapping', 'ebookFlowMapping', 'previousCourse', 'people', 'assignments');
+        });
 
         return [
             'currentPeriod' => $currentPeriod,
             'upcomingPeriod' => $upcomingPeriod,
-            'people' => $people,
-            'assignmentCount' => count($assignments),
-            'previousCourse' => $previousCourse,
-            'printBookMapped' => $flowMapping['mapped'],
-            'ebookMapped' => $ebookFlowMapping['mapped'],
+            'people' => $state['people'],
+            'assignmentCount' => count($state['assignments']),
+            'previousCourse' => $state['previousCourse'],
+            'printBookMapped' => $state['flowMapping']['mapped'],
+            'ebookMapped' => $state['ebookFlowMapping']['mapped'],
         ];
     }
 
