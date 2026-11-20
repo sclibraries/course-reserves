@@ -16,6 +16,7 @@ class ItemClaimTransitionService
     private $notifier;
     private $groups;
     private $linkedItems;
+    private $itemProjection;
 
     public function __construct($repository, $eventLog, $presenter, $expiry, $notifier, $groups, $linkedItems)
     {
@@ -26,6 +27,7 @@ class ItemClaimTransitionService
         $this->notifier = $notifier;
         $this->groups = $groups;
         $this->linkedItems = $linkedItems;
+        $this->itemProjection = new ItemWriteLockProjection();
     }
 
     public function transition($operation, $kind, $id, array $actor, $reason, $target)
@@ -34,12 +36,12 @@ class ItemClaimTransitionService
             $operation, $kind, $id, $actor, $reason, $target
         ) {
             if ($operation === 'handoff') {
-                $target = $this->repository->findStaffByUsername($target);
+                $target = $this->groups->staffMember($target, true);
                 if (!$target) {
                     return $this->result(404, ['error_code' => 'unknown_staff']);
                 }
             } elseif ($operation === 'group_handoff') {
-                $target = $this->groups->find((int)$target);
+                $target = $this->groups->find((int)$target, false, true);
                 if (!$target) {
                     return $this->result(404, ['error_code' => 'group_not_found']);
                 }
@@ -70,7 +72,7 @@ class ItemClaimTransitionService
                 'takeover' => 'taken_over',
                 'group_handoff' => 'group_handoff',
             ][$operation];
-            $after = $this->repository->find($kind, $id);
+            $after = $this->itemProjection->reread($kind, $id, $item['submission_id']);
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, $eventType, $reason, $before, $this->snapshot($after), $kind
             );
@@ -83,7 +85,7 @@ class ItemClaimTransitionService
                     'claim_taken_over', $this->notificationContext($kind, $id, $item, $actorUsername, $previousHolder)
                 );
             } elseif ($operation === 'group_handoff') {
-                foreach ($this->groups->memberUsernames($target['id']) as $memberUsername) {
+                foreach ($this->groups->memberUsernames($target['id'], true) as $memberUsername) {
                     $context = $this->notificationContext($kind, $id, $item, $actorUsername, $memberUsername);
                     $context['group_id'] = (int)$target['id'];
                     $context['group_name'] = $target['name'];

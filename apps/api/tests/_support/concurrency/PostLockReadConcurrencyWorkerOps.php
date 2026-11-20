@@ -1,18 +1,31 @@
 <?php
 
 use app\services\LegacySubmissionItemUpdateService;
+use app\services\ItemClaimService;
 use app\services\SubmissionCopyInputRefreshService;
 use app\services\SubmissionItemDetailsService;
+
+class PostLockReadConcurrencyNotifier implements \app\services\WorkflowNotifier
+{
+    public $notifications = [];
+
+    public function notify($eventType, array $context)
+    {
+        $this->notifications[] = ['event' => $eventType, 'context' => $context];
+    }
+}
 
 /** Runs item writers behind an acknowledged barrier after their plain discovery read. */
 class PostLockReadConcurrencyWorkerOps
 {
     private static $paused;
     private static $request;
+    private static $notifier;
 
     public static function run(array $request, $db)
     {
         self::$request = $request;
+        self::$notifier = null;
         PublicationDestinationConcurrencyWorkerOps::assertFixtureManifest($request['manifest'] ?? [], $db);
         self::$paused = false;
         Api119A4ItemLockConcurrencyCommand::setObserver(function ($sql) {
@@ -23,7 +36,8 @@ class PostLockReadConcurrencyWorkerOps
             if (isset($request['caller_read'])) {
                 return self::nested($request, $db);
             }
-            return self::invoke($request);
+            $result = self::invoke($request);
+            return self::includeNotifications($result);
         } finally {
             Api119A4ItemLockConcurrencyCommand::setObserver(null);
         }
@@ -37,8 +51,9 @@ class PostLockReadConcurrencyWorkerOps
             $result = self::invoke($request);
             $after = self::callerRead($request, $db);
             $transaction->commit();
+            Yii::$app->get('workflowNotificationQueue')->flushAfterCommit();
             return [
-                'result' => self::response($result),
+                'result' => self::includeNotifications(self::response($result)),
                 'caller_read_before' => $before,
                 'caller_read_after' => $after,
             ];
@@ -58,6 +73,22 @@ class PostLockReadConcurrencyWorkerOps
 
     private static function invoke(array $request)
     {
+        if ($request['op'] === 'item_lock_a5_claim') {
+            return (new ItemClaimService())->claim(
+                $request['kind'], $request['item_id'], $request['actor']
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_handoff') {
+            return (new ItemClaimService())->handoff(
+                $request['kind'], $request['item_id'], $request['target'], $request['actor'], 'Synthetic A5c handoff'
+            );
+        }
+        if ($request['op'] === 'item_lock_a5_group_handoff') {
+            self::$notifier = new PostLockReadConcurrencyNotifier();
+            return (new ItemClaimService(null, null, null, self::$notifier))->handoffToGroup(
+                $request['kind'], $request['item_id'], $request['group_id'], $request['actor'], 'Synthetic A5c group handoff'
+            );
+        }
         if ($request['op'] === 'item_lock_a5_flow_get') {
             return (new \app\services\FlowRunner())->getItemFlow(
                 $request['kind'], $request['item_id'], $request['actor']
@@ -129,6 +160,14 @@ class PostLockReadConcurrencyWorkerOps
             $body['item'] = $body['item']->getAttributes();
         }
         return ['status' => $result['status'], 'body' => $body];
+    }
+
+    private static function includeNotifications(array $result)
+    {
+        if (self::$notifier !== null) {
+            $result['notifications'] = self::$notifier->notifications;
+        }
+        return $result;
     }
 
     private static function checkpoint($operation, $sql, $phase)

@@ -149,7 +149,7 @@ class FlowRunner
 
             $group = null;
             if (isset($next['handoff_group'])) {
-                $group = $this->groups->findByName($next['handoff_group']);
+                $group = $this->groups->findByName($next['handoff_group'], true);
                 if (!$group) {
                     return $this->result(409, ['error_code' => 'unknown_group']);
                 }

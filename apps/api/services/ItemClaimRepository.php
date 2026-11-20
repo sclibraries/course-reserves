@@ -285,16 +285,6 @@ class ItemClaimRepository
         return FacultySubmission::find()->where(['submission_uuid' => $uuid])->one();
     }
 
-    public function findStaffByUsername($username)
-    {
-        return Yii::$app->db->createCommand(
-            'SELECT claimant.id, claimant.username, claimant.full_name, claimant.role, '
-            . self::claimedByDisplayNameSql() . ' AS claimed_by_display FROM users claimant '
-            . 'WHERE claimant.username = :username AND claimant.role IN ("staff", "admin") LIMIT 1',
-            [':username' => $username]
-        )->queryOne();
-    }
-
     public function legacyClaimedNewItems($username)
     {
         return SubmissionNewResource::find()

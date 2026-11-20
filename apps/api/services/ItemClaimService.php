@@ -63,12 +63,16 @@ class ItemClaimService
     {
         return $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use ($kind, $id, $actor) {
             $username = $this->username($actor);
-            if (!empty($item['assigned_group_id']) && !$this->groups->isMember($item['assigned_group_id'], $username)) {
+            if (!empty($item['assigned_group_id']) && !$this->groups->isMember(
+                $item['assigned_group_id'], $username, true
+            )) {
                 return $this->result(403, ['error_code' => 'not_group_member']);
             }
             $before = $this->snapshot($item);
             if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
-                if (!empty($item['assigned_group_id']) && !$this->groups->isMember($item['assigned_group_id'], $username)) {
+                if (!empty($item['assigned_group_id']) && !$this->groups->isMember(
+                    $item['assigned_group_id'], $username, true
+                )) {
                     return $this->result(403, ['error_code' => 'not_group_member']);
                 }
                 return $this->result(409, [
@@ -81,8 +85,8 @@ class ItemClaimService
             $claimed['claimed_at'] = $now;
             $claimed['last_activity_at'] = $now;
             $claimed['status'] = 'in_progress';
-            $claimant = $this->repository->findStaffByUsername($username);
-            $claimed['claimed_by_display'] = $claimant['claimed_by_display'] ?? $username;
+            $claimant = $this->groups->staffMember($username);
+            $claimed['claimed_by_display'] = $claimant['display_name'] ?? $username;
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
             );

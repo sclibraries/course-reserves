@@ -7,16 +7,19 @@ use Yii;
 /** Owns persistence and membership queries for staff groups. */
 class StaffGroupRepository
 {
-    public function find($id, $forUpdate = false)
+    public function find($id, $forUpdate = false, $forShare = false)
     {
-        $sql = 'SELECT * FROM staff_groups WHERE id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
+        $lock = $forUpdate ? ' FOR UPDATE' : ($forShare ? ' LOCK IN SHARE MODE' : '');
+        $sql = 'SELECT * FROM staff_groups WHERE id = :id LIMIT 1' . $lock;
         return Yii::$app->db->createCommand($sql, [':id' => (int)$id])->queryOne() ?: null;
     }
 
-    public function findByName($name)
+    public function findByName($name, $forShare = false)
     {
         return Yii::$app->db->createCommand(
-            'SELECT * FROM staff_groups WHERE name = :name LIMIT 1', [':name' => $name]
+            'SELECT * FROM staff_groups WHERE name = :name LIMIT 1'
+                . ($forShare ? ' LOCK IN SHARE MODE' : ''),
+            [':name' => $name]
         )->queryOne() ?: null;
     }
 
@@ -30,10 +33,11 @@ class StaffGroupRepository
         return Yii::$app->db->createCommand($this->groupListSql(true), [':username' => $username])->queryAll();
     }
 
-    public function isMember($groupId, $username)
+    public function isMember($groupId, $username, $forShare = false)
     {
         return (bool)Yii::$app->db->createCommand(
-            'SELECT 1 FROM staff_group_members WHERE group_id = :group_id AND username = :username LIMIT 1',
+            'SELECT 1 FROM staff_group_members WHERE group_id = :group_id AND username = :username LIMIT 1'
+                . ($forShare ? ' LOCK IN SHARE MODE' : ''),
             [':group_id' => (int)$groupId, ':username' => $username]
         )->queryScalar();
     }
@@ -49,11 +53,13 @@ class StaffGroupRepository
         )->queryAll();
     }
 
-    public function staffMember($username)
+    public function staffMember($username, $forShare = false)
     {
+        $displayName = ItemClaimRepository::claimedByDisplayNameSql();
         return Yii::$app->db->createCommand(
-            'SELECT username, COALESCE(NULLIF(full_name, ""), username) AS display_name, role '
-            . 'FROM users WHERE username = :username AND role IN ("staff", "admin") LIMIT 1',
+            'SELECT claimant.username, ' . $displayName . ' AS display_name, claimant.role FROM users claimant '
+            . 'WHERE claimant.username = :username AND claimant.role IN ("staff", "admin") LIMIT 1'
+            . ($forShare ? ' LOCK IN SHARE MODE' : ''),
             [':username' => $username]
         )->queryOne();
     }
@@ -111,10 +117,11 @@ class StaffGroupRepository
         ])->execute();
     }
 
-    public function memberUsernames($groupId)
+    public function memberUsernames($groupId, $forShare = false)
     {
         return Yii::$app->db->createCommand(
-            'SELECT username FROM staff_group_members WHERE group_id = :group_id ORDER BY username ASC',
+            'SELECT username FROM staff_group_members WHERE group_id = :group_id ORDER BY username ASC'
+                . ($forShare ? ' LOCK IN SHARE MODE' : ''),
             [':group_id' => (int)$groupId]
         )->queryColumn();
     }
