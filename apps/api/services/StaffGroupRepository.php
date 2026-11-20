@@ -44,10 +44,11 @@ class StaffGroupRepository
 
     public function members($groupId)
     {
+        $displayName = ItemClaimRepository::claimedByDisplayNameSql();
         return Yii::$app->db->createCommand(
-            'SELECT m.username, COALESCE(NULLIF(u.full_name, ""), u.username) AS display_name, '
+            'SELECT m.username, ' . $displayName . ' AS display_name, '
             . 'm.added_by, m.added_at FROM staff_group_members m '
-            . 'LEFT JOIN users u ON u.username = m.username '
+            . 'LEFT JOIN users claimant ON claimant.username = m.username '
             . 'WHERE m.group_id = :group_id ORDER BY display_name ASC, m.username ASC',
             [':group_id' => (int)$groupId]
         )->queryAll();

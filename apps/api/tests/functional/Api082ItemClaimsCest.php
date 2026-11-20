@@ -5,6 +5,7 @@ require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
 use PHPUnit\Framework\Assert;
 use app\services\ItemClaimRepository;
 use app\services\ItemClaimService;
+use app\services\StaffGroupRepository;
 
 /** Covers item-level claim routes, logging, expiry, privacy, and legacy admin compatibility. */
 class Api082ItemClaimsCest extends BaseFunctionalCest
@@ -168,8 +169,20 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
     public function claimAllClaimsEachAvailableItemAndReportsAlreadyClaimedItems(FunctionalTester $I)
     {
         $submission = $this->createSubmission('claim-all');
+        \Yii::$app->db->createCommand()->update('faculty_submissions', [
+            'submitted_at' => date('Y-m-d H:i:s'),
+        ], ['submission_id' => $submission['submission_id']])->execute();
         $secondNewId = $this->createNewItem($submission['submission_id'], 'API-082 second new item', 2);
-        $reuseId = $this->createReuseItem($submission['submission_id'], 'API-082 reused book', 3);
+        $groupDeniedId = $this->createNewItem($submission['submission_id'], 'API-082 group denied item', 3);
+        $reuseId = $this->createReuseItem($submission['submission_id'], 'API-082 reused book', 4);
+        $groupId = (new StaffGroupRepository())->insertGroup([
+            'name' => $this->prefix . 'claim-all-group',
+            'description' => 'Synthetic API-082 claim-all group',
+            'created_by' => 'test-api082-admin',
+        ]);
+        \Yii::$app->db->createCommand()->update('submission_new_resources', [
+            'assigned_group_id' => $groupId,
+        ], ['id' => $groupDeniedId])->execute();
         $this->claim($I, 'reuse', $reuseId, $this->targetToken);
 
         $this->request($I, 'POST', 'workflow-claim/claim-all', [], $this->staffToken, [
@@ -181,8 +194,108 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
             ['kind' => 'new', 'id' => $submission['new_item_id']],
             ['kind' => 'new', 'id' => $secondNewId],
         ], $this->response($I)['claimed']);
-        Assert::assertSame('Synthetic API-082 Target', $this->response($I)['skipped'][0]['claimed_by_display']);
-        Assert::assertSame('reuse', $this->response($I)['skipped'][0]['kind']);
+        Assert::assertSame([
+            ['kind' => 'new', 'id' => $groupDeniedId, 'error_code' => 'not_group_member'],
+            ['kind' => 'reuse', 'id' => $reuseId, 'claimed_by_display' => 'Synthetic API-082 Target'],
+        ], $this->response($I)['skipped']);
+
+        $drafted = $this->createSubmission('claim-all-guard');
+        \Yii::$app->db->createCommand()->update('faculty_submissions', [
+            'submitted_at' => date('Y-m-d H:i:s'),
+        ], ['submission_id' => $drafted['submission_id']])->execute();
+        $repository = new class($drafted['uuid']) extends ItemClaimRepository {
+            private $uuid;
+
+            public function __construct($uuid)
+            {
+                $this->uuid = $uuid;
+            }
+
+            public function submissionByUuid($uuid)
+            {
+                $submission = parent::submissionByUuid($uuid);
+                if ($submission && $uuid === $this->uuid) {
+                    \Yii::$app->db->createCommand()->update('faculty_submissions', [
+                        'status' => 'draft',
+                    ], ['submission_id' => $submission->submission_id])->execute();
+                }
+                return $submission;
+            }
+        };
+        $result = (new ItemClaimService($repository))->claimAll(
+            $drafted['uuid'], ['username' => 'test-api082-staff', 'role' => 'staff']
+        );
+        Assert::assertSame(200, $result['status']);
+        Assert::assertSame([
+            ['kind' => 'new', 'id' => $drafted['new_item_id'], 'error_code' => 'submission_not_submitted'],
+        ], $result['body']['skipped']);
+    }
+
+    public function claimAllRetriesEachCandidateAndKeepsCommittedPartialResults(FunctionalTester $I)
+    {
+        $oldCommandClass = \Yii::$app->db->commandClass;
+        \Yii::$app->db->commandClass = Api082BatchClaimCommand::class;
+        try {
+            foreach ([2, 3] as $failures) {
+                $this->clockNow = date('Y-m-d H:i:s');
+                $submission = $this->createSubmission('claim-all-retry-' . $failures);
+                \Yii::$app->db->createCommand()->update('faculty_submissions', [
+                    'submitted_at' => $this->clockNow,
+                ], ['submission_id' => $submission['submission_id']])->execute();
+                \Yii::$app->db->createCommand()->update('submission_new_resources', [
+                    'display_order' => 1,
+                ], ['id' => $submission['new_item_id']])->execute();
+                $heldId = $this->createNewItem($submission['submission_id'], 'API-082 held item', 2);
+                $retryId = $this->createNewItem($submission['submission_id'], 'API-082 retried item', 3);
+                $laterId = $this->createNewItem($submission['submission_id'], 'API-082 later item', 4);
+                $this->claim($I, 'new', $heldId, $this->targetToken);
+
+                Api082BatchClaimCommand::failAfterClaimWrite($retryId, $failures);
+                $this->request($I, 'POST', 'workflow-claim/claim-all', [], $this->staffToken, [
+                    'uuid' => $submission['uuid'],
+                ]);
+                Assert::assertSame(3, Api082BatchClaimCommand::matches());
+                $body = $this->response($I);
+                $earlier = [['kind' => 'new', 'id' => $submission['new_item_id']]];
+                $held = [[
+                    'kind' => 'new',
+                    'id' => $heldId,
+                    'claimed_by_display' => 'Synthetic API-082 Target',
+                ]];
+
+                if ($failures === 2) {
+                    $I->seeResponseCodeIs(200);
+                    Assert::assertSame([
+                        'claimed' => array_merge($earlier, [
+                            ['kind' => 'new', 'id' => $retryId],
+                            ['kind' => 'new', 'id' => $laterId],
+                        ]),
+                        'skipped' => $held,
+                    ], $body);
+                    Assert::assertSame('test-api082-staff', $this->claimRow('new', $retryId)['claimed_by']);
+                    Assert::assertSame('test-api082-staff', $this->claimRow('new', $laterId)['claimed_by']);
+                    Assert::assertSame(4, $this->eventCount($submission['submission_id'], 'claimed'));
+                } else {
+                    $I->seeResponseCodeIs(409);
+                    Assert::assertSame([
+                        'error_code' => 'item_contention',
+                        'reference' => $body['reference'],
+                        'claimed' => $earlier,
+                        'skipped' => $held,
+                    ], $body);
+                    Assert::assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/', $body['reference']);
+                    Assert::assertSame('test-api082-staff', $this->claimRow('new', $submission['new_item_id'])['claimed_by']);
+                    Assert::assertSame('test-api082-target', $this->claimRow('new', $heldId)['claimed_by']);
+                    Assert::assertNull($this->claimRow('new', $retryId)['claimed_by']);
+                    Assert::assertNull($this->claimRow('new', $laterId)['claimed_by']);
+                    Assert::assertSame(0, $this->eventCountForItem($retryId, 'claimed'));
+                    Assert::assertSame(2, $this->eventCount($submission['submission_id'], 'claimed'));
+                }
+            }
+        } finally {
+            Api082BatchClaimCommand::resetHarness();
+            \Yii::$app->db->commandClass = $oldCommandClass;
+        }
     }
 
     public function queueAndMyItemsReturnTheSharedItemSummary(FunctionalTester $I)
@@ -532,6 +645,15 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
         )->queryScalar();
     }
 
+    private function eventCountForItem($itemId, $eventType)
+    {
+        return (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM workflow_events WHERE item_kind = "new" AND item_id = :item_id '
+            . 'AND event_type = :event_type',
+            [':item_id' => $itemId, ':event_type' => $eventType]
+        )->queryScalar();
+    }
+
     private function recursiveKeys(array $value)
     {
         $keys = [];
@@ -557,6 +679,10 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
     private function cleanup()
     {
         $db = \Yii::$app->db;
+        $groupIds = $db->createCommand(
+            'SELECT id FROM staff_groups WHERE name LIKE :prefix',
+            [':prefix' => $this->prefix . '%']
+        )->queryColumn();
         $submissionIds = $db->createCommand(
             'SELECT submission_id FROM faculty_submissions WHERE course_title LIKE :prefix',
             [':prefix' => $this->prefix . '%']
@@ -564,6 +690,10 @@ class Api082ItemClaimsCest extends BaseFunctionalCest
         if ($submissionIds) {
             $db->createCommand()->delete('workflow_events', ['submission_id' => $submissionIds])->execute();
             $db->createCommand()->delete('faculty_submissions', ['submission_id' => $submissionIds])->execute();
+        }
+        if ($groupIds) {
+            $db->createCommand()->delete('staff_group_members', ['group_id' => $groupIds])->execute();
+            $db->createCommand()->delete('staff_groups', ['id' => $groupIds])->execute();
         }
         $courseIds = $db->createCommand(
             'SELECT course_id FROM courses WHERE location_id LIKE :prefix',
@@ -609,5 +739,49 @@ class Api082NotifierSpy
     public function notify($event, array $context)
     {
         call_user_func($this->callback, $event, $context);
+    }
+}
+
+class Api082BatchClaimCommand extends \yii\db\Command
+{
+    private static $itemId;
+    private static $failures = 0;
+    private static $matches = 0;
+
+    public static function failAfterClaimWrite($itemId, $failures)
+    {
+        self::$itemId = (int)$itemId;
+        self::$failures = (int)$failures;
+        self::$matches = 0;
+    }
+
+    public static function matches()
+    {
+        return self::$matches;
+    }
+
+    public static function resetHarness()
+    {
+        self::$itemId = null;
+        self::$failures = 0;
+        self::$matches = 0;
+    }
+
+    public function execute()
+    {
+        $sql = $this->getRawSql();
+        $result = parent::execute();
+        if (self::$itemId !== null && preg_match(
+            '/^UPDATE `?submission_new_resources`? SET .*`?claimed_by`?\s*=.*WHERE `?id`?\s*=\s*'
+                . self::$itemId . '\b/i',
+            $sql
+        )) {
+            self::$matches++;
+            if (self::$failures > 0) {
+                self::$failures--;
+                throw new \app\services\ItemAssociationChanged('Synthetic batch claim retry.');
+            }
+        }
+        return $result;
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
+require_once __DIR__ . '/../_support/concurrency/ItemWriteConcurrencyWorkerOps.php';
 
 use PHPUnit\Framework\Assert;
 use app\services\ItemClaimRepository;
@@ -195,6 +196,49 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         Assert::assertSame(2, $this->claimReadCount($six['submission_id']));
     }
 
+    public function detailPropagatesTypedContentionFromClaimDisplayAndInputProjection(FunctionalTester $I)
+    {
+        $submission = $this->createSubmission('contention');
+        \Yii::$app->db->createCommand()->update('faculty_submissions', [
+            'submitted_at' => $this->clockNow,
+        ], ['submission_id' => $submission['submission_id']])->execute();
+        $oldCommandClass = \Yii::$app->db->commandClass;
+        \Yii::$app->db->commandClass = Api119A4TestCommand::class;
+        try {
+            Api119A4TestCommand::failAfterQuery('/^SELECT current_item\.id,/i', 3);
+            $this->request($I, 'GET', 'submission-workflow/view-submission', [], 'staff-a', [
+                'id' => $submission['submission_id'],
+            ]);
+            $I->seeResponseCodeIs(409);
+            $displayBody = $this->response($I);
+            Assert::assertSame([
+                'error_code' => 'item_contention',
+                'reference' => $displayBody['reference'],
+            ], $displayBody);
+            Assert::assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/', $displayBody['reference']);
+            Assert::assertSame(3, Api119A4TestCommand::afterMatches());
+
+            Api119A4TestCommand::failAfterQuery(
+                '/FROM `?item_flow_runs`? WHERE item_kind = ["\']?new["\']?/i',
+                3
+            );
+            $this->request($I, 'GET', 'submission-workflow/view-submission', [], 'staff-a', [
+                'id' => $submission['submission_id'],
+            ]);
+            $I->seeResponseCodeIs(409);
+            $projectionBody = $this->response($I);
+            Assert::assertSame([
+                'error_code' => 'item_contention',
+                'reference' => $projectionBody['reference'],
+            ], $projectionBody);
+            Assert::assertRegExp('/^[A-HJ-NP-Z2-9]{6}$/', $projectionBody['reference']);
+            Assert::assertSame(3, Api119A4TestCommand::afterMatches());
+        } finally {
+            Api119A4TestCommand::resetHarness();
+            \Yii::$app->db->commandClass = $oldCommandClass;
+        }
+    }
+
     private function createSubmission($suffix)
     {
         $uuid = $this->uuid();
@@ -333,7 +377,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
             return $message[2] === 'yii\\db\\Command::query'
                 && $message[1] === \yii\log\Logger::LEVEL_INFO
                 && is_string($message[0])
-                && strpos($message[0], 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username)') !== false;
+                && strpos($message[0], 'LEFT JOIN users claimant ON claimant.username =') !== false;
         });
         return count($queries);
     }

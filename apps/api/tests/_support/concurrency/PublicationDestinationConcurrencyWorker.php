@@ -211,6 +211,10 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt)
     if (strpos($operation, 'item_lock_a5_') === 0) {
         return PostLockReadConcurrencyWorkerOps::run($request, $db);
     }
+    if (strpos($operation, 'item_lock_batch_') === 0) {
+        require_once __DIR__ . '/ItemClaimBatchConcurrencyWorkerOps.php';
+        return ItemClaimBatchConcurrencyWorkerOps::run($request);
+    }
     if (strpos($operation, 'item_lock_') === 0) {
         return ItemWriteConcurrencyWorkerOps::run($request);
     }

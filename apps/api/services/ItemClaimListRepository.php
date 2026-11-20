@@ -66,14 +66,18 @@ class ItemClaimListRepository
 
     public function staff($query)
     {
-        $sql = 'SELECT username, COALESCE(NULLIF(full_name, ""), username) AS display_name '
-            . 'FROM users WHERE role IN ("staff", "admin")';
+        $displayName = ItemClaimRepository::claimedByDisplayNameSql();
+        $sql = 'SELECT claimant.username, ' . $displayName . ' AS display_name '
+            . 'FROM users claimant WHERE claimant.role IN ("staff", "admin")';
         $params = [];
         if ($query !== null && trim((string)$query) !== '') {
-            $sql .= ' AND (username LIKE :query OR full_name LIKE :query)';
+            $sql .= ' AND (claimant.username LIKE :query OR claimant.full_name LIKE :query)';
             $params[':query'] = '%' . trim((string)$query) . '%';
         }
-        return Yii::$app->db->createCommand($sql . ' ORDER BY display_name ASC, username ASC LIMIT 20', $params)->queryAll();
+        return Yii::$app->db->createCommand(
+            $sql . ' ORDER BY display_name ASC, claimant.username ASC LIMIT 20',
+            $params
+        )->queryAll();
     }
 
     private function queueSql($term, $type)

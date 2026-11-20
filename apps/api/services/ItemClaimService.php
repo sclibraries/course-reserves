@@ -61,37 +61,48 @@ class ItemClaimService
 
     public function claim($kind, $id, array $actor)
     {
-        return $this->linkedItems->withLinkedItem($kind, $id, function ($item, $transaction, $now) use ($kind, $id, $actor) {
-            $username = $this->username($actor);
-            if (!empty($item['assigned_group_id']) && !$this->groups->isMember(
-                $item['assigned_group_id'], $username, true
-            )) {
-                return $this->result(403, ['error_code' => 'not_group_member']);
-            }
-            $before = $this->snapshot($item);
-            if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
+        return $this->claimItem($kind, $id, $actor, null);
+    }
+
+    private function claimItem($kind, $id, array $actor, $expectedSubmissionId)
+    {
+        return $this->linkedItems->withLinkedItem(
+            $kind,
+            $id,
+            function ($item, $transaction, $now) use ($kind, $id, $actor) {
+                $username = $this->username($actor);
                 if (!empty($item['assigned_group_id']) && !$this->groups->isMember(
                     $item['assigned_group_id'], $username, true
                 )) {
                     return $this->result(403, ['error_code' => 'not_group_member']);
                 }
-                return $this->result(409, [
-                    'error_code' => 'already_claimed',
-                    'claimed_by_display' => $item['claimed_by_display'],
-                ]);
-            }
-            $claimed = $item;
-            $claimed['claimed_by'] = $username;
-            $claimed['claimed_at'] = $now;
-            $claimed['last_activity_at'] = $now;
-            $claimed['status'] = 'in_progress';
-            $claimant = $this->groups->staffMember($username);
-            $claimed['claimed_by_display'] = $claimant['display_name'] ?? $username;
-            $this->eventLog->record(
-                $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
-            );
-            return $this->result(200, ['item' => $this->presenter->present($claimed, $this->expiry->hours())]);
-        });
+                $before = $this->snapshot($item);
+                if (!$this->repository->claimIfUnclaimed($kind, $id, $username, $now)) {
+                    if (!empty($item['assigned_group_id']) && !$this->groups->isMember(
+                        $item['assigned_group_id'], $username, true
+                    )) {
+                        return $this->result(403, ['error_code' => 'not_group_member']);
+                    }
+                    return $this->result(409, [
+                        'error_code' => 'already_claimed',
+                        'claimed_by_display' => $item['claimed_by_display'],
+                    ]);
+                }
+                $claimed = $item;
+                $claimed['claimed_by'] = $username;
+                $claimed['claimed_at'] = $now;
+                $claimed['last_activity_at'] = $now;
+                $claimed['status'] = 'in_progress';
+                $claimant = $this->groups->staffMember($username);
+                $claimed['claimed_by_display'] = $claimant['display_name'] ?? $username;
+                $this->eventLog->record(
+                    $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
+                );
+                return $this->result(200, ['item' => $this->presenter->present($claimed, $this->expiry->hours())]);
+            },
+            null,
+            $expectedSubmissionId
+        );
     }
 
     public function release($kind, $id, array $actor, $reason = null)
@@ -137,7 +148,18 @@ class ItemClaimService
         $claimed = [];
         $skipped = [];
         foreach ($this->repository->itemRefsBySubmission($submission->submission_id) as $reference) {
-            $result = $this->claim($reference['kind'], $reference['id'], $actor);
+            try {
+                $result = $this->claimItem(
+                    $reference['kind'], $reference['id'], $actor, $submission->submission_id
+                );
+            } catch (ItemContention $exception) {
+                return $this->result(409, [
+                    'error_code' => 'item_contention',
+                    'reference' => $exception->reference,
+                    'claimed' => $claimed,
+                    'skipped' => $skipped,
+                ]);
+            }
             if ($result['status'] === 200) {
                 $claimed[] = ['kind' => $reference['kind'], 'id' => $reference['id']];
             } elseif ($result['status'] === 409 && $result['body']['error_code'] === 'already_claimed') {
@@ -145,6 +167,12 @@ class ItemClaimService
                     'kind' => $reference['kind'],
                     'id' => $reference['id'],
                     'claimed_by_display' => $result['body']['claimed_by_display'],
+                ];
+            } elseif (in_array($result['status'], [403, 404, 409], true)) {
+                $skipped[] = [
+                    'kind' => $reference['kind'],
+                    'id' => $reference['id'],
+                    'error_code' => $result['body']['error_code'],
                 ];
             }
         }

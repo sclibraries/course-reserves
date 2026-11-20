@@ -44,7 +44,8 @@ class ItemWriteLockProjection
         $materialType = $this->materialType($materialTypeId);
         $claimedBy = $item['claimed_by'] ?? null;
         $claimedByDisplay = $claimedBy === null ? null : Yii::$app->db->createCommand(
-            'SELECT COALESCE(NULLIF(full_name, ""), username) FROM users WHERE username = :username LIMIT 1',
+            'SELECT ' . ItemClaimRepository::claimedByDisplayNameSql()
+                . ' FROM users claimant WHERE claimant.username = :username LIMIT 1',
             [':username' => $claimedBy]
         )->queryScalar();
         $groupId = $item['assigned_group_id'] ?? null;

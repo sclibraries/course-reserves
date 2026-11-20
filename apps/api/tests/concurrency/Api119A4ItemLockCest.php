@@ -9,6 +9,8 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
 {
     private $fixture;
     private $prefix;
+    private $batchUuids = [];
+    private $batchUsernames = [];
 
     public function _before(ConcurrencyTester $I)
     {
@@ -21,6 +23,12 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
     {
         $this->supervisor->stopAll();
         $this->fixture->cleanup();
+        foreach ($this->batchUuids as $uuid) {
+            TestSubmissionFixture::delete($uuid);
+        }
+        if ($this->batchUsernames) {
+            \Yii::$app->db->createCommand()->delete('users', ['username' => $this->batchUsernames])->execute();
+        }
         \Yii::$app->db->createCommand()->delete('users', [
             'username' => $this->prefix . 'fresh-holder',
         ])->execute();
@@ -120,6 +128,107 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
             [':id' => $moving['id'], ':actor' => $this->prefix . 'worker']
         )->queryScalar());
         $this->assertAcquisitionAttempts($result['queries'], 'new', 2);
+    }
+
+    public function claimAllSkipsCandidatesMovedOrDeletedAfterItsListRead(ConcurrencyTester $I)
+    {
+        $actor = $this->prefix . 'batch-actor';
+        $this->batchUsernames[] = $actor;
+        \Yii::$app->db->createCommand()->insert('users', [
+            'username' => $actor,
+            'full_name' => 'Synthetic API-119A4 batch actor',
+            'email' => $actor . '@example.test',
+            'role' => 'staff',
+            'institution' => 'SM',
+            'approved' => 1,
+        ])->execute();
+
+        foreach ([
+            ['before_discovery', 'refs', false],
+            ['between_discovery_and_lock', 'discovery', false],
+            ['deleted_before_discovery', 'refs', true],
+        ] as $case) {
+            list($name, $pausePoint, $delete) = $case;
+            $source = $this->createBatchSubmission('source-' . $name);
+            $target = $this->createBatchSubmission('target-' . $name);
+            $candidateId = $source['item_id'];
+            $laterId = $this->createBatchItem($source['submission_id'], 'later-' . $name, 2);
+            $stale = date('Y-m-d H:i:s', time() - 80 * 3600);
+            \Yii::$app->db->createCommand()->update('submission_new_resources', [
+                'claimed_by' => $this->prefix . 'old-holder',
+                'claimed_at' => $stale,
+                'last_activity_at' => $stale,
+                'item_status' => 'in_progress',
+            ], ['id' => $candidateId])->execute();
+
+            $label = 'batch-' . $name;
+            $this->startOperation($label, 'item_lock_batch_claim', [
+                'uuid' => $source['uuid'],
+                'actor' => $actor,
+                'candidate_id' => $candidateId,
+                'pause_point' => $pausePoint,
+            ]);
+            $phase = 'discovered';
+            $barrier = $this->supervisor->awaitPhase($label, $phase, $pausePoint === 'refs' ? 0 : 1);
+            Assert::assertNotEmpty($barrier['context']['sql']);
+            if ($pausePoint === 'refs') {
+                Assert::assertSame(1, preg_match(
+                    '/SELECT id, display_order AS position FROM submission_new_resources/i',
+                    $barrier['context']['sql']
+                ));
+            } else {
+                Assert::assertSame(1, preg_match(
+                    '/SELECT submission_id FROM submission_new_resources WHERE id\s*=\s*' . $candidateId . '\s+LIMIT 1/i',
+                    $barrier['context']['sql']
+                ));
+            }
+
+            if ($delete) {
+                \Yii::$app->db->createCommand()->delete('submission_new_resources', ['id' => $candidateId])->execute();
+            } else {
+                \Yii::$app->db->createCommand()->update('submission_new_resources', [
+                    'submission_id' => $target['submission_id'],
+                ], ['id' => $candidateId])->execute();
+            }
+            $this->supervisor->release($label, $phase, $pausePoint === 'refs' ? 0 : 1);
+            $result = $this->supervisor->complete($label);
+            Assert::assertSame([
+                'status' => 200,
+                'body' => [
+                    'claimed' => [['kind' => 'new', 'id' => $laterId]],
+                    'skipped' => [[
+                        'kind' => 'new', 'id' => $candidateId, 'error_code' => 'item_not_found',
+                    ]],
+                ],
+            ], $result['result']);
+
+            $candidateDiscoveries = array_filter($result['queries'], function ($sql) use ($candidateId) {
+                return preg_match(
+                    '/SELECT submission_id FROM submission_new_resources WHERE id\s*=\s*' . $candidateId . '\s+LIMIT 1/i',
+                    $sql
+                );
+            });
+            Assert::assertCount($name === 'between_discovery_and_lock' ? 2 : 1, $candidateDiscoveries);
+            if ($delete) {
+                Assert::assertFalse(\Yii::$app->db->createCommand(
+                    'SELECT 1 FROM submission_new_resources WHERE id = :id', [':id' => $candidateId]
+                )->queryScalar());
+            } else {
+                $row = \Yii::$app->db->createCommand(
+                    'SELECT submission_id, claimed_by, claimed_at, last_activity_at, item_status '
+                    . 'FROM submission_new_resources WHERE id = :id', [':id' => $candidateId]
+                )->queryOne();
+                Assert::assertSame((int)$target['submission_id'], (int)$row['submission_id']);
+                Assert::assertSame($this->prefix . 'old-holder', $row['claimed_by']);
+                Assert::assertSame($stale, $row['claimed_at']);
+                Assert::assertSame($stale, $row['last_activity_at']);
+                Assert::assertSame('in_progress', $row['item_status']);
+                Assert::assertSame(0, (int)\Yii::$app->db->createCommand(
+                    'SELECT COUNT(*) FROM workflow_events WHERE item_kind = "new" AND item_id = :id '
+                    . 'AND event_type IN ("claimed", "claim_expired")', [':id' => $candidateId]
+                )->queryScalar());
+            }
+        }
     }
 
     public function claimDisplayDoesNotExpireAClaimRenewedBeforeTheItemLock(ConcurrencyTester $I)
@@ -266,6 +375,42 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
             'created_at' => '2026-10-01 10:00:00',
             'updated_at' => '2026-10-01 10:00:01',
         ])->execute();
+    }
+
+    private function createBatchSubmission($suffix)
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $uuid = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
+        $this->batchUuids[] = $uuid;
+        $submissionId = TestSubmissionFixture::create($uuid, $this->prefix . 'faculty', [
+            'term_code' => 'Fall 2027',
+            'course_code' => 'TST 119A4-' . substr(str_replace('-', '', $uuid), 0, 8),
+            'section' => '01',
+            'course_title' => $this->prefix . $suffix,
+            'submitted_at' => date('Y-m-d H:i:s'),
+            'link_state' => 'linked',
+        ]);
+        $itemId = (int)\Yii::$app->db->createCommand(
+            'SELECT id FROM submission_new_resources WHERE submission_id = :id ORDER BY id LIMIT 1',
+            [':id' => $submissionId]
+        )->queryScalar();
+        \Yii::$app->db->createCommand()->update('submission_new_resources', [
+            'display_order' => 1,
+        ], ['id' => $itemId])->execute();
+        return ['uuid' => $uuid, 'submission_id' => $submissionId, 'item_id' => $itemId];
+    }
+
+    private function createBatchItem($submissionId, $title, $position)
+    {
+        \Yii::$app->db->createCommand()->insert('submission_new_resources', [
+            'submission_id' => $submissionId,
+            'resource_data' => json_encode(['title' => 'Synthetic ' . $title]),
+            'display_order' => $position,
+            'item_status' => 'pending',
+        ])->execute();
+        return (int)\Yii::$app->db->getLastInsertID();
     }
 
     private function assertAcquisitionAttempts(array $queries, $kind, $attempts)

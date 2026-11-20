@@ -23,11 +23,27 @@ class LinkedItemService
         $this->statusGuard = $statusGuard ?: [$submittedScope, 'guardStatus'];
     }
 
-    public function withLinkedItem($kind, $id, callable $callback, ?callable $beforeProjection = null)
+    public function withLinkedItem(
+        $kind,
+        $id,
+        callable $callback,
+        ?callable $beforeProjection = null,
+        $expectedSubmissionId = null
+    )
     {
-        return Transactional::retrying(function ($transaction) use ($kind, $id, $callback, $beforeProjection) {
+        return Transactional::retrying(function ($transaction) use (
+            $kind,
+            $id,
+            $callback,
+            $beforeProjection,
+            $expectedSubmissionId
+        ) {
             $locked = $this->itemLock->lock($kind, $id);
             if ($locked['missing'] !== null) {
+                return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
+            }
+            if ($expectedSubmissionId !== null
+                && (int)$locked['submission_id'] !== (int)$expectedSubmissionId) {
                 return $this->reject($transaction, 404, ['error_code' => 'item_not_found']);
             }
             if ($beforeProjection !== null) {
