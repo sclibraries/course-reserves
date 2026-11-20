@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
+
 use PHPUnit\Framework\Assert;
 use app\services\ItemClaimRepository;
 use app\services\ItemClaimService;
@@ -9,16 +11,18 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
 {
     private $prefix = 'test-api102-';
     private $tokens = [];
-    private $clockNow = '2026-10-19 12:00:00';
+    private $clockNow;
     private $notifications = [];
     private $materialTypeId;
     private $resourceId;
     private $courseIds = [];
     private $originalExpiryHours;
+    private $restoreDb;
 
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $this->restoreDb = Api116B1CommittedConnection::swap();
         $this->cleanup();
         $this->insertUser('admin', 'admin', 'Synthetic API-102 Admin');
         $this->insertUser('staff-a', 'staff', '');
@@ -31,7 +35,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
             'faculty' => $this->token('faculty', 'faculty'),
         ];
         $this->notifications = [];
-        $this->clockNow = '2026-10-19 12:00:00';
+        $this->clockNow = date('Y-m-d H:i:s', time() - 60);
         $this->originalExpiryHours = \Yii::$app->params['workflowClaimExpiryHours'];
         \Yii::$app->params['workflowClaimExpiryHours'] = 72;
         \Yii::$app->db->createCommand()->insert('material_types', [
@@ -62,9 +66,13 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
 
     public function _after(FunctionalTester $I)
     {
-        $this->cleanup();
-        \Yii::$app->params['workflowClaimExpiryHours'] = $this->originalExpiryHours;
-        \Yii::$container->clear(ItemClaimService::class);
+        try {
+            $this->cleanup();
+            \Yii::$app->params['workflowClaimExpiryHours'] = $this->originalExpiryHours;
+            \Yii::$container->clear(ItemClaimService::class);
+        } finally {
+            call_user_func($this->restoreDb);
+        }
     }
 
     public function staffDetailPresentsClaimsByCollectionKindAndKeepsOnlyTheStaffProjection(FunctionalTester $I)
@@ -99,8 +107,8 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         \Yii::$app->params['workflowClaimExpiryHours'] = 6;
 
         $detail = $this->staffDetail($I, $submission['submission_id']);
-        $newItems = $this->itemsById($detail['newResources']);
-        $reuseItems = $this->itemsById($detail['reuseResources']);
+        $newItems = array_column($detail['newResources'], null, 'id');
+        $reuseItems = array_column($detail['reuseResources'], null, 'id');
         $claimFields = ['claimed_by', 'claimed_by_display', 'claimed_at', 'last_activity_at', 'expires_at', 'assigned_group'];
 
         foreach ([$newItems, $reuseItems] as $items) {
@@ -114,12 +122,13 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         }
         Assert::assertSame($this->prefix . 'staff-a', $newItems[$submission['new_item_id']]['claimed_by']);
         Assert::assertSame($this->prefix . 'staff-a', $newItems[$submission['new_item_id']]['claimed_by_display']);
-        Assert::assertSame('2026-10-19 12:00:00', $newItems[$submission['new_item_id']]['claimed_at']);
-        Assert::assertSame('2026-10-19 18:00:00', $newItems[$submission['new_item_id']]['expires_at']);
+        Assert::assertSame($this->clockNow, $newItems[$submission['new_item_id']]['claimed_at']);
+        Assert::assertSame(date('Y-m-d H:i:s', strtotime($this->clockNow) + 6 * 3600),
+            $newItems[$submission['new_item_id']]['expires_at']);
 
         $this->assertNullClaim($newItems[$pristineId]);
         Assert::assertNull($newItems[$releasedId]['claimed_by']);
-        Assert::assertSame('2026-10-19 12:00:00', $newItems[$releasedId]['last_activity_at']);
+        Assert::assertSame($this->clockNow, $newItems[$releasedId]['last_activity_at']);
         Assert::assertNull($newItems[$releasedId]['expires_at']);
         Assert::assertSame(1, (int)$newItems[$isReuseId]['is_reuse']);
         Assert::assertSame($this->prefix . 'staff-b', $newItems[$isReuseId]['claimed_by']);
@@ -128,7 +137,7 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
         Assert::assertNull($reuseItems[$reuseId]['claimed_by']);
         Assert::assertNull($reuseItems[$reuseId]['claimed_by_display']);
         Assert::assertNull($reuseItems[$reuseId]['claimed_at']);
-        Assert::assertSame('2026-10-19 12:00:00', $reuseItems[$reuseId]['last_activity_at']);
+        Assert::assertSame($this->clockNow, $reuseItems[$reuseId]['last_activity_at']);
         Assert::assertNull($reuseItems[$reuseId]['expires_at']);
         Assert::assertSame([
             'id' => $groupId,
@@ -159,9 +168,9 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
             Assert::assertNotContains($field, $facultyKeys);
         }
 
-        $this->clockNow = '2026-10-22 12:00:01';
+        $this->clockNow = date('Y-m-d H:i:s', strtotime($this->clockNow) + 72 * 3600 + 1);
         $detail = $this->staffDetail($I, $submission['submission_id']);
-        $item = $this->itemsById($detail['newResources'])[$submission['new_item_id']];
+        $item = array_column($detail['newResources'], null, 'id')[$submission['new_item_id']];
         Assert::assertNull($item['claimed_by']);
         Assert::assertNull($item['claimed_by_display']);
         Assert::assertNull($item['claimed_at']);
@@ -327,15 +336,6 @@ class Api102SubmissionDetailClaimsCest extends BaseFunctionalCest
                 && strpos($message[0], 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username)') !== false;
         });
         return count($queries);
-    }
-
-    private function itemsById(array $items)
-    {
-        $result = [];
-        foreach ($items as $item) {
-            $result[(int)$item['id']] = $item;
-        }
-        return $result;
     }
 
     private function assertNullClaim(array $item)

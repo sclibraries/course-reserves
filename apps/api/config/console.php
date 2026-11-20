@@ -26,6 +26,9 @@ $config = [
             ],
         ],
         'db' => $db,
+        'workflowNotificationQueue' => [
+            'class' => \app\services\WorkflowNotificationQueue::class,
+        ],
     ],
     'params' => $params,
     /*

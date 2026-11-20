@@ -32,17 +32,10 @@ class ItemClaimExpiryService
 
     public function expireLocked($kind, array $item, $now)
     {
-        if (empty($item['claimed_by'])) {
+        if (!$this->isDue($item, $now)) {
             return null;
         }
-        $lastActivity = $item['last_activity_at'] ?: $item['claimed_at'];
-        $lastTimestamp = $lastActivity ? strtotime($lastActivity) : false;
         $nowTimestamp = strtotime($now);
-        if ($lastTimestamp === false || $nowTimestamp === false
-            || $lastTimestamp + ($this->hours() * 3600) > $nowTimestamp) {
-            return null;
-        }
-
         $cutoff = date('Y-m-d H:i:s', $nowTimestamp - ($this->hours() * 3600));
         if (!$this->repository->expireIfDue($kind, $item['id'], $item['claimed_by'], $cutoff, $now)) {
             return null;
@@ -74,28 +67,40 @@ class ItemClaimExpiryService
         ];
     }
 
-    public function expireDueClaims()
+    public function expiredClaimCandidates()
     {
         $now = $this->now();
-        $nowTimestamp = strtotime($now);
-        $cutoff = date('Y-m-d H:i:s', $nowTimestamp - ($this->hours() * 3600));
-        $expired = 0;
-        foreach ($this->repository->expiredClaimCandidates($cutoff) as $reference) {
-            $transaction = Yii::$app->db->beginTransaction();
-            try {
-                $item = $this->repository->find($reference['kind'], $reference['id'], true);
-                $notification = $item ? $this->expireLocked($reference['kind'], $item, $now) : null;
-                $transaction->commit();
-                if ($notification) {
-                    $expired++;
-                    $this->notify($notification);
-                }
-            } catch (\Throwable $exception) {
-                if ($transaction->isActive) {
-                    $transaction->rollBack();
-                }
-                throw $exception;
+        $cutoff = date('Y-m-d H:i:s', strtotime($now) - ($this->hours() * 3600));
+        return $this->repository->expiredClaimCandidates($cutoff);
+    }
+
+    public function expireCandidate(array $reference, $linkedItems)
+    {
+        $claimBefore = null;
+        $responseStatus = Yii::$app->response->statusCode;
+        $result = $linkedItems->withLinkedItem(
+            $reference['kind'],
+            $reference['id'],
+            function ($item, $transaction, $now) use (&$claimBefore) {
+                return !empty($claimBefore['claimed_by'])
+                    && $this->isDue($claimBefore, $now)
+                    && empty($item['claimed_by']);
+            },
+            function () use (&$claimBefore, $reference) {
+                $claimBefore = $this->repository->lockedClaimState($reference['kind'], $reference['id']);
             }
+        );
+        if (is_array($result) && $result['status'] === 409) {
+            Yii::$app->response->statusCode = $responseStatus;
+        }
+        return $result === true;
+    }
+
+    public function expireDueClaims($linkedItems)
+    {
+        $expired = 0;
+        foreach ($this->expiredClaimCandidates() as $reference) {
+            $expired += $this->expireCandidate($reference, $linkedItems) ? 1 : 0;
         }
         return $expired;
     }
@@ -116,5 +121,17 @@ class ItemClaimExpiryService
             'last_activity_at' => $item['last_activity_at'],
             'assigned_group_id' => $item['assigned_group_id'],
         ];
+    }
+
+    private function isDue(array $item, $now)
+    {
+        if (empty($item['claimed_by'])) {
+            return false;
+        }
+        $lastActivity = $item['last_activity_at'] ?: $item['claimed_at'];
+        $lastTimestamp = $lastActivity ? strtotime($lastActivity) : false;
+        $nowTimestamp = strtotime($now);
+        return $lastTimestamp !== false && $nowTimestamp !== false
+            && $lastTimestamp + ($this->hours() * 3600) <= $nowTimestamp;
     }
 }

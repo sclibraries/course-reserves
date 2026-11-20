@@ -21,6 +21,9 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
     {
         $this->supervisor->stopAll();
         $this->fixture->cleanup();
+        \Yii::$app->db->createCommand()->delete('users', [
+            'username' => $this->prefix . 'fresh-holder',
+        ])->execute();
         parent::_after($I);
     }
 
@@ -117,6 +120,62 @@ class Api119A4ItemLockCest extends Api116B1ConcurrencyCase
             [':id' => $moving['id'], ':actor' => $this->prefix . 'worker']
         )->queryScalar());
         $this->assertAcquisitionAttempts($result['queries'], 'new', 2);
+    }
+
+    public function claimDisplayDoesNotExpireAClaimRenewedBeforeTheItemLock(ConcurrencyTester $I)
+    {
+        $offeringId = $this->fixture->createOffering('claim-display');
+        $item = $this->fixture->createItem('claim-display-expiry', $offeringId);
+        $holder = $this->prefix . 'fresh-holder';
+        \Yii::$app->db->createCommand()->insert('users', [
+            'username' => $holder,
+            'full_name' => 'Synthetic fresh claim holder',
+            'email' => $holder . '@example.test',
+            'role' => 'staff',
+            'institution' => 'SM',
+            'approved' => 1,
+        ])->execute();
+        $table = 'submission_new_resources';
+        \Yii::$app->db->createCommand()->update($table, [
+            'claimed_by' => $this->prefix . 'stale-holder',
+            'claimed_at' => date('Y-m-d H:i:s', time() - 80 * 3600),
+            'last_activity_at' => date('Y-m-d H:i:s', time() - 80 * 3600),
+            'item_status' => 'in_progress',
+        ], ['id' => $item['id']])->execute();
+
+        $label = 'claim-display-expiry';
+        $this->supervisor->start($label, [
+            'op' => 'item_lock_claim_display',
+            'submission_id' => $item['submission_id'],
+            'kind' => 'new',
+            'item_id' => $item['id'],
+            'pause_attempts' => 1,
+        ]);
+        $ready = $this->supervisor->awaitPhase($label, 'ready', 0);
+        Assert::assertNotSame($this->parentConnectionId, (int)$ready['connection_id']);
+        Assert::assertSame('reserves_test', $ready['database']);
+        Assert::assertSame('REPEATABLE-READ', $ready['isolation_level']);
+        $this->connections[$label] = (int)$ready['connection_id'];
+        $this->supervisor->release($label, 'ready', 0);
+
+        $discovery = $this->supervisor->awaitPhase($label, 'discovered', 1);
+        Assert::assertSame(1, preg_match('/submission_new_resources/', $discovery['context']['sql']));
+        \Yii::$app->db->createCommand()->update($table, [
+            'claimed_by' => $holder,
+            'claimed_at' => date('Y-m-d H:i:s'),
+            'last_activity_at' => date('Y-m-d H:i:s'),
+        ], ['id' => $item['id']])->execute();
+        $this->supervisor->release($label, 'discovered', 1);
+
+        $result = $this->supervisor->complete($label);
+        $claim = $result['result']['claims']['new'][$item['id']];
+        Assert::assertSame($holder, $claim['claimed_by']);
+        Assert::assertSame('Synthetic fresh claim holder', $claim['claimed_by_display']);
+        Assert::assertSame(0, (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM workflow_events WHERE item_kind = "new" AND item_id = :id '
+            . 'AND event_type = "claim_expired"', [':id' => $item['id']]
+        )->queryScalar());
+        $this->assertAcquisitionAttempts($result['queries'], 'new', 1);
     }
 
     public function invalidatorMovementRetriesTheWholeResourceOwner(ConcurrencyTester $I)

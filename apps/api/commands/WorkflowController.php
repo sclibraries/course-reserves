@@ -4,6 +4,7 @@ namespace app\commands;
 
 use app\services\LinkSuggestionService;
 use app\services\ItemClaimService;
+use app\services\ItemContention;
 use Yii;
 use yii\console\Controller;
 use yii\console\ExitCode;
@@ -33,7 +34,15 @@ class WorkflowController extends Controller
 
     public function actionExpireClaims()
     {
-        $expired = Yii::$container->get(ItemClaimService::class)->expireDueClaims();
+        $claims = Yii::$container->get(ItemClaimService::class);
+        $expired = 0;
+        foreach ($claims->expiredClaimCandidates() as $reference) {
+            try {
+                $expired += $claims->expireCandidate($reference) ? 1 : 0;
+            } catch (ItemContention $exception) {
+                Yii::error('Claim expiry contention reference=' . $exception->reference, __METHOD__);
+            }
+        }
         $this->stdout($expired . " claims expired\n");
         return ExitCode::OK;
     }

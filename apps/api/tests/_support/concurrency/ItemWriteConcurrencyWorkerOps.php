@@ -25,8 +25,12 @@ class ItemWriteConcurrencyWorkerOps
                 return ['resource_name' => $updated['resource']->name];
             }
 
-            if (self::$request['op'] === 'item_lock_linked_claim') {
-                $result = (new \app\services\ItemClaimService())->claim(
+            if (in_array(self::$request['op'], ['item_lock_linked_claim', 'item_lock_claim_display'], true)) {
+                $claims = new \app\services\ItemClaimService();
+                if (self::$request['op'] === 'item_lock_claim_display') {
+                    return ['claims' => $claims->claimsForSubmission(self::$request['submission_id'])];
+                }
+                $result = $claims->claim(
                     self::$request['kind'],
                     self::$request['item_id'],
                     ['username' => self::$request['actor'], 'role' => 'staff']

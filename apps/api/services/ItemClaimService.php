@@ -2,7 +2,6 @@
 
 namespace app\services;
 
-use Yii;
 use app\models\FacultySubmission;
 
 /** Coordinates atomic item claims and exposes one shared read shape to staff controllers. */
@@ -38,7 +37,9 @@ class ItemClaimService
         $this->expiry = new ItemClaimExpiryService($this->repository, $this->eventLog, $nowProvider, $notifier);
         $this->submittedScope = new SubmittedSubmissionScope();
         $this->linkedItems = new LinkedItemService($this->repository, $this->expiry, $this->submittedScope);
-        $this->readService = new ItemClaimReadService($this->linkedItems, $this->eventLog);
+        $this->readService = new ItemClaimReadService(
+            $this->linkedItems, $this->eventLog, $this->repository, $this->expiry, $this->presenter
+        );
         $this->transitionService = new ItemClaimTransitionService(
             $this->repository,
             $this->eventLog,
@@ -68,14 +69,13 @@ class ItemClaimService
                     'claimed_by_display' => $item['claimed_by_display'],
                 ]);
             }
-            $claimant = $this->repository->findStaffByUsername($username);
             $claimed = $item;
             $claimed['claimed_by'] = $username;
             $claimed['claimed_at'] = $now;
             $claimed['last_activity_at'] = $now;
             $claimed['status'] = 'in_progress';
-            $claimed['claimed_by_display'] = $claimant && !empty($claimant['full_name'])
-                ? $claimant['full_name'] : $username;
+            $claimant = $this->repository->findStaffByUsername($username);
+            $claimed['claimed_by_display'] = $claimant['claimed_by_display'] ?? $username;
             $this->eventLog->record(
                 $item['submission_id'], $id, $actor, 'claimed', null, $before, $this->snapshot($claimed), $kind
             );
@@ -199,46 +199,22 @@ class ItemClaimService
 
     public function expireDueClaims()
     {
-        return $this->expiry->expireDueClaims();
+        return $this->expiry->expireDueClaims($this->linkedItems);
     }
 
     public function claimsForSubmission($submissionId)
     {
-        $transaction = Yii::$app->db->beginTransaction();
-        $notifications = [];
-        try {
-            Yii::$app->db->createCommand(
-                'SELECT submission_id FROM faculty_submissions WHERE submission_id = :id FOR UPDATE',
-                [':id' => (int)$submissionId]
-            )->queryScalar();
-            $rows = $this->repository->claimsBySubmission($submissionId);
-            $now = $this->expiry->now();
-            $claims = [];
-            foreach ($rows as $kind => $items) {
-                foreach ($items as $id => $row) {
-                    if ($row['link_state'] === 'linked' && $row['submission_status'] !== FacultySubmission::STATUS_DRAFT) {
-                        $notification = $this->expiry->expireLocked($kind, $row, $now);
-                        if ($notification) {
-                            $row['claimed_by'] = null;
-                            $row['claimed_at'] = null;
-                            $row['last_activity_at'] = $now;
-                            $notifications[] = $notification;
-                        }
-                    }
-                    $claims[$kind][$id] = $this->presenter->claimFields($row, $this->expiry->hours());
-                }
-            }
-            $transaction->commit();
-        } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                $transaction->rollBack();
-            }
-            throw $exception;
-        }
-        foreach ($notifications as $notification) {
-            $this->expiry->notify($notification);
-        }
-        return $claims;
+        return $this->readService->claimsForSubmission($submissionId);
+    }
+
+    public function expiredClaimCandidates()
+    {
+        return $this->expiry->expiredClaimCandidates();
+    }
+
+    public function expireCandidate(array $reference)
+    {
+        return $this->expiry->expireCandidate($reference, $this->linkedItems);
     }
 
     private function presentRows(array $rows)

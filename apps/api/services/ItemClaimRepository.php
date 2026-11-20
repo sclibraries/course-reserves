@@ -26,14 +26,9 @@ class ItemClaimRepository
         return 'COALESCE(NULLIF(claimant.full_name, ""), claimant.username)';
     }
 
-    public function find($kind, $id, $forUpdate = false)
+    public function find($kind, $id)
     {
         $table = $this->table($kind);
-        if ($forUpdate && !Yii::$app->db->createCommand(
-            'SELECT id FROM ' . $table . ' WHERE id = :id FOR UPDATE', [':id' => (int)$id]
-        )->queryScalar()) {
-            return null;
-        }
         $effectiveType = EffectiveMaterialType::sql('i', 'source');
         $sourceResourceId = $kind === 'new'
             ? SourceResourceId::sqlValue('i.source_resource_id')
@@ -73,6 +68,15 @@ class ItemClaimRepository
         return $row ?: null;
     }
 
+    public function lockedClaimState($kind, $id)
+    {
+        return Yii::$app->db->createCommand(
+            'SELECT claimed_by, claimed_at, last_activity_at FROM ' . $this->table($kind)
+            . ' WHERE id = :id FOR UPDATE',
+            [':id' => (int)$id]
+        )->queryOne() ?: null;
+    }
+
     public function submissionId($kind, $id)
     {
         return Yii::$app->db->createCommand(
@@ -94,7 +98,7 @@ class ItemClaimRepository
                 . 'INNER JOIN faculty_submissions s ON s.submission_id = i.submission_id '
                 . 'LEFT JOIN users claimant ON claimant.username = i.claimed_by '
                 . 'LEFT JOIN staff_groups group_ref ON group_ref.id = i.assigned_group_id '
-                . 'WHERE i.submission_id = :submission_id FOR UPDATE',
+                . 'WHERE i.submission_id = :submission_id',
                 [':submission_id' => (int)$submissionId]
             )->queryAll();
             foreach ($rows as $row) {
@@ -253,7 +257,9 @@ class ItemClaimRepository
     public function findStaffByUsername($username)
     {
         return Yii::$app->db->createCommand(
-            'SELECT id, username, full_name, role FROM users WHERE username = :username AND role IN ("staff", "admin") LIMIT 1',
+            'SELECT claimant.id, claimant.username, claimant.full_name, claimant.role, '
+            . self::claimedByDisplayNameSql() . ' AS claimed_by_display FROM users claimant '
+            . 'WHERE claimant.username = :username AND claimant.role IN ("staff", "admin") LIMIT 1',
             [':username' => $username]
         )->queryOne();
     }
