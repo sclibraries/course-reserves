@@ -86,11 +86,15 @@ $testDbConfig = require $apiRoot . '/config/test_db.php';
 $checklistWorker = strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete';
 $sharedRowWorker = strpos($operation, 'shared_') === 0;
 $itemLockWorker = strpos($operation, 'item_lock_') === 0;
+$postLockReadWorker = strpos($operation, 'item_lock_a5_') === 0;
 if ($sharedRowWorker) {
     require_once __DIR__ . '/SharedRowConcurrencyWorkerOps.php';
 }
 if ($itemLockWorker) {
     require_once __DIR__ . '/ItemWriteConcurrencyWorkerOps.php';
+}
+if ($postLockReadWorker) {
+    require_once __DIR__ . '/PostLockReadConcurrencyWorkerOps.php';
 }
 $testDbConfig['commandClass'] = $checklistWorker
     ? Api119A2ChecklistConcurrencyCommand::class
@@ -203,6 +207,9 @@ function runConcurrencyOperation($operation, array $request, $db, &$attempt)
     }
     if (strpos($operation, 'checklist_') === 0 || $operation === 'faculty_delete') {
         return Api119A2ChecklistWorker::run($operation, $request, $db);
+    }
+    if (strpos($operation, 'item_lock_a5_') === 0) {
+        return PostLockReadConcurrencyWorkerOps::run($request, $db);
     }
     if (strpos($operation, 'item_lock_') === 0) {
         return ItemWriteConcurrencyWorkerOps::run($request);

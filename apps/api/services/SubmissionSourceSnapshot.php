@@ -16,7 +16,7 @@ class SubmissionSourceSnapshot
         $source = Yii::$app->db->createCommand(
             'SELECT name, item_url, description, material_type_id, start_visibility, end_visibility, use_proxy, '
             . 'use_primary_link_visibility, primary_link_start_visibility, primary_link_end_visibility '
-            . 'FROM resources WHERE resource_id = :id LIMIT 1',
+            . 'FROM resources WHERE resource_id = :id LIMIT 1 LOCK IN SHARE MODE',
             [':id' => $resourceId]
         )->queryOne();
         if (!$source) {
@@ -70,7 +70,7 @@ class SubmissionSourceSnapshot
     {
         $rows = Yii::$app->db->createCommand(
             'SELECT url, title, `order`, use_proxy, use_link_visibility, start_visibility, end_visibility '
-            . 'FROM resource_links WHERE resource_id = :id ORDER BY `order`, url, title',
+            . 'FROM resource_links WHERE resource_id = :id ORDER BY `order`, url, title LOCK IN SHARE MODE',
             [':id' => (int)$resourceId]
         )->queryAll();
         return array_map(function ($row) {
@@ -98,7 +98,7 @@ class SubmissionSourceSnapshot
         }
         $rows = Yii::$app->db->createCommand(
             'SELECT field_name, field_value FROM resource_metadata WHERE resource_id = :resource_id '
-            . 'AND field_name IN (' . implode(', ', $holders) . ') ORDER BY field_name, field_value',
+            . 'AND field_name IN (' . implode(', ', $holders) . ') ORDER BY field_name, field_value LOCK IN SHARE MODE',
             $params
         )->queryAll();
         $values = [];

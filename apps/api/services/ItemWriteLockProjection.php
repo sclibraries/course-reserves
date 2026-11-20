@@ -12,10 +12,7 @@ class ItemWriteLockProjection
         if ($locked['missing'] !== null) {
             return null;
         }
-        $transaction = Yii::$app->db->getTransaction();
-        if ($transaction === null || !$transaction->isActive) {
-            throw new \LogicException('ItemWriteLockProjection requires an active transaction.');
-        }
+        $this->requireTransaction();
 
         $kind = $locked['kind'];
         $item = $locked['item']->getAttributes();
@@ -44,13 +41,7 @@ class ItemWriteLockProjection
             'default_material_type_id' => $item['material_type_id'] ?? null,
             'source_material_type_id' => $sourceTypeId,
         ]);
-        $materialType = null;
-        if ($materialTypeId !== null) {
-            $materialType = Yii::$app->db->createCommand(
-                'SELECT * FROM material_types WHERE material_type_id = :id LOCK IN SHARE MODE',
-                [':id' => $materialTypeId]
-            )->queryOne() ?: null;
-        }
+        $materialType = $this->materialType($materialTypeId);
         $claimedBy = $item['claimed_by'] ?? null;
         $claimedByDisplay = $claimedBy === null ? null : Yii::$app->db->createCommand(
             'SELECT COALESCE(NULLIF(full_name, ""), username) FROM users WHERE username = :username LIMIT 1',
@@ -105,5 +96,31 @@ class ItemWriteLockProjection
             'assigned_group_name' => $groupName,
             'item_kind' => $kind,
         ];
+    }
+
+    public function reread($kind, $itemId, $submissionId)
+    {
+        $locked = (new ItemWriteLock())->lockDiscovered($kind, $itemId, $submissionId);
+        return $this->project($locked);
+    }
+
+    public function materialType($id)
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+        $this->requireTransaction();
+        return Yii::$app->db->createCommand(
+            'SELECT * FROM material_types WHERE material_type_id = :id LOCK IN SHARE MODE',
+            [':id' => $id]
+        )->queryOne() ?: null;
+    }
+
+    private function requireTransaction()
+    {
+        $transaction = Yii::$app->db->getTransaction();
+        if ($transaction === null || !$transaction->isActive) {
+            throw new \LogicException('ItemWriteLockProjection requires an active transaction.');
+        }
     }
 }

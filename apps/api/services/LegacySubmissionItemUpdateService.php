@@ -3,7 +3,6 @@
 namespace app\services;
 
 use Yii;
-use app\models\SubmissionNewResource;
 use yii\web\BadRequestHttpException;
 use yii\web\ConflictHttpException;
 
@@ -35,7 +34,8 @@ class LegacySubmissionItemUpdateService
             }
 
             $this->publication->lockForWrite('new', $itemId, $item['submission_id']);
-            $record = SubmissionNewResource::findOne((int)$itemId);
+            $locked = (new ItemWriteLock())->lockDiscovered('new', $itemId, $item['submission_id']);
+            $record = $locked['item'];
             $fields = $this->fields($data);
             if ($fields['error']) {
                 throw new BadRequestHttpException($fields['error']);
