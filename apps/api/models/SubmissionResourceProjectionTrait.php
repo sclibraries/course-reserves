@@ -27,6 +27,7 @@ trait SubmissionResourceProjectionTrait
     {
         foreach (array_merge($additionalHiddenFields, [
             'staff_material_type_id', 'destination_class_choice', 'source_snapshot_json', 'staff_corrections_json',
+            'locked_for_faculty_at',
         ]) as $field) {
             unset($fields[$field]);
         }
