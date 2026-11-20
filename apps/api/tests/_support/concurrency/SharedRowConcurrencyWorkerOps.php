@@ -245,9 +245,10 @@ trait Api119A3CurrentStateFixtureSupport
 
     private function claim($itemId)
     {
+        $liveClaimAt = date('Y-m-d H:i:s', time() - 300);
         \Yii::$app->db->createCommand()->update('submission_new_resources', [
-            'claimed_by' => $this->prefix . 'staff', 'claimed_at' => '2026-11-17 11:00:00',
-            'last_activity_at' => '2026-11-17 11:00:00',
+            'claimed_by' => $this->prefix . 'staff', 'claimed_at' => $liveClaimAt,
+            'last_activity_at' => $liveClaimAt,
         ], ['id' => $itemId])->execute();
     }
 

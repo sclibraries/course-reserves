@@ -103,9 +103,10 @@ class Api119A3SharedRowWritersCest extends Api116B1ConcurrencyCase
             'material_type_id' => $this->materialTypeId, 'flow_id' => $flowId,
         ])->execute();
         $this->tracker->fixture()->setMarkers($item, ['material_type_id' => $this->materialTypeId]);
+        $liveClaimAt = date('Y-m-d H:i:s', time() - 300);
         $db->createCommand()->update('submission_new_resources', [
-            'claimed_by' => $this->prefix . 'staff', 'claimed_at' => '2026-11-17 11:00:00',
-            'last_activity_at' => '2026-11-17 11:00:00',
+            'claimed_by' => $this->prefix . 'staff', 'claimed_at' => $liveClaimAt,
+            'last_activity_at' => $liveClaimAt,
         ], ['id' => $item['id']])->execute();
 
         $steps = [[
