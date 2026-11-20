@@ -7,6 +7,8 @@ use Yii;
 /** Persists private publication state for the polymorphic submission item keys. */
 class SubmissionPublicationStateRepository
 {
+    private const CLAIM_EVENT_TYPES_SQL = '"claimed", "claim_expired", "released", "handed_off", "taken_over", "group_handoff"';
+
     public function ensureForSubmission($submissionId)
     {
         $transaction = Yii::$app->db->getTransaction();
@@ -52,8 +54,7 @@ class SubmissionPublicationStateRepository
     {
         return Yii::$app->db->createCommand(
             'SELECT event_type FROM workflow_events WHERE item_kind = :kind AND item_id = :item_id '
-            . 'AND event_type IN ("claimed", "claim_expired", "released", "handed_off", '
-            . '"taken_over", "group_handoff") ORDER BY id DESC LIMIT 1 LOCK IN SHARE MODE',
+            . 'AND event_type IN (' . self::CLAIM_EVENT_TYPES_SQL . ') ORDER BY id DESC LIMIT 1 LOCK IN SHARE MODE',
             [':kind' => $kind, ':item_id' => (int)$itemId]
         )->queryScalar() ?: null;
     }
@@ -88,8 +89,7 @@ class SubmissionPublicationStateRepository
         $rows = Yii::$app->db->createCommand(
             'SELECT event.item_kind, event.item_id, event.event_type FROM workflow_events event '
             . 'INNER JOIN (SELECT item_kind, item_id, MAX(id) AS id FROM workflow_events '
-            . 'WHERE event_type IN ("claimed", "claim_expired", "released", "handed_off", '
-            . '"taken_over", "group_handoff") AND (' . implode(' OR ', $conditions) . ') '
+            . 'WHERE event_type IN (' . self::CLAIM_EVENT_TYPES_SQL . ') AND (' . implode(' OR ', $conditions) . ') '
             . 'GROUP BY item_kind, item_id) latest ON latest.id = event.id'
         , $params)->queryAll();
         $events = [];
