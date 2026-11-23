@@ -116,6 +116,7 @@ return [
     'PUT submission-workflow/item/<itemId:\d+>' => 'submission-workflow/update-item',
     'POST submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/complete-processing',
     'POST submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/claim-item',
+    'POST submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/review-item',
     'OPTIONS submission-workflow/pending-submissions' => 'submission-workflow/options',
     'OPTIONS submission-workflow/my-assignments' => 'submission-workflow/options',
     'OPTIONS submission-workflow/my-claimed-items' => 'submission-workflow/options',
@@ -133,4 +134,5 @@ return [
     'OPTIONS submission-workflow/item/<itemId:\d+>' => 'submission-workflow/options',
     'OPTIONS submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/options',
     'OPTIONS submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/options',
+    'OPTIONS submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/options',
 ];

@@ -156,6 +156,10 @@ class UrlRulesTest extends \Codeception\Test\Unit
             'POST offering-link/link-existing-resources' => 'offering-link/reuse-existing-resources',
             'PUT offering-link/link-existing-resources' => 'offering-link/reuse-existing-resources',
         ];
+        $historyReviewRules = [
+            'POST submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/review-item',
+            'OPTIONS submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/options',
+        ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
         $expectedFlowRules = array_intersect_key($mergedRules, $flowRules);
@@ -168,6 +172,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $expectedCorsRules = array_intersect_key($mergedRules, $corsRules);
         $expectedResourceUsageRules = array_intersect_key($mergedRules, $resourceUsageRules);
         $expectedResourceReuseRules = array_intersect_key($mergedRules, $resourceReuseRules);
+        $expectedHistoryReviewRules = array_intersect_key($mergedRules, $historyReviewRules);
         $declaredRules = array_merge(
             $claimRules,
             $groupRules,
@@ -180,10 +185,11 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $navPinRules,
             $corsRules,
             $resourceUsageRules,
-            $resourceReuseRules
+            $resourceReuseRules,
+            $historyReviewRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(268, $mergedRules);
+        $this->assertCount(270, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -196,6 +202,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
         $this->assertSame($corsRules, $expectedCorsRules);
         $this->assertSame($resourceUsageRules, $expectedResourceUsageRules);
         $this->assertSame($resourceReuseRules, $expectedResourceReuseRules);
+        $this->assertSame($historyReviewRules, $expectedHistoryReviewRules);
         $this->assertSame($baseline, $existingRules);
 
         $config = require codecept_root_dir('config/web.php');
@@ -221,6 +228,15 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ]],
             ['POST', 'workflow/submission/staff-entered', ['staff-entered-submission/create', []]],
             ['OPTIONS', 'workflow/submission/staff-entered', ['staff-entered-submission/options', []]],
+            ['POST', 'submission-workflow/items/new/999119202/history-review', [
+                'workflow-history-review/review-item', ['id' => '999119202'],
+            ]],
+            ['OPTIONS', 'submission-workflow/items/new/999119202/history-review', [
+                'workflow-history-review/options', ['id' => '999119202'],
+            ]],
+            ['POST', 'submission-workflow/items/new/not-a-number/history-review', [
+                'submission-workflow/items/new/not-a-number/history-review', [],
+            ]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
             ['POST', 'faculty-submission/draft', ['faculty-draft/create', []]],
             ['OPTIONS', 'faculty-submission/draft', ['faculty-draft/options', []]],

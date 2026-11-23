@@ -21,12 +21,14 @@ class Api119CHistoryReviewMigrationCest extends BaseFunctionalCest
             $db = \Yii::$app->db;
             $expected = [];
             $excluded = [];
+            $submissionIds = [];
             foreach ([
                 ['draft', false], ['submitted', true], ['in_review', true],
                 ['partially_complete', true], ['complete', true], ['canceled', true], [null, false],
             ] as $index => $case) {
                 list($status, $eligible) = $case;
                 list($submissionId, $itemId) = $this->createSubmission('scope-' . $index, $status);
+                $submissionIds[] = $submissionId;
                 if ($eligible) {
                     $expected[$itemId] = [$submissionId, 'none'];
                 } else {
@@ -35,6 +37,7 @@ class Api119CHistoryReviewMigrationCest extends BaseFunctionalCest
             }
 
             list($submissionId, $plainItemId) = $this->createSubmission('traces');
+            $submissionIds[] = $submissionId;
             $unlinked = $db->createCommand(
                 'SELECT offering_id, folio_course_listing_id FROM faculty_submissions WHERE submission_id = :id',
                 [':id' => $submissionId]
@@ -71,6 +74,7 @@ class Api119CHistoryReviewMigrationCest extends BaseFunctionalCest
             $expected[$currentClaimId] = [$submissionId, 'none'];
 
             list($otherSubmissionId, $otherBaseItemId) = $this->createSubmission('event-collision');
+            $submissionIds[] = $otherSubmissionId;
             $expected[$otherBaseItemId] = [$otherSubmissionId, 'none'];
             $typedCollisionId = $this->nextSharedItemId();
             $typedMismatchId = $this->createItem($submissionId, ['id' => $typedCollisionId]);
@@ -99,8 +103,10 @@ class Api119CHistoryReviewMigrationCest extends BaseFunctionalCest
 
             $actual = [];
             $flaggedAt = [];
-            foreach ($db->createCommand('SELECT item_id, submission_id, trace, flagged_at FROM item_history_review')
-                ->queryAll() as $row) {
+            foreach ($db->createCommand(
+                'SELECT item_id, submission_id, trace, flagged_at FROM item_history_review '
+                . 'WHERE submission_id IN (' . implode(',', array_map('intval', $submissionIds)) . ')'
+            )->queryAll() as $row) {
                 $itemId = (int)$row['item_id'];
                 $actual[$itemId] = [(int)$row['submission_id'], $row['trace']];
                 $flaggedAt[$row['flagged_at']] = true;
@@ -135,7 +141,8 @@ class Api119CHistoryReviewMigrationCest extends BaseFunctionalCest
             MigrationRollback::migrate('up');
             $this->assertSchema($db);
             $reviewedItemId = (int)$db->createCommand(
-                'SELECT item_id FROM item_history_review ORDER BY id LIMIT 1'
+                'SELECT item_id FROM item_history_review WHERE submission_id = :id ORDER BY id LIMIT 1',
+                [':id' => $submissionId]
             )->queryScalar();
             Assert::assertSame(FacultyLockLatchBackfill::BATCH_SIZE + 1, (int)$db->createCommand(
                 'SELECT COUNT(*) FROM item_history_review WHERE submission_id = :id', [':id' => $submissionId]
