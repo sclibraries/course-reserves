@@ -41,7 +41,7 @@ class HistoryReviewConcurrencyWorkerOps
     private static function observe($sql)
     {
         $itemId = (int)(self::$request['item_id'] ?? 0);
-        if (self::waitingFor('discovered') && $itemId && preg_match(
+        if ($itemId && preg_match(
             '/SELECT\s+submission_id\s+FROM\s+submission_new_resources\s+WHERE\s+id\s*=\s*'
                 . $itemId . '\s+LIMIT\s+1/i',
             $sql
@@ -50,23 +50,14 @@ class HistoryReviewConcurrencyWorkerOps
             return;
         }
 
-        if (self::waitingFor('review_written') && preg_match(
-            '/^UPDATE\s+`?item_history_review`?.*WHERE\s+`?item_id`?\s*=\s*(\d+)/i',
-            $sql,
-            $match
-        ) && (!isset(self::$request['pause_item_id']) || (int)$match[1] === (int)self::$request['pause_item_id'])) {
+        if (preg_match('/^UPDATE\s+`?item_history_review`?.*WHERE\s+`?item_id`?\s*=\s*\d+/i', $sql)) {
             self::checkpointIfRequested('review_written', 'locked', $sql);
         }
     }
 
-    private static function waitingFor($phase)
-    {
-        return isset(self::$pausePoints[$phase]);
-    }
-
     private static function checkpointIfRequested($pausePoint, $phase, $sql)
     {
-        if (!self::waitingFor($pausePoint)) {
+        if (!isset(self::$pausePoints[$pausePoint])) {
             return;
         }
         unset(self::$pausePoints[$pausePoint]);

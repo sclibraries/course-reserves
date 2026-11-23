@@ -58,7 +58,6 @@ class Api119CHistoryReviewCest extends Api116B1ConcurrencyCase
         if (!$submissionFirst) {
             $this->startReviewWorker('single-' . $suffix, 'item_lock_history_single', $single + [
                 'pause_points' => ['review_written'],
-                'pause_item_id' => $fixture['first_item_id'],
             ]);
             $written = $this->supervisor->awaitPhase('single-' . $suffix, 'locked', 1);
             Assert::assertRegExp('/^UPDATE `?item_history_review`?/i', $written['context']['sql']);
@@ -85,17 +84,15 @@ class Api119CHistoryReviewCest extends Api116B1ConcurrencyCase
             return;
         }
 
-        $this->startReviewWorker('bulk-' . $suffix, 'item_lock_history_submission', $bulk + [
-            'pause_points' => ['before_action', 'review_written'],
-        ]);
-        $this->supervisor->awaitPhase('bulk-' . $suffix, 'discovered', 1);
         $this->startReviewWorker('single-' . $suffix, 'item_lock_history_single', $single + [
             'pause_points' => ['discovered'],
         ]);
         $discovered = $this->supervisor->awaitPhase('single-' . $suffix, 'discovered', 1);
         Assert::assertRegExp('/SELECT submission_id FROM submission_new_resources WHERE id\s*=/',
             $discovered['context']['sql']);
-        $this->supervisor->release('bulk-' . $suffix, 'discovered', 1);
+        $this->startReviewWorker('bulk-' . $suffix, 'item_lock_history_submission', $bulk + [
+            'pause_points' => ['review_written'],
+        ]);
         $this->supervisor->awaitPhase('bulk-' . $suffix, 'locked', 1);
         $this->releaseIntoSubmissionWait('single-' . $suffix, 'discovered', $fixture['submission_id']);
         $this->supervisor->release('bulk-' . $suffix, 'locked', 1);

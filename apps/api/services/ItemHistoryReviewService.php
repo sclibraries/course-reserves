@@ -4,7 +4,6 @@ namespace app\services;
 
 use Yii;
 use app\models\FacultySubmission;
-use yii\db\Query;
 use yii\helpers\ArrayHelper;
 
 /** Atomically records staff decisions for flagged new items. */
@@ -17,12 +16,11 @@ class ItemHistoryReviewService
 
     public function review($itemId, array $actor, $reviewerId, $decision, $reason)
     {
-        $normalizedReason = null;
-        $validation = $this->validate($decision, $reason, $normalizedReason);
+        $validation = $this->validate($decision, $reason);
         if ($validation !== null) {
             return $validation;
         }
-        $reason = $normalizedReason;
+        $reason = trim($reason);
 
         return Transactional::retrying(function () use ($itemId, $actor, $reviewerId, $decision, $reason) {
             $locked = (new ItemWriteLock())->lock('new', $itemId);
@@ -61,12 +59,11 @@ class ItemHistoryReviewService
 
     public function reviewSubmission($submissionId, array $actor, $reviewerId, $decision, $reason)
     {
-        $normalizedReason = null;
-        $validation = $this->validate($decision, $reason, $normalizedReason);
+        $validation = $this->validate($decision, $reason);
         if ($validation !== null) {
             return $validation;
         }
-        $reason = $normalizedReason;
+        $reason = trim($reason);
 
         return Transactional::retrying(function () use ($submissionId, $actor, $reviewerId, $decision, $reason) {
             $submission = FacultySubmission::findBySql(
@@ -99,16 +96,14 @@ class ItemHistoryReviewService
                 }
             }
 
-            $reviewQuery = (new Query())
-                ->from('item_history_review')
-                ->where(['submission_id' => $submissionId])
-                ->andWhere(['item_id' => array_keys($lockedItems)])
-                ->orderBy(['item_id' => SORT_ASC]);
-            $command = $reviewQuery->createCommand();
-            $sql = $command->getSql();
-            $params = $command->params;
-            $command->setSql($sql . ' FOR UPDATE')->bindValues($params);
-            $reviews = ArrayHelper::index($command->queryAll(), 'item_id');
+            if (!$lockedItems) {
+                return $this->failure(404, 'history_review_not_found');
+            }
+            $reviews = ArrayHelper::index(Yii::$app->db->createCommand(
+                'SELECT * FROM item_history_review WHERE submission_id = :submission_id AND item_id IN ('
+                . implode(',', array_keys($lockedItems)) . ') ORDER BY item_id FOR UPDATE',
+                [':submission_id' => $submissionId]
+            )->queryAll(), 'item_id');
             if (!$reviews) {
                 return $this->failure(404, 'history_review_not_found');
             }
@@ -142,7 +137,7 @@ class ItemHistoryReviewService
         });
     }
 
-    private function validate($decision, $reason, &$normalizedReason)
+    private function validate($decision, $reason)
     {
         if (!is_string($decision) || !in_array($decision, ['finished', 'not_finished'], true)) {
             return $this->failure(422, 'invalid_review_decision');
@@ -150,11 +145,11 @@ class ItemHistoryReviewService
         if (!is_string($reason)) {
             return $this->failure(422, 'invalid_review_reason');
         }
-        $normalizedReason = trim($reason);
-        if ($normalizedReason === '') {
+        $trimmedReason = trim($reason);
+        if ($trimmedReason === '') {
             return $this->failure(422, 'invalid_review_reason');
         }
-        if (strlen($normalizedReason) > self::MAX_REASON_BYTES) {
+        if (strlen($trimmedReason) > self::MAX_REASON_BYTES) {
             return $this->failure(422, 'review_reason_too_long');
         }
         return null;
