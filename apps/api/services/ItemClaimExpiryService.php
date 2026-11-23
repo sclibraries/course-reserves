@@ -25,18 +25,18 @@ class ItemClaimExpiryService
         return call_user_func($this->nowProvider);
     }
 
-    public function hours()
+    public static function hours()
     {
         return max(1, (int)(Yii::$app->params['workflowClaimExpiryHours'] ?? 72));
     }
 
     public function expireLocked($kind, array $item, $now)
     {
-        if (!$this->isDue($item, $now)) {
+        if (!self::isDue($item, $now)) {
             return null;
         }
         $nowTimestamp = strtotime($now);
-        $cutoff = date('Y-m-d H:i:s', $nowTimestamp - ($this->hours() * 3600));
+        $cutoff = date('Y-m-d H:i:s', $nowTimestamp - (self::hours() * 3600));
         if (!$this->repository->expireIfDue($kind, $item['id'], $item['claimed_by'], $cutoff, $now)) {
             return null;
         }
@@ -70,7 +70,7 @@ class ItemClaimExpiryService
     public function expiredClaimCandidates()
     {
         $now = $this->now();
-        $cutoff = date('Y-m-d H:i:s', strtotime($now) - ($this->hours() * 3600));
+        $cutoff = date('Y-m-d H:i:s', strtotime($now) - (self::hours() * 3600));
         return $this->repository->expiredClaimCandidates($cutoff);
     }
 
@@ -82,7 +82,7 @@ class ItemClaimExpiryService
             $reference['id'],
             function ($item, $transaction, $now) use (&$claimBefore) {
                 return !empty($claimBefore['claimed_by'])
-                    && $this->isDue($claimBefore, $now)
+                    && self::isDue($claimBefore, $now)
                     && empty($item['claimed_by']);
             },
             function () use (&$claimBefore, $reference) {
@@ -119,7 +119,7 @@ class ItemClaimExpiryService
         ];
     }
 
-    private function isDue(array $item, $now)
+    public static function isDue(array $item, $now)
     {
         if (empty($item['claimed_by'])) {
             return false;
@@ -128,6 +128,6 @@ class ItemClaimExpiryService
         $lastTimestamp = $lastActivity ? strtotime($lastActivity) : false;
         $nowTimestamp = strtotime($now);
         return $lastTimestamp !== false && $nowTimestamp !== false
-            && $lastTimestamp + ($this->hours() * 3600) <= $nowTimestamp;
+            && $lastTimestamp + (self::hours() * 3600) <= $nowTimestamp;
     }
 }
