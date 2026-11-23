@@ -46,6 +46,9 @@ class LegacySubmissionItemUpdateService
             if (!$record->save()) {
                 return $this->result(422, ['errors' => $record->errors]);
             }
+            if (($fields['values']['item_status'] ?? null) === 'complete') {
+                (new FacultyLockLatch())->set('new', $itemId, $now);
+            }
             $this->claims->renewClaimLocked('new', $itemId, $now);
             $record->refresh();
             return $this->result(200, [

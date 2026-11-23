@@ -127,6 +127,8 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
         Assert::assertSame((int)$run['id'], (int)$this->response($I)['run_id']);
         Assert::assertSame(1, $this->response($I)['result_seq']);
         Assert::assertSame('available_online', $this->response($I)['finished']['finish_state']);
+        $latch = $this->facultyLatch($item['id']);
+        Assert::assertNotEmpty($latch);
         $this->request($I, 'GET', 'workflow-publication/state', [], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
         Assert::assertNotSame('ready', $this->response($I)['publication']['state']);
@@ -135,6 +137,7 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
         $this->request($I, 'GET', 'workflow-flow/item-flow', [], ['kind' => 'new', 'id' => $item['id']]);
         $I->seeResponseCodeIs(200);
         Assert::assertSame((int)$run['id'], (int)$this->latestRun('new', $item['id'])['id']);
+        Assert::assertSame($latch, $this->facultyLatch($item['id']));
         Assert::assertCount(1, $this->runs('new', $item['id']));
 
         $this->setRevisions($item, 7, 3);
@@ -157,6 +160,7 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
         $latest = $this->latestRun('new', $item['id']);
         Assert::assertSame(9, (int)$latest['draft_revision']);
         Assert::assertSame(4, (int)$latest['workflow_revision']);
+        Assert::assertSame($latch, $this->facultyLatch($item['id']));
     }
 
     public function testMissingStateUsesWorkflowRevisionOne(FunctionalTester $I)
@@ -266,6 +270,14 @@ class Api122RevisionFoundationCest extends Api109FunctionalCest
         $row = (new ItemClaimRepository())->find('new', $item['id']);
         $mapping = (new FlowRepository())->mappedFlow($row['material_type_id']);
         return (new PublicationPolicy())->context($row, null, $mapping);
+    }
+
+    private function facultyLatch($itemId)
+    {
+        return \Yii::$app->db->createCommand(
+            'SELECT locked_for_faculty_at FROM submission_new_resources WHERE id = :id',
+            [':id' => $itemId]
+        )->queryScalar();
     }
 
     private function setSuccessfulSteps($flowId)

@@ -102,6 +102,10 @@ class Api122StepResultContextCest extends Api109FunctionalCest
         Assert::assertSame('superseded', $run['finish_state']);
         Assert::assertNotEmpty($run['closed_at']);
         Assert::assertSame(0, $this->resultCount($runId));
+        Assert::assertNull(\Yii::$app->db->createCommand(
+            'SELECT locked_for_faculty_at FROM submission_new_resources WHERE id = :id',
+            [':id' => $item['id']]
+        )->queryScalar());
     }
 
     private function loopingItem(FunctionalTester $I, $suffix)

@@ -189,6 +189,9 @@ class FlowRunner
                 }
             }
             $run = $this->flows->run($run['id'], true);
+            if (PublicationPolicy::isReadyRun($run)) {
+                (new FacultyLockLatch())->set($kind, $itemId, $now);
+            }
             $item = $this->itemProjection->reread($kind, $itemId, $item['submission_id']);
             $this->publication->syncFlowReadiness($kind, $itemId, $item, $run);
             $state = $this->presenter->present(

@@ -168,6 +168,7 @@ class ChecklistWriteService
             if (!$item->save(false)) {
                 throw new \RuntimeException('Failed to complete item: ' . json_encode($item->errors));
             }
+            (new FacultyLockLatch())->set('new', $itemId, $now);
             return ['success' => true, 'message' => 'Item checklist completed'];
         });
     }

@@ -110,6 +110,7 @@ class Api119A2ChecklistCest extends Api116B1ConcurrencyCase
         Assert::assertTrue($uncompleted['result']['success']);
         $this->assertLockOrder($completed['queries']);
         Assert::assertSame('completed', $this->rowsForItem($completionFirst['submission']['item_id'])[0]['item_status']);
+        Assert::assertNotEmpty($this->rowsForItem($completionFirst['submission']['item_id'])[0]['locked_for_faculty_at']);
         Assert::assertSame(0, (int)$this->task($completionFirst['checklist']['task_ids'][0])['completed']);
 
         $association = $this->checkedItem('association-change');
@@ -158,6 +159,7 @@ class Api119A2ChecklistCest extends Api116B1ConcurrencyCase
         ));
         $this->assertLockOrder($result['queries']);
         Assert::assertSame('completed', $this->rowsForItem($itemId)[0]['item_status']);
+        Assert::assertNotEmpty($this->rowsForItem($itemId)[0]['locked_for_faculty_at']);
         Assert::assertNotNull($this->checklist($checklistId)['completed_at']);
     }
 

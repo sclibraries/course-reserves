@@ -101,6 +101,7 @@ class Api119A2ChecklistCest extends BaseFunctionalCest
         $I->seeResponseCodeIs(200);
         $after = $this->fixture->snapshot($first['item_id']);
         Assert::assertSame([1, 1], array_map('intval', array_column($after['tasks'], 'completed')));
+        Assert::assertNotEmpty($after['item']['locked_for_faculty_at']);
 
         $claimClearFailure = $this->fixture->submission('claim-clear-failure');
         $claimTemplate = $this->fixture->template([false]);
@@ -204,6 +205,9 @@ class Api119A2ChecklistCest extends BaseFunctionalCest
                 Assert::assertCount(1, $this->notifier->notifications);
                 Assert::assertSame(1, $this->fixture->eventCount($item['item_id'], 'claim_expired'));
                 $this->notifier->notifications = [];
+            }
+            if ($operation === 'complete') {
+                Assert::assertNotEmpty($this->fixture->snapshot($item['item_id'])['item']['locked_for_faculty_at']);
             }
 
             $exhausted = $this->fixture->submission($operation . '-exhausted');

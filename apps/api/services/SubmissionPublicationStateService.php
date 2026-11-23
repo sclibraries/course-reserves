@@ -122,6 +122,7 @@ class SubmissionPublicationStateService
                 $item['submission_id'], $itemId, $actor, 'item_marked_ready', $reason,
                 $before, ['source' => 'manual', 'revision' => (int)$state['draft_revision'], 'context' => $context], $kind
             );
+            (new FacultyLockLatch())->set($kind, $itemId, $now);
             $updated = $this->itemProjection->reread($kind, $itemId, $item['submission_id']);
             $saved = $this->states->find($kind, $itemId);
             $lastEvent = $this->states->lastClaimEvent($kind, $itemId);
