@@ -117,6 +117,7 @@ return [
     'POST submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/complete-processing',
     'POST submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/claim-item',
     'POST submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/review-item',
+    'POST submission-workflow/<submission_id:\\d+>/history-review' => 'workflow-history-review/review-submission',
     'GET submission-workflow/history-reviews' => 'workflow-history-review/index',
     'OPTIONS submission-workflow/pending-submissions' => 'submission-workflow/options',
     'OPTIONS submission-workflow/my-assignments' => 'submission-workflow/options',
@@ -136,5 +137,6 @@ return [
     'OPTIONS submission-workflow/item/<itemId:\d+>/complete-processing' => 'submission-workflow/options',
     'OPTIONS submission-workflow/item/<itemId:\d+>/claim' => 'submission-workflow/options',
     'OPTIONS submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/options',
+    'OPTIONS submission-workflow/<submission_id:\\d+>/history-review' => 'workflow-history-review/options',
     'OPTIONS submission-workflow/history-reviews' => 'workflow-history-review/options',
 ];

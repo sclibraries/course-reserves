@@ -191,6 +191,148 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         $this->assertError($I, 404, 'item_not_found');
     }
 
+    public function submissionReviewBatchChangesOnlyOpenRowsInItsSubmission(FunctionalTester $I)
+    {
+        $existingLatch = $this->past();
+        $primary = $this->createReviewFixture('batch-primary', $existingLatch, 'linked');
+        $open = $this->insertReviewItem($primary['submission_id'], 'Synthetic batch open item');
+        $reviewed = $this->insertReviewItem($primary['submission_id'], 'Synthetic batch reviewed item', [
+            'reviewed_at' => $this->past(),
+            'reviewed_by_staff_id' => 'existing-synthetic-reviewer',
+            'decision' => 'finished',
+            'reason' => 'Existing synthetic review',
+        ]);
+        $other = $this->createSubmissionFixture('batch-other', 'submitted', 'linked');
+        $otherOpen = $this->insertReviewItem($other['submission_id'], 'Synthetic other submission item');
+        $mismatched = $other['item_id'];
+        $this->insertReview($mismatched, $primary['submission_id']);
+
+        $before = [];
+        foreach ([$primary['item_id'], $open, $reviewed, $other['item_id'], $otherOpen] as $itemId) {
+            $before[$itemId] = $this->snapshot($itemId);
+        }
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $primary['submission_id'], [
+            'decision' => 'not_finished',
+            'reason' => '  Synthetic batch decision  ',
+        ]);
+        $I->seeResponseCodeIs(200);
+        $response = $this->response($I);
+        Assert::assertSame([
+            'submission_id' => $primary['submission_id'],
+            'decision' => 'not_finished',
+            'reviewed_count' => 2,
+        ], $response);
+
+        $reviewedAt = null;
+        foreach ([$primary['item_id'], $open] as $itemId) {
+            $after = $this->snapshot($itemId);
+            Assert::assertSame(1, count($after['events']));
+            Assert::assertSame('not_finished', $after['review']['decision']);
+            Assert::assertSame('Synthetic batch decision', $after['review']['reason']);
+            Assert::assertSame('token-reviewer-id', $after['review']['reviewed_by_staff_id']);
+            Assert::assertSame($itemId === $primary['item_id'] ? $existingLatch : null,
+                $after['item']['locked_for_faculty_at']);
+            $reviewedAt = $reviewedAt === null ? $after['review']['reviewed_at'] : $reviewedAt;
+            Assert::assertSame($reviewedAt, $after['review']['reviewed_at']);
+            Assert::assertSame($primary['submission_id'], (int)$after['events'][0]['submission_id']);
+            Assert::assertSame($itemId, (int)$after['events'][0]['item_id']);
+        }
+        foreach ([$reviewed, $other['item_id'], $otherOpen, $mismatched] as $itemId) {
+            Assert::assertSame($before[$itemId], $this->snapshot($itemId));
+        }
+    }
+
+    public function submissionReviewBatchReturnsItsBusinessErrors(FunctionalTester $I)
+    {
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $this->nextMissingSubmissionId(), [
+            'decision' => 'finished', 'reason' => 'Synthetic missing submission',
+        ]);
+        $this->assertError($I, 404, 'submission_not_found');
+
+        $empty = $this->createSubmissionFixture('batch-no-cohort', 'submitted', 'linked');
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $empty['submission_id'], [
+            'decision' => 'finished', 'reason' => 'Synthetic empty cohort',
+        ]);
+        $this->assertError($I, 404, 'history_review_not_found');
+
+        $draft = $this->createReviewFixture('batch-draft', null, 'linked', 'draft');
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $draft['submission_id'], [
+            'decision' => 'finished', 'reason' => 'Synthetic draft review',
+        ]);
+        $this->assertError($I, 409, 'submission_not_submitted');
+
+        $duplicate = $this->createReviewFixture('batch-duplicate', null, 'linked');
+        $payload = ['decision' => 'finished', 'reason' => 'Synthetic duplicate review'];
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $duplicate['submission_id'], $payload);
+        $I->seeResponseCodeIs(200);
+        $beforeSecondCall = $this->snapshot($duplicate['item_id']);
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $duplicate['submission_id'], $payload);
+        $this->assertError($I, 409, 'already_reviewed');
+        Assert::assertSame($beforeSecondCall, $this->snapshot($duplicate['item_id']));
+
+        $invalid = $this->createReviewFixture('batch-invalid', null, 'linked');
+        $this->postSubmissionWithToken($I, $this->reviewerToken, $invalid['submission_id'], [
+            'decision' => 'complete', 'reason' => 'Synthetic invalid decision',
+        ]);
+        $this->assertError($I, 422, 'invalid_review_decision');
+
+        $denied = $this->createReviewFixture('batch-denied', null, 'linked');
+        $this->postSubmissionWithToken($I, $this->facultyToken, $denied['submission_id'], [
+            'decision' => 'finished', 'reason' => 'Synthetic denied review',
+        ]);
+        $I->seeResponseCodeIs(403);
+    }
+
+    public function submissionReviewBatchRetriesAndRollsBackAfterAnEventFailure(FunctionalTester $I)
+    {
+        $restore = Api116B1CommittedConnection::swap();
+        $originalCommandClass = \Yii::$app->db->commandClass;
+        \Yii::$app->db->commandClass = Api119A2FailingCommand::class;
+        Api119A2FailingCommand::clearConfiguration();
+        try {
+            $exhausted = $this->createReviewFixture('batch-exhausted', null, 'linked');
+            $exhaustedSecond = $this->insertReviewItem($exhausted['submission_id'], 'Synthetic second event failure');
+            $exhaustedBefore = [
+                $this->snapshot($exhausted['item_id']),
+                $this->snapshot($exhaustedSecond),
+            ];
+            Api119A2FailingCommand::resetQueries();
+            Api119A2FailingCommand::failNext($this->eventInsertPattern($exhaustedSecond), 3, true);
+            $this->postSubmissionWithToken($I, $this->reviewerToken, $exhausted['submission_id'], [
+                'decision' => 'finished', 'reason' => 'Synthetic exhausted batch',
+            ]);
+            $I->seeResponseCodeIs(409);
+            Assert::assertSame('item_contention', $this->response($I)['error_code']);
+            Assert::assertSame(3, Api119A2FailingCommand::matches());
+            Assert::assertSame($exhaustedBefore, [
+                $this->snapshot($exhausted['item_id']),
+                $this->snapshot($exhaustedSecond),
+            ]);
+
+            $retry = $this->createReviewFixture('batch-retry', null, 'linked');
+            $retrySecond = $this->insertReviewItem($retry['submission_id'], 'Synthetic retry second item');
+            Api119A2FailingCommand::resetQueries();
+            Api119A2FailingCommand::failNext($this->eventInsertPattern($retrySecond), 1, true);
+            $this->postSubmissionWithToken($I, $this->reviewerToken, $retry['submission_id'], [
+                'decision' => 'finished', 'reason' => 'Synthetic retried batch',
+            ]);
+            $I->seeResponseCodeIs(200);
+            Assert::assertSame(1, Api119A2FailingCommand::matches());
+            $firstAfter = $this->snapshot($retry['item_id']);
+            $secondAfter = $this->snapshot($retrySecond);
+            Assert::assertCount(1, $firstAfter['events']);
+            Assert::assertCount(1, $secondAfter['events']);
+            Assert::assertSame($firstAfter['review']['reviewed_at'], $secondAfter['review']['reviewed_at']);
+            Assert::assertSame($firstAfter['review']['reviewed_at'], $firstAfter['item']['locked_for_faculty_at']);
+            Assert::assertSame($secondAfter['review']['reviewed_at'], $secondAfter['item']['locked_for_faculty_at']);
+        } finally {
+            Api119A2FailingCommand::clearConfiguration();
+            \Yii::$app->db->commandClass = $originalCommandClass;
+            $this->cleanupCommittedFixtures();
+            call_user_func($restore);
+        }
+    }
+
     public function openReviewQueueIsBoundedFilteredAndKeepsCourseLabels(FunctionalTester $I)
     {
         $this->getWithToken($I, $this->reviewerToken, ['page' => '1']);
@@ -433,6 +575,19 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         $I->sendJsonRequest('POST', 'workflow-history-review/review-item', $payload, ['id' => $itemId]);
     }
 
+    private function postSubmissionWithToken(FunctionalTester $I, $token, $submissionId, array $payload)
+    {
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
+        $I->sendJsonRequest('POST', 'workflow-history-review/review-submission', $payload, [
+            'submission_id' => $submissionId,
+        ]);
+    }
+
+    private function eventInsertPattern($itemId)
+    {
+        return '/INSERT INTO `?workflow_events`?.*VALUES\s*\(\d+,\s*' . (int)$itemId . ',/i';
+    }
+
     private function getWithToken(FunctionalTester $I, $token, array $params = [])
     {
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
@@ -474,6 +629,13 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         return (int)\Yii::$app->db->createCommand(
             'SELECT GREATEST(COALESCE((SELECT MAX(id) FROM submission_new_resources), 0), '
             . 'COALESCE((SELECT MAX(id) FROM submission_reuse_resources), 0)) + 1000'
+        )->queryScalar();
+    }
+
+    private function nextMissingSubmissionId()
+    {
+        return (int)\Yii::$app->db->createCommand(
+            'SELECT COALESCE(MAX(submission_id), 0) + 1000 FROM faculty_submissions'
         )->queryScalar();
     }
 

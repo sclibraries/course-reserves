@@ -10,7 +10,7 @@ use Yii;
 use yii\filters\Cors;
 use yii\rest\Controller;
 
-/** Staff-only entry point for resolving one flagged new-item history row. */
+/** Staff-only entry point for reviewing flagged new-item history. */
 class WorkflowHistoryReviewController extends Controller
 {
     public function behaviors()
@@ -28,6 +28,7 @@ class WorkflowHistoryReviewController extends Controller
         return ApiAccessBehaviors::withRoleRules($behaviors, [
             'index' => Roles::STAFF,
             'review-item' => Roles::STAFF,
+            'review-submission' => Roles::STAFF,
             'options' => Roles::STAFF,
         ]);
     }
@@ -49,18 +50,40 @@ class WorkflowHistoryReviewController extends Controller
 
     public function actionReviewItem($id)
     {
-        $identity = Yii::$app->user->identity;
-        $body = Yii::$app->request->getBodyParams();
-        $decision = is_array($body) ? ($body['decision'] ?? null) : null;
-        $reason = is_array($body) ? ($body['reason'] ?? null) : null;
+        $input = $this->reviewInput();
         $result = Yii::$container->get(ItemHistoryReviewService::class)->review(
             (int)$id,
-            ['username' => $identity->username ?? (string)$identity->id, 'role' => $identity->role],
-            (string)$identity->id,
-            $decision,
-            $reason
+            $input['actor'],
+            $input['reviewer_id'],
+            $input['decision'],
+            $input['reason']
         );
         return $this->respond($result);
+    }
+
+    public function actionReviewSubmission($submission_id)
+    {
+        $input = $this->reviewInput();
+        $result = Yii::$container->get(ItemHistoryReviewService::class)->reviewSubmission(
+            (int)$submission_id,
+            $input['actor'],
+            $input['reviewer_id'],
+            $input['decision'],
+            $input['reason']
+        );
+        return $this->respond($result);
+    }
+
+    private function reviewInput()
+    {
+        $identity = Yii::$app->user->identity;
+        $body = Yii::$app->request->getBodyParams();
+        return [
+            'actor' => ['username' => $identity->username ?? (string)$identity->id, 'role' => $identity->role],
+            'reviewer_id' => (string)$identity->id,
+            'decision' => is_array($body) ? ($body['decision'] ?? null) : null,
+            'reason' => is_array($body) ? ($body['reason'] ?? null) : null,
+        ];
     }
 
     private function respond(array $result)

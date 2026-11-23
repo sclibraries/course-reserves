@@ -158,8 +158,10 @@ class UrlRulesTest extends \Codeception\Test\Unit
         ];
         $historyReviewRules = [
             'POST submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/review-item',
+            'POST submission-workflow/<submission_id:\\d+>/history-review' => 'workflow-history-review/review-submission',
             'GET submission-workflow/history-reviews' => 'workflow-history-review/index',
             'OPTIONS submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/options',
+            'OPTIONS submission-workflow/<submission_id:\\d+>/history-review' => 'workflow-history-review/options',
             'OPTIONS submission-workflow/history-reviews' => 'workflow-history-review/options',
         ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
@@ -191,7 +193,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $historyReviewRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(272, $mergedRules);
+        $this->assertCount(274, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -233,13 +235,22 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['POST', 'submission-workflow/items/new/999119202/history-review', [
                 'workflow-history-review/review-item', ['id' => '999119202'],
             ]],
+            ['POST', 'submission-workflow/999119202/history-review', [
+                'workflow-history-review/review-submission', ['submission_id' => '999119202'],
+            ]],
             ['GET', 'submission-workflow/history-reviews', ['workflow-history-review/index', []]],
             ['OPTIONS', 'submission-workflow/history-reviews', ['workflow-history-review/options', []]],
+            ['OPTIONS', 'submission-workflow/999119202/history-review', [
+                'workflow-history-review/options', ['submission_id' => '999119202'],
+            ]],
             ['OPTIONS', 'submission-workflow/items/new/999119202/history-review', [
                 'workflow-history-review/options', ['id' => '999119202'],
             ]],
             ['POST', 'submission-workflow/items/new/not-a-number/history-review', [
                 'submission-workflow/items/new/not-a-number/history-review', [],
+            ]],
+            ['POST', 'submission-workflow/not-a-number/history-review', [
+                'submission-workflow/not-a-number/history-review', [],
             ]],
             ['GET', 'faculty-submission/' . $uuid, ['faculty-submission/view', ['id' => $uuid]]],
             ['POST', 'faculty-submission/draft', ['faculty-draft/create', []]],
