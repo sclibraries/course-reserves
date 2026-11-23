@@ -24,22 +24,29 @@ class FacultyLockLatchBackfill
             'new' => 'submission_new_resources',
             'reuse' => 'submission_reuse_resources',
         ] as $kind => $table) {
-            $lastId = 0;
-            do {
-                $items = (new Query())->select([
-                    'id', 'submission_id', 'item_status', 'materialized_resource_id',
-                    'materialized_course_resource_id', 'materialized_physical_reference_id',
-                    'materialized_folder_id', 'materialized_by_staff_id', 'materialized_at',
-                ])->from($table)->where(['>', 'id', $lastId])
-                    ->andWhere(['locked_for_faculty_at' => null])
-                    ->orderBy(['id' => SORT_ASC])->limit(self::BATCH_SIZE)->all($this->db);
-                if (!$items) {
-                    break;
-                }
-                $lastId = (int)end($items)['id'];
+            $query = (new Query())->select([
+                'id', 'submission_id', 'item_status', 'materialized_resource_id',
+                'materialized_course_resource_id', 'materialized_physical_reference_id',
+                'materialized_folder_id', 'materialized_by_staff_id', 'materialized_at',
+            ])->from($table)->where(['locked_for_faculty_at' => null]);
+            foreach (self::keysetBatches($this->db, $query) as $items) {
                 $this->backfillBatch($kind, $table, $items, $timestamp);
-            } while (count($items) === self::BATCH_SIZE);
+            }
         }
+    }
+
+    public static function keysetBatches(Connection $db, Query $query, $idColumn = 'id')
+    {
+        $lastId = 0;
+        do {
+            $batch = (clone $query)->andWhere(['>', $idColumn, $lastId])
+                ->orderBy([$idColumn => SORT_ASC])->limit(self::BATCH_SIZE)->all($db);
+            if (!$batch) {
+                break;
+            }
+            $lastId = (int)end($batch)['id'];
+            yield $batch;
+        } while (count($batch) === self::BATCH_SIZE);
     }
 
     private function backfillBatch($kind, $table, array $items, $timestamp)
@@ -51,7 +58,7 @@ class FacultyLockLatchBackfill
         }
         $evidence = [];
         $this->addRunEvidence($evidence, $kind, $ids);
-        $this->addEventEvidence($evidence, $kind, $itemsById, $ids);
+        $this->addEventEvidence($evidence, $kind, $itemsById);
 
         if ($kind === 'new') {
             $completedIds = (new Query())->select('submission_item_id')->from('item_checklists')
@@ -89,52 +96,49 @@ class FacultyLockLatchBackfill
 
     private function addRunEvidence(array &$evidence, $kind, array $ids)
     {
-        $lastId = 0;
-        do {
-            $runs = (new Query())->select([
-                'id', 'item_id', 'closed_at', 'current_step_key', 'finish_state',
-            ])->from('item_flow_runs')->where(['item_kind' => $kind, 'item_id' => $ids])
-                ->andWhere(['>', 'id', $lastId])->orderBy(['id' => SORT_ASC])
-                ->limit(self::BATCH_SIZE)->all($this->db);
-            if (!$runs) {
-                break;
-            }
-            $lastId = (int)end($runs)['id'];
+        $query = (new Query())->select([
+            'id', 'item_id', 'closed_at', 'current_step_key', 'finish_state',
+        ])->from('item_flow_runs')->where(['item_kind' => $kind, 'item_id' => $ids]);
+        foreach (self::keysetBatches($this->db, $query) as $runs) {
             foreach ($runs as $run) {
                 if (PublicationPolicy::isReadyRun($run)) {
                     $evidence[$this->key($kind, $run['item_id'])] = true;
                 }
             }
-        } while (count($runs) === self::BATCH_SIZE);
+        }
     }
 
-    private function addEventEvidence(array &$evidence, $kind, array $itemsById, array $ids)
+    private function addEventEvidence(array &$evidence, $kind, array $itemsById)
     {
-        $lastId = 0;
-        do {
-            $events = (new Query())->select([
-                'id', 'item_id', 'submission_id', 'item_kind', 'event_type', 'reason', 'before_json', 'after_json',
-            ])->from('workflow_events')->where(['item_id' => $ids])->andWhere(['>', 'id', $lastId])
-                ->orderBy(['id' => SORT_ASC])->limit(self::BATCH_SIZE)->all($this->db);
-            if (!$events) {
-                break;
+        foreach ($this->matchingEvents($kind, $itemsById) as $matching) {
+            $event = $matching['event'];
+            if ($event['event_type'] === 'item_marked_ready'
+                || ($event['event_type'] === 'released' && $event['reason'] === 'Checklist completed')
+                || $this->hasFinishedStatus($matching['before'])
+                || $this->hasFinishedStatus($matching['after'])) {
+                $evidence[$this->key($kind, $event['item_id'])] = true;
             }
-            $lastId = (int)end($events)['id'];
+        }
+    }
+
+    public function matchingEvents($kind, array $itemsById)
+    {
+        $ids = array_map('intval', array_keys($itemsById));
+        $query = (new Query())->select([
+            'id', 'item_id', 'submission_id', 'item_kind', 'event_type', 'reason', 'before_json', 'after_json',
+        ])->from('workflow_events')->where(['item_id' => $ids]);
+        foreach (self::keysetBatches($this->db, $query) as $events) {
             foreach ($events as $event) {
                 $item = $itemsById[(int)$event['item_id']] ?? null;
-                if (!$item || !$this->eventMatchesItem($event, $kind, $item)) {
-                    continue;
-                }
-                $before = json_decode($event['before_json'], true);
-                $after = json_decode($event['after_json'], true);
-                if ($event['event_type'] === 'item_marked_ready'
-                    || ($event['event_type'] === 'released' && $event['reason'] === 'Checklist completed')
-                    || $this->hasFinishedStatus($before)
-                    || $this->hasFinishedStatus($after)) {
-                    $evidence[$this->key($kind, $item['id'])] = true;
+                if ($item && $this->eventMatchesItem($event, $kind, $item)) {
+                    yield [
+                        'event' => $event,
+                        'before' => json_decode($event['before_json'], true),
+                        'after' => json_decode($event['after_json'], true),
+                    ];
                 }
             }
-        } while (count($events) === self::BATCH_SIZE);
+        }
     }
 
     private function eventMatchesItem(array $event, $kind, array $item)
