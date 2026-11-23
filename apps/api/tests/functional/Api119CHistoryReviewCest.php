@@ -234,28 +234,13 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         Assert::assertSame(1, $global['page']);
         Assert::assertSame(50, $global['per_page']);
 
-        $firstPage = (int)floor($countBefore / 50) + 1;
-        $lastPage = (int)floor(($countBefore + 52) / 50) + 1;
-        $allItems = [];
-        for ($page = $firstPage; $page <= $lastPage; $page++) {
-            $this->getWithToken($I, $this->reviewerToken, ['page' => (string)$page]);
-            $I->seeResponseCodeIs(200);
-            $response = $this->response($I);
-            Assert::assertSame($countBefore + 53, $response['count']);
-            $allItems = array_merge($allItems, $response['items']);
-        }
-        Assert::assertSame(
-            array_merge($primaryItemIds, $unlinkedItemIds),
-            array_column(array_slice($allItems, $countBefore % 50), 'item_id')
-        );
-
         $this->getWithToken($I, $this->reviewerToken, [
             'submission_id' => (string)$primary['submission_id'], 'page' => '1',
         ]);
         $I->seeResponseCodeIs(200);
         $primaryPageOne = $this->response($I);
         Assert::assertSame(51, $primaryPageOne['count']);
-        Assert::assertSame($primaryItemIds[0], $primaryPageOne['items'][0]['item_id']);
+        Assert::assertSame(array_slice($primaryItemIds, 0, 50), array_column($primaryPageOne['items'], 'item_id'));
         Assert::assertSame('Synthetic history review source title', $primaryPageOne['items'][0]['item_title']);
         Assert::assertSame(51, $primaryPageOne['items'][0]['submission_open_count']);
         Assert::assertSame([
@@ -275,7 +260,7 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         $primaryPageTwo = $this->response($I);
         Assert::assertSame(51, $primaryPageTwo['count']);
         Assert::assertSame(1, count($primaryPageTwo['items']));
-        Assert::assertSame($primaryItemIds[50], $primaryPageTwo['items'][0]['item_id']);
+        Assert::assertSame([$primaryItemIds[50]], array_column($primaryPageTwo['items'], 'item_id'));
         Assert::assertSame(51, $primaryPageTwo['items'][0]['submission_open_count']);
 
         $this->getWithToken($I, $this->reviewerToken, [

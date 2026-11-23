@@ -3,6 +3,7 @@
 namespace app\services;
 
 use Yii;
+use yii\db\Query;
 
 /** Reads a bounded page of currently open item-history review rows. */
 class ItemHistoryReviewReadService
@@ -70,7 +71,7 @@ class ItemHistoryReviewReadService
                     'term_code' => $row['term_code'],
                     'section' => $row['section'],
                 ],
-                'submission_open_count' => $submissionOpenCounts[$submissionId] ?? 0,
+                'submission_open_count' => (int)($submissionOpenCounts[$submissionId] ?? 0),
             ];
         }, $rows);
 
@@ -84,42 +85,27 @@ class ItemHistoryReviewReadService
 
     private function openCountsForRows(array $rows)
     {
-        $submissionIds = array_unique(array_map('intval', array_column($rows, 'submission_id')));
+        $submissionIds = array_column($rows, 'submission_id');
         if (!$submissionIds) {
             return [];
         }
 
-        $placeholders = [];
-        $params = [];
-        foreach (array_values($submissionIds) as $index => $submissionId) {
-            $name = ':submission_' . $index;
-            $placeholders[] = $name;
-            $params[$name] = $submissionId;
-        }
-        $rows = Yii::$app->db->createCommand(
-            'SELECT submission_id, COUNT(*) AS open_count FROM item_history_review '
-            . 'WHERE reviewed_at IS NULL AND submission_id IN (' . implode(', ', $placeholders) . ') '
-            . 'GROUP BY submission_id',
-            $params
-        )->queryAll();
-
-        $counts = [];
-        foreach ($rows as $row) {
-            $counts[(int)$row['submission_id']] = (int)$row['open_count'];
-        }
-        return $counts;
+        return (new Query())
+            ->select(['open_count' => 'COUNT(*)', 'submission_id'])
+            ->from('item_history_review')
+            ->where(['reviewed_at' => null, 'submission_id' => $submissionIds])
+            ->groupBy('submission_id')
+            ->indexBy('submission_id')
+            ->column();
     }
 
     private function positiveInteger($value, $maximum)
     {
-        if (!is_string($value) || preg_match('/\A[1-9][0-9]*\z/', $value) !== 1) {
+        if (!is_string($value) || (string)(int)$value !== $value) {
             return null;
         }
-        $maximum = (string)$maximum;
-        if (strlen($value) > strlen($maximum)
-            || (strlen($value) === strlen($maximum) && strcmp($value, $maximum) > 0)) {
-            return null;
-        }
-        return (int)$value;
+
+        $integer = (int)$value;
+        return $integer >= 1 && $integer <= $maximum ? $integer : null;
     }
 }
