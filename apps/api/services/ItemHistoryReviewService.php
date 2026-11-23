@@ -8,6 +8,7 @@ use Yii;
 class ItemHistoryReviewService
 {
     use ServiceResult;
+    use ItemHistoryReviewFailure;
 
     const MAX_REASON_BYTES = 65535;
 
@@ -83,16 +84,5 @@ class ItemHistoryReviewService
                 'reviewed_at' => $now,
             ]);
         });
-    }
-
-    private function failure($status, $code)
-    {
-        $reference = FailureReference::generate();
-        Yii::warning('Item history review ' . $code . ' reference=' . $reference, __METHOD__);
-        return $this->result($status, [
-            'error_code' => $code,
-            'message' => 'The item history review could not be completed.',
-            'reference' => $reference,
-        ]);
     }
 }

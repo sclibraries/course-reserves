@@ -191,6 +191,142 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
         $this->assertError($I, 404, 'item_not_found');
     }
 
+    public function openReviewQueueIsBoundedFilteredAndKeepsCourseLabels(FunctionalTester $I)
+    {
+        $this->getWithToken($I, $this->reviewerToken, ['page' => '1']);
+        $I->seeResponseCodeIs(200);
+        $countBefore = $this->response($I)['count'];
+
+        $primary = $this->createSubmissionFixture('queue-primary', 'submitted', 'linked');
+        \Yii::$app->db->createCommand()->insert('resources', [
+            'name' => 'Synthetic history review source title',
+        ])->execute();
+        $sourceId = (int)\Yii::$app->db->getLastInsertID();
+        $this->resourceIds[] = $sourceId;
+        \Yii::$app->db->createCommand()->update('submission_new_resources', [
+            'is_reuse' => 1,
+            'source_resource_id' => (string)$sourceId,
+            'resource_data' => json_encode(['title' => '']),
+        ], ['id' => $primary['item_id']])->execute();
+        $this->insertReview($primary['item_id'], $primary['submission_id']);
+        $primaryItemIds = [$primary['item_id']];
+        for ($index = 1; $index < 51; $index++) {
+            $primaryItemIds[] = $this->insertReviewItem(
+                $primary['submission_id'], 'Synthetic review item ' . $index
+            );
+        }
+        $this->insertReviewItem($primary['submission_id'], 'Reviewed synthetic item', [
+            'reviewed_at' => $this->past(),
+            'reviewed_by_staff_id' => 'synthetic-reviewer',
+            'decision' => 'not_finished',
+            'reason' => 'Synthetic existing review',
+        ]);
+
+        $unlinked = $this->createReviewFixture('queue-unlinked', null, 'unlinked');
+        $unlinkedItemIds = [$unlinked['item_id'], $this->insertReviewItem(
+            $unlinked['submission_id'], 'Synthetic unlinked review item'
+        )];
+
+        $this->getWithToken($I, $this->reviewerToken, ['page' => '1']);
+        $I->seeResponseCodeIs(200);
+        $global = $this->response($I);
+        Assert::assertSame($countBefore + 53, $global['count']);
+        Assert::assertSame(1, $global['page']);
+        Assert::assertSame(50, $global['per_page']);
+
+        $firstPage = (int)floor($countBefore / 50) + 1;
+        $lastPage = (int)floor(($countBefore + 52) / 50) + 1;
+        $allItems = [];
+        for ($page = $firstPage; $page <= $lastPage; $page++) {
+            $this->getWithToken($I, $this->reviewerToken, ['page' => (string)$page]);
+            $I->seeResponseCodeIs(200);
+            $response = $this->response($I);
+            Assert::assertSame($countBefore + 53, $response['count']);
+            $allItems = array_merge($allItems, $response['items']);
+        }
+        Assert::assertSame(
+            array_merge($primaryItemIds, $unlinkedItemIds),
+            array_column(array_slice($allItems, $countBefore % 50), 'item_id')
+        );
+
+        $this->getWithToken($I, $this->reviewerToken, [
+            'submission_id' => (string)$primary['submission_id'], 'page' => '1',
+        ]);
+        $I->seeResponseCodeIs(200);
+        $primaryPageOne = $this->response($I);
+        Assert::assertSame(51, $primaryPageOne['count']);
+        Assert::assertSame($primaryItemIds[0], $primaryPageOne['items'][0]['item_id']);
+        Assert::assertSame('Synthetic history review source title', $primaryPageOne['items'][0]['item_title']);
+        Assert::assertSame(51, $primaryPageOne['items'][0]['submission_open_count']);
+        Assert::assertSame([
+            'item_id', 'submission_id', 'item_title', 'trace', 'flagged_at', 'course', 'submission_open_count',
+        ], array_keys($primaryPageOne['items'][0]));
+        Assert::assertSame(['course_code', 'course_title', 'term_code', 'section'],
+            array_keys($primaryPageOne['items'][0]['course']));
+        Assert::assertSame('Synthetic review item 1', $primaryPageOne['items'][1]['item_title']);
+        Assert::assertSame('none', $primaryPageOne['items'][0]['trace']);
+        Assert::assertTrue(is_string($primaryPageOne['items'][0]['flagged_at']));
+        Assert::assertSame(50, count($primaryPageOne['items']));
+
+        $this->getWithToken($I, $this->reviewerToken, [
+            'submission_id' => (string)$primary['submission_id'], 'page' => '2',
+        ]);
+        $I->seeResponseCodeIs(200);
+        $primaryPageTwo = $this->response($I);
+        Assert::assertSame(51, $primaryPageTwo['count']);
+        Assert::assertSame(1, count($primaryPageTwo['items']));
+        Assert::assertSame($primaryItemIds[50], $primaryPageTwo['items'][0]['item_id']);
+        Assert::assertSame(51, $primaryPageTwo['items'][0]['submission_open_count']);
+
+        $this->getWithToken($I, $this->reviewerToken, [
+            'submission_id' => (string)$primary['submission_id'], 'page' => '3',
+        ]);
+        $I->seeResponseCodeIs(200);
+        $primaryPastEnd = $this->response($I);
+        Assert::assertSame(51, $primaryPastEnd['count']);
+        Assert::assertSame([], $primaryPastEnd['items']);
+
+        $this->getWithToken($I, $this->reviewerToken, [
+            'submission_id' => (string)$unlinked['submission_id'],
+        ]);
+        $I->seeResponseCodeIs(200);
+        $unlinkedResponse = $this->response($I);
+        Assert::assertSame(1, $unlinkedResponse['page']);
+        Assert::assertSame(2, $unlinkedResponse['count']);
+        Assert::assertSame($unlinkedItemIds, array_column($unlinkedResponse['items'], 'item_id'));
+        Assert::assertSame(2, $unlinkedResponse['items'][0]['submission_open_count']);
+        Assert::assertSame([
+            'course_code' => $unlinked['course_code'],
+            'course_title' => $unlinked['course_title'],
+            'term_code' => $unlinked['term_code'],
+            'section' => $unlinked['section'],
+        ], $unlinkedResponse['items'][0]['course']);
+
+        foreach (['0', '-1', '1.5', 'abc', '01', '9223372036854775807', ['1']] as $value) {
+            $this->getWithToken($I, $this->reviewerToken, ['page' => $value]);
+            $this->assertError($I, 422, 'invalid_page');
+        }
+        foreach (['0', '-1', '1.5', 'abc', '01', '9223372036854775808', ['1']] as $value) {
+            $this->getWithToken($I, $this->reviewerToken, ['submission_id' => $value]);
+            $this->assertError($I, 422, 'invalid_submission_id');
+        }
+
+        $this->getWithToken($I, $this->facultyToken, ['page' => '1']);
+        $I->seeResponseCodeIs(403);
+
+        $origin = 'http://localhost:5173';
+        $preflightStatus = $I->sendCorsRequest(
+            'OPTIONS', \Yii::$app->urlManager->createUrl(['workflow-history-review/options']),
+            $origin,
+            'GET',
+            'Authorization'
+        );
+        Assert::assertSame(200, $preflightStatus);
+        Assert::assertSame($origin, \Yii::$app->response->headers->get('Access-Control-Allow-Origin'));
+        Assert::assertSame('GET, POST, OPTIONS', \Yii::$app->response->headers->get('Access-Control-Allow-Methods'));
+        Assert::assertSame('workflow-history-review/options', \Yii::$app->requestedRoute);
+    }
+
     public function committedEventFailureRetriesAndExhaustsWithoutPartialWrites(FunctionalTester $I)
     {
         $restore = Api116B1CommittedConnection::swap();
@@ -253,12 +389,14 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
             'SELECT id FROM submission_new_resources WHERE submission_id = :id ORDER BY id LIMIT 1',
             [':id' => $submissionId]
         )->queryScalar();
-        $uuid = (string)\Yii::$app->db->createCommand(
-            'SELECT submission_uuid FROM faculty_submissions WHERE submission_id = :id',
+        $submission = \Yii::$app->db->createCommand(
+            'SELECT submission_uuid, course_code, course_title, term_code, section '
+            . 'FROM faculty_submissions WHERE submission_id = :id',
             [':id' => $submissionId]
-        )->queryScalar();
+        )->queryOne();
+        $uuid = $submission['submission_uuid'];
         $this->createdUuids[] = $uuid;
-        return ['submission_id' => $submissionId, 'item_id' => $itemId, 'uuid' => $uuid];
+        return array_merge(['submission_id' => $submissionId, 'item_id' => $itemId, 'uuid' => $uuid], $submission);
     }
 
     private function insertReview($itemId, $submissionId, array $review = [])
@@ -273,6 +411,18 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
             'decision' => null,
             'reason' => null,
         ], $review))->execute();
+    }
+
+    private function insertReviewItem($submissionId, $title, array $review = [])
+    {
+        \Yii::$app->db->createCommand()->insert('submission_new_resources', [
+            'submission_id' => $submissionId,
+            'resource_data' => json_encode(['title' => $title]),
+            'item_status' => 'pending',
+        ])->execute();
+        $itemId = (int)\Yii::$app->db->getLastInsertID();
+        $this->insertReview($itemId, $submissionId, $review);
+        return $itemId;
     }
 
     private function snapshot($itemId)
@@ -296,6 +446,12 @@ class Api119CHistoryReviewCest extends Api109FunctionalCest
     {
         $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
         $I->sendJsonRequest('POST', 'workflow-history-review/review-item', $payload, ['id' => $itemId]);
+    }
+
+    private function getWithToken(FunctionalTester $I, $token, array $params = [])
+    {
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $token);
+        $I->sendJsonRequest('GET', 'workflow-history-review/index', [], $params);
     }
 
     private function getFacultySubmission(FunctionalTester $I, $uuid)

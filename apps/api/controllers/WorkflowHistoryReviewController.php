@@ -4,6 +4,7 @@ namespace app\controllers;
 
 use app\components\ApiAccessBehaviors;
 use app\components\Roles;
+use app\services\ItemHistoryReviewReadService;
 use app\services\ItemHistoryReviewService;
 use Yii;
 use yii\filters\Cors;
@@ -19,12 +20,13 @@ class WorkflowHistoryReviewController extends Controller
             'class' => Cors::class,
             'cors' => [
                 'Origin' => \app\components\CorsOriginPolicy::allowedOrigins(),
-                'Access-Control-Request-Method' => ['POST', 'OPTIONS'],
+                'Access-Control-Request-Method' => ['GET', 'POST', 'OPTIONS'],
                 'Access-Control-Allow-Credentials' => true,
                 'Access-Control-Allow-Headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
             ],
         ];
         return ApiAccessBehaviors::withRoleRules($behaviors, [
+            'index' => Roles::STAFF,
             'review-item' => Roles::STAFF,
             'options' => Roles::STAFF,
         ]);
@@ -34,6 +36,15 @@ class WorkflowHistoryReviewController extends Controller
     {
         Yii::$app->response->statusCode = 204;
         return null;
+    }
+
+    public function actionIndex()
+    {
+        $result = Yii::$container->get(ItemHistoryReviewReadService::class)->list(
+            Yii::$app->request->get('page'),
+            Yii::$app->request->get('submission_id')
+        );
+        return $this->respond($result);
     }
 
     public function actionReviewItem($id)

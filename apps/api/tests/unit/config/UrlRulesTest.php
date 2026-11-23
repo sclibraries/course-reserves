@@ -158,7 +158,9 @@ class UrlRulesTest extends \Codeception\Test\Unit
         ];
         $historyReviewRules = [
             'POST submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/review-item',
+            'GET submission-workflow/history-reviews' => 'workflow-history-review/index',
             'OPTIONS submission-workflow/items/new/<id:\\d+>/history-review' => 'workflow-history-review/options',
+            'OPTIONS submission-workflow/history-reviews' => 'workflow-history-review/options',
         ];
         $expectedClaimRules = array_intersect_key($mergedRules, $claimRules);
         $expectedGroupRules = array_intersect_key($mergedRules, $groupRules);
@@ -189,7 +191,7 @@ class UrlRulesTest extends \Codeception\Test\Unit
             $historyReviewRules
         );
         $existingRules = array_diff_key($mergedRules, $declaredRules);
-        $this->assertCount(270, $mergedRules);
+        $this->assertCount(272, $mergedRules);
         $this->assertSame($claimRules, $expectedClaimRules);
         $this->assertSame($groupRules, $expectedGroupRules);
         $this->assertSame($flowRules, $expectedFlowRules);
@@ -231,6 +233,8 @@ class UrlRulesTest extends \Codeception\Test\Unit
             ['POST', 'submission-workflow/items/new/999119202/history-review', [
                 'workflow-history-review/review-item', ['id' => '999119202'],
             ]],
+            ['GET', 'submission-workflow/history-reviews', ['workflow-history-review/index', []]],
+            ['OPTIONS', 'submission-workflow/history-reviews', ['workflow-history-review/options', []]],
             ['OPTIONS', 'submission-workflow/items/new/999119202/history-review', [
                 'workflow-history-review/options', ['id' => '999119202'],
             ]],

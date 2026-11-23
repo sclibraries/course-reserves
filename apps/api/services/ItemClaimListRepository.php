@@ -80,6 +80,12 @@ class ItemClaimListRepository
         )->queryAll();
     }
 
+    public static function newItemTitleSql($resourceDataExpression)
+    {
+        return 'CASE WHEN JSON_VALID(' . $resourceDataExpression . ') THEN JSON_UNQUOTE(JSON_EXTRACT('
+            . $resourceDataExpression . ', "$.title")) ELSE NULL END';
+    }
+
     private function queueSql($term, $type)
     {
         $kinds = in_array($type, ['new', 'reuse'], true) ? [$type] : ['new', 'reuse'];
@@ -124,9 +130,7 @@ class ItemClaimListRepository
         $sourceResourceId = $kind === 'new'
             ? SourceResourceId::sqlValue('i.source_resource_id')
             : 'i.source_resource_id';
-        $title = $kind === 'new'
-            ? 'CASE WHEN JSON_VALID(i.resource_data) THEN JSON_UNQUOTE(JSON_EXTRACT(i.resource_data, "$.title")) ELSE NULL END'
-            : 'NULL';
+        $title = $kind === 'new' ? self::newItemTitleSql('i.resource_data') : 'NULL';
         $resourceData = $kind === 'new' ? 'i.resource_data' : 'NULL';
         return 'SELECT "' . $kind . '" AS kind, i.id, i.submission_id, s.submission_uuid, '
             . 's.course_code, s.section, s.term_code, ' . $title . ' AS title, source.name AS source_resource_title, '
