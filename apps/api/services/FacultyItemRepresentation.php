@@ -16,7 +16,6 @@ class FacultyItemRepresentation
         'doi' => 'doi',
         'edition' => 'edition',
         'oclcNumber' => 'oclcNumber',
-        'journalTitle' => 'journalTitle',
         'volume' => 'volume',
         'issue' => 'issue',
         'pages' => 'pages',
@@ -44,54 +43,50 @@ class FacultyItemRepresentation
         array $evidence
     ): array {
         $grouped = (new FacultyFolderGrouping())->group($folders, $itemsByKind);
-        $folderRows = [];
-        foreach ($folders as $folder) {
-            $folderRows[(int)$folder['folder_id']] = $folder;
-        }
-        $rowsByKind = ['new' => [], 'reuse' => []];
-        foreach ($itemsByKind as $kind => $rows) {
-            foreach ($rows as $row) {
-                $rowsByKind[$kind][(int)$row['id']] = $row;
-            }
-        }
-        $resultFolders = [];
-        foreach ($grouped['folders'] as $folder) {
+        $folderRows = array_column($folders, null, 'folder_id');
+        $rowsByKind = [
+            'new' => array_column($itemsByKind['new'] ?? [], null, 'id'),
+            'reuse' => array_column($itemsByKind['reuse'] ?? [], null, 'id'),
+        ];
+        $resultFolders = array_map(function ($folder) use ($submission, $folderRows, $rowsByKind, $evidence) {
             $row = $folderRows[$folder['folder_id']];
-            $resultFolders[] = [
+            return [
                 'folder_id' => $folder['folder_id'],
                 'name' => $row['folder_name'],
                 'display_order' => self::integerOrNull($row['display_order']),
                 'ambiguous' => $folder['ambiguous'],
-                'items' => array_map(function ($reference) use (
-                    $submission,
-                    $rowsByKind,
-                    $evidence,
-                    $folder
-                ) {
-                    return $this->item(
-                        $submission,
-                        $rowsByKind[$reference['kind']][$reference['id']],
-                        $reference['kind'],
-                        $folder['folder_id'],
-                        $folder['ambiguous'],
-                        $evidence
-                    );
-                }, $folder['items']),
+                'items' => $this->itemsForReferences(
+                    $folder['items'], $submission, $rowsByKind, $evidence, $folder['folder_id'], $folder['ambiguous']
+                ),
             ];
-        }
+        }, $grouped['folders']);
 
-        $rootItems = array_map(function ($reference) use ($submission, $rowsByKind, $evidence) {
+        return [
+            'folders' => $resultFolders,
+            'unfoldered_items' => $this->itemsForReferences(
+                $grouped['root'], $submission, $rowsByKind, $evidence, null, false
+            ),
+        ];
+    }
+
+    private function itemsForReferences(
+        array $references,
+        FacultySubmission $submission,
+        array $rowsByKind,
+        array $evidence,
+        $folderId,
+        $ambiguousFolder
+    ): array {
+        return array_map(function ($reference) use ($submission, $rowsByKind, $evidence, $folderId, $ambiguousFolder) {
             return $this->item(
                 $submission,
                 $rowsByKind[$reference['kind']][$reference['id']],
                 $reference['kind'],
-                null,
-                false,
+                $folderId,
+                $ambiguousFolder,
                 $evidence
             );
-        }, $grouped['root']);
-
-        return ['folders' => $resultFolders, 'unfoldered_items' => $rootItems];
+        }, $references);
     }
 
     private function item(
@@ -105,25 +100,18 @@ class FacultyItemRepresentation
         $data = json_decode($row['resource_data'] ?? '', true);
         $data = is_array($data) ? $data : [];
         $id = (int)$row['id'];
-        $itemEvidence = $evidence[$kind][$id] ?? [];
         $lock = $this->lockPredicate->evaluate(
             $submission,
             $kind,
             $row,
-            array_replace([
-                'open_run' => false,
-                'publication_history' => false,
-                'published' => false,
-                'open_review' => false,
-            ], $itemEvidence),
+            $evidence[$kind][$id],
             $ambiguousFolder
         );
-        $resourceFields = [];
-        foreach (self::RESOURCE_FIELDS as $outputKey => $dataKey) {
-            $resourceFields[$outputKey] = $outputKey === 'journalTitle'
-                ? (array_key_exists('journal', $data) ? $data['journal'] : ($data['journalTitle'] ?? null))
-                : ($data[$dataKey] ?? null);
+        $values = [];
+        foreach (self::RESOURCE_FIELDS as $name => $key) {
+            $values[$name] = $data[$key] ?? null;
         }
+
         return [
             'kind' => $kind,
             'id' => $id,
@@ -134,21 +122,9 @@ class FacultyItemRepresentation
             'is_reuse' => $kind === 'reuse' || (bool)$row['is_reuse'],
             'status' => $row['item_status'],
             'title' => $data['title'] ?? $row['source_resource_name'] ?? 'Untitled',
-            'authors' => $resourceFields['authors'],
-            'publisher' => $resourceFields['publisher'],
-            'publicationYear' => $resourceFields['publicationYear'],
-            'isbn' => $resourceFields['isbn'],
-            'issn' => $resourceFields['issn'],
-            'doi' => $resourceFields['doi'],
-            'edition' => $resourceFields['edition'],
-            'oclcNumber' => $resourceFields['oclcNumber'],
-            'journalTitle' => $resourceFields['journalTitle'],
-            'volume' => $resourceFields['volume'],
-            'issue' => $resourceFields['issue'],
-            'pages' => $resourceFields['pages'],
-            'url' => $resourceFields['url'],
-            'displayStartDate' => $resourceFields['displayStartDate'],
-            'displayEndDate' => $resourceFields['displayEndDate'],
+            'journalTitle' => array_key_exists('journal', $data)
+                ? $data['journal']
+                : ($data['journalTitle'] ?? null),
             'material_type' => $row['material_type_name'] !== null
                 ? EffectiveMaterialType::key($row, $row['material_type_name'])
                 : null,
@@ -164,33 +140,21 @@ class FacultyItemRepresentation
             'source_resource_id' => $row['source_resource_id'],
             'source_folio_instance_id' => $row['source_folio_instance_id'],
             'instance_id' => $data['instanceId'] ?? $row['source_folio_instance_id'],
-            'instance_hrid' => $resourceFields['instance_hrid'],
             'holdings_id' => $data['holdingsId'] ?? $row['source_folio_holdings_id'],
-            'chapter_title' => $resourceFields['chapter_title'],
-            'copy' => $resourceFields['copy'],
-            'temporary_location_id' => $resourceFields['temporary_location_id'],
-            'permanent_location_id' => $resourceFields['permanent_location_id'],
             'temporary_location' => self::nestedData($data, 'temporaryLocationObject', ['id', 'name', 'code']),
             'permanent_location' => self::nestedData($data, 'permanentLocationObject', ['id', 'name', 'code']),
-            'lock' => [
-                'locked' => $lock['locked'],
-                'kind' => $lock['lock'],
-                'reason' => $lock['message'],
-            ],
+            'lock' => ['locked' => $lock['locked'], 'kind' => $lock['lock'], 'reason' => $lock['message']],
             'capabilities' => $lock['capabilities'],
-        ];
+        ] + $values;
     }
 
     private static function nestedData(array $data, $key, array $fields)
     {
-        if (!isset($data[$key]) || !is_array($data[$key])) {
-            return null;
-        }
-        $value = [];
-        foreach ($fields as $field) {
-            $value[$field] = $data[$key][$field] ?? null;
-        }
-        return $value;
+        return isset($data[$key]) && is_array($data[$key])
+            ? array_combine($fields, array_map(function ($field) use ($data, $key) {
+                return $data[$key][$field] ?? null;
+            }, $fields))
+            : null;
     }
 
     private static function integerOrNull($value)

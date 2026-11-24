@@ -5,6 +5,21 @@ use app\services\FacultyItemRepresentation;
 
 class FacultyItemRepresentationTest extends \Codeception\Test\Unit
 {
+    public function testMissingEvidenceFailsInsteadOfReturningAnUnlockedItem()
+    {
+        $this->expectException(\Throwable::class);
+        $submission = new FacultySubmission([
+            'status' => FacultySubmission::STATUS_SUBMITTED,
+            'is_locked' => 0,
+        ]);
+        (new FacultyItemRepresentation(date('Y-m-d H:i:s', time() - 300)))->represent(
+            $submission,
+            [],
+            ['new' => [$this->item(['id' => 17])]],
+            []
+        );
+    }
+
     public function testRepresentsBothKindsWithOnlyFacultyFields()
     {
         $now = date('Y-m-d H:i:s', time() - 300);
@@ -256,21 +271,7 @@ class FacultyItemRepresentationTest extends \Codeception\Test\Unit
             'is_reuse' => false,
             'status' => 'pending',
             'title' => 'Untitled',
-            'authors' => null,
-            'publisher' => null,
-            'publicationYear' => null,
-            'isbn' => null,
-            'issn' => null,
-            'doi' => null,
-            'edition' => null,
-            'oclcNumber' => null,
             'journalTitle' => null,
-            'volume' => null,
-            'issue' => null,
-            'pages' => null,
-            'url' => null,
-            'displayStartDate' => null,
-            'displayEndDate' => null,
             'material_type' => null,
             'assignedPages' => null,
             'faculty_notes' => null,
@@ -280,16 +281,30 @@ class FacultyItemRepresentationTest extends \Codeception\Test\Unit
             'source_resource_id' => null,
             'source_folio_instance_id' => null,
             'instance_id' => null,
-            'instance_hrid' => null,
             'holdings_id' => null,
-            'chapter_title' => null,
-            'copy' => null,
-            'temporary_location_id' => null,
-            'permanent_location_id' => null,
             'temporary_location' => null,
             'permanent_location' => null,
             'lock' => ['locked' => false, 'kind' => null, 'reason' => null],
             'capabilities' => ['edit' => true, 'delete' => true, 'move' => true, 'reorder' => true],
+            'authors' => null,
+            'publisher' => null,
+            'publicationYear' => null,
+            'isbn' => null,
+            'issn' => null,
+            'doi' => null,
+            'edition' => null,
+            'oclcNumber' => null,
+            'volume' => null,
+            'issue' => null,
+            'pages' => null,
+            'url' => null,
+            'displayStartDate' => null,
+            'displayEndDate' => null,
+            'instance_hrid' => null,
+            'chapter_title' => null,
+            'copy' => null,
+            'temporary_location_id' => null,
+            'permanent_location_id' => null,
         ];
     }
 }
