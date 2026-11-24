@@ -5,14 +5,15 @@ namespace app\services;
 /** Validates faculty-editable fields without reading application state. */
 class FacultySaveFields
 {
-    const NULLABLE_STRING = ['type' => 'string', 'limit' => null, 'create_only' => false];
+    const STRING_TYPES = ['string', 'bytes', 'nonblank', 'url', 'date', 'material_type', 'priority'];
+    const NULLABLE_STRING = ['type' => 'string'];
     const ID_VALUE = ['type' => 'string', 'limit' => 255];
-    const CREATE_STRING = ['type' => 'string', 'limit' => null, 'create_only' => true];
+    const CREATE_STRING = ['type' => 'string', 'create_only' => true];
     const CREATE_ID = ['type' => 'string', 'limit' => 255, 'create_only' => true];
-    const DATE = ['type' => 'date', 'limit' => null, 'create_only' => false];
-    const BYTE_LIMIT = ['type' => 'bytes', 'limit' => 65535, 'create_only' => false];
+    const DATE = ['type' => 'date'];
+    const BYTE_LIMIT = ['type' => 'bytes', 'limit' => 65535];
     const LOCATION = [
-        'type' => 'map', 'limit' => null, 'create_only' => true,
+        'type' => 'map', 'create_only' => true,
         'members' => [
             'id' => self::ID_VALUE,
             'name' => self::NULLABLE_STRING,
@@ -21,46 +22,33 @@ class FacultySaveFields
     ];
     const RULES = [
         'item' => [
-            'title' => ['type' => 'nonblank', 'limit' => null, 'create_only' => false, 'required' => true],
-            'material_type' => ['type' => 'material_type', 'limit' => null, 'create_only' => false, 'required' => true],
-            'authors' => self::NULLABLE_STRING,
-            'publisher' => self::NULLABLE_STRING,
-            'publicationYear' => self::NULLABLE_STRING,
-            'isbn' => self::NULLABLE_STRING,
-            'issn' => self::NULLABLE_STRING,
-            'doi' => self::NULLABLE_STRING,
-            'edition' => self::NULLABLE_STRING,
-            'oclcNumber' => self::NULLABLE_STRING,
-            'journalTitle' => self::NULLABLE_STRING,
-            'volume' => self::NULLABLE_STRING,
-            'issue' => self::NULLABLE_STRING,
-            'pages' => self::NULLABLE_STRING,
-            'url' => ['type' => 'url', 'limit' => null, 'create_only' => false],
-            'displayStartDate' => self::DATE,
-            'displayEndDate' => self::DATE,
-            'assignedPages' => self::BYTE_LIMIT,
-            'faculty_notes' => self::BYTE_LIMIT,
-            'is_reuse' => ['type' => 'boolean', 'limit' => null, 'create_only' => true, 'default' => false],
-            'priority' => [
-                'type' => 'priority', 'limit' => null, 'create_only' => true, 'default' => 'medium',
-            ],
+            'title' => ['type' => 'nonblank', 'required' => true],
+            'material_type' => ['type' => 'material_type', 'required' => true],
+            'authors' => self::NULLABLE_STRING, 'publisher' => self::NULLABLE_STRING,
+            'publicationYear' => self::NULLABLE_STRING, 'isbn' => self::NULLABLE_STRING,
+            'issn' => self::NULLABLE_STRING, 'doi' => self::NULLABLE_STRING,
+            'edition' => self::NULLABLE_STRING, 'oclcNumber' => self::NULLABLE_STRING,
+            'journalTitle' => self::NULLABLE_STRING, 'volume' => self::NULLABLE_STRING,
+            'issue' => self::NULLABLE_STRING, 'pages' => self::NULLABLE_STRING,
+            'url' => ['type' => 'url'],
+            'displayStartDate' => self::DATE, 'displayEndDate' => self::DATE,
+            'assignedPages' => self::BYTE_LIMIT, 'faculty_notes' => self::BYTE_LIMIT,
+            'is_reuse' => ['type' => 'boolean', 'create_only' => true, 'default' => false],
+            'priority' => ['type' => 'priority', 'create_only' => true, 'default' => 'medium'],
             'barcode' => self::CREATE_ID,
             'call_number' => ['type' => 'string', 'limit' => 512, 'create_only' => true],
-            'source_resource_id' => self::CREATE_ID,
-            'source_folio_instance_id' => self::CREATE_ID,
-            'instance_id' => self::CREATE_ID,
-            'instance_hrid' => self::CREATE_ID,
+            'source_resource_id' => self::CREATE_ID, 'source_folio_instance_id' => self::CREATE_ID,
+            'instance_id' => self::CREATE_ID, 'instance_hrid' => self::CREATE_ID,
             'holdings_id' => self::CREATE_ID,
             'chapter_title' => self::CREATE_STRING,
             'copy' => self::CREATE_STRING,
             'temporary_location_id' => self::CREATE_ID,
             'permanent_location_id' => self::CREATE_ID,
             'eds' => [
-                'type' => 'map', 'limit' => null, 'create_only' => true,
+                'type' => 'map', 'create_only' => true,
                 'members' => [
-                    'dbId' => ['type' => 'string', 'limit' => 255],
-                    'an' => ['type' => 'string', 'limit' => null],
-                    'plink' => ['type' => 'string', 'limit' => null],
+                    'dbId' => ['type' => 'string', 'limit' => 255], 'an' => ['type' => 'string'],
+                    'plink' => ['type' => 'string'],
                 ],
             ],
             'temporary_location' => self::LOCATION,
@@ -69,10 +57,10 @@ class FacultySaveFields
         'submission' => [
             'submission_notes' => self::BYTE_LIMIT,
             'needed_by_date' => self::DATE,
-            'course_title' => ['type' => 'nonblank', 'limit' => 500, 'create_only' => false],
+            'course_title' => ['type' => 'nonblank', 'limit' => 500],
         ],
         'folder' => [
-            'name' => ['type' => 'nonblank', 'limit' => 255, 'create_only' => false],
+            'name' => ['type' => 'nonblank', 'limit' => 255],
         ],
     ];
 
@@ -88,28 +76,20 @@ class FacultySaveFields
 
     public static function folderName($name)
     {
-        $result = self::validate('folder', ['name' => $name], false);
-        return $result === false ? false : $result['name'];
+        return self::validate('folder', ['name' => $name], false)['name'];
     }
 
     private static function validate($scope, array $fields, $create)
     {
         $result = [];
         foreach ($fields as $name => $value) {
-            if (!isset(self::RULES[$scope][$name])) {
-                return false;
-            }
+            self::ensure(isset(self::RULES[$scope][$name]));
             $rule = self::RULES[$scope][$name];
-            if (($rule['create_only'] && !$create) || !self::normalize($value, $rule, $normalized)) {
-                return false;
-            }
-            $result[$name] = $normalized;
+            self::ensure(empty($rule['create_only']) || $create);
+            $result[$name] = self::normalize($value, $rule);
         }
-
         foreach (self::RULES[$scope] as $name => $rule) {
-            if ($create && !empty($rule['required']) && !array_key_exists($name, $result)) {
-                return false;
-            }
+            self::ensure(!$create || empty($rule['required']) || array_key_exists($name, $result));
             if ($create && array_key_exists('default', $rule) && !array_key_exists($name, $result)) {
                 $result[$name] = $rule['default'];
             }
@@ -117,88 +97,58 @@ class FacultySaveFields
         return $result;
     }
 
-    private static function normalize($value, array $rule, &$normalized)
+    private static function normalize($value, array $rule)
     {
         $type = $rule['type'];
-        if ($type === 'string' || $type === 'bytes' || $type === 'nonblank') {
-            if (!is_string($value) && !($type !== 'nonblank' && $value === null)) {
-                return false;
-            }
-            if ($type === 'nonblank' && trim($value) === '') {
-                return false;
-            }
-            if ($value !== null && $rule['limit'] !== null) {
-                $length = $type === 'bytes' ? strlen($value) : mb_strlen($value, 'UTF-8');
-                if ($length > $rule['limit']) {
-                    return false;
-                }
-            }
-            $normalized = $value;
-            return true;
+        if ($value === null) {
+            self::ensure(!in_array($type, ['nonblank', 'material_type', 'boolean', 'priority'], true));
+            return null;
         }
-        if ($type === 'material_type') {
-            if (!is_string($value) || !in_array($value, EffectiveMaterialType::KEYS, true)) {
-                return false;
-            }
-            $normalized = $value;
-            return true;
+        self::ensure(!in_array($type, self::STRING_TYPES, true) || is_string($value));
+        if (isset($rule['limit'])) {
+            self::ensure(($type === 'bytes' ? strlen($value) : mb_strlen($value, 'UTF-8')) <= $rule['limit']);
         }
-        if ($type === 'url') {
-            if ($value === null || $value === '') {
-                $normalized = $value;
-                return true;
-            }
-            $normalized = \app\components\ResourceUrl::normalize($value);
-            return $normalized !== null;
+
+        switch ($type) {
+            case 'string':
+            case 'bytes':
+                return $value;
+            case 'nonblank':
+                self::ensure(trim($value) !== ''); return $value;
+            case 'material_type':
+                self::ensure(in_array($value, EffectiveMaterialType::KEYS, true)); return $value;
+            case 'url':
+                $url = $value === '' ? '' : \app\components\ResourceUrl::normalize($value);
+                self::ensure($url !== null); return $url;
+            case 'date':
+                $date = \DateTime::createFromFormat('!Y-m-d', $value);
+                self::ensure($date !== false && $date->format('Y-m-d') === $value); return $value;
+            case 'boolean':
+                self::ensure(is_bool($value)); return $value;
+            case 'priority':
+                self::ensure(in_array($value, ['high', 'medium', 'low'], true)); return $value;
+            case 'map':
+                return self::normalizeMap($value, $rule['members']);
+            default:
+                self::ensure(false);
         }
-        if ($type === 'date') {
-            if ($value === null) {
-                $normalized = null;
-                return true;
-            }
-            if (!is_string($value)) {
-                return false;
-            }
-            $date = \DateTime::createFromFormat('!Y-m-d', $value);
-            if ($date === false || $date->format('Y-m-d') !== $value) {
-                return false;
-            }
-            $normalized = $value;
-            return true;
+    }
+
+    private static function normalizeMap($value, array $members)
+    {
+        self::ensure(is_array($value) && count($value) === count($members));
+        $result = [];
+        foreach ($members as $name => $rule) {
+            self::ensure(array_key_exists($name, $value));
+            $result[$name] = self::normalize($value[$name], $rule);
         }
-        if ($type === 'boolean') {
-            if (!is_bool($value)) {
-                return false;
-            }
-            $normalized = $value;
-            return true;
+        return $result;
+    }
+
+    private static function ensure($condition)
+    {
+        if (!$condition) {
+            throw new \DomainException('payload_format');
         }
-        if ($type === 'priority') {
-            if (!is_string($value) || !in_array($value, ['high', 'medium', 'low'], true)) {
-                return false;
-            }
-            $normalized = $value;
-            return true;
-        }
-        if ($type === 'map') {
-            if ($value === null) {
-                $normalized = null;
-                return true;
-            }
-            $members = $rule['members'];
-            if (!is_array($value) || count($value) !== count($members)
-                || array_diff(array_keys($value), array_keys($members))) {
-                return false;
-            }
-            $normalized = [];
-            foreach ($members as $name => $memberRule) {
-                if (!array_key_exists($name, $value) || !self::normalize($value[$name], $memberRule, $member)) {
-                    return false;
-                }
-                $normalized[$name] = $member;
-            }
-            return true;
-        }
-        return false;
     }
 }

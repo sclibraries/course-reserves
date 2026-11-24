@@ -6,14 +6,10 @@ namespace app\services;
 class FacultySaveOperations
 {
     const OPERATION_KEYS = [
-        'create_item' => ['op', 'client_key', 'folder', 'data'],
-        'change_item' => ['op', 'kind', 'id', 'changes'],
-        'move_item' => ['op', 'kind', 'id', 'to_folder'],
-        'delete_item' => ['op', 'kind', 'id'],
-        'create_folder' => ['op', 'client_key', 'name'],
-        'rename_folder' => ['op', 'id', 'name'],
-        'delete_folder' => ['op', 'id'],
-        'reorder_folder' => ['op', 'folder', 'order'],
+        'create_item' => ['op', 'client_key', 'folder', 'data'], 'change_item' => ['op', 'kind', 'id', 'changes'],
+        'move_item' => ['op', 'kind', 'id', 'to_folder'], 'delete_item' => ['op', 'kind', 'id'],
+        'create_folder' => ['op', 'client_key', 'name'], 'rename_folder' => ['op', 'id', 'name'],
+        'delete_folder' => ['op', 'id'], 'reorder_folder' => ['op', 'folder', 'order'],
         'reorder_root' => ['op', 'order'],
     ];
 
@@ -23,236 +19,203 @@ class FacultySaveOperations
             return self::parsePayload($payload);
         } catch (\DomainException $error) {
             return ['error_code' => $error->getMessage()];
-        } catch (\Throwable $error) {
-            return ['error_code' => 'payload_format'];
         }
     }
 
     private static function parsePayload(array $payload)
     {
-        $topKeys = ['format', 'operations'];
+        $keys = ['format', 'operations'];
         if (array_key_exists('submission', $payload)) {
-            $topKeys[] = 'submission';
+            $keys[] = 'submission';
         }
-        self::ensure(self::hasExactKeys($payload, $topKeys)
-            && ($payload['format'] ?? null) === 'faculty-save-operations-v1'
+        self::ensure(self::hasExactKeys($payload, $keys) && ($payload['format'] ?? null) === 'faculty-save-operations-v1'
             && isset($payload['operations']) && is_array($payload['operations'])
             && array_values($payload['operations']) === $payload['operations']);
 
-        $submission = [];
-        if (array_key_exists('submission', $payload)) {
-            self::ensure(is_array($payload['submission']));
-            $submission = FacultySaveFields::submission($payload['submission']);
-            self::ensure($submission !== false);
-        }
-
+        self::ensure(!array_key_exists('submission', $payload) || is_array($payload['submission']));
+        $submission = isset($payload['submission']) ? FacultySaveFields::submission($payload['submission']) : [];
         $operations = [];
-        $createKeys = [];
-        $folderCreates = [];
-        $itemCreates = [];
-        $folderReferences = [];
-        $itemActions = [];
-        $folderActions = [];
-        $deletedItems = [];
-        $deletedFolders = [];
-        $reorders = [];
-        $orders = [];
-        $readOnlyChange = false;
-
         foreach ($payload['operations'] as $operation) {
             self::ensure(is_array($operation) && isset($operation['op']) && is_string($operation['op'])
                 && isset(self::OPERATION_KEYS[$operation['op']])
                 && self::hasExactKeys($operation, self::OPERATION_KEYS[$operation['op']]));
-
-            $op = $operation['op'];
-            if ($op === 'create_item') {
-                self::ensure(self::validClientKey($operation['client_key']) && is_array($operation['data']));
-                $folder = self::folderReference($operation['folder']);
-                $data = FacultySaveFields::item($operation['data'], true);
-                self::ensure($folder !== false && $data !== false);
-                $createKeys[] = $operation['client_key'];
-                $itemCreates[] = $operation['client_key'];
-                if ($folder !== null) {
-                    $folderReferences[] = $folder;
-                }
-                $operation['data'] = $data;
-            } elseif ($op === 'change_item' || $op === 'move_item' || $op === 'delete_item') {
-                $reference = self::itemReference(['kind' => $operation['kind'], 'id' => $operation['id']]);
-                self::ensure($reference !== false);
-                $identity = self::itemIdentity($reference);
-                if ($op === 'change_item') {
-                    self::ensure(is_array($operation['changes']) && $operation['changes']);
-                    $changes = FacultySaveFields::item($operation['changes'], false);
-                    self::ensure($changes !== false);
-                    $operation['changes'] = $changes;
-                    $readOnlyChange = $readOnlyChange || $operation['kind'] === 'reuse';
-                } elseif ($op === 'move_item') {
-                    $folder = self::folderReference($operation['to_folder']);
-                    self::ensure($folder !== false);
-                    if ($folder !== null) {
-                        $folderReferences[] = $folder;
-                    }
-                } else {
-                    $deletedItems[$identity] = true;
-                }
-                $itemActions[$identity][$op] = ($itemActions[$identity][$op] ?? 0) + 1;
-            } elseif ($op === 'create_folder') {
-                self::ensure(self::validClientKey($operation['client_key'])
-                    && FacultySaveFields::folderName($operation['name']) !== false);
-                $createKeys[] = $operation['client_key'];
-                $folderCreates[] = $operation['client_key'];
-            } elseif ($op === 'rename_folder' || $op === 'delete_folder') {
-                self::ensure(self::positiveId($operation['id']));
-                self::ensure($op !== 'rename_folder' || FacultySaveFields::folderName($operation['name']) !== false);
-                $identity = 'id:' . $operation['id'];
-                $folderActions[$identity][$op] = ($folderActions[$identity][$op] ?? 0) + 1;
-                if ($op === 'delete_folder') {
-                    $deletedFolders[$identity] = true;
-                }
+            if (in_array($operation['op'], ['create_item', 'change_item', 'move_item', 'delete_item'], true)) {
+                $operation = self::readItemOperation($operation);
+            } elseif (in_array($operation['op'], ['create_folder', 'rename_folder', 'delete_folder'], true)) {
+                $operation = self::readFolderOperation($operation);
             } else {
-                if ($op === 'reorder_folder') {
-                    $folder = self::folderReference($operation['folder']);
-                    self::ensure($folder !== false && $folder !== null);
-                    $folderReferences[] = $folder;
-                    $reorders[] = 'folder:' . self::folderIdentity($folder);
-                } else {
-                    $reorders[] = 'root';
-                }
-                $entries = self::parseOrder($operation['order'], $op === 'reorder_root');
-                $orders[] = $entries;
-                foreach ($entries as $entry) {
-                    if ($entry['type'] === 'folder') {
-                        $folderReferences[] = $entry['reference'];
-                    }
-                }
+                $operation = self::readOrderOperation($operation);
             }
             $operations[] = $operation;
         }
 
-        if (count($createKeys) !== count(array_unique($createKeys))) {
-            self::reject('duplicate_reference');
+        self::checkDuplicates($operations);
+        self::checkUnknownReferences($operations);
+        foreach ($operations as $operation) {
+            self::ensure($operation['op'] !== 'change_item' || $operation['kind'] !== 'reuse', 'item_read_only');
         }
-        foreach ($itemActions as $actions) {
-            if (max($actions) > 1 || (isset($actions['delete_item']) && array_sum($actions) > 1)) {
-                self::reject('duplicate_reference');
-            }
-        }
-        foreach ($folderActions as $actions) {
-            if (max($actions) > 1 || (isset($actions['delete_folder']) && array_sum($actions) > 1)) {
-                self::reject('duplicate_reference');
-            }
-        }
-        if (count($reorders) !== count(array_unique($reorders))) {
-            self::reject('duplicate_reference');
-        }
+        return ['submission' => $submission, 'operations' => $operations];
+    }
 
-        $itemOrderCounts = [];
+    private static function readItemOperation(array $operation)
+    {
+        if ($operation['op'] === 'create_item') {
+            self::ensure(self::validClientKey($operation['client_key']) && is_array($operation['data']));
+            $operation['folder'] = self::reference($operation['folder'], 'folder');
+            $operation['data'] = FacultySaveFields::item($operation['data'], true);
+        } else {
+            self::reference(['kind' => $operation['kind'], 'id' => $operation['id']], 'item');
+            if ($operation['op'] === 'change_item') {
+                self::ensure(is_array($operation['changes']) && $operation['changes']);
+                $operation['changes'] = FacultySaveFields::item($operation['changes'], false);
+            } elseif ($operation['op'] === 'move_item') {
+                $operation['to_folder'] = self::reference($operation['to_folder'], 'folder');
+            }
+        }
+        return $operation;
+    }
+
+    private static function readFolderOperation(array $operation)
+    {
+        self::ensure($operation['op'] === 'create_folder' ? self::validClientKey($operation['client_key'])
+            : self::positiveId($operation['id']));
+        if ($operation['op'] !== 'delete_folder') {
+            $operation['name'] = FacultySaveFields::folderName($operation['name']);
+        }
+        return $operation;
+    }
+
+    private static function readOrderOperation(array $operation)
+    {
+        if ($operation['op'] === 'reorder_folder') {
+            $operation['folder'] = self::reference($operation['folder'], 'folder');
+            self::ensure($operation['folder'] !== null);
+        }
+        $operation['order'] = self::parseOrder($operation['order'], $operation['op'] === 'reorder_root');
+        return $operation;
+    }
+
+    private static function checkDuplicates(array $operations)
+    {
+        $creates = [];
+        $actions = [];
+        $reorders = [];
+        $orders = [];
+        foreach ($operations as $operation) {
+            $op = $operation['op'];
+            if (isset($operation['order'])) {
+                $orders[] = $operation['order'];
+            }
+            if (isset($operation['client_key'])) {
+                $creates[] = $operation['client_key'];
+            } elseif (isset($operation['id'])) {
+                $identity = self::referenceIdentity($operation);
+                $actions[$identity][$op] = ($actions[$identity][$op] ?? 0) + 1;
+            } elseif ($op === 'reorder_root') {
+                $reorders[] = 'root';
+            } else {
+                $reorders[] = self::referenceIdentity($operation['folder']);
+            }
+        }
+        self::ensure(count($creates) === count(array_unique($creates)), 'duplicate_reference');
+        foreach ($actions as $counts) {
+            $deletes = isset($counts['delete_item']) || isset($counts['delete_folder']);
+            self::ensure(max($counts) === 1 && (!$deletes || array_sum($counts) === 1), 'duplicate_reference');
+        }
+        self::ensure(count($reorders) === count(array_unique($reorders)), 'duplicate_reference');
+
+        $itemsOrdered = [];
         foreach ($orders as $entries) {
             $seen = [];
             foreach ($entries as $entry) {
-                $identity = $entry['type'] . ':' . ($entry['type'] === 'item'
-                    ? self::itemIdentity($entry['reference'])
-                    : self::folderIdentity($entry['reference']));
-                if (isset($seen[$identity])) {
-                    self::reject('duplicate_reference');
-                }
-                $seen[$identity] = true;
-                if ($entry['type'] === 'item') {
-                    $itemIdentity = self::itemIdentity($entry['reference']);
-                    $itemOrderCounts[$itemIdentity] = ($itemOrderCounts[$itemIdentity] ?? 0) + 1;
-                    if (isset($deletedItems[$itemIdentity])) {
-                        self::reject('duplicate_reference');
-                    }
+                if (isset($entry['item'])) {
+                    $identity = self::referenceIdentity($entry['item']);
+                    self::ensure(!isset($itemsOrdered[$identity])
+                        && !isset($actions[$identity]['delete_item']), 'duplicate_reference');
+                    $itemsOrdered[$identity] = true;
+                } else {
+                    $identity = self::referenceIdentity($entry['folder']);
+                    self::ensure(!isset($seen[$identity]), 'duplicate_reference');
+                    $seen[$identity] = true;
                 }
             }
         }
-        if (max(array_merge([0], array_values($itemOrderCounts))) > 1) {
-            self::reject('duplicate_reference');
-        }
+    }
 
-        $folderCreates = array_fill_keys($folderCreates, true);
-        $itemCreates = array_fill_keys($itemCreates, true);
-        foreach ($folderReferences as $reference) {
-            self::ensure(!isset($reference['client_key']) || isset($folderCreates[$reference['client_key']]), 'unknown_folder');
-            self::ensure(!isset($reference['id']) || !isset($deletedFolders['id:' . $reference['id']]), 'unknown_folder');
-        }
-        foreach ($orders as $entries) {
-            foreach ($entries as $entry) {
-                $reference = $entry['reference'];
-                self::ensure($entry['type'] !== 'item' || !isset($reference['client_key'])
-                    || isset($itemCreates[$reference['client_key']]));
+    private static function checkUnknownReferences(array $operations)
+    {
+        $creates = [];
+        $deletedFolders = [];
+        $folderReferences = [];
+        $itemReferences = [];
+        foreach ($operations as $operation) {
+            if (isset($operation['client_key'])) {
+                $creates[$operation['client_key']] = $operation['op'];
+            } elseif ($operation['op'] === 'delete_folder') {
+                $deletedFolders[$operation['id']] = true;
+            }
+            $folder = $operation['folder'] ?? $operation['to_folder'] ?? null;
+            if ($folder !== null) {
+                $folderReferences[] = $folder;
+            }
+            foreach ($operation['order'] ?? [] as $entry) {
+                if (isset($entry['folder'])) {
+                    $folderReferences[] = $entry['folder'];
+                } elseif (isset($entry['item']['client_key'])) {
+                    $itemReferences[] = $entry['item']['client_key'];
+                }
             }
         }
-        if ($readOnlyChange) {
-            self::reject('item_read_only');
+        foreach ($folderReferences as $reference) {
+            self::ensure((!isset($reference['client_key'])
+                || ($creates[$reference['client_key']] ?? null) === 'create_folder')
+                && (!isset($reference['id']) || !isset($deletedFolders[$reference['id']])), 'unknown_folder');
         }
-        return ['submission' => $submission, 'operations' => $operations];
+        foreach ($itemReferences as $key) {
+            self::ensure(($creates[$key] ?? null) === 'create_item');
+        }
     }
 
     private static function parseOrder($order, $allowFolders)
     {
         self::ensure(is_array($order) && array_values($order) === $order);
-        $entries = [];
         foreach ($order as $entry) {
             self::ensure(is_array($entry));
-            if (self::hasExactKeys($entry, ['item'])) {
-                $reference = self::itemReference($entry['item']);
-                self::ensure($reference !== false);
-                $entries[] = ['type' => 'item', 'reference' => $reference];
-            } elseif ($allowFolders && self::hasExactKeys($entry, ['folder'])) {
-                $reference = self::folderReference($entry['folder']);
-                self::ensure($reference !== false && $reference !== null);
-                $entries[] = ['type' => 'folder', 'reference' => $reference];
-            } else {
-                self::reject();
-            }
+            $type = isset($entry['item']) ? 'item' : 'folder';
+            self::ensure(self::hasExactKeys($entry, [$type]) && ($type === 'item' || $allowFolders));
+            $reference = self::reference($entry[$type], $type);
+            self::ensure($type === 'item' || $reference !== null);
         }
-        return $entries;
+        return $order;
     }
 
-    private static function folderReference($reference)
+    private static function reference($reference, $type)
     {
-        if ($reference === null) {
+        if ($type === 'folder' && $reference === null) {
             return null;
         }
-        if (!is_array($reference)) {
-            return false;
-        }
-        if (self::hasExactKeys($reference, ['id']) && self::positiveId($reference['id'])) {
+        self::ensure(is_array($reference));
+        if (self::hasExactKeys($reference, ['client_key'])) {
+            self::ensure(self::validClientKey($reference['client_key']));
             return $reference;
         }
-        if (self::hasExactKeys($reference, ['client_key']) && self::validClientKey($reference['client_key'])) {
-            return $reference;
-        }
-        return false;
+        $keys = $type === 'folder' ? ['id'] : ['kind', 'id'];
+        self::ensure(self::hasExactKeys($reference, $keys)
+            && ($type === 'folder' ? self::positiveId($reference['id'] ?? null)
+                : in_array($reference['kind'] ?? null, ['new', 'reuse'], true)
+                    && self::positiveId($reference['id'] ?? null)));
+        return $reference;
     }
 
-    private static function itemReference($reference)
+    private static function referenceIdentity(array $reference)
     {
-        if (!is_array($reference)) {
-            return false;
-        }
-        if (self::hasExactKeys($reference, ['client_key']) && self::validClientKey($reference['client_key'])) {
-            return $reference;
-        }
-        if (self::hasExactKeys($reference, ['kind', 'id'])
-            && in_array($reference['kind'], ['new', 'reuse'], true) && self::positiveId($reference['id'])) {
-            return $reference;
-        }
-        return false;
+        return isset($reference['client_key']) ? 'client:' . $reference['client_key'] : (isset($reference['kind'])
+            ? $reference['kind'] . ':' . $reference['id'] : 'id:' . $reference['id']);
     }
 
     private static function hasExactKeys(array $value, array $keys)
     {
-        if (count($value) !== count($keys)) {
-            return false;
-        }
-        foreach ($keys as $key) {
-            if (!array_key_exists($key, $value)) {
-                return false;
-            }
-        }
-        return true;
+        return count($value) === count($keys) && !array_diff($keys, array_keys($value));
     }
 
     private static function validClientKey($key)
@@ -265,27 +228,8 @@ class FacultySaveOperations
         return is_int($id) && $id > 0;
     }
 
-    private static function itemIdentity(array $reference)
-    {
-        return isset($reference['client_key'])
-            ? 'client:' . $reference['client_key']
-            : $reference['kind'] . ':' . $reference['id'];
-    }
-
-    private static function folderIdentity(array $reference)
-    {
-        return isset($reference['client_key']) ? 'client:' . $reference['client_key'] : 'id:' . $reference['id'];
-    }
-
     private static function ensure($condition, $code = 'payload_format')
     {
-        if (!$condition) {
-            self::reject($code);
-        }
-    }
-
-    private static function reject($code = 'payload_format')
-    {
-        throw new \DomainException($code);
+        if (!$condition) { throw new \DomainException($code); }
     }
 }
