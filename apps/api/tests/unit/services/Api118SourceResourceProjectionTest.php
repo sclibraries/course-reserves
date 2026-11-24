@@ -45,10 +45,14 @@ class Api118SourceResourceProjectionTest extends \Codeception\Test\Unit
         $draft = PublicationDraftSnapshot::fromNewItem($item);
         $response = FacultySubmissionPresenter::submissionResponse([
             'submission_uuid' => '11800000-0000-4000-8000-000000000001',
-            'newResources' => [$item],
+            'unfoldered_items' => [[
+                'kind' => 'new',
+                'id' => 118,
+                'source_resource_id' => $uuid,
+            ]],
         ]);
 
         $this->assertSame($uuid, $draft['source_resource_id']);
-        $this->assertSame($uuid, $response['newResources'][0]['source_resource_id']);
+        $this->assertSame($uuid, $response['unfoldered_items'][0]['source_resource_id']);
     }
 }

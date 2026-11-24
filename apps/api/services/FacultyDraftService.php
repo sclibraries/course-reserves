@@ -94,7 +94,7 @@ class FacultyDraftService
         return FacultySubmissionPresenter::submitCompleteResponse([
             'success' => true,
             'message' => 'Submission completed successfully',
-            'submission' => SubmissionConfirmationState::projectResponse($result['submission']),
+            'submission' => $result['submission'],
             'stats' => $this->payloads->submissionStats($data),
         ]);
     }

@@ -189,6 +189,10 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
         }
         \PHPUnit\Framework\Assert::assertSame(1, $responses['update']['draft_version'] ?? null);
         \PHPUnit\Framework\Assert::assertTrue($responses['submit-complete']['success'] ?? false);
+        foreach (['create', 'submit-complete'] as $endpoint) {
+            \PHPUnit\Framework\Assert::assertArrayNotHasKey('newResources', $responses[$endpoint]);
+            \PHPUnit\Framework\Assert::assertArrayNotHasKey('reuseResources', $responses[$endpoint]);
+        }
 
         $leaks = [];
         foreach ($responses as $endpoint => $response) {
@@ -289,12 +293,16 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
                 'id' => $submission['submission_uuid'],
             ])
         );
-        $this->assertEdsIdentity($edsFields, $facultyView['newResources'][0]);
-        \PHPUnit\Framework\Assert::assertSame('3-7', $facultyView['newResources'][0]['assignedPages']);
+        $facultyItem = $facultyView['unfoldered_items'][0];
+        $this->assertEdsIdentity($edsFields, $facultyItem);
+        \PHPUnit\Framework\Assert::assertSame('3-7', $facultyItem['assignedPages']);
         \PHPUnit\Framework\Assert::assertSame(
-            'test-faculty-private-note', $facultyView['newResources'][0]['faculty_notes']
+            'test-faculty-private-note', $facultyItem['faculty_notes']
         );
-        \PHPUnit\Framework\Assert::assertArrayNotHasKey('public_note', $facultyView['newResources'][0]);
+        \PHPUnit\Framework\Assert::assertArrayNotHasKey('public_note', $facultyItem);
+        \PHPUnit\Framework\Assert::assertArrayNotHasKey('newResources', $facultyView);
+        \PHPUnit\Framework\Assert::assertArrayNotHasKey('reuseResources', $facultyView);
+        \PHPUnit\Framework\Assert::assertArrayNotHasKey('ungrouped_items', $facultyView);
 
         $staffView = $this->request(
             $I,
@@ -305,10 +313,17 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
                 'id' => $submission['submission_id'],
             ])
         );
-        $this->assertEdsIdentity($edsFields, $staffView['newResources'][0]);
+        $this->assertRawEdsIdentity($edsFields, $staffView['newResources'][0]);
     }
 
     private function assertEdsIdentity(array $expected, array $resource)
+    {
+        foreach ($expected as $key => $value) {
+            \PHPUnit\Framework\Assert::assertSame($value, $resource[$key] ?? null, $key . ' changed');
+        }
+    }
+
+    private function assertRawEdsIdentity(array $expected, array $resource)
     {
         $resourceData = $resource['resource_data'] ?? null;
         if (is_string($resourceData)) {

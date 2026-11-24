@@ -2,6 +2,7 @@
 
 namespace app\services;
 
+use app\models\FacultySubmission;
 use yii\base\Arrayable;
 
 /**
@@ -18,10 +19,9 @@ class FacultySubmissionPresenter
         'email_confirmation_status', 'email_confirmation_requested_at',
         'email_confirmation_sent_at', 'email_confirmation_sent',
         'id', 'instructors', 'term', 'lastUpdated', 'isTestData', 'item_counts',
-        'completion_percentage', 'folders', 'unfoldered_items', 'ungrouped_items',
+        'completion_percentage', 'folders', 'unfoldered_items',
         'status_summary', 'metadata', 'lock_status', 'can_edit', 'access',
-        'proxy_can_edit', 'reuseResources', 'newResources', 'communications',
-        'courseOffering',
+        'proxy_can_edit', 'communications', 'courseOffering',
     ];
 
     private const RESOURCE_FIELDS = [
@@ -29,15 +29,6 @@ class FacultySubmissionPresenter
         'source_call_number', 'source_resource_id', 'source_folio_instance_id',
         'barcode', 'call_number', 'item_status', 'display_order', 'position_in_folder',
         'folder_name', 'faculty_notes', 'assigned_pages', 'priority', 'created_at', 'updated_at',
-    ];
-
-    private const FOLDER_FIELDS = ['id', 'folder_id', 'name', 'display_order', 'item_count'];
-
-    private const FOLDER_ITEM_FIELDS = [
-        'type', 'id', 'title', 'authors', 'material_type', 'material_type_id',
-        'is_reuse', 'barcode', 'call_number', 'status', 'item_status', 'display_order',
-        'position_in_folder', 'folder_name', 'notes', 'faculty_notes', 'priority',
-        'assigned_pages', 'created_at', 'updated_at', 'resource_data', 'source_barcode', 'source_call_number',
     ];
 
     private const METADATA_FIELDS = [
@@ -74,7 +65,11 @@ class FacultySubmissionPresenter
 
     public static function submissionResponse($submission)
     {
-        $submission = self::arrayValue($submission);
+        if ($submission instanceof FacultySubmission) {
+            $submission = $submission->toArray(self::modelFields($submission));
+        } else {
+            $submission = self::arrayValue($submission);
+        }
         if (!is_array($submission)) {
             return $submission;
         }
@@ -84,13 +79,7 @@ class FacultySubmissionPresenter
             if (!in_array($field, self::SUBMISSION_FIELDS, true)) {
                 continue;
             }
-            if ($field === 'reuseResources' || $field === 'newResources') {
-                $value = self::resourceCollection($value);
-            } elseif ($field === 'folders') {
-                $value = self::folderCollection($value);
-            } elseif ($field === 'unfoldered_items' || $field === 'ungrouped_items') {
-                $value = self::folderItemCollection($value);
-            } elseif ($field === 'metadata') {
+            if ($field === 'metadata') {
                 $value = self::metadata($value);
             } elseif ($field === 'courseOffering') {
                 $value = self::courseOffering($value);
@@ -108,6 +97,11 @@ class FacultySubmissionPresenter
             $result[$field] = $value;
         }
         return $result;
+    }
+
+    public static function modelFields(FacultySubmission $submission): array
+    {
+        return array_values(array_intersect(array_keys($submission->fields()), self::SUBMISSION_FIELDS));
     }
 
     public static function statusResponse(array $response)
@@ -156,30 +150,6 @@ class FacultySubmissionPresenter
             return [];
         }
         return ['messages' => self::communicationCollection($response['messages'])];
-    }
-
-    private static function resourceCollection($resources)
-    {
-        return self::mapRows($resources, [self::class, 'resourceResponse']);
-    }
-
-    private static function folderCollection($folders)
-    {
-        return self::mapRows($folders, function ($folder) {
-            $folder = self::arrayValue($folder);
-            $result = self::pick($folder, self::FOLDER_FIELDS);
-            if (is_array($folder) && array_key_exists('items', $folder)) {
-                $result['items'] = self::folderItemCollection($folder['items']);
-            }
-            return $result;
-        });
-    }
-
-    private static function folderItemCollection($items)
-    {
-        return self::mapRows($items, function ($item) {
-            return self::renameAssignedPages(self::pick(self::arrayValue($item), self::FOLDER_ITEM_FIELDS));
-        });
     }
 
     private static function metadata($metadata)

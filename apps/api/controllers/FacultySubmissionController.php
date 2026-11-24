@@ -184,147 +184,18 @@ class FacultySubmissionController extends BaseRestController
         if (!in_array($sortBy, $allowedSort, true)) {
             $sortBy = 'created_at';
         }
-        
+
         $ownership = new SubmissionOwnershipPolicy();
         $dataProvider = new ActiveDataProvider([
             'query' => $ownership->accessibleSubmissionsQuery($facultyUser)
-                ->with(['reuseResources', 'newResources'])
                 ->orderBy([$sortBy => $sortOrder, 'submission_id' => $sortOrder]),
             // Let per-page and page be controlled by query params (defaults handled by Yii)
         ]);
-
         $models = $dataProvider->getModels();
-        $items = array_map(function($m) use ($ownership, $facultyUser) {
-            $item = $m->toArray();
-            
-            // Get all resources (unified table with is_reuse flag)
-            $allResources = $m->getNewResources()->all();
-            
-            // Get folders with display order
-            $folders = $m->getFolders()
-                ->orderBy(['display_order' => SORT_ASC])
-                ->all();
-            
-            // Count by type
-            $reuseCount = 0;
-            $newCount = 0;
-            $totalComplete = 0;
-            
-            foreach ($allResources as $resource) {
-                if ($resource->is_reuse) {
-                    $reuseCount++;
-                } else {
-                    $newCount++;
-                }
-                
-                if ($resource->item_status === 'complete') {
-                    $totalComplete++;
-                }
-            }
-            
-            $totalItems = count($allResources);
-            
-            $item['item_counts'] = [
-                'total' => $totalItems,
-                'reuse' => $reuseCount,
-                'new' => $newCount,
-                'complete' => $totalComplete,
-                'pending' => $totalItems - $totalComplete,
-            ];
-            
-            $item['completion_percentage'] = $totalItems > 0 
-                ? round(($totalComplete / $totalItems) * 100, 1)
-                : 0;
-            
-            // Organize materials by folder
-            $folderStructure = [];
-            $unfolderedItems = [];
-            
-            // First, create folder structure with metadata
-            foreach ($folders as $folder) {
-                $folderStructure[$folder->folder_name] = [
-                    'id' => $folder->folder_id,
-                    'name' => $folder->folder_name,
-                    'display_order' => $folder->display_order,
-                    'items' => [],
-                ];
-            }
-            
-            // Then, assign materials to their folders
-            foreach ($allResources as $resource) {
-                $resourceData = $resource->getResourceDataForPresentation() ?? [];
-                $materialItem = [
-                    'id' => $resource->id,
-                    'title' => $resourceData['title'] ?? 'Untitled',
-                    'authors' => $resourceData['authors'] ?? null,
-                    'material_type' => $resourceData['materialType'] ?? null,
-                    'is_reuse' => (bool)$resource->is_reuse,
-                    'barcode' => $resource->is_reuse ? $resource->source_barcode : ($resourceData['barcode'] ?? null),
-                    'call_number' => $resource->is_reuse ? $resource->source_call_number : ($resourceData['callNumber'] ?? null),
-                    'status' => $resource->item_status,
-                    'display_order' => $resource->display_order,
-                    'folder_name' => $resource->folder_name,
-                    'resource_data' => $resourceData,
-                    'assigned_pages' => $resource->assigned_pages,
-                ];
-                // Add to appropriate folder or unfoldered list
-                if ($resource->folder_name && isset($folderStructure[$resource->folder_name])) {
-                    $folderStructure[$resource->folder_name]['items'][] = $materialItem;
-                } else {
-                    $unfolderedItems[] = $materialItem;
-                }
-            }
-            
-            // Sort items within each folder by display_order
-            foreach ($folderStructure as &$folder) {
-                usort($folder['items'], function($a, $b) {
-                    return $a['display_order'] - $b['display_order'];
-                });
-            }
-            unset($folder);
-            
-            // Sort unfoldered items by display_order
-            usort($unfolderedItems, function($a, $b) {
-                return $a['display_order'] - $b['display_order'];
-            });
-            
-            // Convert folder structure to array sorted by folder display_order
-            $foldersArray = array_values($folderStructure);
-            usort($foldersArray, function($a, $b) {
-                return $a['display_order'] - $b['display_order'];
-            });
-            
-            // Add count to each folder
-            foreach ($foldersArray as &$folder) {
-                $folder['item_count'] = count($folder['items']);
-            }
-            unset($folder);
-            
-            $item['folders'] = $foldersArray;
-            $item['unfoldered_items'] = $unfolderedItems;
-            
-            // Add frontend-friendly fields
-            $item['id'] = $m->submission_uuid; // UUID for frontend
-            $item['instructors'] = $m->faculty_display_name ?? '';
-            $item['term'] = $this->formatTermCode($m->term_code);
-            $item['lastUpdated'] = $m->updated_at ? date('M j, Y', strtotime($m->updated_at)) : null;
-            $item['isTestData'] = false; // Set based on your test data criteria
-            
-            // Add lock status information
-            $item['is_locked'] = (bool)$m->is_locked;
-            $item['locked_at'] = $m->locked_at;
-            $item['locked_by'] = $m->locked_by_staff_id;
-            $item['lock_reason'] = $m->lock_reason;
-            $item['can_edit'] = $m->canEdit();
-
-            $access = $ownership->accessDetails($m, $facultyUser);
-            $item['access'] = $access['access'];
-            if ($access['access'] === 'proxy') {
-                $item['proxy_can_edit'] = $access['proxy_can_edit'];
-            }
-            
-            return $item;
+        $accessDetails = array_map(function ($submission) use ($ownership, $facultyUser) {
+            return $ownership->accessDetails($submission, $facultyUser);
         }, $models);
+        $items = (new \app\services\FacultySubmissionResponseBuilder())->index($models, $accessDetails);
 
         $pagination = $dataProvider->getPagination();
         return \app\services\FacultySubmissionPresenter::submissionIndexResponse([
@@ -359,158 +230,22 @@ class FacultySubmissionController extends BaseRestController
     }
 
     /**
-     * Format term code (e.g., "202602" -> "2026 Winter" or return as-is if already formatted)
-     * 
-     * @param string $termCode Term code in format YYYYSS or already formatted like "2026 Winter"
-     * @return string Formatted term like "2026 Winter"
-     */
-    protected function formatTermCode($termCode)
-    {
-        if (!$termCode) {
-            return $termCode;
-        }
-        
-        // If already formatted (contains space), return as-is
-        if (strpos($termCode, ' ') !== false) {
-            return $termCode;
-        }
-        
-        // Otherwise parse as YYYYSS format
-        if (strlen($termCode) < 6) {
-            return $termCode;
-        }
-        
-        $year = substr($termCode, 0, 4);
-        $semester = substr($termCode, 4, 2);
-        
-        $semesterMap = [
-            '01' => 'Spring',
-            '02' => 'Winter',
-            '05' => 'Summer',
-            '09' => 'Fall',
-        ];
-        
-        $semesterName = $semesterMap[$semester] ?? 'Term ' . $semester;
-        
-        return "$year $semesterName";
-    }
-
-    /**
      * Get a specific submission with complete details
      * Includes items, folders, metadata, and processing status
      */
     public function actionView($id)
     {
         $facultyUser = $this->getFacultyUser();
-        
-        $submission = (new SubmissionOwnershipPolicy())->findSubmissionWithAccess($id, $facultyUser, false, [
-                'reuseResources' => function($query) {
-                    $query->orderBy(['display_order' => SORT_ASC, 'position_in_folder' => SORT_ASC]);
-                },
-                'newResources' => function($query) {
-                    $query->orderBy(['display_order' => SORT_ASC, 'position_in_folder' => SORT_ASC]);
-                },
-                'folders' => function($query) {
-                    $query->orderBy(['display_order' => SORT_ASC]);
-                },
-                'metadata'
-            ]);
+        $submission = (new SubmissionOwnershipPolicy())->findSubmissionWithAccess(
+            $id,
+            $facultyUser,
+            false,
+            ['metadata']
+        );
 
-        // Build structured response with folders and items
-        $response = $submission->toArray();
-        
-        // Get all items (reuse + new)
-        $allItems = [];
-        foreach ($submission->reuseResources as $item) {
-            $allItems[] = [
-                'type' => 'reuse',
-                'id' => $item->id,
-                'display_order' => $item->display_order,
-                'position_in_folder' => $item->position_in_folder,
-                'folder_name' => $item->folder_name,
-                'barcode' => $item->barcode,
-                'call_number' => $item->call_number,
-                'status' => $item->item_status,
-                'notes' => $item->faculty_notes,
-                'assigned_pages' => $item->assigned_pages,
-                'created_at' => $item->created_at,
-            ];
-        }
-        
-        foreach ($submission->newResources as $item) {
-            $resourceData = $item->getResourceDataForPresentation();
-            $allItems[] = [
-                'type' => 'new',
-                'id' => $item->id,
-                'display_order' => $item->display_order,
-                'position_in_folder' => $item->position_in_folder,
-                'folder_name' => $item->folder_name,
-                'title' => $resourceData['title'] ?? '',
-                'authors' => $resourceData['authors'] ?? '',
-                'status' => $item->item_status,
-                'priority' => $item->priority,
-                'notes' => $item->faculty_notes,
-                'assigned_pages' => $item->assigned_pages,
-                'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at,
-            ];
-        }
-        
-        // Get folders
-        $folders = [];
-        foreach ($submission->folders as $folder) {
-            $folderItems = array_filter($allItems, function($item) use ($folder) {
-                return $item['folder_name'] === $folder->folder_name;
-            });
-            
-            // Sort folder items by position_in_folder
-            usort($folderItems, function($a, $b) {
-                return ($a['position_in_folder'] ?? 999) <=> ($b['position_in_folder'] ?? 999);
-            });
-            
-            $folders[] = [
-                'folder_id' => $folder->folder_id,
-                'name' => $folder->folder_name,
-                'display_order' => $folder->display_order,
-                'item_count' => count($folderItems),
-                'items' => array_values($folderItems),
-            ];
-        }
-        
-        // Get ungrouped items (not in folders)
-        $ungroupedItems = array_filter($allItems, function($item) {
-            return $item['folder_name'] === null;
-        });
-        
-        // Calculate status summary
-        $statusCounts = [
-            'pending' => 0,
-            'in_progress' => 0,
-            'complete' => 0,
-            'unavailable' => 0,
-        ];
-        
-        foreach ($allItems as $item) {
-            $status = $item['status'] ?? 'pending';
-            if (isset($statusCounts[$status])) {
-                $statusCounts[$status]++;
-            } else {
-                $statusCounts['pending']++;
-            }
-        }
-        
-        $response['folders'] = $folders;
-        $response['ungrouped_items'] = array_values($ungroupedItems);
-        $response['metadata'] = $submission->metadata ? $submission->metadata->toArray() : null;
-        $response['status_summary'] = [
-            'total_items' => count($allItems),
-            'by_status' => $statusCounts,
-            'completion_percentage' => count($allItems) > 0 
-                ? round(($statusCounts['complete'] / count($allItems)) * 100, 1)
-                : 0,
-        ];
-        
-        return \app\services\FacultySubmissionPresenter::submissionResponse($response);
+        return \app\services\FacultySubmissionPresenter::submissionResponse(
+            (new \app\services\FacultySubmissionResponseBuilder())->view($submission)
+        );
     }
 
     /**
@@ -697,82 +432,9 @@ class FacultySubmissionController extends BaseRestController
             Yii::$app->response->statusCode = $result['status_code'];
             return $result['body'];
         }
-        return $this->formatSubmissionResponse($result['submission']);
-    }
-
-    private function formatSubmissionResponse($submission)
-    {
-        $submission->refresh();
-        
-        $response = $submission->toArray();
-        
-        // Get all resources
-        $allResources = $submission->getNewResources()->all();
-        
-        // Get folders
-        $folders = $submission->getFolders()->all();
-        
-        // Organize by folder
-        $folderStructure = [];
-        $unfolderedItems = [];
-        
-        foreach ($folders as $folder) {
-            $folderStructure[$folder->folder_name] = [
-                'id' => $folder->folder_id,
-                'name' => $folder->folder_name,
-                'display_order' => $folder->display_order,
-                'items' => [],
-            ];
-        }
-        
-        foreach ($allResources as $resource) {
-            $resourceData = $resource->getResourceDataForPresentation() ?? [];
-            $materialItem = [
-                'id' => $resource->id,
-                'title' => $resourceData['title'] ?? 'Untitled',
-                'authors' => $resourceData['authors'] ?? null,
-                'is_reuse' => (bool)$resource->is_reuse,
-                'display_order' => $resource->display_order,
-                'folder_name' => $resource->folder_name,
-                'faculty_notes' => $resource->faculty_notes,
-                'assigned_pages' => $resource->assigned_pages,
-                'status' => $resource->item_status,
-            ];
-            
-            if ($resource->folder_name && isset($folderStructure[$resource->folder_name])) {
-                $folderStructure[$resource->folder_name]['items'][] = $materialItem;
-            } else {
-                $unfolderedItems[] = $materialItem;
-            }
-        }
-        
-        // Sort items within folders
-        foreach ($folderStructure as &$folder) {
-            usort($folder['items'], function($a, $b) {
-                return $a['display_order'] - $b['display_order'];
-            });
-        }
-        unset($folder);
-        
-        usort($unfolderedItems, function($a, $b) {
-            return $a['display_order'] - $b['display_order'];
-        });
-        
-        $foldersArray = array_values($folderStructure);
-        usort($foldersArray, function($a, $b) {
-            return $a['display_order'] - $b['display_order'];
-        });
-        
-        foreach ($foldersArray as &$folder) {
-            $folder['item_count'] = count($folder['items']);
-        }
-        unset($folder);
-        
-        $response['folders'] = $foldersArray;
-        $response['unfoldered_items'] = $unfolderedItems;
-        $response['lock_status'] = $submission->getLockStatus();
-        
-        return \app\services\FacultySubmissionPresenter::submissionResponse($response);
+        return \app\services\FacultySubmissionPresenter::submissionResponse(
+            (new \app\services\FacultySubmissionResponseBuilder())->saved($result['submission'])
+        );
     }
 
     /**

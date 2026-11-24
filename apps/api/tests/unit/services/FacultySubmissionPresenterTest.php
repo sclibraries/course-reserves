@@ -6,7 +6,7 @@ use app\services\FacultySubmissionPresenter;
 
 class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
 {
-    public function testSubmissionAllowlistFiltersNestedResourcesMetadataOfferingAndCommunications()
+    public function testSubmissionAllowlistPreservesCanonicalItemsAndFiltersPrivateHeaders()
     {
         $response = FacultySubmissionPresenter::submissionResponse([
             'submission_uuid' => '77000000-0000-4000-8000-000000000077',
@@ -33,13 +33,25 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                 'actor_display' => 'test-api084-private-staff',
             ]],
             'folders' => [[
-                'id' => 23,
+                'folder_id' => 23,
                 'name' => 'Synthetic folder',
+                'display_order' => 1,
+                'ambiguous' => false,
                 'items' => [[
+                    'kind' => 'new',
                     'id' => 20,
                     'title' => 'Folder item',
-                    'assigned_pages' => '30-34',
+                    'assignedPages' => '30-34',
+                    'source_resource_id' => 'synthetic-source-id',
+                    'lock' => ['locked' => false, 'kind' => null, 'reason' => null],
+                    'capabilities' => ['can_edit' => true],
                 ]],
+            ]],
+            'unfoldered_items' => [[
+                'kind' => 'reuse',
+                'id' => 21,
+                'title' => 'Root item',
+                'is_reuse' => true,
             ]],
             'workflowAssignment' => ['staff_notes' => 'test-internal-assignment-note'],
             'metadata' => [
@@ -66,20 +78,26 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
             'course_code' => 'TST 077',
             'status' => 'draft',
             'submission_notes' => 'Faculty note',
-            'newResources' => [[
-                'id' => 19,
-                'resource_data' => '{"title":"Synthetic item"}',
-                'faculty_notes' => 'Item note',
-                'assignedPages' => '20-25',
-            ]],
             'folders' => [[
-                'id' => 23,
+                'folder_id' => 23,
                 'name' => 'Synthetic folder',
+                'display_order' => 1,
+                'ambiguous' => false,
                 'items' => [[
+                    'kind' => 'new',
                     'id' => 20,
                     'title' => 'Folder item',
                     'assignedPages' => '30-34',
+                    'source_resource_id' => 'synthetic-source-id',
+                    'lock' => ['locked' => false, 'kind' => null, 'reason' => null],
+                    'capabilities' => ['can_edit' => true],
                 ]],
+            ]],
+            'unfoldered_items' => [[
+                'kind' => 'reuse',
+                'id' => 21,
+                'title' => 'Root item',
+                'is_reuse' => true,
             ]],
             'metadata' => ['total_items' => 1],
             'courseOffering' => ['offering_id' => 7, 'term_name' => 'Fall 2099'],
@@ -89,6 +107,9 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
             ]],
         ], $response);
         $this->assertStringNotContainsString('test-staff-public-note', json_encode($response));
+        $this->assertArrayNotHasKey('newResources', $response);
+        $this->assertArrayNotHasKey('reuseResources', $response);
+        $this->assertArrayNotHasKey('ungrouped_items', $response);
     }
 
     public function testWorkflowLinkingFieldsAndEventsNeverReachFaculty()
