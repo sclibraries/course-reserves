@@ -5,8 +5,8 @@ import {
 
 export function groupSyllabusEntries(entries) {
   return entries.reduce((groups, entry, index) => {
-    const heading = entry.heading || 'Syllabus items';
-    const group = groups.find((item) => item.heading === heading);
+    const heading = entry.heading?.trim() || 'Syllabus items';
+    const group = groups.find((item) => item.heading.toLowerCase() === heading.toLowerCase());
     const identifiedEntry = { ...entry, id: `syllabus-entry-${index + 1}` };
     if (group) group.entries.push(identifiedEntry);
     else groups.push({ heading, entries: [identifiedEntry] });
