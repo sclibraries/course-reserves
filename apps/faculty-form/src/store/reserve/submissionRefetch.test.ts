@@ -114,6 +114,7 @@ function backendResponse(submission: {
   return {
     ok: true,
     json: async () => ({
+      meta: { totalCount: 1 },
       items: [{
         submission_uuid: 'submission-1', course_code: 'BIO 101', course_title: 'Biology',
         section: '01', faculty_display_name: 'Faculty One', term_code: '2026FA',

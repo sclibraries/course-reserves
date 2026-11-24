@@ -334,7 +334,7 @@ describe('submitted item load and payload round-trip', () => {
 
   it('replaces a server draft with complete faculty-safe items and keeps create payload fields', async () => {
     const submission = backendSubmission('draft');
-    api.get.mockResolvedValue({ data: { items: [submission] } });
+    api.get.mockResolvedValue({ data: { items: [submission], meta: { totalCount: 1 } } });
     const staleReserve: CourseReserve = {
       id: 'reserve-local',
       submissionUuid: submission.submission_uuid,
@@ -365,7 +365,7 @@ describe('submitted item load and payload round-trip', () => {
         expect(await sync.loadLatestVersion()).toBe(true);
       });
 
-      expect(api.get).toHaveBeenCalledWith('https://api.test/faculty-submission/index');
+      expect(api.get).toHaveBeenCalledWith('https://api.test/faculty-submission/index?per-page=50&page=1');
       const replacement = useReserveStore.getState().getReserveById('reserve-local');
       if (!replacement) throw new Error('Draft replacement was not stored');
       expect(replacement.submissionNotes).toBe('Faculty submission note');

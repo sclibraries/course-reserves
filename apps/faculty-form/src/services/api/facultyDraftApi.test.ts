@@ -107,7 +107,7 @@ describe('faculty draft API', () => {
   });
 
   it('loads a full server draft from the authenticated index response', async () => {
-    api.get.mockResolvedValue({ data: { items: [{
+    api.get.mockResolvedValue({ data: { meta: { totalCount: 1 }, items: [{
       submission_uuid: 'draft-1',
       course_code: 'BIO 101',
       course_title: 'Synthetic Biology',
@@ -126,7 +126,7 @@ describe('faculty draft API', () => {
       status: 'draft', items: [{ title: 'Server item' }],
     });
     expect(api.get).toHaveBeenCalledWith(
-      'https://api.test/course-reserves/backend/web/faculty-submission/index',
+      'https://api.test/course-reserves/backend/web/faculty-submission/index?per-page=50&page=1',
     );
   });
 });

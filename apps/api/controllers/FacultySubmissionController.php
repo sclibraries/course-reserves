@@ -189,7 +189,7 @@ class FacultySubmissionController extends BaseRestController
         $dataProvider = new ActiveDataProvider([
             'query' => $ownership->accessibleSubmissionsQuery($facultyUser)
                 ->with(['reuseResources', 'newResources'])
-                ->orderBy([$sortBy => $sortOrder]),
+                ->orderBy([$sortBy => $sortOrder, 'submission_id' => $sortOrder]),
             // Let per-page and page be controlled by query params (defaults handled by Yii)
         ]);
 

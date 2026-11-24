@@ -289,15 +289,60 @@ class Api079RosterSubmissionCest extends BaseFunctionalCest
     public function facultyListIncludesRosterFieldsAndLegacyNulls(FunctionalTester $I)
     {
         $courseId = 'TST-107-07-209902';
+        $secondCourseId = 'TST-108-08-209902';
         $this->insertAssignment($this->ownerSmithId, $courseId, $this->academicPeriod, 'test-api079-response-new');
         $this->postComplete($I, $this->ownerToken, 'response-new', [
             'its_course_id' => $courseId,
             'academic_period' => $this->academicPeriod,
         ]);
         $I->seeResponseCodeIs(200);
+
+        $this->insertAssignment(
+            $this->ownerSmithId,
+            $secondCourseId,
+            $this->academicPeriod,
+            'test-api079-response-order-later'
+        );
+        $this->postComplete($I, $this->ownerToken, 'response-order-later', [
+            'its_course_id' => $secondCourseId,
+            'academic_period' => $this->academicPeriod,
+        ]);
+        $I->seeResponseCodeIs(200);
+
+        $firstSubmission = $this->submissionByTitle('response-new');
+        $secondSubmission = $this->submissionByTitle('response-order-later');
+        Assert::assertGreaterThan(
+            (int) $firstSubmission['submission_id'],
+            (int) $secondSubmission['submission_id']
+        );
+        $sameCreatedAt = date('Y-m-d H:i:s', time() + 1);
+        \Yii::$app->db->createCommand()->update('faculty_submissions', [
+            'created_at' => $sameCreatedAt,
+        ], ['submission_id' => [$firstSubmission['submission_id'], $secondSubmission['submission_id']]])->execute();
+
         $this->insertLegacySubmission('legacy-response');
 
         $I->haveHttpHeader('Authorization', 'Bearer ' . $this->ownerToken);
+        $pageSubmissionUuids = [];
+        // Codeception reuses Yii's static provider counter across simulated HTTP requests.
+        $providerCounter = new \ReflectionProperty(\yii\data\BaseDataProvider::class, 'counter');
+        $providerCounter->setAccessible(true);
+        foreach ([1, 2] as $page) {
+            $providerCounter->setValue(null, 0);
+            $I->amOnRoute('faculty-submission/index', ['per-page' => 1, 'page' => $page]);
+            $I->seeResponseCodeIs(200);
+            $pageResponse = $this->response($I);
+            Assert::assertSame(1, $pageResponse['meta']['perPage']);
+            Assert::assertSame($page, $pageResponse['meta']['page']);
+            $pageItems = $pageResponse['items'];
+            Assert::assertCount(1, $pageItems);
+            $pageSubmissionUuids[] = $pageItems[0]['submission_uuid'];
+        }
+        Assert::assertSame([
+            $secondSubmission['submission_uuid'],
+            $firstSubmission['submission_uuid'],
+        ], $pageSubmissionUuids);
+
         $I->amOnRoute('faculty-submission/index');
         $I->seeResponseCodeIs(200);
         $items = $this->response($I)['items'];

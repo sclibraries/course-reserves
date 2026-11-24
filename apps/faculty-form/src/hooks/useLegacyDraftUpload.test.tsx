@@ -59,7 +59,9 @@ describe('useLegacyDraftUpload', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [] }) }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ items: [], meta: { totalCount: 0 } }),
+    }));
     useDraftStore.getState().clearAllDrafts();
     useReserveStore.setState({ reserves: [{ ...localDraft }] });
     container = document.createElement('div');
@@ -137,7 +139,7 @@ describe('useLegacyDraftUpload', () => {
         updated_at: '2026-10-20T12:00:00Z',
         folders: [],
         unfoldered_items: [],
-      }] }),
+      }], meta: { totalCount: 1 } }),
     } as Response);
     act(() => root.render(<Harness onFound={onFound} />));
 

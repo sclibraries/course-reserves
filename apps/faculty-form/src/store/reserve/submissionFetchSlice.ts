@@ -1,10 +1,17 @@
 import type { CourseReserve, ReserveSlice, SubmissionRefetchOptions } from './types';
 import { mergeRefetchedSubmission } from './submissionRefetchMerge';
-import {
-  mapSubmissionDetailItem,
-  mapSubmissionIndexItem,
-  type BackendSubmission,
-} from './submissionMapping';
+import { readAllSubmissions } from '@/services/api/facultySubmissionsApi';
+import { mapSubmissionDetailItem, mapSubmissionIndexItem } from './submissionMapping';
+
+const readPage = async (url: string) => {
+  const { getAuthHeaders } = await import('../authStore');
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json', ...getAuthHeaders() },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  return response.json();
+};
 
 export const createSubmissionFetchSlice: ReserveSlice<
   'fetchSubmissions' | 'fetchSubmissionDetails'
@@ -13,21 +20,10 @@ export const createSubmissionFetchSlice: ReserveSlice<
     if (!silent) set({ loading: true, error: null });
 
     try {
-      const { getAuthHeaders } = await import('../authStore');
-      const { API_ENDPOINTS } = await import('@/config/endpoints');
-      const response = await fetch(
-        `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_INDEX}`,
-        {
-          method: 'GET',
-          headers: { Accept: 'application/json', ...getAuthHeaders() },
-        }
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
-      const data = await response.json();
-      console.log('📦 Fetched submissions from backend:', data);
-      const backendReserves: CourseReserve[] = (data.items || [])
-        .map((item: BackendSubmission) => mapSubmissionIndexItem(item));
+      const submissions = await readAllSubmissions(readPage);
+      console.log('📦 Fetched submissions from backend:', submissions);
+      const backendReserves: CourseReserve[] = submissions
+        .map((item) => mapSubmissionIndexItem(item));
 
       set((state) => {
         const serverIds = new Set(backendReserves.map((reserve) => reserve.id));
@@ -59,19 +55,8 @@ export const createSubmissionFetchSlice: ReserveSlice<
         return get().reserves.find((item) => item.id === submissionId) || null;
       }
 
-      const { getAuthHeaders } = await import('../authStore');
-      const { API_ENDPOINTS } = await import('@/config/endpoints');
-      const response = await fetch(
-        `${API_ENDPOINTS.COURSE_RESERVES.BASE_URL}${API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_INDEX}`,
-        {
-          method: 'GET',
-          headers: { Accept: 'application/json', ...getAuthHeaders() },
-        }
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
-      const data = await response.json();
-      const submission = (data.items || []).find((item: BackendSubmission) => (
+      const submissions = await readAllSubmissions(readPage);
+      const submission = submissions.find((item) => (
         item.submission_uuid === submissionId
       ));
       if (!submission) {

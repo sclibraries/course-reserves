@@ -10,6 +10,7 @@ describe('submission roster course matching after reload', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
+        meta: { totalCount: 1 },
         items: [{
           submission_uuid: 'submission-test-1',
           its_course_id: itsCourseId,

@@ -126,6 +126,7 @@ describe('useReserveStore characterization', () => {
           display_order: 1,
         }],
       }],
+      meta: { totalCount: 1 },
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -228,7 +229,7 @@ describe('useReserveStore characterization', () => {
     store.setState({ reserves: [localDraft] });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [{
+      json: async () => ({ meta: { totalCount: 1 }, items: [{
         submission_uuid: 'server-draft-1',
         its_course_id: 'BIO-101-01-202702',
         academic_period: 'AP_202702',

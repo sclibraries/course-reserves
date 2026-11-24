@@ -88,7 +88,7 @@ describe('Index roster course matching', () => {
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [apiIndexItem] }),
+      json: async () => ({ items: [apiIndexItem], meta: { totalCount: 1 } }),
     }));
     vi.resetModules();
     const { useReserveStore } = await import('@/store/useReserveStore');
@@ -144,7 +144,7 @@ describe('Index roster course matching', () => {
     localStorage.clear();
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [serverDraft] }),
+      json: async () => ({ items: [serverDraft], meta: { totalCount: 1 } }),
     } as Response);
     const { useReserveStore } = await import('@/store/useReserveStore');
     useReserveStore.setState({ reserves: [] });

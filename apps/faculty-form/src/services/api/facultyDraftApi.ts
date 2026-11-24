@@ -1,7 +1,8 @@
 import apiClient from '@/services/apiClient';
 import { API_ENDPOINTS } from '@/config/endpoints';
-import { mapSubmissionDetailItem, type BackendSubmission } from '@/store/reserve/submissionMapping';
+import { mapSubmissionDetailItem } from '@/store/reserve/submissionMapping';
 import type { CourseReserve } from '@/store/courseReservesStore';
+import { readAllSubmissions } from './facultySubmissionsApi';
 
 export interface DraftApiResponse {
   submission_uuid: string;
@@ -60,10 +61,8 @@ export const discardDraft = async (uuid: string): Promise<void> => {
 };
 
 export const getDraft = async (uuid: string): Promise<CourseReserve> => {
-  const response = await apiClient.get(endpoint(API_ENDPOINTS.COURSE_RESERVES.FACULTY_SUBMISSION_INDEX));
-  const submission = (response.data?.items || []).find(
-    (item: BackendSubmission) => item.submission_uuid === uuid,
-  ) as BackendSubmission | undefined;
+  const submissions = await readAllSubmissions(async (url) => (await apiClient.get(url)).data);
+  const submission = submissions.find((item) => item.submission_uuid === uuid);
 
   if (!submission) throw new Error('Draft not found');
   return mapSubmissionDetailItem(submission);
