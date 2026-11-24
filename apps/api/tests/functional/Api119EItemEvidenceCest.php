@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../_support/Api119A2ChecklistFixture.php';
+require_once __DIR__ . '/../_support/Api116B1CommittedConnection.php';
 
 use PHPUnit\Framework\Assert;
 use app\services\FacultyItemEvidenceReader;
@@ -11,10 +12,17 @@ class Api119EItemEvidenceCest extends Api116ADestinationRegistryTestBase
     private $emptyItem;
     private $reuseNoPointer;
     private $reviewOnlyItem;
+    private $snapshotItems = [];
+    private $snapshotDestinationIds = [];
+    private $snapshotRunId;
 
     public function _before(FunctionalTester $I)
     {
         parent::_before($I);
+        $setupTransaction = \Yii::$app->db->getTransaction();
+        if ($setupTransaction !== null && $setupTransaction->isActive) {
+            $setupTransaction->commit();
+        }
         $this->commandClass = \Yii::$app->db->commandClass;
         \Yii::$app->db->commandClass = Api119A2FailingCommand::class;
         Api119A2FailingCommand::clearConfiguration();
@@ -33,6 +41,13 @@ class Api119EItemEvidenceCest extends Api116ADestinationRegistryTestBase
             'legacy_reuse'
         );
         $this->reviewOnlyItem = $this->fixtures->createItem('evidence-review-only', $this->offering);
+        $this->snapshotItems = [
+            'run' => $this->fixtures->createItem('snapshot-run', $this->offering),
+            'attachment' => $this->fixtures->createItem('snapshot-attachment', $this->offering),
+            'review' => $this->fixtures->createItem('snapshot-review', $this->offering),
+            'owner' => $this->fixtures->createItem('snapshot-owner', $this->offering, 'legacy_reuse'),
+        ];
+        $this->snapshotRunId = $this->fixtures->createFinishedRun($this->snapshotItems['run'], 'current-snapshot');
 
         $this->insertRunEvidence($this->owner, true, 'old-open');
         $this->insertRunEvidence($this->attached, false, 'closed-only');
@@ -73,7 +88,14 @@ class Api119EItemEvidenceCest extends Api116ADestinationRegistryTestBase
     {
         Api119A2FailingCommand::clearConfiguration();
         \Yii::$app->db->commandClass = $this->commandClass;
-        parent::_after($I);
+        try {
+            $this->cleanupCommittedSnapshotRows();
+            parent::_after($I);
+        } finally {
+            $this->snapshotItems = [];
+            $this->snapshotDestinationIds = [];
+            $this->snapshotRunId = null;
+        }
     }
 
     public function readsLockEvidenceForItemsInFourBatchQueries(FunctionalTester $I)
@@ -95,6 +117,19 @@ class Api119EItemEvidenceCest extends Api116ADestinationRegistryTestBase
         ];
         $reader = new FacultyItemEvidenceReader();
         $reader->forItems($idsByKind);
+
+        $originalDb = \Yii::$app->db;
+        $unforced = Api116B1CommittedConnection::unforced($originalDb);
+        \Yii::$app->set('db', $unforced);
+        try {
+            $reader->forItems(['new' => [$this->emptyItem['id']]], true);
+            Assert::fail('Expected a current evidence read to require an active transaction.');
+        } catch (\LogicException $exception) {
+            Assert::assertStringContainsString('active transaction', $exception->getMessage());
+        } finally {
+            \Yii::$app->set('db', $originalDb);
+            $unforced->close();
+        }
 
         Api119A2FailingCommand::resetQueries();
         Assert::assertSame([], $reader->forItems([]));
@@ -171,6 +206,120 @@ class Api119EItemEvidenceCest extends Api116ADestinationRegistryTestBase
         Assert::assertSame($oneItemQueries, $allItemQueries);
         Assert::assertLessThanOrEqual(4, $oneItemQueries);
         Assert::assertLessThanOrEqual(4, $allItemQueries);
+    }
+
+    public function currentReadSeesEvidenceCommittedAfterThePlainReadSnapshot(FunctionalTester $I)
+    {
+        $db = \Yii::$app->db;
+        $transaction = null;
+        $observer = null;
+        $reader = new FacultyItemEvidenceReader();
+        $idsByKind = [
+            'new' => array_column([
+                $this->snapshotItems['run'],
+                $this->snapshotItems['attachment'],
+                $this->snapshotItems['review'],
+            ], 'id'),
+            'reuse' => [$this->snapshotItems['owner']['id']],
+        ];
+        $empty = ['open_run' => false, 'publication_history' => false, 'published' => false, 'open_review' => false];
+        $pointers = $db->createCommand(
+            'SELECT course_resource_id, offering_id FROM course_resources ORDER BY course_resource_id LIMIT 2'
+        )->queryAll();
+        Assert::assertCount(2, $pointers, 'The synthetic dev seed supplies two electronic pointers.');
+
+        try {
+            $transaction = $db->beginTransaction();
+            $before = $reader->forItems($idsByKind);
+            Assert::assertSame([
+                'new' => array_fill_keys($idsByKind['new'], $empty),
+                'reuse' => [$this->snapshotItems['owner']['id'] => $empty],
+            ], $before);
+
+            $observer = Api116B1CommittedConnection::open($db, [PDO::ATTR_CASE => PDO::CASE_NATURAL]);
+            Assert::assertNotSame(
+                $db->createCommand('SELECT CONNECTION_ID()')->queryScalar(),
+                $observer->createCommand('SELECT CONNECTION_ID()')->queryScalar()
+            );
+            \Yii::$app->set('db', $observer);
+            try {
+                $observer->createCommand()->update('item_flow_runs', [
+                    'started_at' => date('Y-m-d H:i:s', time() - 600), 'closed_at' => null,
+                ], ['id' => $this->snapshotRunId])->execute();
+
+                $attachmentDestination = $this->insertDestination([
+                    'destination_kind' => 'electronic',
+                    'course_resource_id' => $pointers[0]['course_resource_id'],
+                    'offering_id' => $pointers[0]['offering_id'],
+                ], [
+                    'origin_offering_id' => $pointers[0]['offering_id'],
+                ]);
+                $this->snapshotDestinationIds[] = $attachmentDestination;
+                $this->insertAttachment($attachmentDestination, $this->snapshotItems['attachment']);
+
+                $this->snapshotDestinationIds[] = $this->insertDestination([
+                    'destination_kind' => 'electronic',
+                    'course_resource_id' => $pointers[1]['course_resource_id'],
+                    'offering_id' => $pointers[1]['offering_id'],
+                ], [
+                    'origin_offering_id' => $pointers[1]['offering_id'],
+                    'owner_item_kind' => 'reuse',
+                    'owner_item_id' => $this->snapshotItems['owner']['id'],
+                    'owner_live' => 1,
+                ]);
+                $observer->createCommand()->insert('item_history_review', [
+                    'item_id' => $this->snapshotItems['review']['id'],
+                    'submission_id' => $this->snapshotItems['review']['submission_id'],
+                    'trace' => bin2hex(random_bytes(16)),
+                    'flagged_at' => date('Y-m-d H:i:s', time() - 300),
+                    'reviewed_at' => null,
+                ])->execute();
+            } finally {
+                \Yii::$app->set('db', $db);
+            }
+
+            $expected = ['new' => array_fill_keys($idsByKind['new'], $empty), 'reuse' => [$this->snapshotItems['owner']['id'] => $empty]];
+            $expected['new'][$this->snapshotItems['run']['id']]['open_run'] = true;
+            $expected['new'][$this->snapshotItems['attachment']['id']]['publication_history'] = true;
+            $expected['new'][$this->snapshotItems['attachment']['id']]['published'] = true;
+            $expected['new'][$this->snapshotItems['review']['id']]['open_review'] = true;
+            $expected['reuse'][$this->snapshotItems['owner']['id']]['publication_history'] = true;
+            $expected['reuse'][$this->snapshotItems['owner']['id']]['published'] = true;
+            Assert::assertSame($expected, $reader->forItems($idsByKind, true));
+            Assert::assertSame($before, $reader->forItems($idsByKind));
+        } finally {
+            if ($transaction !== null && $transaction->isActive) {
+                $transaction->rollBack();
+            }
+            if ($observer !== null) {
+                $observer->close();
+            }
+        }
+    }
+
+    private function cleanupCommittedSnapshotRows()
+    {
+        if (!$this->snapshotItems) {
+            return;
+        }
+
+        $db = Api116B1CommittedConnection::unforced(\Yii::$app->db);
+        try {
+            $db->createCommand()->delete('item_history_review', [
+                'item_id' => $this->snapshotItems['review']['id'],
+            ])->execute();
+            $db->createCommand()->delete('item_flow_runs', ['id' => $this->snapshotRunId])->execute();
+            if ($this->snapshotDestinationIds) {
+                $db->createCommand()->delete('publication_attachments', [
+                    'destination_id' => $this->snapshotDestinationIds,
+                ])->execute();
+                $db->createCommand()->delete('publication_destinations', [
+                    'id' => $this->snapshotDestinationIds,
+                ])->execute();
+            }
+        } finally {
+            $db->close();
+        }
     }
 
     private function insertRunEvidence(array $item, $open, $suffix)

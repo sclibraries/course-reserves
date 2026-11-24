@@ -2,15 +2,20 @@
 
 namespace app\services;
 
+use Yii;
 use yii\db\Query;
 
 /**
- * Plain advisory reads for faculty item locks; H supplies its own current reads of these values.
+ * Batched advisory or current evidence reads for faculty item locks.
  */
 class FacultyItemEvidenceReader
 {
-    public function forItems(array $idsByKind)
+    public function forItems(array $idsByKind, $current = false)
     {
+        if ($current) {
+            $this->requireTransaction();
+        }
+
         $newIds = $idsByKind['new'] ?? [];
         $reuseIds = $idsByKind['reuse'] ?? [];
         if (!$newIds && !$reuseIds) {
@@ -33,16 +38,15 @@ class FacultyItemEvidenceReader
             ['item_kind' => 'new', 'item_id' => $newIds],
             ['item_kind' => 'reuse', 'item_id' => $reuseIds],
         ];
-        $openRuns = (new Query())
+        $openRuns = $this->command((new Query())
             ->select(['item_kind', 'item_id'])
             ->from('item_flow_runs')
-            ->where(['and', ['closed_at' => null], $itemCondition])
-            ->all();
+            ->where(['and', ['closed_at' => null], $itemCondition]), $current)->queryAll();
         foreach ($openRuns as $row) {
             $evidence[$row['item_kind']][$row['item_id']]['open_run'] = true;
         }
 
-        $attachments = (new Query())
+        $attachments = $this->command((new Query())
             ->select([
                 'item_kind' => 'a.item_kind',
                 'item_id' => 'a.item_id',
@@ -56,8 +60,7 @@ class FacultyItemEvidenceReader
             ->where(['or',
                 ['a.item_kind' => 'new', 'a.item_id' => $newIds],
                 ['a.item_kind' => 'reuse', 'a.item_id' => $reuseIds],
-            ])
-            ->all();
+            ]), $current)->queryAll();
         foreach ($attachments as $row) {
             $evidence[$row['item_kind']][$row['item_id']]['publication_history'] = true;
             if ((int)$row['live'] === 1 && self::hasCurrentPointer($row)) {
@@ -65,7 +68,7 @@ class FacultyItemEvidenceReader
             }
         }
 
-        $owners = (new Query())
+        $owners = $this->command((new Query())
             ->select([
                 'owner_item_kind', 'owner_item_id', 'owner_live', 'retired_at',
                 'course_resource_id', 'physical_reference_id',
@@ -74,8 +77,7 @@ class FacultyItemEvidenceReader
             ->where(['or',
                 ['owner_item_kind' => 'new', 'owner_item_id' => $newIds],
                 ['owner_item_kind' => 'reuse', 'owner_item_id' => $reuseIds],
-            ])
-            ->all();
+            ]), $current)->queryAll();
         foreach ($owners as $row) {
             $evidence[$row['owner_item_kind']][$row['owner_item_id']]['publication_history'] = true;
             if ((int)$row['owner_live'] === 1 && self::hasCurrentPointer($row)) {
@@ -83,12 +85,10 @@ class FacultyItemEvidenceReader
             }
         }
 
-        $openReviews = (new Query())
+        $openReviews = $this->command((new Query())
             ->select('item_id')
             ->from('item_history_review')
-            ->where(['and', ['item_id' => $newIds], ['reviewed_at' => null]])
-            ->indexBy('item_id')
-            ->column();
+            ->where(['and', ['item_id' => $newIds], ['reviewed_at' => null]]), $current)->queryColumn();
         foreach ($openReviews as $itemId) {
             $evidence['new'][$itemId]['open_review'] = true;
         }
@@ -100,5 +100,24 @@ class FacultyItemEvidenceReader
     {
         return $row['retired_at'] === null
             && ($row['course_resource_id'] !== null || $row['physical_reference_id'] !== null);
+    }
+
+    private function command(Query $query, $current)
+    {
+        $command = $query->createCommand();
+        if ($current) {
+            $params = $command->params;
+            $command->setSql($command->getSql() . ' FOR UPDATE');
+            $command->bindValues($params);
+        }
+        return $command;
+    }
+
+    private function requireTransaction()
+    {
+        $transaction = Yii::$app->db->getTransaction();
+        if ($transaction === null || !$transaction->isActive) {
+            throw new \LogicException('Current faculty evidence reads require an active transaction.');
+        }
     }
 }
