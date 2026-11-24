@@ -44,7 +44,7 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                     'assignedPages' => '30-34',
                     'source_resource_id' => 'synthetic-source-id',
                     'lock' => ['locked' => false, 'kind' => null, 'reason' => null],
-                    'capabilities' => ['can_edit' => true],
+                    'capabilities' => ['edit' => true, 'delete' => true, 'move' => true, 'reorder' => true],
                 ]],
             ]],
             'unfoldered_items' => [[
@@ -90,7 +90,7 @@ class FacultySubmissionPresenterTest extends \Codeception\Test\Unit
                     'assignedPages' => '30-34',
                     'source_resource_id' => 'synthetic-source-id',
                     'lock' => ['locked' => false, 'kind' => null, 'reason' => null],
-                    'capabilities' => ['can_edit' => true],
+                    'capabilities' => ['edit' => true, 'delete' => true, 'move' => true, 'reorder' => true],
                 ]],
             ]],
             'unfoldered_items' => [[

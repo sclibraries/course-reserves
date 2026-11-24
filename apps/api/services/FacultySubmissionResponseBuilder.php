@@ -29,10 +29,7 @@ class FacultySubmissionResponseBuilder
 
     public function view(FacultySubmission $submission): array
     {
-        $represented = (new FacultySubmissionItemsReader())->forSubmissions(
-            [$submission],
-            date('Y-m-d H:i:s')
-        )[(int)$submission->submission_id];
+        $represented = $this->representedItems($submission);
         $response = $this->header($submission, $represented);
         $response['metadata'] = $submission->metadata ? $submission->metadata->toArray() : null;
         $response['status_summary'] = $this->counts($represented)['status_summary'];
@@ -43,10 +40,7 @@ class FacultySubmissionResponseBuilder
     public function saved(FacultySubmission $submission): array
     {
         $submission->refresh();
-        $represented = (new FacultySubmissionItemsReader())->forSubmissions(
-            [$submission],
-            date('Y-m-d H:i:s')
-        )[(int)$submission->submission_id];
+        $represented = $this->representedItems($submission);
         $response = $this->header($submission, $represented);
         $response['lock_status'] = $submission->getLockStatus();
 
@@ -60,21 +54,9 @@ class FacultySubmissionResponseBuilder
         $response['unfoldered_items'] = $represented['unfoldered_items'];
         $response['can_edit'] = $submission->canEdit();
         if ($access !== null) {
-            $termCode = $submission->term_code;
-            if ($termCode && strpos($termCode, ' ') === false && strlen($termCode) >= 6) {
-                $semesterMap = [
-                    '01' => 'Spring',
-                    '02' => 'Winter',
-                    '05' => 'Summer',
-                    '09' => 'Fall',
-                ];
-                $semester = substr($termCode, 4, 2);
-                $termCode = substr($termCode, 0, 4) . ' '
-                    . ($semesterMap[$semester] ?? 'Term ' . $semester);
-            }
             $response['id'] = $submission->submission_uuid;
             $response['instructors'] = $submission->faculty_display_name ?? '';
-            $response['term'] = $termCode;
+            $response['term'] = $this->formatTermCode($submission->term_code);
             $response['lastUpdated'] = $submission->updated_at
                 ? date('M j, Y', strtotime($submission->updated_at))
                 : null;
@@ -89,6 +71,31 @@ class FacultySubmissionResponseBuilder
         return $response;
     }
 
+    private function representedItems(FacultySubmission $submission): array
+    {
+        return (new FacultySubmissionItemsReader())->forSubmissions(
+            [$submission],
+            date('Y-m-d H:i:s')
+        )[(int)$submission->submission_id];
+    }
+
+    private function formatTermCode($termCode)
+    {
+        if (!$termCode || strpos($termCode, ' ') !== false || strlen($termCode) < 6) {
+            return $termCode;
+        }
+
+        $semesterMap = [
+            '01' => 'Spring',
+            '02' => 'Winter',
+            '05' => 'Summer',
+            '09' => 'Fall',
+        ];
+        $semester = substr($termCode, 4, 2);
+
+        return substr($termCode, 0, 4) . ' ' . ($semesterMap[$semester] ?? 'Term ' . $semester);
+    }
+
     private function counts(array $represented): array
     {
         $items = $represented['unfoldered_items'];
@@ -101,11 +108,11 @@ class FacultySubmissionResponseBuilder
         $complete = 0;
         $statusCounts = ['pending' => 0, 'in_progress' => 0, 'complete' => 0, 'unavailable' => 0];
         foreach ($items as $item) {
-            $reuse += !empty($item['is_reuse']) ? 1 : 0;
-            if (($item['status'] ?? null) === 'complete') {
+            $reuse += $item['is_reuse'] ? 1 : 0;
+            $status = $item['status'] ?? 'pending';
+            if ($status === 'complete') {
                 $complete++;
             }
-            $status = $item['status'] ?? 'pending';
             if (!array_key_exists($status, $statusCounts)) {
                 $status = 'pending';
             }
@@ -129,5 +136,4 @@ class FacultySubmissionResponseBuilder
             ],
         ];
     }
-
 }

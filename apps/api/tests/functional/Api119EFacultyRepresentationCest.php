@@ -56,6 +56,7 @@ class Api119EFacultyRepresentationCest extends Api109FunctionalCest
 
         $indexed = $firstPage['items'][0];
         $this->assertCanonicalHeader($indexed, true);
+        $this->assertSyntheticPrivateDataAbsent($indexed);
         Assert::assertSame([
             'total' => 3,
             'reuse' => 2,
@@ -92,6 +93,7 @@ class Api119EFacultyRepresentationCest extends Api109FunctionalCest
         $this->assertNoWorkflowAssignmentRead();
         $this->assertNoWriteOrLockQueries();
         $this->assertCanonicalHeader($view, true);
+        $this->assertSyntheticPrivateDataAbsent($view);
         Assert::assertSame($indexed['folders'], $view['folders']);
         Assert::assertSame($indexed['unfoldered_items'], $view['unfoldered_items']);
         Assert::assertSame([
@@ -115,6 +117,7 @@ class Api119EFacultyRepresentationCest extends Api109FunctionalCest
         );
         $this->assertNoWorkflowAssignmentRead();
         $this->assertCanonicalHeader($saved, true);
+        $this->assertSyntheticPrivateDataAbsent($saved);
         Assert::assertSame($indexed['folders'], $saved['folders']);
         Assert::assertSame($indexed['unfoldered_items'], $saved['unfoldered_items']);
         Assert::assertArrayHasKey('lock_status', $saved);
@@ -209,6 +212,14 @@ class Api119EFacultyRepresentationCest extends Api109FunctionalCest
         Assert::assertArrayNotHasKey('newResources', $submission);
         Assert::assertArrayNotHasKey('reuseResources', $submission);
         Assert::assertArrayNotHasKey('ungrouped_items', $submission);
+    }
+
+    private function assertSyntheticPrivateDataAbsent(array $response)
+    {
+        $json = json_encode($response);
+        foreach (['test-staff-public-note', 'private@example.test', 'private synthetic payload'] as $sentinel) {
+            Assert::assertStringNotContainsString($sentinel, $json);
+        }
     }
 
     private function assertNoWorkflowAssignmentRead()

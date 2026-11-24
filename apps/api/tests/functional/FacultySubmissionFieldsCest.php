@@ -189,9 +189,12 @@ class FacultySubmissionFieldsCest extends BaseFunctionalCest
         }
         \PHPUnit\Framework\Assert::assertSame(1, $responses['update']['draft_version'] ?? null);
         \PHPUnit\Framework\Assert::assertTrue($responses['submit-complete']['success'] ?? false);
-        foreach (['create', 'submit-complete'] as $endpoint) {
-            \PHPUnit\Framework\Assert::assertArrayNotHasKey('newResources', $responses[$endpoint]);
-            \PHPUnit\Framework\Assert::assertArrayNotHasKey('reuseResources', $responses[$endpoint]);
+        foreach (['newResources', 'reuseResources'] as $field) {
+            \PHPUnit\Framework\Assert::assertArrayNotHasKey($field, $responses['create']);
+        }
+        \PHPUnit\Framework\Assert::assertArrayHasKey('submission', $responses['submit-complete']);
+        foreach (['newResources', 'reuseResources'] as $field) {
+            \PHPUnit\Framework\Assert::assertArrayNotHasKey($field, $responses['submit-complete']['submission']);
         }
 
         $leaks = [];

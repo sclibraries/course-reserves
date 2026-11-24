@@ -2,7 +2,8 @@
 
 namespace tests\unit\services;
 
-use app\services\FacultySubmissionPresenter;
+use app\models\FacultySubmission;
+use app\services\FacultyItemRepresentation;
 use app\services\PublicationDraftSnapshot;
 use app\services\SubmissionInputProjection;
 
@@ -32,7 +33,7 @@ class Api118SourceResourceProjectionTest extends \Codeception\Test\Unit
         $this->assertSame('2147483647', $dangling['source']['resource_id']);
     }
 
-    public function testProtectionPublicationDraftAndFacultyPassThroughKeepStoredUuid()
+    public function testProtectionDraftAndCanonicalFacultyProjectionKeepStoredUuid()
     {
         $uuid = '4e5a0000-0000-4000-8000-000000000118';
         $item = [
@@ -43,16 +44,47 @@ class Api118SourceResourceProjectionTest extends \Codeception\Test\Unit
         ];
 
         $draft = PublicationDraftSnapshot::fromNewItem($item);
-        $response = FacultySubmissionPresenter::submissionResponse([
-            'submission_uuid' => '11800000-0000-4000-8000-000000000001',
-            'unfoldered_items' => [[
-                'kind' => 'new',
-                'id' => 118,
-                'source_resource_id' => $uuid,
-            ]],
+        $submission = new FacultySubmission([
+            'submission_id' => 118,
+            'status' => FacultySubmission::STATUS_DRAFT,
+            'is_locked' => 0,
         ]);
+        $represented = (new FacultyItemRepresentation(date('Y-m-d H:i:s')))->represent(
+            $submission,
+            [],
+            ['new' => [[
+                'id' => 118,
+                'submission_id' => 118,
+                'is_reuse' => 0,
+                'source_barcode' => null,
+                'source_call_number' => null,
+                'source_resource_id' => $uuid,
+                'source_folio_instance_id' => null,
+                'source_folio_holdings_id' => null,
+                'resource_data' => json_encode(['title' => 'Synthetic stored source']),
+                'display_order' => 1,
+                'folder_name' => null,
+                'faculty_notes' => null,
+                'assigned_pages' => null,
+                'item_status' => 'pending',
+                'position_in_folder' => null,
+                'claimed_by' => null,
+                'claimed_at' => null,
+                'last_activity_at' => null,
+                'assigned_group_id' => null,
+                'locked_for_faculty_at' => null,
+                'material_type_name' => 'Book',
+                'source_resource_name' => 'Synthetic stored source',
+            ]], 'reuse' => []],
+            ['new' => [118 => [
+                'open_run' => false,
+                'publication_history' => false,
+                'published' => false,
+                'open_review' => false,
+            ]], 'reuse' => []]
+        );
 
         $this->assertSame($uuid, $draft['source_resource_id']);
-        $this->assertSame($uuid, $response['unfoldered_items'][0]['source_resource_id']);
+        $this->assertSame($uuid, $represented['unfoldered_items'][0]['source_resource_id']);
     }
 }

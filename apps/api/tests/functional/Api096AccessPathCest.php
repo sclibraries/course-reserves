@@ -279,7 +279,13 @@ class Api096AccessPathCest extends BaseFunctionalCest
 
         $this->request($I, 'GET', 'faculty-submission/view', [], ['role' => 'faculty', 'id' => $this->uuid]);
         $I->seeResponseCodeIs(200);
-        foreach ($this->response($I)['newResources'] as $item) {
+        $facultyView = $this->response($I);
+        $facultyItems = $facultyView['unfoldered_items'];
+        foreach ($facultyView['folders'] as $folder) {
+            $facultyItems = array_merge($facultyItems, $folder['items']);
+        }
+        Assert::assertCount(2, $facultyItems);
+        foreach ($facultyItems as $item) {
             Assert::assertArrayNotHasKey('access_path', $item);
             Assert::assertArrayNotHasKey('allowed_access_paths', $item);
         }
