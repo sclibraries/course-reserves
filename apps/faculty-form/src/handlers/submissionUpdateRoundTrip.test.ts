@@ -2,8 +2,9 @@ import React from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CourseItem, CourseReserve, FolioCopiedItem, FolioLocation } from '@/store/reserve/types';
+import type { CourseItem, CourseReserve, FolioLocation } from '@/store/reserve/types';
 import type { BackendSubmission } from '@/store/reserve/submissionMapping';
+import type { FacultyItemWire } from '@/store/reserve/facultyItemMapping';
 import type { OrganizedContent } from '@/utils/contentSearch';
 import { buildSubmissionPayload } from './submissionPayload';
 import { createSubmissionHandlers } from './submissionHandlers';
@@ -11,6 +12,7 @@ import { mapSubmissionDetailItem, mapSubmissionIndexItem } from '@/store/reserve
 import { useReserveStore } from '@/store/useReserveStore';
 import { useDraftStore } from '@/store/draftStore';
 import { useServerDraftSync } from '@/hooks/useServerDraftSync';
+import { SubmissionDetailItemsTable } from '@/components/SubmissionDetailItemsTable';
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }));
 vi.mock('@/services/apiClient', () => ({ default: api }));
@@ -52,47 +54,6 @@ type ResourceData = Omit<Partial<CourseItem>, 'journalTitle'> & {
   libraryNotes?: string;
 };
 
-type BaseBackendItem = NonNullable<BackendSubmission['unfoldered_items']>[number];
-type IndexItem = Omit<BaseBackendItem, 'resource_data' | 'barcode' | 'call_number'> & {
-  barcode: string | null;
-  call_number: string | null;
-  is_reuse: boolean;
-  assignedPages: string | null;
-  resource_data: ResourceData;
-};
-
-type NewResourceRow = {
-  id: string | number;
-  material_type_id: number | null;
-  resource_data: ResourceData | string | null;
-  is_reuse: 0 | 1;
-  source_barcode: string | null;
-  source_call_number: string | null;
-  source_resource_id: string | null;
-  source_folio_instance_id: string | null;
-  item_status: string;
-  display_order: number;
-  position_in_folder: number | null;
-  folder_name: string | null;
-  faculty_notes: string | null;
-  assignedPages: string | null;
-  priority: string;
-  created_at: string;
-  updated_at: string;
-};
-
-type IndexFolder = Omit<NonNullable<BackendSubmission['folders']>[number], 'items'> & {
-  item_count: number;
-  items: IndexItem[];
-};
-
-type IndexSubmission = Omit<BackendSubmission, 'folders' | 'unfoldered_items' | 'newResources' | 'reuseResources'> & {
-  folders: IndexFolder[];
-  unfoldered_items: IndexItem[];
-  newResources: NewResourceRow[];
-  reuseResources: NewResourceRow[];
-};
-
 interface ItemSpec {
   id: number;
   title: string;
@@ -123,18 +84,6 @@ function resourceData(spec: ItemSpec): ResourceData {
   const resourceId = String(spec.id);
   const barcode = `BC${resourceId}`;
   const callNumber = `QA ${resourceId} .T1`;
-  const copy: FolioCopiedItem = {
-    title: spec.title,
-    barcode,
-    callNumber,
-    copy: '1',
-    instanceId: `folio-instance-${resourceId}`,
-    holdingsId: `folio-holdings-${resourceId}`,
-    temporaryLocationId: temporaryLocation.id,
-    temporaryLocationObject: temporaryLocation,
-    permanentLocationId: permanentLocation.id,
-    permanentLocationObject: permanentLocation,
-  };
 
   return {
     title: spec.title,
@@ -145,6 +94,7 @@ function resourceData(spec: ItemSpec): ResourceData {
     publisher: `Publisher ${resourceId}`,
     publicationYear: '2024',
     edition: '2nd edition',
+    oclcNumber: `OCLC-${resourceId}`,
     pages: '17-20',
     chapterTitle: `Chapter ${resourceId}`,
     copy: '1',
@@ -168,58 +118,65 @@ function resourceData(spec: ItemSpec): ResourceData {
       temporaryLocationObject: temporaryLocation,
       permanentLocationId: permanentLocation.id,
       permanentLocationObject: permanentLocation,
-      copiedItem: copy,
     } : {}),
     libraryNotes: `Internal library note ${resourceId}`,
   };
 }
 
-function indexItem(spec: ItemSpec): IndexItem {
+function indexItem(spec: ItemSpec): FacultyItemWire {
   const data = resourceData(spec);
   return {
+    kind: 'new',
     id: spec.id,
+    folder_id: spec.folderName ? 701 : null,
+    folder_name: spec.folderName,
+    position: spec.positionInFolder,
+    display_order: spec.displayOrder,
+    is_reuse: spec.isReuse,
+    status: 'pending',
     title: spec.title,
     authors: spec.authors,
     material_type: spec.materialType,
-    is_reuse: spec.isReuse,
+    assignedPages: '17-20',
+    faculty_notes: `Faculty note ${spec.id}`,
     barcode: spec.isReuse ? `BC${spec.id}` : null,
     call_number: spec.isReuse ? `QA ${spec.id} .T1` : null,
-    status: 'pending',
-    display_order: spec.displayOrder,
-    folder_name: spec.folderName,
-    resource_data: data,
-    assignedPages: '17-20',
-  };
-}
-
-function newResourceRow(spec: ItemSpec): NewResourceRow {
-  const barcode = `BC${spec.id}`;
-  const callNumber = `QA ${spec.id} .T1`;
-  return {
-    id: spec.id,
-    material_type_id: 1,
-    resource_data: resourceData(spec),
-    is_reuse: spec.isReuse ? 1 : 0,
-    source_barcode: spec.isReuse ? barcode : null,
-    source_call_number: spec.isReuse ? callNumber : null,
+    eds: data.eds ?? null,
     source_resource_id: spec.sourceResourceId || (spec.isReuse ? `source-resource-${spec.id}` : null),
-    source_folio_instance_id: spec.isReuse ? `folio-instance-${spec.id}` : null,
-    item_status: 'pending',
-    display_order: spec.displayOrder,
-    position_in_folder: spec.positionInFolder,
-    folder_name: spec.folderName,
-    faculty_notes: `Faculty note ${spec.id}`,
-    assignedPages: '17-20',
-    priority: 'medium',
-    created_at: '2026-08-01T12:00:00Z',
-    updated_at: '2026-08-01T12:00:00Z',
+    source_folio_instance_id: spec.isReuse ? `source-folio-${spec.id}` : null,
+    instance_id: spec.isReuse ? `folio-instance-${spec.id}` : null,
+    holdings_id: spec.isReuse ? `folio-holdings-${spec.id}` : null,
+    temporary_location: spec.isReuse ? { id: 'temporary-1', name: 'Temporary', code: 'TEMP' } : null,
+    permanent_location: spec.isReuse ? { id: 'permanent-1', name: 'Permanent', code: 'PERM' } : null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    journalTitle: spec.journal !== undefined ? spec.journal : spec.journalTitle ?? null,
+    publisher: data.publisher ?? null,
+    publicationYear: data.publicationYear ?? null,
+    isbn: data.isbn ?? null,
+    issn: data.issn ?? null,
+    doi: data.doi ?? null,
+    edition: data.edition ?? null,
+    oclcNumber: data.oclcNumber ?? null,
+    volume: data.volume ?? null,
+    issue: data.issue ?? null,
+    pages: data.pages ?? null,
+    url: data.url ?? null,
+    displayStartDate: data.displayStartDate ?? null,
+    displayEndDate: data.displayEndDate ?? null,
+    instance_hrid: spec.isReuse ? `in000${spec.id}` : null,
+    chapter_title: data.chapterTitle ?? null,
+    copy: data.copy ?? null,
+    temporary_location_id: spec.isReuse ? 'temporary-1' : null,
+    permanent_location_id: spec.isReuse ? 'permanent-1' : null,
   };
 }
 
-function backendSubmission(status: 'draft' | 'submitted' = 'draft'): IndexSubmission {
+function backendSubmission(status: 'draft' | 'submitted' = 'draft'): BackendSubmission {
   const rows = specs.map(indexItem);
-  const folderItems = rows.filter((item) => item.folder_name === 'Week 1');
-  const unfolderedItems = rows.filter((item) => item.folder_name === null);
+  const folderItems = rows.filter((item) => item.folder_id === 701)
+    .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+  const unfolderedItems = rows.filter((item) => item.folder_id === null);
 
   return {
     submission_uuid: 'submission-ff055',
@@ -233,10 +190,9 @@ function backendSubmission(status: 'draft' | 'submitted' = 'draft'): IndexSubmis
     draft_version: 4,
     submission_notes: 'Faculty submission note',
     needed_by_date: '2026-12-01',
-    folders: [{ id: 701, name: 'Week 1', display_order: 0, item_count: 3, items: folderItems }],
+    can_edit: true,
+    folders: [{ folder_id: 701, name: 'Week 1', display_order: 0, ambiguous: false, items: folderItems }],
     unfoldered_items: unfolderedItems,
-    newResources: specs.map(newResourceRow),
-    reuseResources: [],
   };
 }
 
@@ -244,6 +200,7 @@ function expectedDraftResource(spec: ItemSpec) {
   return {
     publicationYear: '2024',
     edition: '2nd edition',
+    oclcNumber: `OCLC-${spec.id}`,
     pages: '17-20',
     chapterTitle: `Chapter ${spec.id}`,
     copy: '1',
@@ -255,7 +212,6 @@ function expectedDraftResource(spec: ItemSpec) {
       temporaryLocationObject: temporaryLocation,
       permanentLocationId: 'permanent-1',
       permanentLocationObject: permanentLocation,
-      copiedItem: resourceData(spec).copiedItem,
     } : {}),
   };
 }
@@ -284,15 +240,13 @@ function withItem(reserve: CourseReserve, backendId: string, updates: Partial<Co
   };
 }
 
-function persistJournal(submission: IndexSubmission, id: number, journal: string | null) {
-  const item = [...submission.folders.flatMap((folder) => folder.items), ...submission.unfoldered_items]
+function persistJournal(submission: BackendSubmission, id: number, journal: string | null) {
+  const item = [...(submission.folders || []).flatMap((folder) => folder.items), ...(submission.unfoldered_items || [])]
     .find((row) => row.id === id);
-  const resource = submission.newResources.find((row) => row.id === id);
-  if (!item || !resource || !resource.resource_data || typeof resource.resource_data === 'string') {
+  if (!item) {
     throw new Error(`Missing presented item ${id}`);
   }
-  item.resource_data = { ...item.resource_data, journal };
-  resource.resource_data = { ...resource.resource_data, journal };
+  item.journalTitle = journal;
 }
 
 async function submitUpdate(reserve: CourseReserve) {
@@ -330,6 +284,76 @@ describe('submitted item load and payload round-trip', () => {
   afterEach(() => {
     useDraftStore.getState().clearAllDrafts();
     useReserveStore.setState({ reserves: [] });
+  });
+
+  it('filters legacy reuse rows from the shared save payload but keeps reused new rows', () => {
+    const submission = {
+      submission_uuid: 'submission-legacy-filter',
+      course_code: 'BIO 220',
+      course_title: 'Ecology',
+      section: '01',
+      faculty_display_name: 'Test Faculty',
+      term_code: '2026FA',
+      status: 'draft',
+      updated_at: '2026-08-01T12:00:00Z',
+      can_edit: true,
+      folders: [{
+        folder_id: 701,
+        name: 'Week 1',
+        display_order: 0,
+        ambiguous: false,
+        items: [
+          facultyItem('new', 606, { is_reuse: true }),
+          facultyItem('reuse', 606),
+        ],
+      }],
+      unfoldered_items: [],
+    } as unknown as BackendSubmission;
+    const reserve = mapSubmissionDetailItem(submission);
+
+    const payload = buildSubmissionPayload(reserve, false);
+
+    expect(payload.resources).toHaveLength(1);
+    expect(payload.resources[0].resource_data.id).toBe('material-new-606');
+    expect(payload.items.map((item) => item.id)).toEqual(['material-new-606']);
+    expect(payload.folders[0].items.map((item) => item.id)).toEqual(['material-new-606']);
+    expect(payload.displayOrder).toEqual([{ type: 'folder', id: 'folder-701', displayPosition: 0 }]);
+  });
+
+  it('uses backend ids for new-item message counts and no count for legacy reuse', async () => {
+    const reserve = mapSubmissionDetailItem({
+      submission_uuid: 'submission-message-identity',
+      course_code: 'BIO 220',
+      course_title: 'Ecology',
+      faculty_display_name: 'Test Faculty',
+      term_code: '2026FA',
+      status: 'submitted',
+      updated_at: '2026-08-01T12:00:00Z',
+      can_edit: true,
+      folders: [],
+      unfoldered_items: [facultyItem('new', 607), facultyItem('reuse', 607)],
+    } as unknown as BackendSubmission);
+    const getItemMessageCount = vi.fn(() => 0);
+    const getItemUnreadCount = vi.fn(() => 0);
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(React.createElement(SubmissionDetailItemsTable, {
+        reserve,
+        onItemMessage: vi.fn(async () => {}),
+        getItemMessageCount,
+        getItemUnreadCount,
+        onAddMaterials: vi.fn(),
+      })));
+
+      expect(getItemMessageCount.mock.calls).toEqual([[607]]);
+      expect(getItemUnreadCount.mock.calls).toEqual([[607]]);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
   });
 
   it('replaces a server draft with complete faculty-safe items and keeps create payload fields', async () => {
@@ -378,6 +402,7 @@ describe('submitted item load and payload round-trip', () => {
         const item = replacement.items.find((candidate) => candidate.backendItemId === String(spec.id));
         if (!item) throw new Error(`Missing loaded item ${spec.id}`);
         expect.soft(item).toMatchObject(expectedDraftResource(spec));
+        expect.soft(item).not.toHaveProperty('copiedItem');
         expect.soft(item.notes).toBe(`Faculty note ${spec.id}`);
         expect.soft(item.libraryNotes).toBeUndefined();
         expect.soft(item).not.toHaveProperty('staff_notes');
@@ -385,14 +410,14 @@ describe('submitted item load and payload round-trip', () => {
       }
 
       expect.soft(replacement.items.map((item) => item.id)).toEqual([
-        'material-602', 'material-603', 'material-601', 'material-604', 'material-605',
+        'material-new-602', 'material-new-603', 'material-new-601', 'material-new-604', 'material-new-605',
       ]);
-      expect.soft(replacement.folders[0].itemIds).toEqual(['material-602', 'material-603', 'material-601']);
+      expect.soft(replacement.folders[0].itemIds).toEqual(['material-new-602', 'material-new-603', 'material-new-601']);
 
       const payload = JSON.parse(JSON.stringify(buildSubmissionPayload(replacement, false)));
       for (const spec of specs) {
         const resource = payload.resources.find((candidate: { resource_data: { id: string } }) => (
-          candidate.resource_data.id === `material-${spec.id}`
+          candidate.resource_data.id === `material-new-${spec.id}`
         ));
         if (!resource) throw new Error(`Missing create payload resource ${spec.id}`);
         const original = resourceData(spec);
@@ -400,6 +425,7 @@ describe('submitted item load and payload round-trip', () => {
         expect(resource.is_reuse).toBe(spec.isReuse);
         expect(resource.faculty_notes).toBe(`Faculty note ${spec.id}`);
         expect.soft(resource.resource_data).toMatchObject(expectedDraftResource(spec));
+        expect.soft(resource.resource_data).not.toHaveProperty('copiedItem');
         expect.soft(resource.resource_data).toMatchObject({
           isbn: original.isbn,
           publisher: original.publisher,
@@ -427,6 +453,38 @@ describe('submitted item load and payload round-trip', () => {
 
     expect(reserve.submissionNotes).toBe('Faculty submission note');
     expect(reserve.neededByDate).toBe('2026-12-01');
+  });
+
+  it('clones mapped items without server identities or lock state and keeps source values', () => {
+    const source = mapSubmissionDetailItem(backendSubmission());
+    useReserveStore.setState({ reserves: [source] });
+
+    const cloneId = useReserveStore.getState().cloneReserve(source.id, {
+      courseCode: 'BIO 221', courseTitle: 'Ecology II', section: '02', instructors: 'Test Faculty', term: '2027SP',
+    });
+    const clone = useReserveStore.getState().getReserveById(cloneId);
+    if (!clone) throw new Error('Cloned reserve was not stored');
+    const reusedNewItem = clone.items.find((item) => item.title === 'Rainfall Patterns');
+    if (!reusedNewItem) throw new Error('Cloned reuse item was not stored');
+
+    expect(clone).not.toHaveProperty('submissionUuid');
+    expect(clone).not.toHaveProperty('draftVersion');
+    expect(clone).not.toHaveProperty('courseAssignmentId');
+    expect(clone.folders[0]).not.toHaveProperty('backendFolderId');
+    expect(clone.folders[0]).not.toHaveProperty('ambiguous');
+    expect(reusedNewItem).not.toHaveProperty('backendItemId');
+    expect(reusedNewItem).not.toHaveProperty('backendKind');
+    expect(reusedNewItem).not.toHaveProperty('lock');
+    expect(reusedNewItem).not.toHaveProperty('capabilities');
+    expect(reusedNewItem).toMatchObject({
+      isReuse: true,
+      sourceResourceId: 'source-resource-602',
+      sourceFolioInstanceId: 'source-folio-602',
+      instanceId: 'folio-instance-602',
+    });
+    const clonedPayload = buildSubmissionPayload(clone, false);
+    const clonedReuse = clonedPayload.resources.find((resource) => resource.resource_data.title === 'Rainfall Patterns');
+    expect(clonedReuse).toMatchObject({ is_reuse: true, source_folio_instance_id: 'source-folio-602' });
   });
 
   it('compares submitted-update values with the original presented fixtures', async () => {
@@ -472,17 +530,16 @@ describe('submitted item load and payload round-trip', () => {
   it('round-trips Ebook pages through the index and sends a clear as null', async () => {
     const submission = backendSubmission('submitted');
     const ebook = submission.folders?.flatMap((folder) => folder.items || []).find((item) => item.id === 601);
-    const resource = submission.newResources?.find((row) => row.id === 601);
-    if (!ebook || !resource) throw new Error('Missing synthetic Ebook fixture');
+    if (!ebook) throw new Error('Missing synthetic Ebook fixture');
     ebook.material_type = 'ebook';
-    resource.assignedPages = '12-16';
+    ebook.assignedPages = '12-16';
 
     const loaded = mapSubmissionIndexItem(submission);
-    const ebookItem = loaded.items.find((item) => item.id === 'material-601');
+    const ebookItem = loaded.items.find((item) => item.id === 'material-new-601');
     expect(ebookItem).toMatchObject({ materialType: 'ebook', assignedPages: '12-16' });
 
     const submissionPayload = buildSubmissionPayload(loaded, false);
-    expect(submissionPayload.resources.find((row) => row.resource_data.id === 'material-601')?.assignedPages).toBe('12-16');
+    expect(submissionPayload.resources.find((row) => row.resource_data.id === 'material-new-601')?.assignedPages).toBe('12-16');
 
     const firstUpdate = await submitUpdate(loaded);
     expect(firstUpdate.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.assignedPages).toBe('12-16');
@@ -493,7 +550,7 @@ describe('submitted item load and payload round-trip', () => {
 
     const cleared: CourseReserve = {
       ...reloaded,
-      items: reloaded.items.map((item) => item.id === 'material-601' ? { ...item, assignedPages: '' } : item),
+      items: reloaded.items.map((item) => item.id === 'material-new-601' ? { ...item, assignedPages: '' } : item),
     };
     const clearUpdate = await submitUpdate(cleared);
     expect(clearUpdate.items.find((item: { item_uuid: string }) => item.item_uuid === '601')?.assignedPages).toBeNull();
@@ -523,10 +580,68 @@ describe('submitted item load and payload round-trip', () => {
     expect(item.holdingsId).toBeUndefined();
     const payload = JSON.parse(JSON.stringify(buildSubmissionPayload(reserve, false)));
     const resource = payload.resources.find((candidate: { resource_data: { id: string } }) => (
-      candidate.resource_data.id === 'material-605'
+      candidate.resource_data.id === 'material-new-605'
     ));
     expect(resource).toMatchObject({ is_reuse: false, source_resource_id: 'local-resource-605' });
     expect(resource.resource_data.holdingsId).toBeUndefined();
+  });
+
+  it('keeps numeric source identities separate from instance identities in both save shapes', () => {
+    const submission = backendSubmission();
+    const sourceItem = submission.folders?.[0].items.find((item) => item.id === 601);
+    if (!sourceItem) throw new Error('Missing source identity item');
+    sourceItem.source_resource_id = 1701;
+    sourceItem.source_folio_instance_id = 'source-instance-1701';
+    sourceItem.instance_id = 'instance-data-1701';
+    sourceItem.material_type = null;
+    sourceItem.journalTitle = null;
+    sourceItem.oclcNumber = null;
+    sourceItem.eds = { dbId: null, an: 'synthetic-an', plink: null };
+    sourceItem.temporary_location_id = 'temporary-source-id';
+    sourceItem.temporary_location = { id: 'temporary-source-id', name: null, code: 'TMP' };
+
+    const reserve = mapSubmissionDetailItem(submission);
+    const item = reserve.items.find((candidate) => candidate.backendItemId === '601');
+    expect(item).toMatchObject({
+      sourceResourceId: '1701',
+      sourceFolioInstanceId: 'source-instance-1701',
+      instanceId: 'instance-data-1701',
+      materialType: 'other',
+      journalTitle: '',
+      eds: { dbId: '', an: 'synthetic-an' },
+      temporaryLocationId: 'temporary-source-id',
+      temporaryLocationObject: { id: 'temporary-source-id', name: '', code: 'TMP' },
+    });
+    expect(item?.oclcNumber).toBeUndefined();
+    expect(item?.eds).not.toHaveProperty('plink');
+    const resource = buildSubmissionPayload(reserve, false).resources
+      .find((candidate) => candidate.resource_data.id === 'material-new-601');
+    expect(resource).toMatchObject({
+      source_resource_id: '1701',
+      source_folio_instance_id: 'source-instance-1701',
+      resource_data: { instanceId: 'instance-data-1701' },
+    });
+  });
+
+  it('keeps a new browser id intact as the submitted item fallback', async () => {
+    const loaded = mapSubmissionDetailItem(backendSubmission('submitted'));
+    const reserve = {
+      ...loaded,
+      items: loaded.items.map((item) => item.backendItemId === '601'
+        ? { ...item, backendItemId: undefined }
+        : item),
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = createSubmissionHandlers(vi.fn(), reserve, organizedContent(reserve), vi.fn());
+
+    handlers.confirmSubmit(false);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, request] = fetchMock.mock.calls[0];
+    const payload = JSON.parse(String((request as RequestInit).body));
+
+    expect(payload.items.find((item: { title: string }) => item.title === 'Climate Systems')?.item_uuid)
+      .toBe('material-new-601');
   });
 
   it('serializes genuinely empty submitted fields without sentinel strings', async () => {
@@ -544,27 +659,18 @@ describe('submitted item load and payload round-trip', () => {
     const emptyItem = indexItem(emptySpec);
     emptyItem.barcode = '';
     emptyItem.call_number = '';
-    emptyItem.resource_data = {
-      title: emptySpec.title,
-      authors: '',
-      materialType: 'book',
-      status: 'pending',
-      journalTitle: '',
-      publisher: '',
-      isbn: '',
-      url: '',
-      displayStartDate: '',
-      displayEndDate: '',
-    };
-    const emptyResource = newResourceRow(emptySpec);
-    emptyResource.faculty_notes = '';
-    emptyResource.assignedPages = null;
+    emptyItem.journalTitle = '';
+    emptyItem.publisher = '';
+    emptyItem.isbn = '';
+    emptyItem.url = '';
+    emptyItem.displayStartDate = '';
+    emptyItem.displayEndDate = '';
+    emptyItem.faculty_notes = '';
+    emptyItem.assignedPages = null;
     const reserve = mapSubmissionDetailItem({
       ...submission,
       folders: [],
       unfoldered_items: [emptyItem],
-      newResources: [emptyResource],
-      reuseResources: [],
     });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
     vi.stubGlobal('fetch', fetchMock);
@@ -598,6 +704,59 @@ describe('submitted item load and payload round-trip', () => {
     expect(JSON.stringify(payload.items[0])).not.toContain('"null"');
   });
 });
+
+function facultyItem(
+  kind: 'new' | 'reuse',
+  id: number,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    kind,
+    id,
+    folder_id: 701,
+    folder_name: 'Week 1',
+    position: null,
+    display_order: 0,
+    is_reuse: kind === 'reuse',
+    status: 'pending',
+    title: `Synthetic ${kind} item`,
+    journalTitle: null,
+    material_type: 'book',
+    assignedPages: null,
+    faculty_notes: null,
+    barcode: null,
+    call_number: null,
+    eds: null,
+    source_resource_id: null,
+    source_folio_instance_id: null,
+    instance_id: null,
+    holdings_id: null,
+    temporary_location: null,
+    permanent_location: null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    authors: null,
+    publisher: null,
+    publicationYear: null,
+    isbn: null,
+    issn: null,
+    doi: null,
+    edition: null,
+    oclcNumber: null,
+    volume: null,
+    issue: null,
+    pages: null,
+    url: null,
+    displayStartDate: null,
+    displayEndDate: null,
+    instance_hrid: null,
+    chapter_title: null,
+    copy: null,
+    temporary_location_id: null,
+    permanent_location_id: null,
+    ...overrides,
+  };
+}
 
 function expectedUpdateItem(
   spec: ItemSpec,

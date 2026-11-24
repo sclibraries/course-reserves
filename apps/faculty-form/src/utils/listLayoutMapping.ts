@@ -7,7 +7,7 @@ type LegacyFolder = Omit<CourseFolder, 'itemIds'> & {
   items?: unknown[];
 };
 
-type ServerFolder = CourseFolder & { displayOrder: number };
+type ServerFolder = CourseFolder & { displayOrder: number | null };
 
 export function fromLegacy(folders: LegacyFolder[], items: CourseItem[]): ListLayoutState {
   const folderIds = new Set(folders.map((folder) => folder.id));
@@ -46,7 +46,7 @@ export function fromServer(folders: ServerFolder[], items: CourseItem[]): ListLa
     entry: { kind: 'folder' as const, id: folder.id },
   }));
   const itemEntries = items.flatMap((item, index) => item.folderId ? [] : [{
-    order: item.displayOrder ?? index,
+    order: item.displayOrder ?? null,
     stableOrder: folders.length + index,
     entry: { kind: 'item' as const, id: item.id },
   }]);
@@ -56,7 +56,7 @@ export function fromServer(folders: ServerFolder[], items: CourseItem[]): ListLa
   }));
 
   return {
-    layout: [...folderEntries, ...itemEntries].sort(compareOrder).map((item) => item.entry),
+    layout: [...folderEntries, ...itemEntries].sort(compareServerOrder).map((item) => item.entry),
     folders: normalizedFolders,
     items,
   };
@@ -67,4 +67,18 @@ function compareOrder<T extends { order: number; stableOrder: number; entry: Lay
   right: T
 ): number {
   return left.order - right.order || left.stableOrder - right.stableOrder;
+}
+
+function compareServerOrder<T extends { order: number | null; stableOrder: number; entry: LayoutEntry }>(
+  left: T,
+  right: T
+): number {
+  if (left.order === null || right.order === null) {
+    if (left.order !== right.order) return left.order === null ? 1 : -1;
+  } else if (left.order !== right.order) {
+    return left.order - right.order;
+  }
+
+  if (left.entry.kind !== right.entry.kind) return left.entry.kind === 'folder' ? -1 : 1;
+  return left.stableOrder - right.stableOrder;
 }

@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FacultyItemWire } from '@/store/reserve/facultyItemMapping';
 import Index from './Index';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -85,6 +86,9 @@ describe('Index roster course matching', () => {
       term_code: 'Spring 2027',
       status: 'submitted',
       updated_at: '2026-08-01T12:00:00Z',
+      can_edit: true,
+      folders: [],
+      unfoldered_items: [],
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -138,8 +142,9 @@ describe('Index roster course matching', () => {
       status: 'draft',
       draft_version: 2,
       updated_at: '2026-10-20T12:00:00Z',
+      can_edit: true,
       folders: [],
-      unfoldered_items: [{ id: 4, title: 'Server saved item', material_type: 'book', status: 'draft', display_order: 0 }],
+      unfoldered_items: [facultyItem({ id: 4, title: 'Server saved item' })],
     };
     localStorage.clear();
     vi.mocked(fetch).mockResolvedValue({
@@ -174,5 +179,22 @@ function makeLocalStorageMock() {
     clear: () => { Object.keys(values).forEach((key) => delete values[key]); },
     key: (index: number) => Object.keys(values)[index] ?? null,
     get length() { return Object.keys(values).length; },
+  };
+}
+
+function facultyItem(overrides: Partial<FacultyItemWire>): FacultyItemWire {
+  return {
+    kind: 'new', id: 1, folder_id: null, folder_name: null, position: null, display_order: 0,
+    is_reuse: false, status: 'draft', title: 'Synthetic item', journalTitle: null, material_type: 'book',
+    assignedPages: null, faculty_notes: null, barcode: null, call_number: null, eds: null,
+    source_resource_id: null, source_folio_instance_id: null, instance_id: null, holdings_id: null,
+    temporary_location: null, permanent_location: null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    authors: null, publisher: null, publicationYear: null, isbn: null, issn: null, doi: null,
+    edition: null, oclcNumber: null, volume: null, issue: null, pages: null, url: null,
+    displayStartDate: null, displayEndDate: null, instance_hrid: null, chapter_title: null, copy: null,
+    temporary_location_id: null, permanent_location_id: null,
+    ...overrides,
   };
 }

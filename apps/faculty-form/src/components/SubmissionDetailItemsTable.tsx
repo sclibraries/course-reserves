@@ -105,9 +105,14 @@ function renderItemRow(
   getItemUnreadCount: SubmissionDetailItemsTableProps['getItemUnreadCount'],
   inFolder: boolean
 ) {
-  const resourceId = parseInt(item.id.replace('material-', ''), 10);
-  const totalCount = getItemMessageCount(resourceId);
-  const unreadCount = getItemUnreadCount(resourceId);
+  const parsedResourceId = item.backendKind === 'new' && item.backendItemId !== undefined
+    ? Number(item.backendItemId)
+    : undefined;
+  const resourceId = parsedResourceId !== undefined && Number.isFinite(parsedResourceId)
+    ? parsedResourceId
+    : undefined;
+  const totalCount = resourceId === undefined ? 0 : getItemMessageCount(resourceId);
+  const unreadCount = resourceId === undefined ? 0 : getItemUnreadCount(resourceId);
   return (
     <TableRow key={item.id} className={className}>
       <TableCell className={`font-medium ${inFolder ? 'pl-8 text-muted-foreground text-sm' : ''}`}>{order}</TableCell>

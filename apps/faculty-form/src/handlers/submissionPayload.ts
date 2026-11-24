@@ -17,6 +17,8 @@ export const buildSubmissionPayload = (
   const layout = getLayoutState(reserve);
   const order = toPayloadOrder(layout);
   const itemsById = new Map(layout.items.map((item) => [item.id, item]));
+  const submittedItems = layout.items.filter((item) => item.backendKind !== 'reuse');
+  const submittedItemIds = new Set(submittedItems.map((item) => item.id));
   const foldersWithItems: SubmissionFolder[] = (organizedContent?.folders || layout.folders).map((folder) => ({
     id: folder.id,
     backendFolderId: folder.backendFolderId,
@@ -24,11 +26,11 @@ export const buildSubmissionPayload = (
     description: folder.description,
     position: order.folderOrder[folder.id] ?? 0,
     isOpen: folder.isOpen,
-    items: organizedContent?.folders
+    items: (organizedContent?.folders
       ? folder.items
-      : folder.itemIds.map((itemId) => itemsById.get(itemId)).filter((item): item is CourseItem => !!item),
+      : folder.itemIds.map((itemId) => itemsById.get(itemId)).filter((item): item is CourseItem => !!item))
+      .filter((item) => submittedItemIds.has(item.id)),
   }));
-  const submittedItems = layout.items;
   const transformedResources = submittedItems.map((item) => {
     const folder = foldersWithItems.find((candidate) => candidate.id === item.folderId);
     const positionInfo = order.resourceOrder[item.id] || { displayOrder: 0, positionInFolder: null };
@@ -52,7 +54,7 @@ export const buildSubmissionPayload = (
     items: submittedItems,
     resources: transformedResources,
     folders: foldersWithItems,
-    displayOrder: order.displayOrder,
+    displayOrder: order.displayOrder.filter((entry) => entry.type === 'folder' || submittedItemIds.has(entry.id)),
     metadata: {
       totalItems: submittedItems.length,
       totalFolders: foldersWithItems.length,

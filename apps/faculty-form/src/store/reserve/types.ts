@@ -48,7 +48,20 @@ export interface FolioCopiedItem {
 
 export interface CourseItem {
   id: string;
-  backendItemId?: string; // The actual database ID from backend (e.g., "259", "260")
+  backendItemId?: string;
+  backendKind?: 'new' | 'reuse';
+  isReuse?: boolean;
+  lock?: {
+    locked: boolean;
+    kind?: string | null;
+    reason?: string | null;
+  };
+  capabilities?: {
+    edit: boolean;
+    delete: boolean;
+    move: boolean;
+    reorder: boolean;
+  };
   title: string;
   authors?: string;
   isbn?: string;
@@ -63,10 +76,11 @@ export interface CourseItem {
   issue?: string;
   doi?: string;
   issn?: string;
+  oclcNumber?: string;
   eds?: {
     dbId: string;
     an: string;
-    plink: string;
+    plink?: string;
   };
   url?: string;
   materialType: 'book' | 'ebook' | 'article' | 'chapter' | 'video' | 'website' | 'other';
@@ -89,7 +103,8 @@ export interface CourseItem {
   callNumber?: string; // Maps to source_call_number
   sourceResourceId?: string; // Original resource identity, distinct from FOLIO holdings
   copy?: string; // Copy number
-  instanceId?: string; // FOLIO instance ID - maps to source_folio_instance_id
+  instanceId?: string;
+  sourceFolioInstanceId?: string;
   holdingsId?: string; // Verified FOLIO holdings ID
   instanceHrid?: string; // FOLIO instance human-readable ID
 
@@ -99,7 +114,7 @@ export interface CourseItem {
   permanentLocationId?: string;
   permanentLocationObject?: FolioLocation;
 
-  // Full copiedItem data from FOLIO (preserved for backend)
+  // Present for items created from the reuse picker.
   copiedItem?: FolioCopiedItem;
 }
 
@@ -108,6 +123,7 @@ export interface CourseFolder {
   backendFolderId?: string; // The actual database ID from backend
   title: string;
   description?: string;
+  ambiguous?: boolean;
   isOpen: boolean; // Whether folder is expanded in UI
   itemIds: string[];
 }

@@ -1,14 +1,14 @@
 import type { CourseItem } from '@/store/courseReservesStore';
 
 export const transformItemForBackend = (item: CourseItem, displayOrder: number, folderName?: string) => {
-  const isReuse = !!(item.barcode || item.callNumber || item.holdingsId);
+  const isReuse = item.isReuse ?? Boolean(item.barcode || item.callNumber || item.holdingsId);
 
   return {
     is_reuse: isReuse,
     source_barcode: item.barcode || null,
     source_call_number: item.callNumber || null,
-    source_resource_id: item.sourceResourceId || item.holdingsId || null,
-    source_folio_instance_id: item.instanceId || null,
+    source_resource_id: item.sourceResourceId ?? item.holdingsId ?? null,
+    source_folio_instance_id: item.sourceFolioInstanceId ?? item.instanceId ?? null,
     display_order: displayOrder,
     folder_name: folderName || null,
     faculty_notes: item.notes || null,
@@ -24,6 +24,7 @@ export const transformItemForBackend = (item: CourseItem, displayOrder: number, 
       publisher: item.publisher,
       publicationYear: item.publicationYear,
       edition: item.edition,
+      oclcNumber: item.oclcNumber,
       pages: item.pages,
       chapterTitle: item.chapterTitle,
       copy: item.copy,
@@ -47,7 +48,7 @@ export const transformItemForBackend = (item: CourseItem, displayOrder: number, 
       temporaryLocationObject: item.temporaryLocationObject,
       permanentLocationId: item.permanentLocationId,
       permanentLocationObject: item.permanentLocationObject,
-      copiedItem: item.copiedItem,
+      ...(item.copiedItem ? { copiedItem: item.copiedItem } : {}),
     },
   };
 };

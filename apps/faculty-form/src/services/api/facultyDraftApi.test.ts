@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FacultyItemWire } from '@/store/reserve/facultyItemMapping';
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
@@ -126,8 +127,9 @@ describe('faculty draft API', () => {
       status: 'draft',
       updated_at: '2026-10-20T12:00:00Z',
       draft_version: 8,
+      can_edit: true,
       folders: [],
-      unfoldered_items: [{ id: 1, title: 'Server item', material_type: 'book', status: 'draft', display_order: 0 }],
+      unfoldered_items: [facultyItem({ id: 1, title: 'Server item', material_type: 'book', status: 'draft' })],
     }] } });
 
     await expect(getDraft('draft-1')).resolves.toMatchObject({
@@ -139,3 +141,20 @@ describe('faculty draft API', () => {
     );
   });
 });
+
+function facultyItem(overrides: Partial<FacultyItemWire>): FacultyItemWire {
+  return {
+    kind: 'new', id: 1, folder_id: null, folder_name: null, position: null, display_order: 0,
+    is_reuse: false, status: 'pending', title: 'Synthetic item', journalTitle: null, material_type: null,
+    assignedPages: null, faculty_notes: null, barcode: null, call_number: null, eds: null,
+    source_resource_id: null, source_folio_instance_id: null, instance_id: null, holdings_id: null,
+    temporary_location: null, permanent_location: null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    authors: null, publisher: null, publicationYear: null, isbn: null, issn: null, doi: null,
+    edition: null, oclcNumber: null, volume: null, issue: null, pages: null, url: null,
+    displayStartDate: null, displayEndDate: null, instance_hrid: null, chapter_title: null, copy: null,
+    temporary_location_id: null, permanent_location_id: null,
+    ...overrides,
+  };
+}

@@ -111,25 +111,49 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
       itemIdMapping[item.id] = `item-${timestamp}-${index}`;
     });
 
+    const reserveCopy = { ...originalReserve };
+    delete reserveCopy.submissionUuid;
+    delete reserveCopy.draftVersion;
+    delete reserveCopy.courseAssignmentId;
+    delete reserveCopy.academicPeriod;
+    delete reserveCopy.assigneeStaffUserId;
+    delete reserveCopy.isLocked;
+    delete reserveCopy.lockedAt;
+    delete reserveCopy.lockedBy;
+    delete reserveCopy.lockReason;
+    delete reserveCopy.canEdit;
+    delete reserveCopy.access;
+    delete reserveCopy.proxyCanEdit;
+
     const clonedReserve: CourseReserve = {
-      ...originalReserve,
+      ...reserveCopy,
       ...newCourseData,
       id: newId,
       status: 'draft',
       isTestData: false,
       folders: source.folders.map((folder) => {
-        return {
+        const clonedFolder = {
           ...folder,
           id: folderIdMapping[folder.id],
           itemIds: folder.itemIds.map((itemId) => itemIdMapping[itemId]),
         };
+        delete clonedFolder.backendFolderId;
+        delete clonedFolder.ambiguous;
+        return clonedFolder;
       }),
-      items: source.items.map((item) => ({
-        ...item,
-        id: itemIdMapping[item.id],
-        folderId: item.folderId ? folderIdMapping[item.folderId] : undefined,
-        status: 'draft'
-      })),
+      items: source.items.map((item) => {
+        const clonedItem = {
+          ...item,
+          id: itemIdMapping[item.id],
+          folderId: item.folderId ? folderIdMapping[item.folderId] : undefined,
+          status: 'draft' as const,
+        };
+        delete clonedItem.backendItemId;
+        delete clonedItem.backendKind;
+        delete clonedItem.lock;
+        delete clonedItem.capabilities;
+        return clonedItem;
+      }),
       layout: source.layout.map((entry) => ({
         ...entry,
         id: entry.kind === 'folder' ? folderIdMapping[entry.id] : itemIdMapping[entry.id],

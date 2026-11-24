@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isSubmissionReadOnly } from '@/hooks/useSubmissionLock';
+import type { FacultyItemWire } from './facultyItemMapping';
 import type { CourseReserve } from './types';
 
 type RefetchOptions = {
@@ -23,8 +24,8 @@ describe('submission refocus refresh', () => {
     store.setState({ reserves: [local] });
     const onRemoteItemsChanged = vi.fn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(backendResponse({
-      status: 'complete', is_locked: true, can_edit: false, locked_by: 'Library staff',
-      unfoldered_items: [backendMaterial(22, 'Server title')],
+      status: 'complete', is_locked: true, can_edit: false, locked_by_staff_id: 17,
+      folders: [], unfoldered_items: [backendMaterial(22, 'Server title')],
     })));
 
     const fetchWithRefetchOptions = store.getState().fetchSubmissionDetails as unknown as (
@@ -32,7 +33,7 @@ describe('submission refocus refresh', () => {
     ) => Promise<CourseReserve | null>;
     const result = await fetchWithRefetchOptions('submission-1', true, {
       previousServerReserve: buildReserve({
-        items: [{ id: 'material-22', title: 'Previous server title', materialType: 'book', status: 'draft' }],
+        items: [{ id: 'material-new-22', backendItemId: '22', backendKind: 'new', title: 'Previous server title', materialType: 'book', status: 'draft' }],
         folders: [],
       }),
       onRemoteItemsChanged,
@@ -41,7 +42,7 @@ describe('submission refocus refresh', () => {
     expect(result?.items).toEqual(local.items);
     expect(result?.folders).toEqual(local.folders);
     expect(result).toMatchObject({
-      status: 'complete', isLocked: true, canEdit: false, lockedBy: 'Library staff',
+      status: 'complete', isLocked: true, canEdit: false, lockedBy: '17',
     });
     expect(isSubmissionReadOnly(result)).toBe(true);
     expect(onRemoteItemsChanged).toHaveBeenCalledWith(true);
@@ -52,7 +53,7 @@ describe('submission refocus refresh', () => {
     store.setState({ reserves: [buildReserve()] });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(backendResponse({
       status: 'submitted', is_locked: false, can_edit: true,
-      unfoldered_items: [backendMaterial(22, 'Server title')],
+      folders: [], unfoldered_items: [backendMaterial(22, 'Server title')],
     })));
 
     await store.getState().fetchSubmissionDetails('submission-1', true);
@@ -100,15 +101,28 @@ function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
   };
 }
 
-function backendMaterial(id: number, title: string) {
-  return { id, title, material_type: 'book', status: 'draft', display_order: 0 };
+function backendMaterial(id: number, title: string): FacultyItemWire {
+  return {
+    kind: 'new', id, folder_id: null, folder_name: null, position: null, display_order: 0,
+    is_reuse: false, title, journalTitle: null, material_type: 'book', status: 'draft',
+    assignedPages: null, faculty_notes: null, barcode: null, call_number: null, eds: null,
+    source_resource_id: null, source_folio_instance_id: null, instance_id: null, holdings_id: null,
+    temporary_location: null, permanent_location: null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    authors: null, publisher: null, publicationYear: null, isbn: null, issn: null, doi: null,
+    edition: null, oclcNumber: null, volume: null, issue: null, pages: null, url: null,
+    displayStartDate: null, displayEndDate: null, instance_hrid: null, chapter_title: null, copy: null,
+    temporary_location_id: null, permanent_location_id: null,
+  };
 }
 
 function backendResponse(submission: {
   status: string;
   is_locked: boolean;
   can_edit: boolean;
-  locked_by?: string;
+  folders: [];
+  locked_by_staff_id?: number;
   unfoldered_items: ReturnType<typeof backendMaterial>[];
 }): Response {
   return {

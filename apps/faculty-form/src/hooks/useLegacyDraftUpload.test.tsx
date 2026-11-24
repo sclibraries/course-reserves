@@ -137,6 +137,7 @@ describe('useLegacyDraftUpload', () => {
         status: 'draft',
         draft_version: 3,
         updated_at: '2026-10-20T12:00:00Z',
+        can_edit: true,
         folders: [],
         unfoldered_items: [],
       }], meta: { totalCount: 1 } }),

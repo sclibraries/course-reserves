@@ -189,6 +189,23 @@ describe('listLayout', () => {
     ]);
   });
 
+  it('puts null server order last and keeps folder-first stable ties', () => {
+    const mapped = fromServer([
+      { ...folder('folder-null'), displayOrder: null },
+      { ...folder('folder-two'), displayOrder: 2 },
+      { ...folder('folder-one'), displayOrder: 1 },
+    ], [
+      { ...item('item-null'), displayOrder: null },
+      { ...item('item-two'), displayOrder: 2 },
+      { ...item('item-one-a'), displayOrder: 1 },
+      { ...item('item-one-b'), displayOrder: 1 },
+    ]);
+
+    expect(topLevelIds(mapped)).toEqual([
+      'folder-one', 'item-one-a', 'item-one-b', 'folder-two', 'item-two', 'folder-null', 'item-null',
+    ]);
+  });
+
   it('migrates the old folder-position and item-array order into the same visible order', () => {
     const migrated = fromLegacy(
       [

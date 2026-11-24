@@ -76,6 +76,7 @@ export default function ItemMessageDialog({ itemTitle, itemId, resourceId, onSub
             variant="ghost" 
             size="sm" 
             className="h-8 w-8 p-0"
+            aria-label={`Message about ${itemTitle}`}
             onClick={(e) => e.stopPropagation()}
           >
             <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary" />
@@ -155,7 +156,9 @@ export default function ItemMessageDialog({ itemTitle, itemId, resourceId, onSub
               required
             />
             <p className="text-xs text-muted-foreground">
-              This message will be linked to the item: <strong>{itemTitle}</strong>
+              {resourceId === undefined
+                ? <>This message will be sent about the submission. The subject will include <strong>{itemTitle}</strong>.</>
+                : <>This message will be linked to the item: <strong>{itemTitle}</strong></>}
             </p>
           </div>
 

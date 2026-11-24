@@ -14,6 +14,9 @@ describe('proxy submission mapping', () => {
       updated_at: '2026-08-01T12:00:00Z',
       its_course_id: 'BIO-101-01-202702',
       academic_period: 'AP_202702',
+      can_edit: true,
+      folders: [],
+      unfoldered_items: [],
     });
 
     expect(submission.courseAssignmentId).toBe('BIO-101-01-202702');
@@ -31,6 +34,9 @@ describe('proxy submission mapping', () => {
       updated_at: '2026-08-01T12:00:00Z',
       access: 'proxy',
       proxy_can_edit: false,
+      can_edit: true,
+      folders: [],
+      unfoldered_items: [],
     });
 
     expect(submission).toMatchObject({
@@ -38,6 +44,25 @@ describe('proxy submission mapping', () => {
       proxyCanEdit: false,
       canEdit: false,
     });
+  });
+
+  it('does not let proxy permission override server read-only access', () => {
+    const submission = mapSubmissionIndexItem({
+      submission_uuid: 'submission-test-2',
+      course_code: 'BIO 101',
+      course_title: 'Synthetic Biology',
+      faculty_display_name: 'Test Faculty',
+      term_code: '2026FA',
+      status: 'draft',
+      updated_at: '2026-08-01T12:00:00Z',
+      can_edit: false,
+      access: 'proxy',
+      proxy_can_edit: true,
+      folders: [],
+      unfoldered_items: [],
+    });
+
+    expect(submission.canEdit).toBe(false);
   });
 
   it('keeps the current mapping when the API has not added proxy fields yet', () => {
@@ -49,6 +74,9 @@ describe('proxy submission mapping', () => {
       term_code: '2026FA',
       status: 'draft',
       updated_at: '2026-08-01T12:00:00Z',
+      can_edit: true,
+      folders: [],
+      unfoldered_items: [],
     });
 
     expect(submission).not.toHaveProperty('access');

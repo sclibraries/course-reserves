@@ -93,7 +93,7 @@ export const createSubmissionHandlers = (
           items: transformedResources.map((resource) => {
             const sourceItem = submittedItems.find(i => resource.resource_data.id === i.id);
             return {
-              item_uuid: sourceItem?.backendItemId || sourceItem?.id.replace('material-', '') || resource.resource_data.id,
+              item_uuid: sourceItem?.backendItemId ?? resource.resource_data.id,
               display_order: resource.display_order,
               folder_uuid: resource.folder_name ?
                 foldersWithItems.find(f => f.title === resource.folder_name)?.backendFolderId ||

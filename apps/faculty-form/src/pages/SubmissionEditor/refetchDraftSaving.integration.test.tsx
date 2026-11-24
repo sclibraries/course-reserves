@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseReserve } from '@/store/courseReservesStore';
+import type { FacultyItemWire } from '@/store/reserve/facultyItemMapping';
 
 const testStorage = vi.hoisted(() => {
   const values: Record<string, string> = {};
@@ -161,7 +162,7 @@ function buildReserve(overrides: Partial<CourseReserve> = {}): CourseReserve {
   const reserve: CourseReserve = {
     id: 'submission-1', courseCode: 'BIO 101', courseTitle: 'Biology', section: '01',
     instructors: 'Faculty One', term: '2026FA', status: 'submitted',
-    items: [{ id: 'material-1', title: 'Original server title', materialType: 'book', status: 'draft' }],
+    items: [{ id: 'material-new-1', backendItemId: '1', backendKind: 'new', title: 'Original server title', materialType: 'book', status: 'draft' }],
     folders: [], layout: [], lastUpdated: 'Jun 17, 2026', isLocked: false, canEdit: true,
     ...overrides,
   };
@@ -179,10 +180,26 @@ function buildResponse({ title, locked = false }: { title: string; locked?: bool
       submission_uuid: 'submission-1', course_code: 'BIO 101', course_title: 'Biology',
       section: '01', faculty_display_name: 'Faculty One', term_code: '2026FA',
       updated_at: '2026-06-18T12:00:00.000Z', status: locked ? 'in-progress' : 'submitted',
-      is_locked: locked, can_edit: !locked, locked_by: locked ? 'Library staff' : undefined,
+      is_locked: locked, can_edit: !locked, locked_by_staff_id: locked ? 17 : null,
       folders: [],
-      unfoldered_items: [{ id: 1, title, material_type: 'book', status: 'draft', display_order: 0 }],
+      unfoldered_items: [facultyItem(title)],
     }],
+  };
+}
+
+function facultyItem(title: string): FacultyItemWire {
+  return {
+    kind: 'new', id: 1, folder_id: null, folder_name: null, position: null, display_order: 0,
+    is_reuse: false, status: 'draft', title, journalTitle: null, material_type: 'book',
+    assignedPages: null, faculty_notes: null, barcode: null, call_number: null, eds: null,
+    source_resource_id: null, source_folio_instance_id: null, instance_id: null, holdings_id: null,
+    temporary_location: null, permanent_location: null,
+    lock: { locked: false, kind: null, reason: null },
+    capabilities: { edit: true, delete: true, move: true, reorder: true },
+    authors: null, publisher: null, publicationYear: null, isbn: null, issn: null, doi: null,
+    edition: null, oclcNumber: null, volume: null, issue: null, pages: null, url: null,
+    displayStartDate: null, displayEndDate: null, instance_hrid: null, chapter_title: null, copy: null,
+    temporary_location_id: null, permanent_location_id: null,
   };
 }
 
