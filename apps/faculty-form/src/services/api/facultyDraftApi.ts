@@ -73,6 +73,13 @@ export const isDraftConflict = (error: unknown): boolean => {
   return data?.error_code === 'draft_conflict';
 };
 
+export const getFolderNameTakenMessage = (data: unknown): string | undefined => {
+  const body = data as { error_code?: string; folder_name?: string };
+  return body?.error_code === 'folder_name_taken' && typeof body.folder_name === 'string'
+    ? `Two folders are named "${body.folder_name}". Rename one to save.`
+    : undefined;
+};
+
 export const isRetryableSaveError = (error: unknown): boolean => {
   const status = (error as { response?: { status?: number } })?.response?.status;
   return status === undefined || status === 408 || status === 429 || (status >= 500 && status < 600);

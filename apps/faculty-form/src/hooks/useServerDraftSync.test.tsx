@@ -195,6 +195,37 @@ describe('useServerDraftSync', () => {
     expect(sync?.saveStatus).toBe('saved');
   });
 
+  it('shows folder conflict guidance without retrying and saves again after the next edit', async () => {
+    api.syncDraft
+      .mockRejectedValueOnce({ response: { status: 422, data: { error_code: 'folder_name_taken', folder_name: 'Week 1' } } })
+      .mockResolvedValueOnce({ submission_uuid: 'server-draft-1', status: 'draft', draft_version: 1 });
+
+    act(() => {
+      useReserveStore.getState().updateReserve(initialReserve.id, {
+        items: [{ id: 'item-1', title: 'Local edit', materialType: 'book', status: 'draft' }],
+      });
+      sync?.markChanged();
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+    expect(sync?.saveStatus).toBe('error');
+    expect(container.textContent).toContain('Two folders are named "Week 1". Rename one to save.');
+    expect(container.querySelector('[data-testid="items"]')?.textContent).toContain('Local edit');
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(api.syncDraft).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      useReserveStore.getState().updateReserve(initialReserve.id, {
+        items: [{ id: 'item-1', title: 'Next local edit', materialType: 'book', status: 'draft' }],
+      });
+      sync?.markChanged();
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+    expect(api.syncDraft).toHaveBeenCalledTimes(2);
+    expect(sync?.saveStatus).toBe('saved');
+  });
+
   it('retries a server error', async () => {
     api.syncDraft
       .mockRejectedValueOnce({ response: { status: 500 } })

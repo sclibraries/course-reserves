@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-vi.mock('@/services/notify', () => mocks);
+vi.mock('@/services/notify', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/services/notify')>(),
+  notify: mocks.notify,
+}));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -32,7 +35,7 @@ describe('folder and course actions', () => {
     const createFolder = vi.fn();
     const deleteFolder = vi.fn();
     vi.stubGlobal('prompt', vi.fn(() => '  Reading list  '));
-    const handlers = createFolderHandlers('reserve-1', createFolder, vi.fn(), deleteFolder, vi.fn());
+    const handlers = createFolderHandlers('reserve-1', [], createFolder, vi.fn(), deleteFolder, vi.fn());
 
     handlers.handleCreateFolder();
     handlers.handleDeleteFolder('folder-1');
@@ -46,12 +49,37 @@ describe('folder and course actions', () => {
 
   it('names a folder after a successful rename', () => {
     const updateFolder = vi.fn();
-    const handlers = createFolderHandlers('reserve-1', vi.fn(), updateFolder, vi.fn(), vi.fn());
+    const handlers = createFolderHandlers('reserve-1', [], vi.fn(), updateFolder, vi.fn(), vi.fn());
 
     handlers.handleUpdateFolder('folder-1', { title: 'Reading list' });
 
     expect(updateFolder).toHaveBeenCalledWith('reserve-1', 'folder-1', { title: 'Reading list' });
     expect(notify.success).toHaveBeenCalledWith('Folder renamed to Reading list');
+  });
+
+  it('refuses duplicate names, permits a self-rename, and repairs an existing duplicate', () => {
+    const createFolder = vi.fn();
+    const updateFolder = vi.fn();
+    vi.stubGlobal('prompt', vi.fn(() => ' week 1 '));
+    const handlers = createFolderHandlers('reserve-1', [
+      { id: 'folder-1', title: 'Week 1' },
+      { id: 'folder-3', title: 'week 1' },
+      { id: 'folder-2', title: 'Reading list' },
+    ], createFolder, updateFolder, vi.fn(), vi.fn());
+
+    handlers.handleCreateFolder();
+    handlers.handleUpdateFolder('folder-2', { title: 'WEEK 1' });
+    handlers.handleUpdateFolder('folder-2', { title: 'rEaDiNg LiSt' });
+    handlers.handleUpdateFolder('folder-3', { title: 'Week 1 renamed' });
+
+    expect(createFolder).not.toHaveBeenCalled();
+    expect(updateFolder).toHaveBeenCalledTimes(2);
+    expect(updateFolder).toHaveBeenNthCalledWith(1, 'reserve-1', 'folder-2', { title: 'rEaDiNg LiSt' });
+    expect(updateFolder).toHaveBeenNthCalledWith(2, 'reserve-1', 'folder-3', { title: 'Week 1 renamed' });
+    expect(notify.error).toHaveBeenNthCalledWith(1, 'A folder named "Week 1" already exists.');
+    expect(notify.error).toHaveBeenNthCalledWith(2, 'A folder named "Week 1" already exists.');
+    expect(notify.success).toHaveBeenCalledWith('Folder renamed to rEaDiNg LiSt');
+    vi.unstubAllGlobals();
   });
 
   it('shows one toast when the editor saves course details', async () => {

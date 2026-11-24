@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { citationToCourseItem } from '@/utils/citationToCourseItem';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
+import { findFolderByName } from '@/utils/folderNames';
 import type { DiscoverySearchResult } from '@/services/discoverySearchService';
 import type { CitationChoice, EditableCitation, PasteWorkspace } from './pasteCitationTypes';
 import { useDiscoveryResultActions } from './useDiscoveryResultActions';
@@ -13,7 +14,7 @@ export function usePasteCitationActions(
 ) {
   const { id, reserve, addItem, createFolder, undoAddedMaterial } = useSubmissionEditorContext();
   const { isDuplicate: isResultDuplicate, addResult } = useDiscoveryResultActions();
-  const folderIdsByHeading = useRef(new Map<string, string>());
+  const folderIdsByHeading = useRef(new Map<string, { id: string; title: string }>());
   const addedItemsByCitation = useMemo(() => new Map(
     Object.entries(workspace.choices).flatMap(([citationId, choice]) => {
       // Plain citations may have no duplicate key, so also confirm their saved list ID exists.
@@ -64,15 +65,15 @@ function folderForHeading(
   reserve: ReturnType<typeof useSubmissionEditorContext>['reserve'],
   reserveId: string,
   createFolder: ReturnType<typeof useSubmissionEditorContext>['createFolder'],
-  folderIdsByHeading: Map<string, string>,
+  folderIdsByHeading: Map<string, { id: string; title: string }>,
 ): string | undefined {
   const title = heading?.trim();
   if (!title) return undefined;
-  const existing = reserve.folders.find((folder) => folder.title === title)?.id;
+  const existing = findFolderByName(reserve.folders, title)?.id;
   if (existing) return existing;
-  const remembered = folderIdsByHeading.get(title);
-  if (remembered) return remembered;
+  const remembered = findFolderByName(Array.from(folderIdsByHeading.values()), title);
+  if (remembered) return remembered.id;
   const folderId = createFolder(reserveId, title);
-  folderIdsByHeading.set(title, folderId);
+  folderIdsByHeading.set(title, { id: folderId, title });
   return folderId;
 }

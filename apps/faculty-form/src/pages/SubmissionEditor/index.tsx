@@ -133,7 +133,7 @@ const SubmissionEditor = () => {
   const wrappedMoveTo = (...a: Parameters<typeof moveTo>) => { moveTo(...a); markChanged(); };
 
   const itemHandlers = createItemHandlers(id!, wrappedAddItem, wrappedUpdateItem, wrappedDeleteItem, wrappedMoveItemInList, wrappedUpdateReserve, isSearching, setEditingItem, setModalOpen);
-  const folderHandlers = createFolderHandlers(id!, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
+  const folderHandlers = createFolderHandlers(id!, reserve.folders, wrappedCreateFolder, wrappedUpdateFolder, wrappedDeleteFolder, toggleFolder);
   const courseHandlers = createCourseHandlers(id!, wrappedUpdateReserve, setCourseModalOpen);
   const dragHandlers = createDragHandlers(id!, wrappedMoveTo, isSearching);
   const submissionHandlers = createSubmissionHandlers(navigate, reserve, organizedContent, setShowSubmitDialog, draftSync);

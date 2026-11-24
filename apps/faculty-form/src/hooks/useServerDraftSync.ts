@@ -5,6 +5,7 @@ import { useReserveStore } from '@/store/useReserveStore';
 import { buildSubmissionPayload } from '@/handlers/submissionPayload';
 import {
   getDraft,
+  getFolderNameTakenMessage,
   isDraftConflict,
   isRetryableSaveError,
   syncDraft,
@@ -100,6 +101,14 @@ export function useServerDraftSync(
       } catch (error) {
         console.error('Failed to save faculty draft:', error);
         if (isDraftConflict(error)) { markConflict(); return false; }
+        const errorData = (error as { response?: { data?: unknown } })?.response?.data;
+        const folderNameMessage = getFolderNameTakenMessage(errorData);
+        if (folderNameMessage) {
+          setSaveStatus('error');
+          draftStore.setSavingStatus(reserveId, 'error');
+          draftStore.setSaveError(reserveId, folderNameMessage);
+          return false;
+        }
 
         if (!isRetryableSaveError(error)) {
           setSaveStatus('error');

@@ -93,7 +93,7 @@ describe('usePasteCitationActions folder assignment', () => {
     render();
     act(() => {
       actions?.addAsWritten(citation);
-      actions?.addAsWritten({ ...citation, id: 'citation-2', text: 'Test Author (2022). Another synthetic title.' });
+      actions?.addAsWritten({ ...citation, id: 'citation-2', heading: ' week 1 ', text: 'Test Author (2022). Another synthetic title.' });
     });
 
     expect(createFolder).toHaveBeenCalledOnce();
@@ -101,7 +101,7 @@ describe('usePasteCitationActions folder assignment', () => {
   });
 
   it('reuses an existing folder with the same heading', () => {
-    render({ ...baseReserve, folders: [{ id: 'folder-existing', title: 'Week 1', isOpen: true, itemIds: [] }] });
+    render({ ...baseReserve, folders: [{ id: 'folder-existing', title: 'week 1', isOpen: true, itemIds: [] }] });
     act(() => { actions?.addAsWritten(citation); });
 
     expect(createFolder).not.toHaveBeenCalled();

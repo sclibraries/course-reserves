@@ -1,4 +1,5 @@
 import { getSafeErrorFeedback } from '@/services/notify';
+import { getFolderNameTakenMessage } from '@/services/api/facultyDraftApi';
 
 const ROSTER_COURSE_ERROR_MESSAGE = "This course isn't on your teaching roster for that term - contact the library";
 
@@ -24,8 +25,9 @@ export const getSubmissionErrorMessage = async (response: Response): Promise<Sub
     }
   }
 
+  const folderNameMessage = getFolderNameTakenMessage(body);
   const isRosterError = body.error_code === 'roster_course_required' || body.error_code === 'roster_course_not_found';
-  const message = isRosterError ? ROSTER_COURSE_ERROR_MESSAGE : "Couldn't submit this reserve request";
+  const message = folderNameMessage || (isRosterError ? ROSTER_COURSE_ERROR_MESSAGE : "Couldn't submit this reserve request");
   const feedback = getSafeErrorFeedback({ response: { data: body } }, message);
   return new SubmissionResponseError(feedback.message, feedback.reference);
 };

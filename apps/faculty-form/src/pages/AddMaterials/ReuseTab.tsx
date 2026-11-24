@@ -9,6 +9,7 @@ import { createCloneResourceHandler } from '@/handlers/cloneResourceHandler';
 import { useCourseCloning, type PreviousCourse, type PreviewResource } from '@/hooks/useCourseCloning';
 import { useActingForStore } from '@/store/actingForStore';
 import { findDuplicateCourseItem } from '@/utils/courseItemDuplicates';
+import { findFolderByName } from '@/utils/folderNames';
 import { filterPreviousCoursesForSubmission, getPinnedPreviousCourse, sortPreviousCourses } from '@/utils/reuseCourseTerms';
 import { useSubmissionEditorContext } from '@/pages/SubmissionEditor/SubmissionEditorContext';
 import { mapReuseResources, toReuseDuplicateCandidate } from './reuseResourceMapper';
@@ -24,7 +25,7 @@ export default function ReuseTab() {
   const [selectedCourse, setSelectedCourse] = useState<PreviousCourse | null>(null);
   const [resources, setResources] = useState<PreviewResource[]>([]);
   const [loadingResources, setLoadingResources] = useState(false);
-  const folderIds = useRef<Record<string, string>>({});
+  const folderIds = useRef<Record<string, { id: string; title: string }>>({});
   const requestId = useRef(0);
   const courseSelection = searchParams.get('course');
   const orderedCourses = useMemo(() => sortPreviousCourses(
@@ -83,17 +84,20 @@ export default function ReuseTab() {
     ? Boolean(resource._originalReserve?.copiedItem?.title || resource._originalReserve?.item?.title)
     : Boolean(resource._originalResource);
   const ensureDestinationFolder = (folderName?: string) => {
-    if (!folderName || searchParams.get('folder')) return undefined;
-    if (!folderIds.current[folderName]) {
-      const folderId = createFolder(id, folderName);
-      folderIds.current[folderName] = folderId;
-      const ungroupedItems = (reserve.items || []).filter((item) => !item.folderId).length;
-      const displayItems = reserve.folders.length + ungroupedItems + Object.keys(folderIds.current).length;
-      for (let position = 1; position < displayItems; position += 1) {
-        moveFolderPosition(id, folderId, 'down');
-      }
+    const title = folderName?.trim();
+    if (!title || searchParams.get('folder')) return undefined;
+    const existing = findFolderByName(reserve.folders, title);
+    if (existing) return existing.id;
+    const remembered = findFolderByName(Object.values(folderIds.current), title);
+    if (remembered) return remembered.id;
+    const folderId = createFolder(id, title);
+    folderIds.current[title] = { id: folderId, title };
+    const ungroupedItems = (reserve.items || []).filter((item) => !item.folderId).length;
+    const displayItems = reserve.folders.length + ungroupedItems + Object.keys(folderIds.current).length;
+    for (let position = 1; position < displayItems; position += 1) {
+      moveFolderPosition(id, folderId, 'down');
     }
-    return folderIds.current[folderName];
+    return folderId;
   };
   const addResource = (resource: PreviewResource) => {
     if (isInList(resource)) return;

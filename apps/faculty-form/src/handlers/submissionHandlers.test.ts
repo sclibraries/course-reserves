@@ -122,14 +122,15 @@ describe('createSubmissionHandlers', () => {
   });
 
   it.each([
-    [422, 'roster_course_required'],
-    [403, 'roster_course_not_found'],
-  ])('shows the roster guidance for %s %s responses', async (status, errorCode) => {
+    [422, 'roster_course_required', { error_code: 'roster_course_required' }, "This course isn't on your teaching roster for that term - contact the library"],
+    [403, 'roster_course_not_found', { error_code: 'roster_course_not_found' }, "This course isn't on your teaching roster for that term - contact the library"],
+    [422, 'folder_name_taken', { error_code: 'folder_name_taken', folder_name: 'Week 1' }, 'Two folders are named "Week 1". Rename one to save.'],
+  ])('shows guidance for %s %s responses', async (status, errorCode, body, expectedMessage) => {
     const { createSubmissionHandlers } = await import('./submissionHandlers');
     const { notify } = await import('@/services/notify');
     const reserve = buildReserve();
 
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error_code: errorCode }), {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), {
       status,
       headers: { 'Content-Type': 'application/json' },
     }));
@@ -144,7 +145,7 @@ describe('createSubmissionHandlers', () => {
 
     await vi.waitFor(() => {
       expect(notify.error).toHaveBeenCalledWith(
-        "This course isn't on your teaching roster for that term - contact the library",
+        expectedMessage,
         { reference: undefined }
       );
     });

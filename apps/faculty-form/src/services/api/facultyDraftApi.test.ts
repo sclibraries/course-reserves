@@ -25,6 +25,7 @@ vi.mock('@/config/endpoints', () => ({
 import {
   createDraft,
   discardDraft,
+  getFolderNameTakenMessage,
   getDraft,
   isRetryableSaveError,
   saveDraft,
@@ -47,6 +48,14 @@ describe('faculty draft API', () => {
     [400, 401, 409, 423, 499].forEach((status) => {
       expect(isRetryableSaveError({ response: { status } })).toBe(false);
     });
+  });
+
+  it.each([
+    [{ error_code: 'folder_name_taken', folder_name: 'Week 1' }, 'Two folders are named "Week 1". Rename one to save.'],
+    [{ error_code: 'draft_conflict', folder_name: 'Week 1' }, undefined],
+    [{ error_code: 'folder_name_taken' }, undefined],
+  ])('builds folder conflict guidance from the server folder name', (data, expected) => {
+    expect(getFolderNameTakenMessage(data)).toBe(expected);
   });
 
   it('creates a draft with the existing submit payload and returns its version', async () => {

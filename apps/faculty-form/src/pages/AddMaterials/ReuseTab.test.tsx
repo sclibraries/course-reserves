@@ -12,6 +12,7 @@ const reuseMocks = vi.hoisted(() => ({
   submissionCourseCode: 'BIO 026',
   submissionTerm: 'Fall 2100',
   selectedFaculty: null as { displayName: string } | null,
+  folders: [{ id: 'existing-folder', title: 'Existing week', isOpen: true, items: [], position: 0 }],
   courses: [
     {
       courseListingId: 'listing-bio-spring2099', courseNumber: 'BIO 026', courseName: 'Synthetic Biology',
@@ -34,7 +35,7 @@ vi.mock('@/pages/SubmissionEditor/SubmissionEditorContext', () => ({
     reserve: {
       courseCode: reuseMocks.submissionCourseCode, courseTitle: 'Synthetic Biology', term: reuseMocks.submissionTerm,
       items: [{ id: 'existing-item', title: 'Already in list', authors: '', materialType: 'website', status: 'draft', url: 'https://example.test/already' }],
-      folders: [{ id: 'existing-folder', title: 'Existing week', isOpen: true, items: [], position: 0 }],
+      folders: reuseMocks.folders,
     },
     user: { full_name: 'Test Faculty' },
     addItem: reuseMocks.addItem,
@@ -96,6 +97,10 @@ describe('ReuseTab', () => {
     reuseMocks.submissionCourseCode = 'BIO 026';
     reuseMocks.submissionTerm = 'Fall 2100';
     reuseMocks.selectedFaculty = null;
+    sourceResources[1].folder_name = 'Week 1';
+    reuseMocks.folders.splice(0, reuseMocks.folders.length,
+      { id: 'existing-folder', title: 'Existing week', isOpen: true, items: [], position: 0 },
+    );
     reuseMocks.fetchCourseResources.mockResolvedValue({
       orderedResources: sourceResources,
       physicalReserves: [{
@@ -179,6 +184,7 @@ describe('ReuseTab', () => {
   });
 
   it('adds all available resources in source order and keeps their source folder', async () => {
+    sourceResources[1].folder_name = 'week 1';
     await renderReuseTab('/submission/reserve-026/edit/add?tab=reuse&course=last');
     await flushUi();
 
@@ -201,6 +207,24 @@ describe('ReuseTab', () => {
       .toEqual(['target-week-1', 'target-week-1', 'target-week-2']);
     expect(reuseMocks.addItem.mock.calls[0][1].notes).toBe('Description Faculty note');
     expect(reuseMocks.addItem.mock.calls[0][1].notes).not.toContain('Staff-only note');
+  });
+
+  it('uses an existing folder despite case differences and leaves its position alone', async () => {
+    reuseMocks.folders.splice(0, reuseMocks.folders.length,
+      { id: 'existing-week-1', title: 'week 1', isOpen: true, items: [], position: 0 },
+    );
+    await renderReuseTab('/submission/reserve-026/edit/add?tab=reuse&course=last');
+    await flushUi();
+
+    const addAllButton = Array.from(container!.querySelectorAll('button')).find((button) => /add all/i.test(button.textContent || ''));
+    await act(async () => { addAllButton?.click(); });
+
+    expect(reuseMocks.createFolder).toHaveBeenCalledOnce();
+    expect(reuseMocks.createFolder).toHaveBeenCalledWith('reserve-026', 'Week 2');
+    expect(reuseMocks.addItem).toHaveBeenNthCalledWith(1, 'reserve-026', expect.objectContaining({ folderId: 'existing-week-1' }));
+    expect(reuseMocks.addItem).toHaveBeenNthCalledWith(2, 'reserve-026', expect.objectContaining({ folderId: 'existing-week-1' }));
+    expect(reuseMocks.addItem).toHaveBeenNthCalledWith(3, 'reserve-026', expect.objectContaining({ folderId: 'target-week-2' }));
+    expect(reuseMocks.moveFolderPosition.mock.calls.every(([, folderId]) => folderId !== 'existing-week-1')).toBe(true);
   });
 
   it('passes all physical FOLIO identifiers through the shared add handler', async () => {
