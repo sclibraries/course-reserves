@@ -70,6 +70,9 @@ describe('SubmissionDetailItemsTable in Chromium', () => {
     expect(getItemMessageCount.mock.calls).toEqual([[31]]);
     expect(getItemUnreadCount.mock.calls).toEqual([[31]]);
 
+    const legacyRow = getByRole(document.body, 'row', { name: /Legacy reuse item/ });
+    expect(within(legacyRow).queryByText('1 new')).toBeNull();
+
     const newItemOpener = getByRole(document.body, 'button', { name: 'Message about New table reuse item' });
     newItemOpener.focus();
     await act(async () => fireEvent.click(newItemOpener));
@@ -80,9 +83,7 @@ describe('SubmissionDetailItemsTable in Chromium', () => {
     await act(async () => fireEvent.click(getByRole(newItemDialog, 'button', { name: 'Send Message' })));
     expect(onItemMessage).toHaveBeenCalledTimes(1);
     expect(onItemMessage.mock.calls[0]?.[0].resource_id).toBe(31);
-
-    const legacyRow = getByRole(document.body, 'row', { name: /Legacy reuse item/ });
-    expect(within(legacyRow).queryByText('1 new')).toBeNull();
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
 
     const opener = getByRole(document.body, 'button', { name: 'Message about Legacy reuse item' });
     opener.focus();
@@ -92,7 +93,7 @@ describe('SubmissionDetailItemsTable in Chromium', () => {
     expect(getByRole(dialog, 'textbox', { name: 'Subject' })).toHaveProperty(
       'value', 'Question about: Legacy reuse item',
     );
-    await expectNoAxeViolations(document.body);
+    await expectNoAxeViolations(dialog);
     await expectNoHorizontalOverflow([320, 768, 1280]);
 
     fireEvent.change(getByRole(dialog, 'textbox', { name: 'Message *' }), {

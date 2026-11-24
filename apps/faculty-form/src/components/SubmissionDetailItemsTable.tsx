@@ -105,12 +105,7 @@ function renderItemRow(
   getItemUnreadCount: SubmissionDetailItemsTableProps['getItemUnreadCount'],
   inFolder: boolean
 ) {
-  const parsedResourceId = item.backendKind === 'new' && item.backendItemId !== undefined
-    ? Number(item.backendItemId)
-    : undefined;
-  const resourceId = parsedResourceId !== undefined && Number.isFinite(parsedResourceId)
-    ? parsedResourceId
-    : undefined;
+  const resourceId = item.backendKind === 'new' ? Number(item.backendItemId) : undefined;
   const totalCount = resourceId === undefined ? 0 : getItemMessageCount(resourceId);
   const unreadCount = resourceId === undefined ? 0 : getItemUnreadCount(resourceId);
   return (

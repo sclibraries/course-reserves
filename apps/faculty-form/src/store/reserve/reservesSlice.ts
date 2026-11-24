@@ -2,6 +2,21 @@ import type { ReserveSlice, CourseReserve } from './types';
 import { fromLegacy } from '@/utils/listLayout';
 import { getLayoutState } from './layoutState';
 
+const RESERVE_CLONE_OMIT_KEYS = [
+  'submissionUuid', 'draftVersion', 'courseAssignmentId', 'academicPeriod',
+  'assigneeStaffUserId', 'isLocked', 'lockedAt', 'lockedBy', 'lockReason',
+  'canEdit', 'access', 'proxyCanEdit',
+] as const satisfies readonly (keyof CourseReserve)[];
+
+const FOLDER_CLONE_OMIT_KEYS = ['backendFolderId', 'ambiguous'] as const;
+const ITEM_CLONE_OMIT_KEYS = ['backendItemId', 'backendKind', 'lock', 'capabilities'] as const;
+
+function omitKeys<T extends object, K extends keyof T>(object: T, keys: readonly K[]): Omit<T, K> {
+  return Object.fromEntries(
+    Object.entries(object).filter(([key]) => !keys.includes(key as K)),
+  ) as Omit<T, K>;
+}
+
 export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'findReserveByAssignmentId' | 'updateReserve' | 'deleteReserve' | 'getReserveById' | 'getUserReserves' | 'getTestReserves' | 'cloneReserve' | 'getReserveStats' | 'clearDuplicates'> = (set, get, store) => ({
   initialize: () => {
     // No longer need to inject test data
@@ -111,19 +126,7 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
       itemIdMapping[item.id] = `item-${timestamp}-${index}`;
     });
 
-    const reserveCopy = { ...originalReserve };
-    delete reserveCopy.submissionUuid;
-    delete reserveCopy.draftVersion;
-    delete reserveCopy.courseAssignmentId;
-    delete reserveCopy.academicPeriod;
-    delete reserveCopy.assigneeStaffUserId;
-    delete reserveCopy.isLocked;
-    delete reserveCopy.lockedAt;
-    delete reserveCopy.lockedBy;
-    delete reserveCopy.lockReason;
-    delete reserveCopy.canEdit;
-    delete reserveCopy.access;
-    delete reserveCopy.proxyCanEdit;
+    const reserveCopy = omitKeys(originalReserve, RESERVE_CLONE_OMIT_KEYS);
 
     const clonedReserve: CourseReserve = {
       ...reserveCopy,
@@ -133,25 +136,19 @@ export const createReservesSlice: ReserveSlice<'initialize' | 'addReserve' | 'fi
       isTestData: false,
       folders: source.folders.map((folder) => {
         const clonedFolder = {
-          ...folder,
+          ...omitKeys(folder, FOLDER_CLONE_OMIT_KEYS),
           id: folderIdMapping[folder.id],
           itemIds: folder.itemIds.map((itemId) => itemIdMapping[itemId]),
         };
-        delete clonedFolder.backendFolderId;
-        delete clonedFolder.ambiguous;
         return clonedFolder;
       }),
       items: source.items.map((item) => {
         const clonedItem = {
-          ...item,
+          ...omitKeys(item, ITEM_CLONE_OMIT_KEYS),
           id: itemIdMapping[item.id],
           folderId: item.folderId ? folderIdMapping[item.folderId] : undefined,
           status: 'draft' as const,
         };
-        delete clonedItem.backendItemId;
-        delete clonedItem.backendKind;
-        delete clonedItem.lock;
-        delete clonedItem.capabilities;
         return clonedItem;
       }),
       layout: source.layout.map((entry) => ({

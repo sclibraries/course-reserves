@@ -106,7 +106,7 @@ const mapEds = (value: FacultyEdsWire | null): CourseItem['eds'] => value === nu
   : {
       dbId: value.dbId ?? '',
       an: value.an ?? '',
-      ...(value.plink === null || value.plink === undefined ? {} : { plink: value.plink }),
+      ...(value.plink === null ? {} : { plink: value.plink }),
     };
 
 const mapLocation = (value: FacultyLocationWire | null) => value === null
@@ -147,7 +147,7 @@ export function mapFacultyItem(item: FacultyItemWire, folderId?: string): Course
     displayStartDate: item.displayStartDate ?? undefined,
     displayEndDate: item.displayEndDate ?? undefined,
     notes: item.faculty_notes ?? undefined,
-    sourceResourceId: item.source_resource_id === null || item.source_resource_id === undefined
+    sourceResourceId: item.source_resource_id === null
       ? undefined
       : String(item.source_resource_id),
     sourceFolioInstanceId: item.source_folio_instance_id ?? undefined,
@@ -185,10 +185,8 @@ export function mapFacultySubmissionItems(folders: FacultyFolderWire[], rootItem
     ...mappedFolders.flatMap(({ items: folderItems }) => folderItems),
     ...rootItems.map((item) => mapFacultyItem(item)),
   ];
-  const ordered = fromServer(
+  return fromServer(
     mappedFolders.map(({ folder, displayOrder }) => ({ ...folder, displayOrder })),
     items,
   );
-
-  return ordered;
 }

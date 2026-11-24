@@ -22,6 +22,9 @@ describe('submission roster course matching after reload', () => {
           term_code: 'Spring 2027',
           status: 'submitted',
           updated_at: '2026-08-01T12:00:00Z',
+          can_edit: true,
+          folders: [],
+          unfoldered_items: [],
         }],
       }),
     }));

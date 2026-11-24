@@ -11,8 +11,8 @@ const formatLastUpdated = (updatedAt: string) => new Date(updatedAt).toLocaleDat
 
 const mapSubmission = (submission: BackendSubmission): CourseReserve => {
   const { folders, items, layout } = mapFacultySubmissionItems(
-    submission.folders ?? [],
-    submission.unfoldered_items ?? [],
+    submission.folders,
+    submission.unfoldered_items,
   );
   const isLocked = submission.is_locked || !!submission.locked_by_staff_id;
 
