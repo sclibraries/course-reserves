@@ -185,6 +185,12 @@ class SubmissionPayloadService
         ];
     }
 
+    public function folderNameError(array $payload)
+    {
+        $clash = FolderNames::clash(array_column($this->foldersFromPayload($payload), 'title'));
+        return $clash === null ? null : array_merge(['error_code' => 'folder_name_taken'], $clash);
+    }
+
     private function resourcesFromPayload(array $payload)
     {
         if (array_key_exists('resources', $payload)) {

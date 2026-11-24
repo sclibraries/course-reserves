@@ -126,6 +126,37 @@ class Api086DraftsCest extends BaseFunctionalCest
         )->queryScalar());
     }
 
+    public function draftCreateRejectsClashingFolderNames(FunctionalTester $I)
+    {
+        $payload = $this->draftPayload();
+        $payload['folders'][0]['title'] = 'Week 1';
+        $payload['folders'][] = ['id' => 'folder-api086-duplicate', 'title' => ' week 1 '];
+        $this->postDraft($I, $payload);
+
+        $this->assertFolderNameTaken($I);
+        Assert::assertSame(0, $this->draftSubmissionCount());
+    }
+
+    public function draftUpdateRejectsClashingFolderNamesWithoutChangingSavedData(FunctionalTester $I)
+    {
+        $this->postDraft($I, $this->draftPayload());
+        $uuid = $this->response($I)['submission_uuid'];
+        $submissionId = (int)\Yii::$app->db->createCommand(
+            'SELECT submission_id FROM faculty_submissions WHERE submission_uuid = :uuid', [':uuid' => $uuid]
+        )->queryScalar();
+        $before = $this->draftSnapshot($submissionId);
+
+        $payload = $this->draftPayload();
+        $payload['draft_version'] = 1;
+        $payload['folders'][0]['title'] = 'Week 1';
+        $payload['folders'][] = ['id' => 'folder-api086-duplicate', 'title' => ' week 1 '];
+        $I->haveHttpHeader('Authorization', 'Bearer ' . $this->token);
+        $I->sendJsonRequest('PUT', 'faculty-submission/update', $payload, ['id' => $uuid]);
+
+        $this->assertFolderNameTaken($I);
+        Assert::assertSame($before, $this->draftSnapshot($submissionId));
+    }
+
     public function draftPutNormalizesLinksWithSpacesAndAccents(FunctionalTester $I)
     {
         $this->postDraft($I, $this->draftPayload());
@@ -215,6 +246,17 @@ class Api086DraftsCest extends BaseFunctionalCest
             [':owner' => $this->ownerId, ':course' => $this->courseId, ':period' => $this->academicPeriod]
         )->queryScalar();
         Assert::assertSame('https://example.org/a%20b', $this->storedResourceData($uuid)[0]['url']);
+    }
+
+    public function submitCompleteRejectsClashingFolderNames(FunctionalTester $I)
+    {
+        $payload = $this->draftPayload();
+        $payload['folders'][0]['title'] = 'Week 1';
+        $payload['folders'][] = ['id' => 'folder-api086-duplicate', 'title' => ' week 1 '];
+        $this->postComplete($I, $payload);
+
+        $this->assertFolderNameTaken($I);
+        Assert::assertSame(0, $this->draftSubmissionCount());
     }
 
     public function draftSubmitRejectsAnInvalidUrlSavedDuringDrafting(FunctionalTester $I)
@@ -482,6 +524,42 @@ class Api086DraftsCest extends BaseFunctionalCest
         $response = json_decode($I->grabPageSource(), true);
         Assert::assertIsArray($response);
         return $response;
+    }
+
+    private function assertFolderNameTaken(FunctionalTester $I)
+    {
+        $I->seeResponseCodeIs(422);
+        Assert::assertSame([
+            'error_code' => 'folder_name_taken',
+            'folder_name' => ' week 1 ',
+            'reason' => 'duplicate',
+        ], $this->response($I));
+    }
+
+    private function draftSubmissionCount()
+    {
+        return (int)\Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM faculty_submissions WHERE shibboleth_user_id = :owner '
+            . 'AND its_course_id = :course AND academic_period = :period',
+            [':owner' => $this->ownerId, ':course' => $this->courseId, ':period' => $this->academicPeriod]
+        )->queryScalar();
+    }
+
+    private function draftSnapshot($submissionId)
+    {
+        return [
+            'draft_version' => (int)\Yii::$app->db->createCommand(
+                'SELECT draft_version FROM faculty_submissions WHERE submission_id = :id', [':id' => $submissionId]
+            )->queryScalar(),
+            'folders' => \Yii::$app->db->createCommand(
+                'SELECT folder_name FROM submission_folders WHERE submission_id = :id ORDER BY display_order',
+                [':id' => $submissionId]
+            )->queryColumn(),
+            'items' => \Yii::$app->db->createCommand(
+                'SELECT resource_data, folder_name FROM submission_new_resources WHERE submission_id = :id',
+                [':id' => $submissionId]
+            )->queryAll(),
+        ];
     }
 
     private function storedResourceData($uuid)

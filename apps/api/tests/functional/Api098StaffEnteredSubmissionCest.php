@@ -71,6 +71,24 @@ class Api098StaffEnteredSubmissionCest extends BaseFunctionalCest
         Assert::assertSame(0, $this->submissionCount('test-api098-instructor'));
     }
 
+    public function rejectsClashingFolderNamesBeforeCreatingSubmission(FunctionalTester $I)
+    {
+        $payload = $this->payload('folder-clash');
+        $payload['folders'][0]['title'] = 'Week 1';
+        $payload['folders'][] = ['id' => 'week-2', 'title' => ' week 1 '];
+        $this->folio->addListing($this->listing($payload));
+
+        $this->post($I, $payload);
+
+        $I->seeResponseCodeIs(422);
+        Assert::assertSame([
+            'error_code' => 'folder_name_taken',
+            'folder_name' => ' week 1 ',
+            'reason' => 'duplicate',
+        ], $this->response($I));
+        Assert::assertSame(0, $this->submissionCount('test-api098-instructor'));
+    }
+
     public function createsLinkedSubmittedRequestOwnedByInstructor(FunctionalTester $I)
     {
         $payload = $this->payload('success');

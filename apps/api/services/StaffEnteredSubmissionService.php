@@ -42,6 +42,13 @@ class StaffEnteredSubmissionService
         } catch (BadRequestHttpException $exception) {
             return $this->error(422, 'invalid_submission');
         }
+        $folderError = $this->payloads->folderNameError($input['data']);
+        if ($folderError !== null) {
+            return $this->error(422, $folderError['error_code'], [
+                'folder_name' => $folderError['folder_name'],
+                'reason' => $folderError['reason'],
+            ]);
+        }
 
         $submissionId = null;
         $syllabusId = null;
@@ -160,9 +167,12 @@ class StaffEnteredSubmissionService
         ];
     }
 
-    private function error($statusCode, $errorCode)
+    private function error($statusCode, $errorCode, array $details = [])
     {
-        return ['status_code' => (int)$statusCode, 'body' => ['error_code' => $errorCode]];
+        return [
+            'status_code' => (int)$statusCode,
+            'body' => array_merge(['error_code' => $errorCode], $details),
+        ];
     }
 
     private function failure(\Throwable $exception)

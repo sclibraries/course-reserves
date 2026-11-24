@@ -141,6 +141,12 @@ class FacultyDraftService
             ];
             $this->payloads->validateDraft($course, $this->payloads->payloadResources($payload));
             $payload['courseInfo'] = $course;
+            $folderError = $this->payloads->folderNameError($payload);
+            if ($folderError !== null) {
+                $transaction->rollBack();
+                Yii::$app->response->statusCode = 422;
+                return $folderError;
+            }
 
             $this->applyDraftCourseFields($submission, $payload);
             $this->payloads->replace($submission->submission_id, $payload, $actor);
@@ -232,6 +238,10 @@ class FacultyDraftService
             $this->payloads->validateDraft($data['courseInfo'], $resources);
         } else {
             $this->payloads->validate($data['courseInfo'], $this->payloads->validationResources($resources));
+        }
+        $folderError = $this->payloads->folderNameError($data);
+        if ($folderError !== null) {
+            return ['status_code' => 422, 'body' => $folderError];
         }
         return ['context' => $context];
     }
